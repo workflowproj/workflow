@@ -30,8 +30,16 @@ func New(ctx context.Context, cfg config.S3, pool *pgxpool.Pool) (Store, error) 
 	if !cfg.Enabled() {
 		return &pgStore{q: dbq.New(pool)}, nil
 	}
+	// Without static keys, use the environment: AWS_* variables, the shared credentials file, or
+	// instance / pod identity (IRSA web identity tokens, ECS and EC2 metadata).
+	creds := credentials.NewChainCredentials([]credentials.Provider{
+		&credentials.EnvAWS{}, &credentials.FileAWSCredentials{}, &credentials.IAM{},
+	})
+	if cfg.AccessKey != "" {
+		creds = credentials.NewStaticV4(cfg.AccessKey, cfg.SecretKey, "")
+	}
 	client, err := minio.New(cfg.Endpoint, &minio.Options{
-		Creds:  credentials.NewStaticV4(cfg.AccessKey, cfg.SecretKey, ""),
+		Creds:  creds,
 		Secure: cfg.UseSSL,
 		Region: cfg.Region,
 	})

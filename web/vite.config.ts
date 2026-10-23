@@ -8,6 +8,8 @@ const api = process.env.WFM_API ?? "http://localhost:8080";
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  // Separate caches let several dev servers run side by side.
+  cacheDir: process.env.VITE_CACHE_DIR ?? "node_modules/.vite",
   resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
   server: {
     port: Number(process.env.PORT ?? 5173),
