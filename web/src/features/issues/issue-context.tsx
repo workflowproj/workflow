@@ -1,8 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import type { IssueDetail } from "@/api/types";
 import { cn } from "@/lib/cn";
-import { useUpdateIssue, type IssuePatch } from "./issue-api";
+import { issueQuery, useUpdateIssue, type IssuePatch } from "./issue-api";
 
 type Ctx = {
   issue: IssueDetail;
@@ -39,14 +40,8 @@ export function IssueProvider({
   const mutation = useUpdateIssue(issue.key);
   const navigate = useNavigate();
   const { mutateAsync } = mutation;
-  const update = useCallback(
-    (patch: IssuePatch, optimistic?: Partial<IssueDetail>) => mutateAsync({ patch, optimistic }).catch(() => undefined),
-    [mutateAsync],
-  );
-  const open = useCallback(
-    (key: string) => (onNavigate ? onNavigate(key) : navigate({ to: "/browse/$issueKey", params: { issueKey: key } })),
-    [onNavigate, navigate],
-  );
+  const update = useCallback((patch: IssuePatch, optimistic?: Partial<IssueDetail>) => mutateAsync({ patch, optimistic }).catch(() => undefined), [mutateAsync]);
+  const open = useCallback((key: string) => (onNavigate ? onNavigate(key) : navigate({ to: "/browse/$issueKey", params: { issueKey: key } })), [onNavigate, navigate]);
   const value = useMemo(() => ({ issue, variant, update, open, onClose, request, action }), [issue, variant, update, open, onClose, request, action]);
   return <IssueContext.Provider value={value}>{children}</IssueContext.Provider>;
 }
@@ -77,11 +72,13 @@ export function useIssueAction(type: IssueAction, run: () => void) {
  */
 export function IssueKeyLink({ issueKey, className, children }: { issueKey: string; className?: string; children?: ReactNode }) {
   const { open, variant } = useIssue();
+  const qc = useQueryClient();
   return (
     <Link
       to="/browse/$issueKey"
       params={{ issueKey }}
       className={cn("hover:underline", className)}
+      onMouseEnter={() => qc.prefetchQuery({ ...issueQuery(issueKey), staleTime: 10_000 })}
       onClick={(e) => {
         if (variant !== "drawer" || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
         e.preventDefault();
@@ -107,13 +104,4 @@ export function Section({ title, count, actions, children, id }: { title: ReactN
       {children}
     </section>
   );
-}
-
-/** stopEscape keeps Escape inside an inline editor from also closing the surrounding drawer. */
-export function stopEscape(e: React.KeyboardEvent, cancel: () => void) {
-  if (e.key === "Escape") {
-    e.stopPropagation();
-    e.preventDefault();
-    cancel();
-  }
 }

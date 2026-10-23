@@ -10,7 +10,8 @@ import { IssueTypeIcon } from "@/components/issue-bits";
 import { ProjectAvatar } from "@/layout/AppShell";
 import { cn } from "@/lib/cn";
 import { invalidateIssueLists } from "./issue-api";
-import { IssueKeyLink, stopEscape, useIssue } from "./issue-context";
+import { useEscapeLayer } from "@/lib/escape";
+import { IssueKeyLink, useIssue } from "./issue-context";
 import { MenuKeys } from "./inline-edit";
 
 /** IssueTopBar: breadcrumb (project › parent › key) and the issue's actions. */
@@ -19,7 +20,11 @@ export function IssueTopBar() {
   return (
     <div className={cn("flex h-12 items-center gap-2 px-4 sm:px-6", variant === "drawer" && "sticky top-0 z-20 border-b border-line bg-surface/95 backdrop-blur")}>
       <nav aria-label="Breadcrumb" className="flex min-w-0 flex-1 items-center gap-1 text-[13px] text-muted">
-        <Link to="/projects/$projectKey/board" params={{ projectKey: issue.project.key }} className="flex min-w-0 items-center gap-1.5 rounded px-1 py-0.5 hover:bg-surface-2 hover:text-ink">
+        <Link
+          to="/projects/$projectKey/board"
+          params={{ projectKey: issue.project.key }}
+          className="flex min-w-0 items-center gap-1.5 rounded px-1 py-0.5 hover:bg-surface-2 hover:text-ink"
+        >
           <ProjectAvatar projectKey={issue.project.key} size={16} />
           <span className="truncate">{issue.project.name}</span>
         </Link>
@@ -44,7 +49,13 @@ export function IssueTopBar() {
         <MoreMenu />
         {variant === "drawer" && (
           <>
-            <Link to="/browse/$issueKey" params={{ issueKey: issue.key }} aria-label="Open full page" title="Open full page" className="inline-flex size-8 items-center justify-center rounded-md text-muted hover:bg-surface-2 hover:text-ink">
+            <Link
+              to="/browse/$issueKey"
+              params={{ issueKey: issue.key }}
+              aria-label="Open full page"
+              title="Open full page"
+              className="inline-flex size-8 items-center justify-center rounded-md text-muted hover:bg-surface-2 hover:text-ink"
+            >
               <Maximize2 className="size-4" />
             </Link>
             {onClose && (
@@ -228,6 +239,7 @@ export function SummaryField() {
   const [draft, setDraft] = useState<string | null>(null);
   const ref = useRef<HTMLTextAreaElement>(null);
   const editable = issue.permissions.edit;
+  useEscapeLayer(draft !== null, () => setDraft(null));
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -257,7 +269,7 @@ export function SummaryField() {
           if (e.key === "Enter") {
             e.preventDefault();
             save();
-          } else stopEscape(e, () => setDraft(null));
+          }
         }}
         className={cn(cls, "-mx-2 -my-1 resize-none overflow-hidden rounded-md border border-accent bg-surface px-2 py-1 outline-none ring-2 ring-accent/25")}
       />

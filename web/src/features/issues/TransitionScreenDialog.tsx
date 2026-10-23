@@ -76,7 +76,7 @@ export function TransitionScreenDialog({
     setMissing({});
     run.reset();
     // Reset only when (re)opened, not when the cached issue refreshes underneath.
-  }, [open, transition?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, transition?.id]);
 
   const submit = () => {
     const errs: Record<string, string> = {};
@@ -113,13 +113,6 @@ export function TransitionScreenDialog({
           onSubmit={(e) => {
             e.preventDefault();
             submit();
-          }}
-          onKeyDown={(e) => {
-            // Keep Escape from also closing a drawer behind the dialog.
-            if (e.key === "Escape") {
-              e.stopPropagation();
-              onClose();
-            }
           }}
         >
           <p className="flex items-center gap-2 text-sm text-muted">

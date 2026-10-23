@@ -67,43 +67,43 @@ export function IssuePicker({
   return (
     <div className="relative min-w-0 flex-1">
       <div className="relative">
-      <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-faint" />
-      <input
-        id={id}
-        autoFocus={autoFocus}
-        value={text}
-        role="combobox"
-        aria-expanded={open}
-        aria-controls={listId}
-        aria-autocomplete="list"
-        aria-activedescendant={open && issues[active] ? `${listId}-${active}` : undefined}
-        placeholder={placeholder}
-        onFocus={() => setOpen(true)}
-        onBlur={() => !inline && setTimeout(() => setOpen(false), 120)}
-        onChange={(e) => {
-          setText(e.target.value);
-          setActive(0);
-          setOpen(true);
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "ArrowDown") {
-            e.preventDefault();
-            setActive((a) => Math.min(a + 1, issues.length - 1));
-          } else if (e.key === "ArrowUp") {
-            e.preventDefault();
-            setActive((a) => Math.max(a - 1, 0));
-          } else if (e.key === "Enter") {
-            e.preventDefault();
-            if (issues[active]) pick(issues[active]);
-          } else if (e.key === "Escape") {
-            e.stopPropagation();
-            if (open && text) setText("");
-            else onCancel?.();
-          }
-        }}
-        className="h-8.5 w-full rounded-md border border-line-strong bg-surface pr-8 pl-8 text-sm text-ink placeholder:text-faint focus:border-accent focus:ring-2 focus:ring-accent/25 focus:outline-none"
-      />
-      {isFetching && <Spinner className="absolute top-1/2 right-2.5 size-3.5 -translate-y-1/2" />}
+        <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-faint" />
+        <input
+          id={id}
+          autoFocus={autoFocus}
+          value={text}
+          role="combobox"
+          aria-expanded={open}
+          aria-controls={listId}
+          aria-autocomplete="list"
+          aria-activedescendant={open && issues[active] ? `${listId}-${active}` : undefined}
+          placeholder={placeholder}
+          onFocus={() => setOpen(true)}
+          onBlur={() => !inline && setTimeout(() => setOpen(false), 120)}
+          onChange={(e) => {
+            setText(e.target.value);
+            setActive(0);
+            setOpen(true);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "ArrowDown") {
+              e.preventDefault();
+              setActive((a) => Math.min(a + 1, issues.length - 1));
+            } else if (e.key === "ArrowUp") {
+              e.preventDefault();
+              setActive((a) => Math.max(a - 1, 0));
+            } else if (e.key === "Enter") {
+              e.preventDefault();
+              if (issues[active]) pick(issues[active]);
+            } else if (e.key === "Escape") {
+              // Only reached when no layer (popover, drawer) handles Escape first.
+              if (text) setText("");
+              else onCancel?.();
+            }
+          }}
+          className="h-8.5 w-full rounded-md border border-line-strong bg-surface pr-8 pl-8 text-sm text-ink placeholder:text-faint focus:border-accent focus:ring-2 focus:ring-accent/25 focus:outline-none"
+        />
+        {isFetching && <Spinner className="absolute top-1/2 right-2.5 size-3.5 -translate-y-1/2" />}
       </div>
       {(open || inline) && (
         <ul

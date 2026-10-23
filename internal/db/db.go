@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -21,22 +22,6 @@ import (
 
 //go:embed migrations/*.sql
 var migrations embed.FS
-
-func Open(ctx context.Context, url string) (*pgxpool.Pool, error) {
-	cfg, err := pgxpool.ParseConfig(url)
-	if err != nil {
-		return nil, fmt.Errorf("parse database url: %w", err)
-	}
-	pool, err := pgxpool.NewWithConfig(ctx, cfg)
-	if err != nil {
-		return nil, err
-	}
-	if err := pool.Ping(ctx); err != nil {
-		pool.Close()
-		return nil, fmt.Errorf("connect to database: %w", err)
-	}
-	return pool, nil
-}
 
 // Migrate applies the application schema (goose) and River's job-queue schema.
 // Migrations are written expand-then-contract so they can run before new pods roll out.
@@ -65,6 +50,28 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool, log *slog.Logger) error {
 	}
 	log.Info("database migrated", "schema_version", version, "river_versions_applied", len(res.Versions))
 	return nil
+}
+
+// WaitForSchema blocks until migrations have created the application and job-queue tables, or
+// ctx ends. Workers use it on first install, when they can start before the migration job.
+func WaitForSchema(ctx context.Context, pool *pgxpool.Pool, log *slog.Logger) error {
+	var lastLog time.Time
+	for {
+		var ready bool
+		err := pool.QueryRow(ctx, `SELECT to_regclass('river_queue') IS NOT NULL AND to_regclass('issues') IS NOT NULL`).Scan(&ready)
+		if err == nil && ready {
+			return nil
+		}
+		if time.Since(lastLog) > 30*time.Second {
+			log.Info("waiting for database migrations", "error", err)
+			lastLog = time.Now()
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(2 * time.Second):
+		}
+	}
 }
 
 // Tx runs fn in a transaction, committing on success.

@@ -14,7 +14,7 @@ import (
 )
 
 func meView(u dbq.User, orgRole string) api.Me {
-	return api.Me{Id: u.ID, DisplayName: u.DisplayName, Email: u.Email, AvatarUrl: u.AvatarUrl, Kind: api.UserKind(u.Kind), OrgRole: api.OrgRole(orgRole)}
+	return api.Me{Id: u.ID, DisplayName: u.DisplayName, Email: u.Email, AvatarUrl: u.AvatarUrl, Kind: api.UserKind(u.Kind), OrgRole: api.OrgRole(orgRole), Source: api.UserSource(u.Source)}
 }
 
 func (s *Server) ListAuthProviders(ctx context.Context, _ api.ListAuthProvidersRequestObject) (api.ListAuthProvidersResponseObject, error) {

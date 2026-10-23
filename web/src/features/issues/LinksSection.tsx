@@ -6,6 +6,7 @@ import type { IssueDetail } from "@/api/types";
 import { Button, IconButton, Select, useToast } from "@/components/ui";
 import { IssueTypeIcon, StatusBadge } from "@/components/issue-bits";
 import { cn } from "@/lib/cn";
+import { useEscapeLayer } from "@/lib/escape";
 import { IssueKeyLink, Section, useIssue, useIssueAction } from "./issue-context";
 import { IssuePicker } from "./IssuePicker";
 
@@ -134,6 +135,7 @@ function AddLink({ onDone }: { onDone: () => void }) {
     },
     onError: (err) => toast.error(err),
   });
+  useEscapeLayer(true, onDone);
   const linked = issue.links.filter((l) => l.type === option.type && l.direction === option.direction).map((l) => l.issue.key);
   return (
     <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md border border-line bg-surface-2/60 p-2 sm:flex-nowrap">

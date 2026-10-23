@@ -131,6 +131,7 @@ func TestGitHubIntegration(t *testing.T) {
 		"provider": "github", "name": "GitHub", "apiUrl": gh.URL, "webUrl": "https://github.com",
 		"appId": 4242, "appSlug": "wfm-test", "privateKey": rsaPEM(t), "webhookSecret": "s3cret",
 	}, 201, &conn)
+	eq(t, str(conn, "webhookSecret"), "s3cret", "secret returned once on create")
 	hook := strings.TrimPrefix(str(conn, "webhookUrl"), e.Cfg.HooksPublicURL)
 	eq(t, hook, "/hooks/github/"+str(conn, "id"), "webhook path")
 
@@ -299,6 +300,19 @@ func TestGitLabIntegration(t *testing.T) {
 		"provider": "gitlab", "name": "GitLab", "apiUrl": gl.URL, "webUrl": "https://gitlab.example.com",
 		"token": "glpat-test", "webhookSecret": "gl-secret", "manageHooks": true,
 	}, 201, &conn)
+	var generated obj
+	admin.must("POST", "/api/v1/admin/scm-connections", obj{"provider": "gitlab", "name": "Generated secret", "apiUrl": gl.URL, "token": "x"}, 201, &generated)
+	if len(str(generated, "webhookSecret")) < 20 {
+		t.Fatalf("generated webhook secret not returned: %v", generated)
+	}
+	var conns []obj
+	admin.get("/api/v1/admin/scm-connections", &conns)
+	for _, c := range conns {
+		if _, ok := c["webhookSecret"]; ok {
+			t.Fatal("webhook secret listed after creation")
+		}
+	}
+	admin.must("DELETE", "/api/v1/admin/scm-connections/"+str(generated, "id"), nil, 204, nil)
 	admin.must("POST", "/api/v1/admin/scm-connections/"+str(conn, "id")+"/sync", nil, 202, nil)
 	e.DrainJobs()
 	var repos []obj

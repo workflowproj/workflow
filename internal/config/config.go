@@ -21,6 +21,9 @@ const (
 	ModeAll Mode = "all"
 )
 
+// DefaultDatabaseURL suits local development (`make db-up`).
+const DefaultDatabaseURL = "postgres://wfm:wfm@localhost:5432/wfm?sslmode=disable"
+
 // OIDCProvider is a generic OpenID Connect sign-in provider. Google is one instance.
 type OIDCProvider struct {
 	ID           string
@@ -179,7 +182,7 @@ func LoadFrom(get func(string) string) (*Config, error) {
 		Mode:            Mode(e.str("WFM_MODE", string(ModeAll))),
 		HTTPAddr:        e.str("WFM_HTTP_ADDR", ":8080"),
 		MetricsAddr:     e.str("WFM_METRICS_ADDR", ":9090"),
-		DatabaseURL:     e.str("WFM_DATABASE_URL", "postgres://wfm:wfm@localhost:5432/wfm?sslmode=disable"),
+		DatabaseURL:     e.str("WFM_DATABASE_URL", DefaultDatabaseURL),
 		PublicURL:       strings.TrimRight(e.str("WFM_PUBLIC_URL", "http://localhost:8080"), "/"),
 		SecretKey:       e.str("WFM_SECRET_KEY", ""),
 		SessionTTL:      e.duration("WFM_SESSION_TTL", 7*24*time.Hour),

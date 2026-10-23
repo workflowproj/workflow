@@ -219,7 +219,7 @@ export function TransitionPanel({ doc, index, apply, onDelete, errors }: { doc: 
                   list={ids.fieldList}
                   value={f.field}
                   disabled={readOnly}
-                  className="h-7.5 flex-1 font-mono text-[12px]"
+                  className="!h-7.5 flex-1 font-mono text-[12px]"
                   invalid={!!errorAt(errors, prefix, `.screen[${j}]`)}
                   onChange={(e) => set({ screen: t.screen!.map((x, k) => (k === j ? { ...x, field: e.target.value } : x)) }, `s${j}`)}
                 />
@@ -249,7 +249,7 @@ export function TransitionPanel({ doc, index, apply, onDelete, errors }: { doc: 
             <Select
               aria-label="Add post-function"
               value=""
-              className="h-7 w-auto py-0 pr-7 text-xs"
+              className="!h-7 !w-auto py-0 pr-7 text-xs"
               onChange={(e) => e.target.value && set({ postFunctions: [...(t.postFunctions ?? []), emptyPostFunction(e.target.value as PostFunctionKind)] })}
             >
               <option value="">+ Add…</option>

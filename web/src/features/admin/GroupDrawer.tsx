@@ -156,7 +156,15 @@ export function GroupDrawer({ group, onClose }: { group: Group; onClose: () => v
               icon={<Trash2 className="size-4 text-danger" />}
               loading={remove.isPending}
               onClick={async () => {
-                if (await confirm({ title: `Delete ${group.displayName}?`, body: "Members lose the project roles and organisation role granted through this group.", confirmLabel: "Delete group", danger: true })) remove.mutate();
+                if (
+                  await confirm({
+                    title: `Delete ${group.displayName}?`,
+                    body: "Members lose the project roles and organisation role granted through this group.",
+                    confirmLabel: "Delete group",
+                    danger: true,
+                  })
+                )
+                  remove.mutate();
               }}
             >
               Delete group

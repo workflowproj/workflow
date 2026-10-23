@@ -1,18 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  analyze,
-  applyCompletion,
-  buildJql,
-  classify,
-  currentSort,
-  emptyBasic,
-  parseBasic,
-  quoteValue,
-  runeOffsetToIndex,
-  splitOrderBy,
-  toggleSort,
-  tokenize,
-} from "./jql";
+import { analyze, applyCompletion, buildJql, classify, currentSort, emptyBasic, parseBasic, quoteValue, runeOffsetToIndex, splitOrderBy, toggleSort, tokenize } from "./jql";
 
 describe("tokenize", () => {
   it("splits words, operators, strings and punctuation with offsets", () => {
@@ -42,7 +29,11 @@ describe("tokenize", () => {
 
   it("covers the whole input", () => {
     const src = 'a=b  ORDER BY "x"';
-    expect(tokenize(src).map((t) => t.text).join("")).toBe(src);
+    expect(
+      tokenize(src)
+        .map((t) => t.text)
+        .join(""),
+    ).toBe(src);
   });
 });
 

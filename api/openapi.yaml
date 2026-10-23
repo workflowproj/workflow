@@ -573,7 +573,7 @@ paths:
           description: Created
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/ScmConnection' }
+              schema: { $ref: '#/components/schemas/ScmConnectionCreated' }
         default: { $ref: '#/components/responses/Problem' }
   /admin/scm-connections/{connectionId}:
     patch:
@@ -2118,9 +2118,10 @@ components:
       allOf:
         - $ref: '#/components/schemas/User'
         - type: object
-          required: [orgRole]
+          required: [orgRole, source]
           properties:
             orgRole: { $ref: '#/components/schemas/OrgRole' }
+            source: { $ref: '#/components/schemas/UserSource', description: 'Where the account is managed; scim and google profiles are read-only here' }
     AdminUser:
       allOf:
         - $ref: '#/components/schemas/User'
@@ -3039,6 +3040,13 @@ components:
         createdAt: { type: string, format: date-time }
         lastEventAt: { type: string, format: date-time }
         repositoryCount: { type: integer }
+    ScmConnectionCreated:
+      allOf:
+        - $ref: '#/components/schemas/ScmConnection'
+        - type: object
+          required: [webhookSecret]
+          properties:
+            webhookSecret: { type: string, description: The webhook secret (generated when not supplied); only returned on creation }
     ScmConnectionInput:
       type: object
       required: [provider, name]

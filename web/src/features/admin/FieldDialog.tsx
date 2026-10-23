@@ -149,7 +149,13 @@ export function FieldDialog({ field, onClose }: { field?: FieldDef; onClose: () 
               {options.map((o, i) => (
                 <li key={i} className="flex items-center gap-1.5">
                   <span className="w-5 text-right text-xs text-faint">{i + 1}.</span>
-                  <Input aria-label={`Option ${i + 1}`} value={o} onChange={(e) => setOptions(options.map((x, k) => (k === i ? e.target.value : x)))} className="h-8" placeholder={i === 0 ? "High" : "Low"} />
+                  <Input
+                    aria-label={`Option ${i + 1}`}
+                    value={o}
+                    onChange={(e) => setOptions(options.map((x, k) => (k === i ? e.target.value : x)))}
+                    className="!h-8"
+                    placeholder={i === 0 ? "High" : "Low"}
+                  />
                   <IconButton
                     label={`Move option ${i + 1} up`}
                     size="sm"
@@ -234,11 +240,16 @@ export function FieldDialog({ field, onClose }: { field?: FieldDef; onClose: () 
                     }
                   }}
                   placeholder="Type key, then Enter"
-                  className="mt-2 h-7.5 font-mono text-xs"
+                  className="mt-2 !h-7.5 font-mono text-xs"
                 />
                 <div className="mt-1.5 flex flex-wrap gap-1">
                   {COMMON_TYPES.filter((k) => !typeKeys.includes(k)).map((k) => (
-                    <button key={k} type="button" onClick={() => addType(k)} className={cn("rounded border border-dashed border-line px-1.5 py-0.5 font-mono text-[11px] text-muted hover:border-accent hover:text-accent")}>
+                    <button
+                      key={k}
+                      type="button"
+                      onClick={() => addType(k)}
+                      className={cn("rounded border border-dashed border-line px-1.5 py-0.5 font-mono text-[11px] text-muted hover:border-accent hover:text-accent")}
+                    >
                       + {k}
                     </button>
                   ))}

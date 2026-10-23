@@ -56,14 +56,19 @@ func (s *Server) AdminCreateScmConnection(ctx context.Context, req api.AdminCrea
 	if b.WriteBack != nil {
 		writeBack = *b.WriteBack
 	}
-	c, err := s.SCM.CreateConnection(ctx, a, scm.ConnectionInput{
+	c, secret, err := s.SCM.CreateConnection(ctx, a, scm.ConnectionInput{
 		Provider: string(b.Provider), Name: b.Name, APIURL: deref(b.ApiUrl), WebURL: deref(b.WebUrl), AppID: b.AppId, AppSlug: b.AppSlug,
 		PrivateKey: deref(b.PrivateKey), Token: deref(b.Token), WebhookSecret: deref(b.WebhookSecret), ManageHooks: deref(b.ManageHooks), WriteBack: writeBack,
 	})
 	if err != nil {
 		return nil, err
 	}
-	return api.AdminCreateScmConnection201JSONResponse(s.connectionView(c, 0)), nil
+	v := s.connectionView(c, 0)
+	return api.AdminCreateScmConnection201JSONResponse{
+		Id: v.Id, Provider: v.Provider, Name: v.Name, ApiUrl: v.ApiUrl, WebUrl: v.WebUrl, AppId: v.AppId, AppSlug: v.AppSlug,
+		ManageHooks: v.ManageHooks, WriteBack: v.WriteBack, WebhookUrl: v.WebhookUrl, CreatedAt: v.CreatedAt, RepositoryCount: v.RepositoryCount,
+		WebhookSecret: secret,
+	}, nil
 }
 
 func (s *Server) AdminUpdateScmConnection(ctx context.Context, req api.AdminUpdateScmConnectionRequestObject) (api.AdminUpdateScmConnectionResponseObject, error) {

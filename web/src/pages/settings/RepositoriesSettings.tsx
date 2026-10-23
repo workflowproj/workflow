@@ -98,7 +98,15 @@ export function RepositoriesSettings() {
                       label={`Unlink ${r.fullPath}`}
                       size="sm"
                       onClick={async () => {
-                        if (await confirm({ title: `Unlink ${r.fullPath}?`, body: "New activity from it no longer updates issues. Existing development links stay on issues.", confirmLabel: "Unlink", danger: true })) unlink.mutate(r);
+                        if (
+                          await confirm({
+                            title: `Unlink ${r.fullPath}?`,
+                            body: "New activity from it no longer updates issues. Existing development links stay on issues.",
+                            confirmLabel: "Unlink",
+                            danger: true,
+                          })
+                        )
+                          unlink.mutate(r);
                       }}
                     >
                       <Unlink className="size-4" />
@@ -170,7 +178,7 @@ export function RepositoriesSettings() {
           <div>
             <h3 className="mb-1 text-[13px] font-semibold">Smart commits</h3>
             <p className="mb-2 text-[13px] text-muted">Commands after a key run as the committer (matched by email), through the workflow's conditions and validators:</p>
-            <CodeBlock>{`git commit -m "${projectKey}-42 #comment Fixed the retry loop"\ngit commit -m "${projectKey}-42 #${commands[0] ?? "start-work"}"`}</CodeBlock>
+            <CodeBlock>{`git commit -m "${projectKey}-42 #comment Fixed the retry loop"\ngit commit -m "${projectKey}-42 #${commands.find((c) => /start|progress/.test(c)) ?? commands[0] ?? "start-work"}"`}</CodeBlock>
             {commands.length > 0 && (
               <p className="mt-2 text-[13px] text-muted">
                 Transitions in this project:{" "}

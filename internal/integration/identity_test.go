@@ -91,6 +91,7 @@ func TestSCIMProvisioning(t *testing.T) {
 	// SCIM-managed users can sign in; their profile is owned by the IdP.
 	janeC := e.login("jane@example.com", "Ignored")
 	eq(t, str(janeC.Me, "displayName"), "Jane Doe", "profile from SCIM")
+	eq(t, str(janeC.Me, "source"), "scim", "source on /me")
 	var pat obj
 	janeC.must("POST", "/api/v1/me/tokens", obj{"name": "cli", "scopes": []string{"read"}, "expiresInDays": 30}, 201, &pat)
 	janeTok := e.withToken(str(pat, "token"))

@@ -33,7 +33,8 @@ export function MembersSettings() {
   };
 
   const update = useMutation({
-    mutationFn: ({ m, roleKey }: { m: Member; roleKey: string }) => unwrap(api.PATCH("/projects/{projectKey}/members/{memberId}", { params: { path: { projectKey, memberId: m.id } }, body: { roleKey } })),
+    mutationFn: ({ m, roleKey }: { m: Member; roleKey: string }) =>
+      unwrap(api.PATCH("/projects/{projectKey}/members/{memberId}", { params: { path: { projectKey, memberId: m.id } }, body: { roleKey } })),
     onSuccess: (m) => {
       invalidate();
       toast.success(`${m.user?.displayName ?? m.group?.displayName} is now ${m.role.name}`);
@@ -68,7 +69,8 @@ export function MembersSettings() {
         <ul className="mt-1 list-disc space-y-0.5 pl-4">
           {project?.access === "open" ? (
             <li>
-              This project is <strong className="text-ink">open</strong>: every organisation member (not guests) gets the <strong className="text-ink">{openRole?.name ?? project.openRoleKey}</strong> role without being listed here.
+              This project is <strong className="text-ink">open</strong>: every organisation member (not guests) gets the <strong className="text-ink">{openRole?.name ?? project.openRoleKey}</strong>{" "}
+              role without being listed here.
             </li>
           ) : (
             <li>
@@ -87,7 +89,11 @@ export function MembersSettings() {
           <EmptyState
             icon={<UsersRound className="size-8" />}
             title="No explicit members"
-            body={project?.access === "open" ? "Everyone in the organisation can work here with the open role. Add people or groups to give them a different role." : "Add people or groups so they can see this private project."}
+            body={
+              project?.access === "open"
+                ? "Everyone in the organisation can work here with the open role. Add people or groups to give them a different role."
+                : "Add people or groups so they can see this private project."
+            }
             action={<Button onClick={() => setAdding(true)}>Add members</Button>}
           />
         </div>
@@ -135,7 +141,7 @@ export function MembersSettings() {
                     </td>
                     <td>{m.user ? <Badge>Person</Badge> : <Badge tone="accent">Group</Badge>}</td>
                     <td>
-                      <Select aria-label={`Role of ${label}`} value={m.role.key} disabled={update.isPending} onChange={(e) => update.mutate({ m, roleKey: e.target.value })} className="h-8">
+                      <Select aria-label={`Role of ${label}`} value={m.role.key} disabled={update.isPending} onChange={(e) => update.mutate({ m, roleKey: e.target.value })} className="!h-8">
                         {roles.map((r) => (
                           <option key={r.key} value={r.key}>
                             {r.name}
@@ -151,7 +157,10 @@ export function MembersSettings() {
                           if (
                             await confirm({
                               title: `Remove ${label}?`,
-                              body: project?.access === "open" ? "They fall back to the project's open role (organisation members) or lose access (guests)." : "They lose access to this private project unless another membership grants it.",
+                              body:
+                                project?.access === "open"
+                                  ? "They fall back to the project's open role (organisation members) or lose access (guests)."
+                                  : "They lose access to this private project unless another membership grants it.",
                               confirmLabel: "Remove",
                               danger: true,
                             })

@@ -107,9 +107,11 @@ type ConnectionInput struct {
 	WriteBack     bool
 }
 
-func (s *Service) CreateConnection(ctx context.Context, actor *authz.Actor, in ConnectionInput) (dbq.ScmConnection, error) {
+// CreateConnection stores a connection and returns it with its webhook secret (generated when
+// not supplied), which the caller shows once so it can be entered in GitHub or GitLab.
+func (s *Service) CreateConnection(ctx context.Context, actor *authz.Actor, in ConnectionInput) (dbq.ScmConnection, string, error) {
 	if !actor.IsOrgAdmin() {
-		return dbq.ScmConnection{}, apperr.Forbidden("only organisation admins can connect GitHub or GitLab")
+		return dbq.ScmConnection{}, "", apperr.Forbidden("only organisation admins can connect GitHub or GitLab")
 	}
 	switch in.Provider {
 	case "github":
@@ -120,7 +122,7 @@ func (s *Service) CreateConnection(ctx context.Context, actor *authz.Actor, in C
 			in.WebURL = "https://github.com"
 		}
 		if in.AppID == nil || in.PrivateKey == "" {
-			return dbq.ScmConnection{}, apperr.Invalid("appId", "a GitHub App id and private key are required")
+			return dbq.ScmConnection{}, "", apperr.Invalid("appId", "a GitHub App id and private key are required")
 		}
 	case "gitlab":
 		if in.APIURL == "" {
@@ -130,14 +132,14 @@ func (s *Service) CreateConnection(ctx context.Context, actor *authz.Actor, in C
 			in.WebURL = in.APIURL
 		}
 		if in.Token == "" {
-			return dbq.ScmConnection{}, apperr.Invalid("token", "a GitLab group or project access token is required")
+			return dbq.ScmConnection{}, "", apperr.Invalid("token", "a GitLab group or project access token is required")
 		}
 	default:
-		return dbq.ScmConnection{}, apperr.Invalid("provider", "provider must be github or gitlab")
+		return dbq.ScmConnection{}, "", apperr.Invalid("provider", "provider must be github or gitlab")
 	}
 	for _, u := range []string{in.APIURL, in.WebURL} {
 		if pu, err := url.Parse(u); err != nil || (pu.Scheme != "https" && pu.Scheme != "http") || pu.Host == "" {
-			return dbq.ScmConnection{}, apperr.Invalid("apiUrl", "%q is not a valid URL", u)
+			return dbq.ScmConnection{}, "", apperr.Invalid("apiUrl", "%q is not a valid URL", u)
 		}
 	}
 	if in.WebhookSecret == "" {
@@ -149,7 +151,7 @@ func (s *Service) CreateConnection(ctx context.Context, actor *authz.Actor, in C
 		AppID: in.AppID, AppSlug: in.AppSlug, SecretsEnc: s.Box.Seal(raw), ManageHooks: in.ManageHooks, WriteBack: in.WriteBack, CreatedBy: actor.UserID(),
 	})
 	if err != nil {
-		return c, err
+		return c, "", err
 	}
 	tracker.Audit(ctx, s.Q, actor, "scm.connection_create", "scm_connection", c.ID.String(), nil, map[string]any{"provider": c.Provider, "name": c.Name})
 	if s.Jobs != nil {
@@ -157,7 +159,7 @@ func (s *Service) CreateConnection(ctx context.Context, actor *authz.Actor, in C
 			s.Log.Warn("could not queue initial repository discovery", "error", err)
 		}
 	}
-	return c, nil
+	return c, in.WebhookSecret, nil
 }
 
 type ConnectionPatch struct {
@@ -468,4 +470,3 @@ func branchURL(provider string, repo dbq.ScmRepository, branch string) string {
 	}
 	return repo.WebUrl + "/tree/" + url.PathEscape(branch)
 }
-

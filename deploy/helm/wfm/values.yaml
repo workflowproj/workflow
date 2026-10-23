@@ -122,6 +122,12 @@ database:
     imagePullPolicy: IfNotPresent
     database: wfm
     owner: wfm
+    # Replaces the default `initdb` bootstrap, e.g. to restore from a backup:
+    #   bootstrap: {recovery: {source: origin, recoveryTarget: {targetTime: "2026-01-02T03:04:05Z"}}}
+    # (CNPG only reads bootstrap when it creates the cluster; restore into a NEW name.)
+    bootstrap: {}
+    # externalClusters entries, e.g. the object store a recovery bootstrap reads from.
+    externalClusters: []
     storage:
       size: 10Gi
       storageClass: ""
@@ -279,7 +285,7 @@ web:
   # Seconds to keep serving after the pod is marked terminating, so load balancers deregister it
   # first (ALB target groups especially). 0 disables the preStop hook.
   preStopSleepSeconds: 5
-  # preStop + 25s graceful shutdown in the binary + margin. SSE streams are closed at shutdown.
+  # preStop + up to 25s graceful shutdown in the binary (open SSE streams hold it that long) + margin.
   terminationGracePeriodSeconds: 40
   probes:
     startup:

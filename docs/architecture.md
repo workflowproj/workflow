@@ -95,7 +95,8 @@ sync on their configured intervals.
 
 PostgreSQL holds everything, including attachments when no S3 bucket is configured (fine for
 small installs; configure `WFM_S3_*` for anything larger). Migrations are embedded (goose) and
-run by `wfm migrate`, as an Argo CD PreSync hook or Helm pre-upgrade job in Kubernetes.
+run by `wfm migrate` as a Kubernetes Job: a Helm post-install/pre-upgrade hook, or an Argo CD
+sync hook ordered before the Deployments (see [deployment.md](deployment.md)).
 
 ## Front end
 

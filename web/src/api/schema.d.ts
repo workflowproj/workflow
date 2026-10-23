@@ -1563,6 +1563,8 @@ export interface components {
         };
         Me: components["schemas"]["User"] & {
             orgRole: components["schemas"]["OrgRole"];
+            /** @description Where the account is managed; scim and google profiles are read-only here */
+            source: components["schemas"]["UserSource"];
         };
         AdminUser: components["schemas"]["User"] & {
             username: string;
@@ -2397,6 +2399,10 @@ export interface components {
             /** Format: date-time */
             lastEventAt?: string;
             repositoryCount: number;
+        };
+        ScmConnectionCreated: components["schemas"]["ScmConnection"] & {
+            /** @description The webhook secret (generated when not supplied); only returned on creation */
+            webhookSecret: string;
         };
         ScmConnectionInput: {
             provider: components["schemas"]["ScmProvider"];
@@ -3483,7 +3489,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ScmConnection"];
+                    "application/json": components["schemas"]["ScmConnectionCreated"];
                 };
             };
             default: components["responses"]["Problem"];

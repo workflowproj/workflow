@@ -71,7 +71,7 @@ export function WorkflowEditor({ workflow, projectKey }: { workflow: Detail; pro
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [ed]);
+  }, [ed.undo, ed.redo]);
 
   const deleteSelection = useCallback(
     async (wholeTransition = false) => {
@@ -280,6 +280,14 @@ export function WorkflowEditor({ workflow, projectKey }: { workflow: Detail; pro
               {(validation.errors.length > 0 || nameMismatch) && sel === null && (
                 <div className="border-b border-line p-3">
                   <ProblemsList errors={[...(nameMismatch ? [{ path: "name", message: `must stay “${workflow.name}”` }] : []), ...validation.errors]} doc={ed.doc} onSelect={ed.select} />
+                </div>
+              )}
+              {removed.length > 0 && sel === null && (
+                <div className="border-b border-line p-3">
+                  <Callout tone="warning" title="Issues need a new status">
+                    {removed.map((r) => `${r.name} (${r.issueCount} issue${r.issueCount === 1 ? "" : "s"})`).join(", ")} {removed.length === 1 ? "is" : "are"} removed by this draft. You choose where
+                    those issues go when you publish.
+                  </Callout>
                 </div>
               )}
               {sel?.kind === "status" && selStatusIndex >= 0 ? (

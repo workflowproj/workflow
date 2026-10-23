@@ -50,8 +50,8 @@ export function DevelopmentPanel() {
             "Loading…"
           ) : hasRepos ? (
             <>
-              No branches, commits or pull requests yet. Create a branch, or mention <span className="font-mono text-xs text-ink">{issue.key}</span> in a branch name, commit message or
-              pull request title.
+              No branches, commits or pull requests yet. Create a branch, or mention <span className="font-mono text-xs text-ink">{issue.key}</span> in a branch name, commit
+              message or pull request title.
             </>
           ) : hasPermission(project, "project.admin") ? (
             <>
@@ -71,7 +71,13 @@ export function DevelopmentPanel() {
             <Count icon={<GitBranch className="size-3.5" />} n={branches.length} one="branch" many="branches" />
             <Count icon={<GitCommitHorizontal className="size-3.5" />} n={commits.length} one="commit" />
             {pipeline && (
-              <a href={pipeline.url} target="_blank" rel="noreferrer noopener" className="ml-auto flex items-center gap-1.5 hover:text-ink" title={`${pipeline.title} · ${formatDateTime(pipeline.updatedAt)}`}>
+              <a
+                href={pipeline.url}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="ml-auto flex items-center gap-1.5 hover:text-ink"
+                title={`${pipeline.title} · ${formatDateTime(pipeline.updatedAt)}`}
+              >
                 <PipelineIcon state={pipeline.state} />
                 Pipeline {pipeline.state}
               </a>
@@ -251,12 +257,6 @@ function CreateBranchDialog({ repos, onClose }: { repos: Schemas["ScmRepository"
           e.preventDefault();
           create.mutate();
         }}
-        onKeyDown={(e) => {
-          if (e.key === "Escape") {
-            e.stopPropagation();
-            onClose();
-          }
-        }}
       >
         <Field label="Repository" error={fe.repositoryId}>
           {(id) => (
@@ -269,7 +269,11 @@ function CreateBranchDialog({ repos, onClose }: { repos: Schemas["ScmRepository"
             </Select>
           )}
         </Field>
-        <Field label="Branch name" error={fe.name ?? (missingKey ? `Include ${issue.key} so commits and pull requests link back to this issue.` : undefined)} hint={`Contains ${issue.key} so activity links back here.`}>
+        <Field
+          label="Branch name"
+          error={fe.name ?? (missingKey ? `Include ${issue.key} so commits and pull requests link back to this issue.` : undefined)}
+          hint={`Contains ${issue.key} so activity links back here.`}
+        >
           {(id) => <Input id={id} value={name} onChange={(e) => setName(e.target.value)} className="font-mono text-[13px]" autoFocus invalid={missingKey || !!fe.name} />}
         </Field>
         <Field label="Branch from" hint={repo ? `Defaults to ${repo.defaultBranch}` : undefined} error={fe.fromRef}>
@@ -292,7 +296,12 @@ function CopyCommand({ command }: { command: string }) {
         aria-label="Copy command"
         title="Copy command"
         className="rounded p-1 text-faint hover:bg-surface-3 hover:text-ink"
-        onClick={() => navigator.clipboard.writeText(command).then(() => toast.success("Command copied"), () => toast.info(command))}
+        onClick={() =>
+          navigator.clipboard.writeText(command).then(
+            () => toast.success("Command copied"),
+            () => toast.info(command),
+          )
+        }
       >
         <Copy className="size-3.5" />
       </button>

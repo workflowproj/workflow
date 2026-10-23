@@ -3,7 +3,8 @@ import { Pencil } from "lucide-react";
 import { Button, IconButton } from "@/components/ui";
 import { Markdown } from "@/components/Markdown";
 import { MarkdownEditor } from "@/components/MarkdownEditor";
-import { Section, stopEscape, useIssue } from "./issue-context";
+import { useEscapeLayer } from "@/lib/escape";
+import { Section, useIssue } from "./issue-context";
 
 /** DescriptionSection renders the Markdown description; clicking it (or the pencil) edits it. */
 export function DescriptionSection() {
@@ -11,6 +12,8 @@ export function DescriptionSection() {
   const [draft, setDraft] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const editable = issue.permissions.edit;
+  // Escape abandons an untouched edit; changed text is kept until saved or cancelled.
+  useEscapeLayer(draft !== null, () => draft?.trim() === issue.description.trim() && setDraft(null));
 
   const save = async () => {
     if (draft === null) return;
@@ -38,7 +41,7 @@ export function DescriptionSection() {
       }
     >
       {draft !== null ? (
-        <div onKeyDown={(e) => stopEscape(e, () => setDraft(null))}>
+        <div>
           <MarkdownEditor value={draft} onChange={setDraft} autoFocus onSubmit={save} minHeight={140} placeholder="Describe the work, steps to reproduce, acceptance criteria…" />
           <div className="mt-2 flex items-center gap-2">
             <Button size="sm" variant="primary" onClick={save} loading={saving}>

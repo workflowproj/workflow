@@ -124,7 +124,13 @@ function FilterItem({ filter: f, active, onOpen, onEdit, onDeleted }: { filter: 
       </Item>
       {f.mine && (
         <div className="absolute top-1/2 right-1 flex -translate-y-1/2 gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100">
-          <button type="button" aria-label={`Edit ${f.name}`} title="Rename or change sharing" onClick={onEdit} className="rounded p-1 text-faint hover:bg-surface-3 hover:text-ink">
+          <button
+            type="button"
+            aria-label={`Edit ${f.name}`}
+            title="Rename or change sharing"
+            onClick={onEdit}
+            className="rounded p-1 text-faint hover:bg-surface-3 hover:text-ink"
+          >
             <Pencil className="size-3.5" />
           </button>
           <button
@@ -133,7 +139,15 @@ function FilterItem({ filter: f, active, onOpen, onEdit, onDeleted }: { filter: 
             title="Delete filter"
             disabled={remove.isPending}
             onClick={async () => {
-              if (await confirm({ title: "Delete filter?", body: `"${f.name}" will be deleted${f.shared ? " for everyone it is shared with" : ""}.`, confirmLabel: "Delete", danger: true })) remove.mutate();
+              if (
+                await confirm({
+                  title: "Delete filter?",
+                  body: `"${f.name}" will be deleted${f.shared ? " for everyone it is shared with" : ""}.`,
+                  confirmLabel: "Delete",
+                  danger: true,
+                })
+              )
+                remove.mutate();
             }}
             className="rounded p-1 text-faint hover:bg-surface-3 hover:text-danger"
           >
@@ -149,7 +163,19 @@ function FilterItem({ filter: f, active, onOpen, onEdit, onDeleted }: { filter: 
  * SaveFilterDialog saves `jql` as a new filter, or (with `filter`) updates that filter's name,
  * description and sharing — and its query when `jql` differs.
  */
-export function SaveFilterDialog({ open, onClose, jql, filter, onSaved }: { open: boolean; onClose: () => void; jql: string; filter?: SavedFilter; onSaved?: (f: SavedFilter) => void }) {
+export function SaveFilterDialog({
+  open,
+  onClose,
+  jql,
+  filter,
+  onSaved,
+}: {
+  open: boolean;
+  onClose: () => void;
+  jql: string;
+  filter?: SavedFilter;
+  onSaved?: (f: SavedFilter) => void;
+}) {
   const qc = useQueryClient();
   const toast = useToast();
   const [name, setName] = useState("");
@@ -158,9 +184,7 @@ export function SaveFilterDialog({ open, onClose, jql, filter, onSaved }: { open
   const save = useMutation({
     mutationFn: () => {
       const body = { name: name.trim(), description: description.trim(), jql, shared };
-      return filter
-        ? unwrap(api.PUT("/filters/{filterId}", { params: { path: { filterId: filter.id } }, body }))
-        : unwrap(api.POST("/filters", { body }));
+      return filter ? unwrap(api.PUT("/filters/{filterId}", { params: { path: { filterId: filter.id } }, body })) : unwrap(api.POST("/filters", { body }));
     },
     onSuccess: (f) => {
       qc.invalidateQueries({ queryKey: ["filters"] });
@@ -169,13 +193,14 @@ export function SaveFilterDialog({ open, onClose, jql, filter, onSaved }: { open
       onClose();
     },
   });
+  // Start from the filter's values each time the dialog opens.
   useEffect(() => {
     if (!open) return;
     setName(filter?.name ?? "");
     setDescription(filter?.description ?? "");
     setShared(filter?.shared ?? false);
     save.reset();
-  }, [open, filter?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, filter?.id]);
   const fe = save.error instanceof ApiError ? save.error.fieldErrors() : {};
   return (
     <Modal

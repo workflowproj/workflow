@@ -86,7 +86,14 @@ export function ScimSection({ scim }: { scim: ScimStatus }) {
                         label={`Rotate the token of ${c.name}`}
                         size="sm"
                         onClick={async () => {
-                          if (await confirm({ title: `Rotate the token of ${c.name}?`, body: "The current token stops working immediately; paste the new one into your identity provider.", confirmLabel: "Rotate token" })) rotate.mutate(c.id);
+                          if (
+                            await confirm({
+                              title: `Rotate the token of ${c.name}?`,
+                              body: "The current token stops working immediately; paste the new one into your identity provider.",
+                              confirmLabel: "Rotate token",
+                            })
+                          )
+                            rotate.mutate(c.id);
                         }}
                       >
                         <RotateCw className="size-4" />
@@ -95,7 +102,14 @@ export function ScimSection({ scim }: { scim: ScimStatus }) {
                         label={`Revoke ${c.name}`}
                         size="sm"
                         onClick={async () => {
-                          if (await confirm({ title: `Revoke ${c.name}?`, body: "Provisioning from this identity provider stops. People and groups it created stay, but are no longer updated.", confirmLabel: "Revoke", danger: true }))
+                          if (
+                            await confirm({
+                              title: `Revoke ${c.name}?`,
+                              body: "Provisioning from this identity provider stops. People and groups it created stay, but are no longer updated.",
+                              confirmLabel: "Revoke",
+                              danger: true,
+                            })
+                          )
                             revoke.mutate(c.id);
                         }}
                       >

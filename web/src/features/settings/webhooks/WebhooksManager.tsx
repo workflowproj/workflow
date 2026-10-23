@@ -36,7 +36,12 @@ export function WebhooksManager({ projectKey }: { projectKey?: string }) {
         <PageSpinner />
       ) : list.length === 0 ? (
         <div className="rounded-lg border border-line bg-surface">
-          <EmptyState icon={<WebhookIcon className="size-8" />} title="No webhooks" body="Create one to push issue, comment, sprint and release events to chat, CI or your own services." action={<Button onClick={() => setEditing("new")}>New webhook</Button>} />
+          <EmptyState
+            icon={<WebhookIcon className="size-8" />}
+            title="No webhooks"
+            body="Create one to push issue, comment, sprint and release events to chat, CI or your own services."
+            action={<Button onClick={() => setEditing("new")}>New webhook</Button>}
+          />
         </div>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-line bg-surface">
@@ -121,7 +126,7 @@ function HookRow({ hook: w, projectKey, expanded, onToggle, onEdit }: { hook: We
       <td>
         <div className="flex max-w-xs flex-wrap gap-1">
           {labels.map((l) => (
-            <Badge key={l} className="normal-case">
+            <Badge key={l} className="!normal-case">
               {l}
             </Badge>
           ))}
@@ -131,7 +136,14 @@ function HookRow({ hook: w, projectKey, expanded, onToggle, onEdit }: { hook: We
         <Switch checked={w.active} onChange={(v) => setActive.mutate(v)} disabled={setActive.isPending} label={`${w.name} active`} hideLabel />
       </td>
       <td className="text-right whitespace-nowrap">
-        <Button size="sm" icon={<Send className="size-3.5" />} loading={test.isPending} onClick={() => test.mutate()} disabled={!w.active} title={w.active ? "Send a ping event" : "Activate the webhook to test it"}>
+        <Button
+          size="sm"
+          icon={<Send className="size-3.5" />}
+          loading={test.isPending}
+          onClick={() => test.mutate()}
+          disabled={!w.active}
+          title={w.active ? "Send a ping event" : "Activate the webhook to test it"}
+        >
           Send test
         </Button>
         <IconButton label={`Edit ${w.name}`} size="sm" onClick={onEdit}>
@@ -192,7 +204,11 @@ function Deliveries({ hookId }: { hookId: string }) {
                 <td className="font-mono text-xs">{d.event}</td>
                 <td className="max-w-xs text-xs">
                   {d.responseStatus && <span className={d.responseStatus < 300 ? "text-success" : "text-danger"}>HTTP {d.responseStatus}</span>}
-                  {d.lastError && <span className="block truncate text-danger" title={d.lastError}>{d.lastError}</span>}
+                  {d.lastError && (
+                    <span className="block truncate text-danger" title={d.lastError}>
+                      {d.lastError}
+                    </span>
+                  )}
                   {!d.responseStatus && !d.lastError && <span className="text-faint">—</span>}
                 </td>
                 <td>{d.attempts}</td>

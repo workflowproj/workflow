@@ -24,7 +24,17 @@ import { DetailsPanel } from "./DetailsPanel";
  * and inside the board/backlog/search drawer (`variant="drawer"`, with `onClose`).
  * `onNavigate` lets a drawer switch to another issue (e.g. clicking a sub-task) in place.
  */
-export function IssueView({ issueKey, variant = "page", onClose, onNavigate }: { issueKey: string; variant?: "page" | "drawer"; onClose?: () => void; onNavigate?: (key: string) => void }) {
+export function IssueView({
+  issueKey,
+  variant = "page",
+  onClose,
+  onNavigate,
+}: {
+  issueKey: string;
+  variant?: "page" | "drawer";
+  onClose?: () => void;
+  onNavigate?: (key: string) => void;
+}) {
   const { data: issue, isLoading, error } = useQuery(issueQuery(issueKey));
   if (isLoading) return <PageSpinner label={`Loading ${issueKey}`} />;
   if (!issue) return <IssueUnavailable issueKey={issueKey} error={error} onClose={onClose} />;

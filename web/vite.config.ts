@@ -17,6 +17,9 @@ export default defineConfig({
       "/api": { target: api, changeOrigin: false },
       "/auth": { target: api, changeOrigin: false },
       "/healthz": { target: api },
+      // Shown in the UI as the SCIM base URL and SCM webhook URLs.
+      "/scim": { target: api },
+      "/hooks": { target: api },
     },
   },
   build: { sourcemap: true, chunkSizeWarningLimit: 1500 },

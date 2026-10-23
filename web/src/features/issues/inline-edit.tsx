@@ -1,37 +1,41 @@
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Check, ChevronDown, Plus, X } from "lucide-react";
+import { Check, Plus, X } from "lucide-react";
 import { labelsQuery, useUsers } from "@/api/queries";
 import type { User } from "@/api/types";
 import { Popover } from "@/components/ui";
 import { UserAvatar } from "@/components/UserAvatar";
 import { cn } from "@/lib/cn";
 import { formatDate } from "@/lib/format";
-import { stopEscape } from "./issue-context";
+import { useEscapeLayer } from "@/lib/escape";
 
 /** Ghost value trigger: looks like text, highlights on hover when editable. */
 export const ghost =
   "-mx-2 flex min-h-8 w-[calc(100%+1rem)] min-w-0 items-center gap-2 rounded-md px-2 py-1 text-left text-sm transition-colors " +
   "enabled:hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-default";
 
-const inlineInput =
-  "-mx-2 h-8 w-[calc(100%+1rem)] rounded-md border border-accent bg-surface px-2 text-sm text-ink outline-none ring-2 ring-accent/25";
+const inlineInput = "-mx-2 h-8 w-[calc(100%+1rem)] rounded-md border border-accent bg-surface px-2 text-sm text-ink outline-none ring-2 ring-accent/25";
 
 export function None({ children = "None" }: { children?: ReactNode }) {
   return <span className="text-faint">{children}</span>;
 }
 
 /**
- * MenuKeys wraps popover content: focuses the first item, moves focus with the arrow keys, and
- * closes on Escape without letting it reach an enclosing drawer. Focus returns to the trigger.
+ * MenuKeys wraps popover content: focuses the first item and moves focus with the arrow keys.
+ * The Popover closes on Escape; focus then returns to the trigger instead of being lost.
  */
 export function MenuKeys({ close, children, className }: { close: () => void; children: ReactNode; className?: string }) {
   const ref = useRef<HTMLDivElement>(null);
+  // Kept in a ref: StrictMode re-runs the effect after focus has already moved into the menu.
   const trigger = useRef<HTMLElement | null>(null);
   useEffect(() => {
-    trigger.current = document.activeElement as HTMLElement | null;
-    const first = ref.current?.querySelector<HTMLElement>("input, [aria-checked=true], [role^=menuitem]:not(:disabled)");
-    first?.focus();
+    trigger.current ??= document.activeElement as HTMLElement | null;
+    ref.current?.querySelector<HTMLElement>("input, [aria-checked=true], [role^=menuitem]:not(:disabled)")?.focus();
+    return () => {
+      // Closing removed the focused item: hand focus back to the trigger (unless it moved on).
+      const t = trigger.current;
+      if ((!document.activeElement || document.activeElement === document.body) && t && document.contains(t)) t.focus();
+    };
   }, []);
   const items = () => Array.from(ref.current?.querySelectorAll<HTMLElement>("[role^=menuitem]:not(:disabled)") ?? []);
   return (
@@ -40,11 +44,8 @@ export function MenuKeys({ close, children, className }: { close: () => void; ch
       role="menu"
       className={className}
       onKeyDown={(e) => {
-        if (e.key === "Escape") {
-          e.stopPropagation();
-          close();
-          trigger.current?.focus();
-        } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        if (e.key === "Tab") close();
+        else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
           e.preventDefault();
           const list = items();
           const i = list.indexOf(document.activeElement as HTMLElement);
@@ -117,7 +118,11 @@ export function InlineSelect({
         <button type="button" className={ghost} disabled={disabled} onClick={toggle} aria-label={label} aria-haspopup="menu" aria-expanded={open}>
           {current ? (
             <>
-              {current.icon && <span aria-hidden className="contents">{current.icon}</span>}
+              {current.icon && (
+                <span aria-hidden className="contents">
+                  {current.icon}
+                </span>
+              )}
               <span className="truncate">{current.label}</span>
             </>
           ) : value ? (
@@ -136,7 +141,11 @@ export function InlineSelect({
           )}
           {options.map((o) => (
             <Option key={o.value} selected={o.value === value} onClick={() => (close(), o.value !== value && onCommit(o.value))}>
-              {o.icon && <span aria-hidden className="contents">{o.icon}</span>}
+              {o.icon && (
+                <span aria-hidden className="contents">
+                  {o.icon}
+                </span>
+              )}
               <span className="truncate">{o.label}</span>
               {o.hint && <span className="ml-auto text-xs text-faint">{o.hint}</span>}
             </Option>
@@ -193,8 +202,17 @@ export function InlineMulti({
       content={(close) => (
         <MenuKeys close={close} className="max-h-72 w-60 overflow-y-auto">
           {options.map((o) => (
-            <Option key={o.value} checkbox selected={values.includes(o.value)} onClick={() => onCommit(values.includes(o.value) ? values.filter((v) => v !== o.value) : [...values, o.value])}>
-              {o.icon && <span aria-hidden className="contents">{o.icon}</span>}
+            <Option
+              key={o.value}
+              checkbox
+              selected={values.includes(o.value)}
+              onClick={() => onCommit(values.includes(o.value) ? values.filter((v) => v !== o.value) : [...values, o.value])}
+            >
+              {o.icon && (
+                <span aria-hidden className="contents">
+                  {o.icon}
+                </span>
+              )}
               <span className="truncate">{o.label}</span>
               {o.hint && <span className="ml-auto text-xs text-faint">{o.hint}</span>}
             </Option>
@@ -207,7 +225,21 @@ export function InlineMulti({
 }
 
 /** UserMenu is the searchable people list used by user pickers. */
-export function UserMenu({ value, onPick, project, allowNone, noneLabel, close }: { value?: User | null; onPick: (u: User | null) => void; project?: string; allowNone?: boolean; noneLabel?: string; close: () => void }) {
+export function UserMenu({
+  value,
+  onPick,
+  project,
+  allowNone,
+  noneLabel,
+  close,
+}: {
+  value?: User | null;
+  onPick: (u: User | null) => void;
+  project?: string;
+  allowNone?: boolean;
+  noneLabel?: string;
+  close: () => void;
+}) {
   const [q, setQ] = useState("");
   const { data: users = [], isFetching } = useUsers(q, project);
   return (
@@ -275,9 +307,7 @@ export function InlineUser({
           {value ? <span className="truncate">{value.displayName}</span> : <None>{noneLabel}</None>}
         </button>
       )}
-      content={(close) => (
-        <UserMenu value={value} project={project} allowNone={allowNone} noneLabel={noneLabel} close={close} onPick={(u) => u?.id !== value?.id && onCommit(u)} />
-      )}
+      content={(close) => <UserMenu value={value} project={project} allowNone={allowNone} noneLabel={noneLabel} close={close} onPick={(u) => u?.id !== value?.id && onCommit(u)} />}
     />
   );
 }
@@ -307,6 +337,7 @@ export function InlineText({
     setDraft(null);
     if (draft.trim() !== value) onCommit(draft.trim());
   };
+  useEscapeLayer(draft !== null, () => setDraft(null));
   if (draft !== null) {
     return (
       <input
@@ -322,7 +353,7 @@ export function InlineText({
           if (e.key === "Enter") {
             e.preventDefault();
             commit();
-          } else stopEscape(e, () => setDraft(null));
+          }
         }}
         className={inlineInput}
       />
@@ -356,6 +387,7 @@ export function InlineDate({ value, onCommit, disabled, label }: { value?: strin
     last.current = v;
     onCommit(v || null);
   };
+  useEscapeLayer(editing, () => setEditing(false));
   if (editing) {
     return (
       <input
@@ -375,7 +407,6 @@ export function InlineDate({ value, onCommit, disabled, label }: { value?: strin
         }}
         onKeyDown={(e) => {
           if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-          stopEscape(e, () => setEditing(false));
         }}
         className={inlineInput}
       />
@@ -387,7 +418,12 @@ export function InlineDate({ value, onCommit, disabled, label }: { value?: strin
         {value ? formatDate(value) : <None />}
       </button>
       {value && !disabled && (
-        <button type="button" aria-label={`Clear ${label.toLowerCase()}`} onClick={() => commit("")} className="-ml-7 rounded p-1 text-faint opacity-0 group-hover:opacity-100 hover:text-ink focus:opacity-100">
+        <button
+          type="button"
+          aria-label={`Clear ${label.toLowerCase()}`}
+          onClick={() => commit("")}
+          className="-ml-7 rounded p-1 text-faint opacity-0 group-hover:opacity-100 hover:text-ink focus:opacity-100"
+        >
           <X className="size-3.5" />
         </button>
       )}
@@ -440,7 +476,12 @@ export function LabelsEditor({
         {value.map((l) => (
           <span key={l} className="inline-flex items-center gap-0.5 rounded bg-surface-2 py-0.5 pr-0.5 pl-1.5 text-[13px]">
             {l}
-            <button type="button" aria-label={`Remove ${l}`} onClick={() => onChange(value.filter((x) => x !== l))} className="rounded p-0.5 text-faint hover:bg-surface-3 hover:text-ink">
+            <button
+              type="button"
+              aria-label={`Remove ${l}`}
+              onClick={() => onChange(value.filter((x) => x !== l))}
+              className="rounded p-0.5 text-faint hover:bg-surface-3 hover:text-ink"
+            >
               <X className="size-3" />
             </button>
           </span>
@@ -471,7 +512,7 @@ export function LabelsEditor({
             } else if (e.key === "ArrowUp") {
               e.preventDefault();
               setActive((a) => Math.max(a - 1, 0));
-            } else if (onDone) stopEscape(e, onDone);
+            }
           }}
           className="h-6 min-w-20 flex-1 bg-transparent px-1 text-sm outline-none placeholder:text-faint"
         />
@@ -505,6 +546,8 @@ export function InlineLabels({ value, onCommit, projectKey, disabled }: { value:
     setDraft(null);
     if (v && v.join(",") !== value.join(",")) onCommit(v);
   };
+  // Escape keeps the labels chosen so far, like clicking away.
+  useEscapeLayer(draft !== null, () => done(draft));
   if (draft !== null) {
     return (
       <div
@@ -530,9 +573,4 @@ export function InlineLabels({ value, onCommit, projectKey, disabled }: { value:
       )}
     </button>
   );
-}
-
-/** Chevron used by select-like triggers. */
-export function Caret() {
-  return <ChevronDown className="ml-auto size-3.5 shrink-0 text-faint" />;
 }

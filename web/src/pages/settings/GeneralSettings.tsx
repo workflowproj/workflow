@@ -82,14 +82,7 @@ function GeneralForm({ project }: { project: Project }) {
             </Field>
             <Field label="Key" required error={keyError}>
               {(id) => (
-                <Input
-                  id={id}
-                  value={key}
-                  maxLength={10}
-                  className="font-mono uppercase"
-                  invalid={!!keyError}
-                  onChange={(e) => setKey(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))}
-                />
+                <Input id={id} value={key} maxLength={10} className="font-mono uppercase" invalid={!!keyError} onChange={(e) => setKey(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))} />
               )}
             </Field>
             {key !== project.key && (
@@ -233,7 +226,9 @@ function DeleteProjectDialog({ open, onClose, project }: { open: boolean; onClos
     >
       <div className="flex flex-col gap-3 text-sm">
         <p className="text-muted">All of the project's issues and configuration are permanently deleted.</p>
-        <Field label={`Type ${project.key} to confirm`}>{(id) => <Input id={id} value={typed} onChange={(e) => setTyped(e.target.value.toUpperCase())} className="font-mono" autoComplete="off" />}</Field>
+        <Field label={`Type ${project.key} to confirm`}>
+          {(id) => <Input id={id} value={typed} onChange={(e) => setTyped(e.target.value.toUpperCase())} className="font-mono" autoComplete="off" />}
+        </Field>
         {del.error && <ErrorBox error={del.error} />}
       </div>
     </Modal>

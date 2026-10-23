@@ -11,7 +11,8 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { cn } from "@/lib/cn";
 import { formatDate, formatDateTime, relativeTime } from "@/lib/format";
 import { commentsQuery, historyQuery } from "./issue-api";
-import { stopEscape, useIssue } from "./issue-context";
+import { useEscapeLayer } from "@/lib/escape";
+import { useIssue } from "./issue-context";
 
 type Comment = Schemas["Comment"];
 type HistoryEntry = Schemas["HistoryEntry"];
@@ -104,6 +105,8 @@ function CommentItem({ comment: c }: { comment: Comment }) {
     },
     onError: (err) => toast.error(err),
   });
+  // While editing, Escape cancels the edit rather than closing a surrounding drawer.
+  useEscapeLayer(draft !== null, () => draft?.trim() === c.body.trim() && setDraft(null));
   const author = c.author ?? (c.source === "automation" ? automationUser : { displayName: "Unknown", kind: "human" });
   const via = c.source !== "user" ? (sourceLabel[c.source] ?? `via ${c.source}`) : null;
   const submit = () => draft?.trim() && save.mutate(draft.trim());
@@ -124,7 +127,7 @@ function CommentItem({ comment: c }: { comment: Comment }) {
           )}
         </div>
         {draft !== null ? (
-          <div className="mt-1.5" onKeyDown={(e) => stopEscape(e, () => setDraft(null))}>
+          <div className="mt-1.5">
             <MarkdownEditor value={draft} onChange={setDraft} autoFocus onSubmit={submit} minHeight={72} />
             <div className="mt-2 flex gap-2">
               <Button size="sm" variant="primary" onClick={submit} loading={save.isPending} disabled={!draft.trim()}>
@@ -180,12 +183,14 @@ function Composer() {
     onError: (err) => toast.error(err),
   });
   const submit = () => body.trim() && !post.isPending && post.mutate(body.trim());
+  // Escape collapses an empty composer; a draft is kept (and the drawer stays open).
+  useEscapeLayer(open, () => !body.trim() && setOpen(false));
   return (
     <div className="flex gap-3">
       <UserAvatar user={me} size={28} className="mt-0.5" />
       <div className="min-w-0 flex-1">
         {open ? (
-          <div onKeyDown={(e) => stopEscape(e, () => !body.trim() && setOpen(false))}>
+          <div>
             <MarkdownEditor value={body} onChange={setBody} autoFocus onSubmit={submit} minHeight={80} placeholder="Add a comment… Markdown is supported" />
             <div className="mt-2 flex items-center gap-2">
               <Button size="sm" variant="primary" onClick={submit} loading={post.isPending} disabled={!body.trim()}>

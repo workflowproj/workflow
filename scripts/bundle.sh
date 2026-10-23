@@ -119,6 +119,7 @@ if docker image save --help 2>/dev/null | grep -q -- '--platform'; then save_arg
 TAR="$WORK/images/wfm-images-${ARCH}.tar"
 log "saving ${#IMAGES[@]} images"
 docker image save "${save_args[@]}" -o "$TAR" "${IMAGES[@]}"
+chmod 0644 "$TAR"
 if command -v zstd >/dev/null; then
   zstd -q -T0 -19 --rm "$TAR"
 else
@@ -207,8 +208,7 @@ kubectl -n wfm logs job/wfm-migrate
 kubectl -n wfm rollout status deployment/wfm-web
 \`\`\`
 
-(Do not add \`--wait\` to the first install: the schema migration runs as a post-install hook, and
-the worker restarts until it has finished.)
+(The schema migration runs as a post-install hook; the worker waits for it before processing jobs.)
 
 Without the helm CLI, k3s' helm-controller can install the embedded chart: edit
 \`valuesContent\` in \`manifests/helmchart-k3s.yaml\` (add \`secrets.values.WFM_SECRET_KEY\`, or point

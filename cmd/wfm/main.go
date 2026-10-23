@@ -95,7 +95,7 @@ func serve(args []string) error {
 	}
 	defer func() { _ = shutdownTracing(context.Background()) }()
 
-	pool, err := app.Open(ctx, cfg)
+	pool, err := app.OpenWithRetry(ctx, cfg.DatabaseURL, 2*time.Minute, log)
 	if err != nil {
 		return err
 	}
@@ -113,31 +113,30 @@ func serve(args []string) error {
 	return a.Run(ctx)
 }
 
+// migrate only needs the database: it runs as a Kubernetes job (or Argo CD hook) that should
+// not depend on the rest of the configuration being valid.
 func migrate() error {
-	cfg, err := config.Load()
+	url := os.Getenv("WFM_DATABASE_URL")
+	if url == "" {
+		url = config.DefaultDatabaseURL
+	}
+	log := telemetry.Logger(envOr("WFM_LOG_LEVEL", "info"), envOr("WFM_LOG_FORMAT", "json"))
+	ctx, stop := signalContext()
+	defer stop()
+	// A fresh database (e.g. a new CloudNativePG cluster) can take minutes to accept connections.
+	pool, err := app.OpenWithRetry(ctx, url, 5*time.Minute, log)
 	if err != nil {
 		return err
 	}
-	log := telemetry.Logger(cfg.LogLevel, cfg.LogFormat)
-	ctx, stop := signalContext()
-	defer stop()
-	// Retry briefly: in Kubernetes the migration job can start before the database accepts connections.
-	var lastErr error
-	for attempt := 0; attempt < 30; attempt++ {
-		pool, err := app.Open(ctx, cfg)
-		if err == nil {
-			defer pool.Close()
-			return app.Migrate(ctx, pool, log)
-		}
-		lastErr = err
-		log.Warn("database not ready", "error", err)
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(2 * time.Second):
-		}
+	defer pool.Close()
+	return app.Migrate(ctx, pool, log)
+}
+
+func envOr(key, def string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
 	}
-	return lastErr
+	return def
 }
 
 // ---------------------------------------------------------------------------

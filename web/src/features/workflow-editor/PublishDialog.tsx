@@ -114,7 +114,7 @@ export function PublishDialog({
                   <dt className="text-muted">{label}</dt>
                   <dd className="flex flex-wrap gap-1">
                     {v.map((n) => (
-                      <Badge key={n} className="normal-case">
+                      <Badge key={n} className="!normal-case">
                         {n}
                       </Badge>
                     ))}

@@ -1,6 +1,7 @@
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { CircleAlert, CornerDownLeft } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { useEscapeLayer } from "@/lib/escape";
 import { analyze, applyCompletion, classify, tokenize, type Highlight } from "./jql";
 import { useJqlSuggestions, type Suggestion } from "./use-jql-suggestions";
 
@@ -39,7 +40,7 @@ export function JqlEditor({
   onRun,
   error,
   projectKey,
-  placeholder = "project = PLAT AND status = \"In Progress\" ORDER BY updated DESC",
+  placeholder = 'project = PLAT AND status = "In Progress" ORDER BY updated DESC',
   autoFocus,
 }: {
   value: string;
@@ -64,6 +65,7 @@ export function JqlEditor({
   const ctx = useMemo(() => (caret === null ? null : analyze(value, caret)), [value, caret]);
   const { items, hint } = useJqlSuggestions(open ? ctx : null, projectKey);
   const showList = open && ctx !== null && (items.length > 0 || !!hint);
+  useEscapeLayer(showList, () => setOpen(false));
 
   // Highlight the first suggestion only once something has been typed, so Enter still runs.
   useEffect(() => setActive(ctx?.prefix ? 0 : -1), [ctx?.from, ctx?.prefix, ctx?.expect]);
@@ -128,12 +130,6 @@ export function JqlEditor({
         return;
       }
     }
-    if (e.key === "Escape" && showList) {
-      e.preventDefault();
-      e.stopPropagation();
-      setOpen(false);
-      return;
-    }
     if (e.key === "Enter") {
       e.preventDefault();
       setOpen(false);
@@ -189,7 +185,10 @@ export function JqlEditor({
             setOpen(false);
             setCaret(null);
           }}
-          className={cn(textBox, "relative block min-h-9 w-full resize-none overflow-hidden bg-transparent text-transparent caret-ink outline-none placeholder:text-faint selection:bg-accent/25")}
+          className={cn(
+            textBox,
+            "relative block min-h-9 w-full resize-none overflow-hidden bg-transparent text-transparent caret-ink outline-none placeholder:text-faint selection:bg-accent/25",
+          )}
         />
         {showList && (
           <ul

@@ -40,7 +40,8 @@ export function RolesAdmin() {
         }
       />
       <Callout>
-        Built-in roles can't change; duplicate one to start a custom role. A person's rights in a project are the union of their roles there (direct and through groups); open projects give organisation members the project's open role.
+        Built-in roles can't change; duplicate one to start a custom role. A person's rights in a project are the union of their roles there (direct and through groups); open projects give
+        organisation members the project's open role.
       </Callout>
       {(roles.error || perms.error) && <ErrorBox error={roles.error ?? perms.error} />}
       {roles.isLoading || perms.isLoading ? (
@@ -82,7 +83,15 @@ export function RolesAdmin() {
                                 icon={<Trash2 className="size-4" />}
                                 onClick={async () => {
                                   close();
-                                  if (await confirm({ title: `Delete ${r.name}?`, body: "Memberships with this role are removed (people fall back to their other roles), and open projects that use it as their open role become private.", confirmLabel: "Delete role", danger: true })) remove.mutate(r);
+                                  if (
+                                    await confirm({
+                                      title: `Delete ${r.name}?`,
+                                      body: "Memberships with this role are removed (people fall back to their other roles), and open projects that use it as their open role become private.",
+                                      confirmLabel: "Delete role",
+                                      danger: true,
+                                    })
+                                  )
+                                    remove.mutate(r);
                                 }}
                               >
                                 Delete
@@ -112,7 +121,13 @@ export function RolesAdmin() {
                       </td>
                       {sorted.map((r) => (
                         <td key={r.id} className="px-3 py-2 text-center">
-                          {r.permissions.includes(p.key) ? <Check className="mx-auto size-4 text-success" aria-label={`${r.name} has ${p.key}`} /> : <span className="text-faint" aria-label={`${r.name} lacks ${p.key}`}>·</span>}
+                          {r.permissions.includes(p.key) ? (
+                            <Check className="mx-auto size-4 text-success" aria-label={`${r.name} has ${p.key}`} />
+                          ) : (
+                            <span className="text-faint" aria-label={`${r.name} lacks ${p.key}`}>
+                              ·
+                            </span>
+                          )}
                         </td>
                       ))}
                     </tr>

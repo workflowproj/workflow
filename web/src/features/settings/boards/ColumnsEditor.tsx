@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { DndContext, DragOverlay, KeyboardSensor, PointerSensor, useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
-import { ChevronLeft, ChevronRight, GripVertical, Plus, Trash2, TriangleAlert } from "lucide-react";
-import { Button, IconButton, Input, Select } from "@/components/ui";
+import { ChevronLeft, ChevronRight, GripVertical, Plus, Trash2, TriangleAlert, X } from "lucide-react";
+import { IconButton, Input, Select } from "@/components/ui";
 import { StatusBadge } from "@/components/issue-bits";
 import type { StatusCategory } from "@/api/types";
 import { cn } from "@/lib/cn";
@@ -81,7 +81,10 @@ export function ColumnsEditor({ columns, onChange, statuses }: { columns: Column
 function Tray({ statuses }: { statuses: StatusInfo[] }) {
   const { setNodeRef, isOver } = useDroppable({ id: "unmapped" });
   return (
-    <div ref={setNodeRef} className={cn("rounded-lg border border-dashed px-3 py-2.5", isOver ? "border-accent bg-accent-soft" : statuses.length ? "border-warning/50 bg-warning-soft/50" : "border-line")}>
+    <div
+      ref={setNodeRef}
+      className={cn("rounded-lg border border-dashed px-3 py-2.5", isOver ? "border-accent bg-accent-soft" : statuses.length ? "border-warning/50 bg-warning-soft/50" : "border-line")}
+    >
       <p className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-muted">
         {statuses.length > 0 && <TriangleAlert className="size-3.5 text-warning" />}
         Not on the board {statuses.length > 0 ? `(${statuses.length}) — issues in these statuses are hidden from the board` : "— every status the project uses has a column"}
@@ -122,13 +125,20 @@ function Column({
   const { setNodeRef, isOver } = useDroppable({ id: `col:${column.key}` });
   const label = column.name || `Column ${index + 1}`;
   return (
-    <div ref={setNodeRef} className={cn("flex w-56 shrink-0 flex-col gap-2 rounded-lg border bg-surface-2/60 p-2.5", isOver ? "border-accent ring-2 ring-accent/20" : "border-line")}>
+    <div ref={setNodeRef} className={cn("flex w-64 shrink-0 flex-col gap-2 rounded-lg border bg-surface-2/60 p-2.5", isOver ? "border-accent ring-2 ring-accent/20" : "border-line")}>
       <div className="flex items-center gap-1">
-        <Input aria-label={`Column ${index + 1} name`} value={column.name} maxLength={60} onChange={(e) => onUpdate({ name: e.target.value })} className="h-7.5 font-medium" invalid={!column.name.trim()} />
+        <Input
+          aria-label={`Column ${index + 1} name`}
+          value={column.name}
+          maxLength={60}
+          onChange={(e) => onUpdate({ name: e.target.value })}
+          className="!h-7.5 font-medium"
+          invalid={!column.name.trim()}
+        />
       </div>
       <div className="flex items-center justify-between gap-1">
-        <label className="flex items-center gap-1.5 text-xs text-muted">
-          WIP limit
+        <label className="flex items-center gap-1.5 text-xs whitespace-nowrap text-muted" title="Work-in-progress limit">
+          WIP
           <Input
             type="number"
             min={1}
@@ -136,7 +146,7 @@ function Column({
             value={column.wipLimit ?? ""}
             placeholder="None"
             onChange={(e) => onUpdate({ wipLimit: e.target.value ? Math.max(1, Number(e.target.value)) : undefined })}
-            className="h-7 w-16 px-1.5 text-xs"
+            className="!h-7 !w-16 px-1.5 text-xs"
           />
         </label>
         <div className="flex">
@@ -159,7 +169,7 @@ function Column({
         {column.statusIds.length === 0 && <p className="px-1 py-2 text-center text-xs text-faint">Drop statuses here</p>}
       </div>
       {assignable.length > 0 && (
-        <Select aria-label={`Add a status to ${label}`} value="" onChange={(e) => e.target.value && onAssign(e.target.value)} className="h-7 py-0 text-xs">
+        <Select aria-label={`Add a status to ${label}`} value="" onChange={(e) => e.target.value && onAssign(e.target.value)} className="!h-7 py-0 text-xs">
           <option value="">+ Add status…</option>
           {assignable.map((s) => (
             <option key={s.id} value={s.id}>
@@ -187,16 +197,21 @@ function Chip({ status, handleProps, onRemove, overlay }: { status: StatusInfo; 
       <button type="button" aria-label={`Drag ${status.name}`} className="cursor-grab text-faint hover:text-ink active:cursor-grabbing" {...handleProps}>
         <GripVertical className="size-3.5" />
       </button>
-      <StatusBadge status={status} />
+      <StatusBadge status={status} className="min-w-0" />
       {!status.inProject && (
         <span className="text-[10px] text-warning" title="No workflow in this project uses this status">
           unused
         </span>
       )}
       {onRemove && (
-        <Button size="sm" variant="ghost" className="ml-auto h-5 px-1 text-[11px] text-faint opacity-0 group-focus-within:opacity-100 group-hover:opacity-100" onClick={onRemove} aria-label={`Remove ${status.name} from the column`}>
-          Remove
-        </Button>
+        <IconButton
+          label={`Remove ${status.name} from the column`}
+          size="sm"
+          className="ml-auto size-5 text-faint opacity-60 group-focus-within:opacity-100 group-hover:opacity-100"
+          onClick={onRemove}
+        >
+          <X className="size-3.5" />
+        </IconButton>
       )}
     </div>
   );

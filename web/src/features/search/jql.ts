@@ -136,19 +136,7 @@ export function classify(tokens: Token[]): Highlight[] {
 // ---------------------------------------------------------------------------
 // Autocomplete context
 
-export type Expect =
-  | "field"
-  | "operator"
-  | "value"
-  | "list-value"
-  | "list-next"
-  | "is-value"
-  | "logical"
-  | "by"
-  | "order-field"
-  | "order-dir"
-  | "order-next"
-  | "none";
+export type Expect = "field" | "operator" | "value" | "list-value" | "list-next" | "is-value" | "logical" | "by" | "order-field" | "order-dir" | "order-next" | "none";
 
 export type Context = {
   expect: Expect;

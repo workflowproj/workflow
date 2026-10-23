@@ -184,7 +184,13 @@ function AttachmentCard({ attachment: a, onPreview }: { attachment: Attachment; 
         {a.uploader && <UserAvatar user={a.uploader} size={18} className="mt-0.5" />}
       </div>
       <div className="absolute top-1.5 right-1.5 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
-        <a href={a.url} download={a.filename} aria-label={`Download ${a.filename}`} title="Download" className="inline-flex size-7 items-center justify-center rounded-md bg-surface/90 text-muted shadow-sm hover:text-ink">
+        <a
+          href={a.url}
+          download={a.filename}
+          aria-label={`Download ${a.filename}`}
+          title="Download"
+          className="inline-flex size-7 items-center justify-center rounded-md bg-surface/90 text-muted shadow-sm hover:text-ink"
+        >
           <Download className="size-3.5" />
         </a>
         {canDelete && (

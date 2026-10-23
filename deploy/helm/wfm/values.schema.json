@@ -207,6 +207,12 @@
             "owner": {
               "type": "string"
             },
+            "bootstrap": {
+              "type": "object"
+            },
+            "externalClusters": {
+              "type": "array"
+            },
             "storage": {
               "type": "object",
               "properties": {

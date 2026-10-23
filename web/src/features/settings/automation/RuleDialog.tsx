@@ -35,7 +35,9 @@ export function RuleDialog({ projectKey, rule, onClose }: { projectKey: string; 
   const save = useMutation({
     mutationFn: () => {
       const body: RuleInput = { name: name.trim(), description, enabled, trigger: cleanTrigger(trigger), condition: condition.trim(), actions: actions.map(cleanAction) };
-      return rule ? unwrap(api.PUT("/automation-rules/{ruleId}", { params: { path: { ruleId: rule.id } }, body })) : unwrap(api.POST("/projects/{projectKey}/automation-rules", { params: { path: { projectKey } }, body }));
+      return rule
+        ? unwrap(api.PUT("/automation-rules/{ruleId}", { params: { path: { ruleId: rule.id } }, body }))
+        : unwrap(api.POST("/projects/{projectKey}/automation-rules", { params: { path: { projectKey } }, body }));
     },
     onSuccess: (r) => {
       qc.invalidateQueries({ queryKey: ["automation-rules", projectKey] });
@@ -136,8 +138,15 @@ export function RuleDialog({ projectKey, rule, onClose }: { projectKey: string; 
                 <Field label="Cron (UTC)" error={fe["trigger.cron"]} hint="minute hour day month weekday, or @daily / @hourly">
                   {(id) => (
                     <div className="flex gap-2">
-                      <Input id={id} value={trigger.cron ?? ""} onChange={(e) => setTrigger({ ...trigger, cron: e.target.value })} className="font-mono" placeholder="0 9 * * 1-5" invalid={!!fe["trigger.cron"]} />
-                      <Select aria-label="Cron presets" value="" onChange={(e) => e.target.value && setTrigger({ ...trigger, cron: e.target.value })} className="w-32">
+                      <Input
+                        id={id}
+                        value={trigger.cron ?? ""}
+                        onChange={(e) => setTrigger({ ...trigger, cron: e.target.value })}
+                        className="font-mono"
+                        placeholder="0 9 * * 1-5"
+                        invalid={!!fe["trigger.cron"]}
+                      />
+                      <Select aria-label="Cron presets" value="" onChange={(e) => e.target.value && setTrigger({ ...trigger, cron: e.target.value })} className="!w-32 shrink-0">
                         <option value="">Presets…</option>
                         {CRON_PRESETS.map((p) => (
                           <option key={p.cron} value={p.cron}>
@@ -149,7 +158,16 @@ export function RuleDialog({ projectKey, rule, onClose }: { projectKey: string; 
                   )}
                 </Field>
                 <Field label="Issues (JQL)" error={fe["trigger.jql"]} hint="The actions run once for each matching issue." className="sm:col-span-2">
-                  {(id) => <Input id={id} value={trigger.jql ?? ""} onChange={(e) => setTrigger({ ...trigger, jql: e.target.value })} className="font-mono text-[13px]" placeholder={`project = ${projectKey} AND status = "In Review" AND updated < -7d`} invalid={!!fe["trigger.jql"]} />}
+                  {(id) => (
+                    <Input
+                      id={id}
+                      value={trigger.jql ?? ""}
+                      onChange={(e) => setTrigger({ ...trigger, jql: e.target.value })}
+                      className="font-mono text-[13px]"
+                      placeholder={`project = ${projectKey} AND status = "In Review" AND updated < -7d`}
+                      invalid={!!fe["trigger.jql"]}
+                    />
+                  )}
                 </Field>
               </>
             )}
@@ -157,7 +175,16 @@ export function RuleDialog({ projectKey, rule, onClose }: { projectKey: string; 
         </Step>
 
         <Step n={2} title="If (optional)" hint="A CEL expression; the actions run only when it is true. Leave empty to always run.">
-          <Textarea aria-label="Condition (CEL)" rows={2} spellCheck={false} value={condition} onChange={(e) => setCondition(e.target.value)} className="font-mono text-[12px]" placeholder='issue.type == "bug" && issue.priority == "highest"' invalid={!!fe.condition} />
+          <Textarea
+            aria-label="Condition (CEL)"
+            rows={2}
+            spellCheck={false}
+            value={condition}
+            onChange={(e) => setCondition(e.target.value)}
+            className="font-mono text-[12px]"
+            placeholder='issue.type == "bug" && issue.priority == "highest"'
+            invalid={!!fe.condition}
+          />
           {fe.condition && <p className="mt-1 text-xs text-danger">{fe.condition}</p>}
           <CelHelp className="mt-2" context="automation" examples={conditionExamples} onInsert={setCondition} />
         </Step>
@@ -168,7 +195,7 @@ export function RuleDialog({ projectKey, rule, onClose }: { projectKey: string; 
               <li key={i} className="rounded-md border border-line bg-surface-2/50 p-3">
                 <div className="mb-2 flex items-center gap-2">
                   <span className="flex size-5 items-center justify-center rounded-full bg-surface-3 text-[11px] font-semibold">{i + 1}</span>
-                  <Select aria-label={`Action ${i + 1} type`} value={a.type} onChange={(e) => setAction(i, emptyAction(e.target.value as ActionType))} className="h-7.5 w-52 py-0 text-[13px]">
+                  <Select aria-label={`Action ${i + 1} type`} value={a.type} onChange={(e) => setAction(i, emptyAction(e.target.value as ActionType))} className="!h-7.5 !w-52 py-0 text-[13px]">
                     {ACTIONS.map((x) => (
                       <option key={x.type} value={x.type}>
                         {x.label}
@@ -193,7 +220,7 @@ export function RuleDialog({ projectKey, rule, onClose }: { projectKey: string; 
             ))}
           </ol>
           {fe.actions && <p className="mt-1 text-xs text-danger">{fe.actions}</p>}
-          <Select aria-label="Add an action" value="" onChange={(e) => e.target.value && setActions([...actions, emptyAction(e.target.value as ActionType)])} className="mt-2 w-56">
+          <Select aria-label="Add an action" value="" onChange={(e) => e.target.value && setActions([...actions, emptyAction(e.target.value as ActionType)])} className="mt-2 !w-56">
             <option value="">+ Add an action…</option>
             {ACTIONS.map((x) => (
               <option key={x.type} value={x.type}>
@@ -245,7 +272,9 @@ function ActionFields({ action: a, index, onChange, statuses, customFields }: { 
             <option value="unassigned">Nobody (unassign)</option>
             <option value="email">A specific person…</option>
           </Select>
-          {preset === "email" && <Input aria-label={`${label}: email`} type="email" value={a.assignee ?? ""} onChange={(e) => onChange({ ...a, assignee: e.target.value })} placeholder="person@example.com" />}
+          {preset === "email" && (
+            <Input aria-label={`${label}: email`} type="email" value={a.assignee ?? ""} onChange={(e) => onChange({ ...a, assignee: e.target.value })} placeholder="person@example.com" />
+          )}
         </div>
       );
     }
@@ -281,7 +310,14 @@ function ActionFields({ action: a, index, onChange, statuses, customFields }: { 
     case "comment":
       return (
         <div>
-          <Textarea aria-label={`${label}: comment`} rows={3} value={a.body ?? ""} onChange={(e) => onChange({ ...a, body: e.target.value })} placeholder="Merged in {{event.url}} — closing {{issue.key}}." invalid={!a.body?.trim()} />
+          <Textarea
+            aria-label={`${label}: comment`}
+            rows={3}
+            value={a.body ?? ""}
+            onChange={(e) => onChange({ ...a, body: e.target.value })}
+            placeholder="Merged in {{event.url}} — closing {{issue.key}}."
+            invalid={!a.body?.trim()}
+          />
           <p className="mt-1 flex flex-wrap items-center gap-1 text-xs text-muted">
             Markdown. Insert:
             {templateVars.map((v) => (
@@ -293,7 +329,15 @@ function ActionFields({ action: a, index, onChange, statuses, customFields }: { 
         </div>
       );
     case "add_label":
-      return <Input aria-label={`${label}: label`} value={a.label ?? ""} onChange={(e) => onChange({ ...a, label: e.target.value.replace(/\s+/g, "-") })} placeholder="needs-triage" invalid={!a.label?.trim()} />;
+      return (
+        <Input
+          aria-label={`${label}: label`}
+          value={a.label ?? ""}
+          onChange={(e) => onChange({ ...a, label: e.target.value.replace(/\s+/g, "-") })}
+          placeholder="needs-triage"
+          invalid={!a.label?.trim()}
+        />
+      );
     case "webhook":
       return (
         <div>

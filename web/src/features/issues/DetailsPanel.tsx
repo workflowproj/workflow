@@ -68,7 +68,13 @@ export function DetailsPanel() {
           />
         </Row>
         <Row label="Priority">
-          <InlineSelect label="Priority" value={issue.priority} options={priorityOptions} disabled={!p.edit} onCommit={(v) => v && update({ priority: v as Priority }, { priority: v as Priority })} />
+          <InlineSelect
+            label="Priority"
+            value={issue.priority}
+            options={priorityOptions}
+            disabled={!p.edit}
+            onCommit={(v) => v && update({ priority: v as Priority }, { priority: v as Priority })}
+          />
         </Row>
         {level === 0 && <ParentRow />}
         {level < 0 && issue.parent && (

@@ -67,7 +67,7 @@ export function IssueTypesSettings() {
                 <tr key={t.id} className="hover:bg-surface-2/60">
                   <td>
                     <span className="flex items-center gap-2.5">
-                      <IssueTypeIcon type={t} className="size-5 [&_svg]:size-3.5" />
+                      <IssueTypeIcon type={t} className="!size-5 [&_svg]:size-3.5" />
                       <span className="min-w-0">
                         <span className="block font-medium">{t.name}</span>
                         {t.description && <span className="block max-w-sm truncate text-xs text-muted">{t.description}</span>}
@@ -89,7 +89,8 @@ export function IssueTypesSettings() {
                       label={`Delete ${t.name}`}
                       size="sm"
                       onClick={async () => {
-                        if (await confirm({ title: `Delete ${t.name}?`, body: "Only types without issues can be deleted; change existing issues' type first.", confirmLabel: "Delete", danger: true })) remove.mutate(t);
+                        if (await confirm({ title: `Delete ${t.name}?`, body: "Only types without issues can be deleted; change existing issues' type first.", confirmLabel: "Delete", danger: true }))
+                          remove.mutate(t);
                       }}
                     >
                       <Trash2 className="size-4" />

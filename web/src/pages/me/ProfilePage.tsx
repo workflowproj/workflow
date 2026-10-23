@@ -18,13 +18,6 @@ export function ProfilePage() {
   const toast = useToast();
   const [creating, setCreating] = useState(false);
   const tokens = useQuery({ queryKey: ["my-tokens"], queryFn: () => unwrap(api.GET("/me/tokens")) });
-  // /me has no provisioning source; admins can look themselves up to show where the profile comes from.
-  const self = useQuery({
-    queryKey: ["admin-users", me?.email ?? "", "", "self"],
-    queryFn: () => unwrap(api.GET("/admin/users", { params: { query: { q: me!.email } } })),
-    enabled: me?.orgRole === "admin",
-    select: (users) => users.find((u) => u.id === me?.id),
-  });
   const revoke = useMutation({
     mutationFn: (id: string) => unwrap(api.DELETE("/me/tokens/{tokenId}", { params: { path: { tokenId: id } } })),
     onSuccess: () => {
@@ -34,7 +27,7 @@ export function ProfilePage() {
     onError: toast.error,
   });
   if (!me) return <PageSpinner />;
-  const source = self.data?.source;
+  const source = me.source;
   const server = window.location.origin;
 
   return (

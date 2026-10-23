@@ -77,7 +77,12 @@ export function CreateUserDialog({ onClose, initialKind = "human" }: { onClose: 
         <Field label={kind === "service" ? "Name" : "Display name"} required error={fe.displayName}>
           {(id) => <Input id={id} autoFocus value={displayName} maxLength={200} onChange={(e) => setDisplayName(e.target.value)} placeholder={kind === "service" ? "CI deploy bot" : "Grace Hopper"} />}
         </Field>
-        <Field label="Email" required={kind === "human"} error={fe.email} hint={kind === "service" ? "Optional; a placeholder address is generated." : "They are matched by this address when they first sign in."}>
+        <Field
+          label="Email"
+          required={kind === "human"}
+          error={fe.email}
+          hint={kind === "service" ? "Optional; a placeholder address is generated." : "They are matched by this address when they first sign in."}
+        >
           {(id) => <Input id={id} type="email" value={email} onChange={(e) => setEmail(e.target.value)} />}
         </Field>
         <Field label="Organisation role" error={fe.orgRole} hint={kind === "service" ? "Service accounts cannot be admins; give them project roles instead." : undefined}>

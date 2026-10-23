@@ -126,7 +126,12 @@ export function BoardEditor({ board, projectKey, statuses, onDeleted }: { board:
               ))}
             </div>
           </fieldset>
-          <Field label="Filter (JQL)" error={fe.filterJql ?? fe.jql} hint="Narrows the board to matching issues of this project, e.g. labels = web AND type != epic. Leave empty for all." className="sm:col-span-2">
+          <Field
+            label="Filter (JQL)"
+            error={fe.filterJql ?? fe.jql}
+            hint="Narrows the board to matching issues of this project, e.g. labels = web AND type != epic. Leave empty for all."
+            className="sm:col-span-2"
+          >
             {(id) => <Textarea id={id} rows={2} spellCheck={false} value={filterJql} onChange={(e) => setFilterJql(e.target.value)} className="font-mono text-[13px]" placeholder="labels = web" />}
           </Field>
           <Field label="Swimlanes" error={fe.swimlanes}>
@@ -144,7 +149,7 @@ export function BoardEditor({ board, projectKey, statuses, onDeleted }: { board:
             <Field label="Hide done issues after" error={fe.doneRetentionDays} hint="Issues resolved longer ago leave the last column.">
               {(id) => (
                 <div className="flex items-center gap-2">
-                  <Input id={id} type="number" min={1} max={365} value={retention} onChange={(e) => setRetention(Math.min(365, Math.max(1, Number(e.target.value) || 1)))} className="w-24" />
+                  <Input id={id} type="number" min={1} max={365} value={retention} onChange={(e) => setRetention(Math.min(365, Math.max(1, Number(e.target.value) || 1)))} className="!w-24" />
                   <span className="text-sm text-muted">days</span>
                 </div>
               )}
@@ -153,7 +158,10 @@ export function BoardEditor({ board, projectKey, statuses, onDeleted }: { board:
         </div>
       </SettingsSection>
 
-      <SettingsSection title="Columns" description="Each status shows in at most one column. Drag statuses between columns, or use the menus. A WIP limit highlights a column when it holds too many issues.">
+      <SettingsSection
+        title="Columns"
+        description="Each status shows in at most one column. Drag statuses between columns, or use the menus. A WIP limit highlights a column when it holds too many issues."
+      >
         <div className="p-4">
           <ColumnsEditor columns={columns} onChange={setColumns} statuses={statuses} />
           {fe.columns && <p className="mt-2 text-sm text-danger">{fe.columns}</p>}
@@ -175,7 +183,15 @@ export function BoardEditor({ board, projectKey, statuses, onDeleted }: { board:
           icon={<Trash2 className="size-4 text-danger" />}
           loading={remove.isPending}
           onClick={async () => {
-            if (await confirm({ title: `Delete ${board.name}?`, body: "The board and its column configuration are deleted. Issues and sprints are not affected.", confirmLabel: "Delete board", danger: true })) remove.mutate();
+            if (
+              await confirm({
+                title: `Delete ${board.name}?`,
+                body: "The board and its column configuration are deleted. Issues and sprints are not affected.",
+                confirmLabel: "Delete board",
+                danger: true,
+              })
+            )
+              remove.mutate();
           }}
         >
           Delete board

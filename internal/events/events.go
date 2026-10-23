@@ -44,8 +44,9 @@ type Hub struct {
 	pool *pgxpool.Pool
 	log  *slog.Logger
 
-	mu   sync.RWMutex
-	subs map[uuid.UUID]map[chan Event]struct{}
+	mu     sync.RWMutex
+	subs   map[uuid.UUID]map[chan Event]struct{}
+	closed bool
 }
 
 func NewHub(pool *pgxpool.Pool, log *slog.Logger) *Hub {
@@ -56,6 +57,12 @@ func NewHub(pool *pgxpool.Pool, log *slog.Logger) *Hub {
 func (h *Hub) Subscribe(projectID uuid.UUID) (<-chan Event, func()) {
 	ch := make(chan Event, 64)
 	h.mu.Lock()
+	if h.closed {
+		h.mu.Unlock()
+		close(ch)
+		subscribers.Inc()
+		return ch, func() { subscribers.Dec() }
+	}
 	if h.subs[projectID] == nil {
 		h.subs[projectID] = map[chan Event]struct{}{}
 	}
@@ -74,6 +81,23 @@ func (h *Hub) Subscribe(projectID uuid.UUID) (<-chan Event, func()) {
 			subscribers.Dec()
 		})
 	}
+}
+
+// Close ends every open stream (their channels close) so a shutting-down server does not wait
+// for long-lived SSE connections; clients reconnect to another replica.
+func (h *Hub) Close() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.closed {
+		return
+	}
+	h.closed = true
+	for _, chans := range h.subs {
+		for ch := range chans {
+			close(ch)
+		}
+	}
+	h.subs = map[uuid.UUID]map[chan Event]struct{}{}
 }
 
 func (h *Hub) dispatch(ev Event) {

@@ -124,7 +124,12 @@ export function useJqlSuggestions(ctx: Context | null, projectKey?: string): { i
     case "by":
       return { items: rank([kw("BY")], prefix) };
     case "order-field":
-      return { items: rank(ORDER_FIELDS.map((f) => ({ label: f, insert: f, kind: "field" as const })), prefix) };
+      return {
+        items: rank(
+          ORDER_FIELDS.map((f) => ({ label: f, insert: f, kind: "field" as const })),
+          prefix,
+        ),
+      };
     case "order-dir":
       return { items: rank([kw("DESC"), kw("ASC")], prefix) };
     case "value":
@@ -165,7 +170,7 @@ export function useJqlSuggestions(ctx: Context | null, projectKey?: string): { i
           break;
         case "date":
           items = DATE_VALUES.map(([v, d]) => (v.endsWith(")") ? fn(v, d || undefined) : val(v, d)));
-          hint = 'A date (2026-01-31), a relative offset (-7d, -2w) or a function';
+          hint = "A date (2026-01-31), a relative offset (-7d, -2w) or a function";
           break;
         case "select":
         case "multiselect":

@@ -36,7 +36,8 @@ export function BasicFilters({ value, onChange, projectKey }: { value: Filters; 
   const labelOptions = useMemo(() => [...new Set(labels.flatMap((q) => q.data ?? []))].sort().map((l) => ({ value: l, label: l })), [labels]);
   const statusOptions = useMemo(() => {
     const seen = new Map<string, Option>();
-    for (const s of statuses) if (!seen.has(s.name)) seen.set(s.name, { value: s.name, label: s.name, icon: <span className={cn("size-2 shrink-0 rounded-full", categoryDot[s.category])} /> });
+    for (const s of statuses)
+      if (!seen.has(s.name)) seen.set(s.name, { value: s.name, label: s.name, icon: <span className={cn("size-2 shrink-0 rounded-full", categoryDot[s.category])} /> });
     return [...seen.values()];
   }, [statuses]);
 
@@ -77,9 +78,9 @@ function TextFilter({ value, onChange }: { value: string; onChange: (v: string) 
   useEffect(() => {
     if (debounced !== value) onChange(debounced);
     // Only react to typing, not to the value coming back from the URL.
-  }, [debounced]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [debounced]);
   return (
-    <div className="relative w-56">
+    <div className="relative w-48">
       <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-faint" />
       <input
         value={text}
@@ -87,7 +88,6 @@ function TextFilter({ value, onChange }: { value: string; onChange: (v: string) 
         onKeyDown={(e) => {
           if (e.key === "Enter") onChange(text);
           if (e.key === "Escape" && text) {
-            e.stopPropagation();
             setText("");
             onChange("");
           }
@@ -97,7 +97,12 @@ function TextFilter({ value, onChange }: { value: string; onChange: (v: string) 
         className="h-8 w-full rounded-md border border-line-strong bg-surface pr-7 pl-8 text-sm placeholder:text-faint focus:border-accent focus:ring-2 focus:ring-accent/25 focus:outline-none"
       />
       {text && (
-        <button type="button" aria-label="Clear text" onClick={() => (setText(""), onChange(""))} className="absolute top-1/2 right-1.5 -translate-y-1/2 rounded p-0.5 text-faint hover:text-ink">
+        <button
+          type="button"
+          aria-label="Clear text"
+          onClick={() => (setText(""), onChange(""))}
+          className="absolute top-1/2 right-1.5 -translate-y-1/2 rounded p-0.5 text-faint hover:text-ink"
+        >
           <X className="size-3.5" />
         </button>
       )}
@@ -205,7 +210,11 @@ function FilterChip({
             {all.length === 0 && <p className="px-2.5 py-2 text-sm text-muted">{empty}</p>}
           </div>
           {active && (
-            <button type="button" onClick={() => onChange([])} className="mt-1 w-full rounded border-t border-line px-2 pt-1.5 pb-1 text-left text-[13px] text-muted hover:text-ink">
+            <button
+              type="button"
+              onClick={() => onChange([])}
+              className="mt-1 w-full rounded border-t border-line px-2 pt-1.5 pb-1 text-left text-[13px] text-muted hover:text-ink"
+            >
               Clear {label.toLowerCase()}
             </button>
           )}

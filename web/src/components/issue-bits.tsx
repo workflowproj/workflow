@@ -28,10 +28,12 @@ const priorityMeta: Record<Priority, { icon: typeof ArrowUp; color: string; labe
   lowest: { icon: ChevronsDown, color: "text-progress", label: "Lowest" },
 };
 
-export function PriorityIcon({ priority, className }: { priority: Priority; className?: string }) {
+/** PriorityIcon shows a priority; pass `decorative` when the priority's name is shown next to it. */
+export function PriorityIcon({ priority, className, decorative }: { priority: Priority; className?: string; decorative?: boolean }) {
   const m = priorityMeta[priority] ?? priorityMeta.medium;
   const Icon = m.icon;
-  return <Icon aria-label={`${m.label} priority`} className={cn("size-4 shrink-0", m.color, className)} strokeWidth={2.5} />;
+  const a11y = decorative ? { "aria-hidden": true } : { role: "img", "aria-label": `${m.label} priority` };
+  return <Icon {...a11y} className={cn("size-4 shrink-0", m.color, className)} strokeWidth={2.5} />;
 }
 
 export function priorityLabel(p: Priority) {

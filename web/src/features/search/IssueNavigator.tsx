@@ -87,7 +87,10 @@ export function IssueNavigator({
   const queryError = results.error instanceof ApiError && results.error.status === 400 ? results.error : null;
   const jqlError: JqlError | null =
     queryError && sameJql(draft, jql)
-      ? { message: queryError.problem.detail ?? queryError.message, index: queryError.problem.position !== undefined ? runeOffsetToIndex(jql, queryError.problem.position) : undefined }
+      ? {
+          message: queryError.problem.detail ?? queryError.message,
+          index: queryError.problem.position !== undefined ? runeOffsetToIndex(jql, queryError.problem.position) : undefined,
+        }
       : null;
 
   const panel = (
@@ -148,7 +151,11 @@ export function IssueNavigator({
               <div className="min-w-0 flex-1">
                 {mode === "basic" ? (
                   parsed ? (
-                    <BasicFilters value={parsed.filters} projectKey={projectKey} onChange={(f: Filters) => run(buildJql(f, parsed.orderBy || splitOrderBy(defaultJql).orderBy, projectKey))} />
+                    <BasicFilters
+                      value={parsed.filters}
+                      projectKey={projectKey}
+                      onChange={(f: Filters) => run(buildJql(f, parsed.orderBy || splitOrderBy(defaultJql).orderBy, projectKey))}
+                    />
                   ) : (
                     <div className="flex flex-wrap items-center gap-2 rounded-md border border-warning/40 bg-warning-soft px-3 py-1.5 text-[13px] text-warning">
                       <TriangleAlert className="size-4 shrink-0" />

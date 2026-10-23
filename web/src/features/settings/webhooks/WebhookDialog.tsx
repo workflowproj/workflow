@@ -131,10 +131,11 @@ export function SignatureHelp({ secretHint }: { secretHint?: boolean }) {
   return (
     <div className="flex flex-col gap-2 text-[13px]">
       <p className="text-muted">
-        Every delivery is signed: the <code className="rounded bg-surface-2 px-1 font-mono text-[12px] text-ink">X-WFM-Signature-256</code> header is <code className="rounded bg-surface-2 px-1 font-mono text-[12px] text-ink">sha256=</code> followed by the
-        hex HMAC-SHA256 of the raw request body{secretHint ? " with this secret" : " with the webhook's secret"}. Compare it in constant time before trusting the payload.{" "}
-        <code className="rounded bg-surface-2 px-1 font-mono text-[12px] text-ink">X-WFM-Event</code> names the event and <code className="rounded bg-surface-2 px-1 font-mono text-[12px] text-ink">X-WFM-Delivery</code> identifies the delivery
-        (retries reuse it).
+        Every delivery is signed: the <code className="rounded bg-surface-2 px-1 font-mono text-[12px] text-ink">X-WFM-Signature-256</code> header is{" "}
+        <code className="rounded bg-surface-2 px-1 font-mono text-[12px] text-ink">sha256=</code> followed by the hex HMAC-SHA256 of the raw request body
+        {secretHint ? " with this secret" : " with the webhook's secret"}. Compare it in constant time before trusting the payload.{" "}
+        <code className="rounded bg-surface-2 px-1 font-mono text-[12px] text-ink">X-WFM-Event</code> names the event and{" "}
+        <code className="rounded bg-surface-2 px-1 font-mono text-[12px] text-ink">X-WFM-Delivery</code> identifies the delivery (retries reuse it).
       </p>
       <CodeBlock>{`// Node.js
 const expected = "sha256=" + crypto.createHmac("sha256", secret).update(rawBody).digest("hex");

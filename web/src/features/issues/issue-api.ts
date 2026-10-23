@@ -145,7 +145,3 @@ export function useRunTransition(issueKey: string) {
     },
   });
 }
-
-export function conflictMessage() {
-  return CONFLICT_MESSAGE;
-}

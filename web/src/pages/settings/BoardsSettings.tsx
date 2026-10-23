@@ -46,7 +46,12 @@ export function BoardsSettings() {
         <PageSpinner />
       ) : boards.length === 0 ? (
         <div className="rounded-lg border border-line bg-surface">
-          <EmptyState icon={<KanbanSquare className="size-8" />} title="No boards" body="Create a board to visualise work by status." action={<Button onClick={() => setCreating(true)}>New board</Button>} />
+          <EmptyState
+            icon={<KanbanSquare className="size-8" />}
+            title="No boards"
+            body="Create a board to visualise work by status."
+            action={<Button onClick={() => setCreating(true)}>New board</Button>}
+          />
         </div>
       ) : (
         <div className="flex flex-col gap-5">
@@ -59,7 +64,10 @@ export function BoardsSettings() {
                   type="button"
                   aria-selected={selected?.id === b.id}
                   onClick={() => setPicked(b.id)}
-                  className={cn("flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm", selected?.id === b.id ? "border-accent bg-accent-soft font-medium text-accent" : "border-line bg-surface hover:border-line-strong")}
+                  className={cn(
+                    "flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm",
+                    selected?.id === b.id ? "border-accent bg-accent-soft font-medium text-accent" : "border-line bg-surface hover:border-line-strong",
+                  )}
                 >
                   {b.name}
                   <Badge>{b.type}</Badge>

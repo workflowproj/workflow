@@ -41,7 +41,12 @@ export function FieldsAdmin() {
         <PageSpinner />
       ) : list.length === 0 ? (
         <div className="rounded-lg border border-line bg-surface">
-          <EmptyState icon={<TextCursorInput className="size-8" />} title="No custom fields" body="Add fields such as “Customer impact” (select) or “Environment” (text) and limit them to some projects or issue types." action={<Button onClick={() => setEditing("new")}>New field</Button>} />
+          <EmptyState
+            icon={<TextCursorInput className="size-8" />}
+            title="No custom fields"
+            body="Add fields such as “Customer impact” (select) or “Environment” (text) and limit them to some projects or issue types."
+            action={<Button onClick={() => setEditing("new")}>New field</Button>}
+          />
         </div>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-line bg-surface">
@@ -93,7 +98,15 @@ export function FieldsAdmin() {
                       label={`Delete ${f.name}`}
                       size="sm"
                       onClick={async () => {
-                        if (await confirm({ title: `Delete ${f.name}?`, body: "The field disappears from issues, screens and search. Stored values are kept on issues but no longer shown.", confirmLabel: "Delete field", danger: true })) remove.mutate(f);
+                        if (
+                          await confirm({
+                            title: `Delete ${f.name}?`,
+                            body: "The field disappears from issues, screens and search. Stored values are kept on issues but no longer shown.",
+                            confirmLabel: "Delete field",
+                            danger: true,
+                          })
+                        )
+                          remove.mutate(f);
                       }}
                     >
                       <Trash2 className="size-4" />

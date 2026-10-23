@@ -7,6 +7,12 @@ image:
   # Pin the Cosign-verified digest (Argo CD Image Updater / Kargo / Renovate can bump it).
   digest: ""
 
+serviceAccount:
+  annotations:
+    # IRSA role for the attachments bucket (s3:GetObject/PutObject/DeleteObject). With no
+    # WFM_S3_ACCESS_KEY the app uses these ambient credentials (EKS Pod Identity works too).
+    eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/wfm-app
+
 config:
   WFM_ENV: production
   WFM_PUBLIC_URL: "https://wfm.corp.example.com"
@@ -26,8 +32,7 @@ config:
   OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector.observability.svc:4318
 
 # AWS Secrets Manager secret "prod/wfm/app" holds a JSON document whose properties are env vars:
-#   {"WFM_SECRET_KEY": "...", "WFM_GOOGLE_CLIENT_SECRET": "...", "WFM_GOOGLE_SERVICE_ACCOUNT_KEY": "...",
-#    "WFM_S3_ACCESS_KEY": "...", "WFM_S3_SECRET_KEY": "..."}
+#   {"WFM_SECRET_KEY": "...", "WFM_GOOGLE_CLIENT_SECRET": "...", "WFM_GOOGLE_SERVICE_ACCOUNT_KEY": "..."}
 secrets:
   externalSecret:
     enabled: true
@@ -183,6 +188,9 @@ networkPolicy:
             kubernetes.io/metadata.name: monitoring
   egress:
     extraRules:
+      # With EKS Pod Identity instead of IRSA, also allow the agent:
+      # - to: [{ipBlock: {cidr: 169.254.170.23/32}}]
+      #   ports: [{port: 80, protocol: TCP}]
       # OpenTelemetry collector.
       - to:
           - namespaceSelector:

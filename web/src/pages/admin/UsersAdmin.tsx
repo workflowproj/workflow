@@ -29,7 +29,8 @@ export function UsersAdmin() {
     placeholderData: keepPreviousData,
   });
   const update = useMutation({
-    mutationFn: ({ user, body }: { user: AdminUser; body: { orgRole?: Schemas["OrgRole"]; active?: boolean } }) => unwrap(api.PATCH("/admin/users/{userId}", { params: { path: { userId: user.id } }, body })),
+    mutationFn: ({ user, body }: { user: AdminUser; body: { orgRole?: Schemas["OrgRole"]; active?: boolean } }) =>
+      unwrap(api.PATCH("/admin/users/{userId}", { params: { path: { userId: user.id } }, body })),
     onSuccess: (u, { body }) => {
       qc.invalidateQueries({ queryKey: ["admin-users"] });
       toast.success(body.active === undefined ? `${u.displayName} is now ${u.orgRole}` : `${u.displayName} ${u.active ? "reactivated" : "deactivated"}`);
@@ -60,17 +61,17 @@ export function UsersAdmin() {
           <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-faint" />
           <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name or email" aria-label="Search users" className="pl-8" />
         </div>
-        <Select aria-label="Status" value={status} onChange={(e) => setStatus(e.target.value as typeof status)} className="w-36">
+        <Select aria-label="Status" value={status} onChange={(e) => setStatus(e.target.value as typeof status)} className="!w-36">
           <option value="">Any status</option>
           <option value="active">Active</option>
           <option value="inactive">Deactivated</option>
         </Select>
-        <Select aria-label="Kind" value={kind} onChange={(e) => setKind(e.target.value as Kind)} className="w-40">
+        <Select aria-label="Kind" value={kind} onChange={(e) => setKind(e.target.value as Kind)} className="!w-44">
           <option value="">People and bots</option>
           <option value="human">People</option>
           <option value="service">Service accounts</option>
         </Select>
-        <Select aria-label="Source" value={source} onChange={(e) => setSource(e.target.value as typeof source)} className="w-36">
+        <Select aria-label="Source" value={source} onChange={(e) => setSource(e.target.value as typeof source)} className="!w-36">
           <option value="">Any source</option>
           {(["google", "scim", "jit", "admin", "dev", "system"] as const).map((s) => (
             <option key={s} value={s}>
@@ -94,7 +95,7 @@ export function UsersAdmin() {
               <tr>
                 <th>User</th>
                 <th>Source</th>
-                <th className="w-40">Organisation role</th>
+                <th className="!w-44">Organisation role</th>
                 <th>Status</th>
                 <th>Last sign-in</th>
                 <th className="w-10">
@@ -133,10 +134,14 @@ export function UsersAdmin() {
                         title={self ? "You cannot change your own role" : undefined}
                         onChange={async (e) => {
                           const orgRole = e.target.value as Schemas["OrgRole"];
-                          if (orgRole === "admin" && !(await confirm({ title: `Make ${u.displayName} an admin?`, body: "Admins can change every project and the organisation's settings.", confirmLabel: "Make admin" }))) return;
+                          if (
+                            orgRole === "admin" &&
+                            !(await confirm({ title: `Make ${u.displayName} an admin?`, body: "Admins can change every project and the organisation's settings.", confirmLabel: "Make admin" }))
+                          )
+                            return;
                           update.mutate({ user: u, body: { orgRole } });
                         }}
-                        className="h-8"
+                        className="!h-8"
                       >
                         {u.kind !== "service" && <option value="admin">Admin</option>}
                         <option value="member">Member</option>

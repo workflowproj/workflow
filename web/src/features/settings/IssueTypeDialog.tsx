@@ -119,10 +119,12 @@ export function IssueTypeDialog({ open, onClose, projectKey, type }: { open: boo
         }}
       >
         <div className="flex items-center gap-3 rounded-md border border-line bg-surface-2 px-3 py-2.5">
-          <IssueTypeIcon type={{ icon, color, name: name || "Preview" }} className="size-6 rounded [&_svg]:size-4" />
+          <IssueTypeIcon type={{ icon, color, name: name || "Preview" }} className="!size-6 rounded [&_svg]:size-4" />
           <div>
             <p className="text-sm font-medium">{name || "Issue type"}</p>
-            <p className="text-xs text-muted">{LEVELS.find((l) => l.value === level)?.label} · keys look like {projectKey}-42</p>
+            <p className="text-xs text-muted">
+              {LEVELS.find((l) => l.value === level)?.label} · keys look like {projectKey}-42
+            </p>
           </div>
         </div>
         <div className="grid gap-4 sm:grid-cols-[1fr_12rem]">
@@ -173,7 +175,7 @@ export function IssueTypeDialog({ open, onClose, projectKey, type }: { open: boo
                   onClick={() => setIcon(i.id)}
                   className={cn("rounded-md border p-1.5", icon === i.id ? "border-accent bg-accent-soft" : "border-line hover:border-line-strong")}
                 >
-                  <IssueTypeIcon type={{ icon: i.id, color, name: i.label }} className="size-5 [&_svg]:size-3.5" />
+                  <IssueTypeIcon type={{ icon: i.id, color, name: i.label }} className="!size-5 [&_svg]:size-3.5" />
                 </button>
               ))}
             </div>

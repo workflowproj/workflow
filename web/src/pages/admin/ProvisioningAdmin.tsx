@@ -23,14 +23,34 @@ export function ProvisioningAdmin() {
         <dl className="grid gap-x-6 gap-y-3 p-4 text-sm sm:grid-cols-[12rem_1fr]">
           <dt className="text-muted">Identity providers</dt>
           <dd className="flex flex-wrap gap-1.5">
-            {oidc.providers.length ? oidc.providers.map((p) => <Badge key={p} tone="accent" className="normal-case">{p}</Badge>) : <span className="text-muted">None — set WFM_OIDC_PROVIDERS (or WFM_GOOGLE_CLIENT_ID / _SECRET).</span>}
+            {oidc.providers.length ? (
+              oidc.providers.map((p) => (
+                <Badge key={p} tone="accent" className="!normal-case">
+                  {p}
+                </Badge>
+              ))
+            ) : (
+              <span className="text-muted">None — set WFM_OIDC_PROVIDERS (or WFM_GOOGLE_CLIENT_ID / _SECRET).</span>
+            )}
           </dd>
           <dt className="text-muted">Allowed email domains</dt>
-          <dd className="flex flex-wrap gap-1.5">{oidc.allowedDomains.length ? oidc.allowedDomains.map((d) => <code key={d} className="rounded bg-surface-2 px-1.5 font-mono text-[12px]">{d}</code>) : <span className="text-muted">Any domain the provider accepts (WFM_ALLOWED_DOMAINS)</span>}</dd>
+          <dd className="flex flex-wrap gap-1.5">
+            {oidc.allowedDomains.length ? (
+              oidc.allowedDomains.map((d) => (
+                <code key={d} className="rounded bg-surface-2 px-1.5 font-mono text-[12px]">
+                  {d}
+                </code>
+              ))
+            ) : (
+              <span className="text-muted">Any domain the provider accepts (WFM_ALLOWED_DOMAINS)</span>
+            )}
+          </dd>
           <dt className="text-muted">Just-in-time accounts</dt>
           <dd>
             {oidc.jitProvisioning ? <Badge tone="success">On</Badge> : <Badge>Off</Badge>}
-            <span className="ml-2 text-[13px] text-muted">{oidc.jitProvisioning ? "Anyone who signs in with an allowed domain gets an account." : "Only people provisioned by SCIM, directory sync or an admin can sign in."}</span>
+            <span className="ml-2 text-[13px] text-muted">
+              {oidc.jitProvisioning ? "Anyone who signs in with an allowed domain gets an account." : "Only people provisioned by SCIM, directory sync or an admin can sign in."}
+            </span>
           </dd>
           <dt className="text-muted">Bootstrap admins</dt>
           <dd className="text-[13px]">{oidc.bootstrapAdmins.length ? oidc.bootstrapAdmins.join(", ") : <span className="text-muted">None (WFM_BOOTSTRAP_ADMINS)</span>}</dd>
@@ -58,7 +78,9 @@ function DirectorySync({ status }: { status: Schemas["DirectorySyncStatus"] }) {
   return (
     <SettingsSection
       title="Google Workspace directory sync"
-      description={status.configured ? `Every ${status.intervalMinutes} minutes${status.group ? ` · group ${status.group}` : ""}${status.orgUnit ? ` · org unit ${status.orgUnit}` : ""}` : "Not configured"}
+      description={
+        status.configured ? `Every ${status.intervalMinutes} minutes${status.group ? ` · group ${status.group}` : ""}${status.orgUnit ? ` · org unit ${status.orgUnit}` : ""}` : "Not configured"
+      }
       actions={
         <div className="flex gap-1.5">
           <Button size="sm" variant="ghost" icon={<RefreshCw className="size-3.5" />} onClick={() => qc.invalidateQueries({ queryKey: ["provisioning"] })}>
@@ -73,8 +95,8 @@ function DirectorySync({ status }: { status: Schemas["DirectorySyncStatus"] }) {
       <div className="flex flex-col gap-3 p-4">
         {!status.configured && (
           <Callout title="Sync people and groups from Google Workspace">
-            Set <code>WFM_GOOGLE_DIRECTORY_ENABLED=true</code>, <code>WFM_GOOGLE_SERVICE_ACCOUNT_KEY</code> (a service account with domain-wide delegation for the Admin SDK directory scopes) and <code>WFM_GOOGLE_ADMIN_SUBJECT</code>, then restart the
-            server. Synced people and groups are read-only here and are deactivated when removed in Google.
+            Set <code>WFM_GOOGLE_DIRECTORY_ENABLED=true</code>, <code>WFM_GOOGLE_SERVICE_ACCOUNT_KEY</code> (a service account with domain-wide delegation for the Admin SDK directory scopes) and{" "}
+            <code>WFM_GOOGLE_ADMIN_SUBJECT</code>, then restart the server. Synced people and groups are read-only here and are deactivated when removed in Google.
           </Callout>
         )}
         {status.runs.length === 0 ? (

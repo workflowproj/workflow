@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/exaring/otelpgx"
@@ -67,8 +68,32 @@ type Options struct {
 	OIDCHTTPClient *http.Client
 }
 
+// OpenWithRetry opens the pool, retrying until the database accepts connections or `wait`
+// elapses. In Kubernetes a pod often starts before its database (or its network policy) is ready.
+func OpenWithRetry(ctx context.Context, databaseURL string, wait time.Duration, log *slog.Logger) (*pgxpool.Pool, error) {
+	deadline := time.Now().Add(wait)
+	backoff := time.Second
+	for {
+		pool, err := OpenURL(ctx, databaseURL)
+		if err == nil || time.Now().After(deadline) {
+			return pool, err
+		}
+		log.Warn("database not ready; retrying", "error", err, "in", backoff)
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(backoff):
+		}
+		backoff = min(backoff*2, 10*time.Second)
+	}
+}
+
 func Open(ctx context.Context, cfg *config.Config) (*pgxpool.Pool, error) {
-	pc, err := pgxpool.ParseConfig(cfg.DatabaseURL)
+	return OpenURL(ctx, cfg.DatabaseURL)
+}
+
+func OpenURL(ctx context.Context, databaseURL string) (*pgxpool.Pool, error) {
+	pc, err := pgxpool.ParseConfig(databaseURL)
 	if err != nil {
 		return nil, fmt.Errorf("parse database url: %w", err)
 	}
@@ -203,11 +228,23 @@ func (a *App) Run(ctx context.Context) error {
 		wg.Add(1)
 		go func() { defer wg.Done(); a.Hub.Run(ctx) }()
 	}
+	var workerStarted atomic.Bool
 	if a.Cfg.RunsWorker() {
-		if err := a.River.Start(ctx); err != nil {
-			return fmt.Errorf("start worker: %w", err)
-		}
-		a.Log.Info("worker started", "concurrency", a.Cfg.WorkerConcurrency)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			// On a first install the migration job may still be running; wait for its tables
+			// rather than crash-looping.
+			if err := db.WaitForSchema(ctx, a.Pool, a.Log); err != nil {
+				return // shutting down
+			}
+			if err := a.River.Start(ctx); err != nil {
+				errc <- fmt.Errorf("start worker: %w", err)
+				return
+			}
+			workerStarted.Store(true)
+			a.Log.Info("worker started", "concurrency", a.Cfg.WorkerConcurrency)
+		}()
 	}
 
 	var runErr error
@@ -219,9 +256,10 @@ func (a *App) Run(ctx context.Context) error {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
 	defer cancel()
 	if srv != nil {
+		a.Hub.Close() // end SSE streams so Shutdown does not wait for them
 		_ = srv.Shutdown(shutdownCtx)
 	}
-	if a.Cfg.RunsWorker() {
+	if workerStarted.Load() {
 		if err := a.River.Stop(shutdownCtx); err != nil {
 			a.Log.Warn("worker stop", "error", err)
 		}

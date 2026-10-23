@@ -67,7 +67,10 @@ export function AddMemberDialog({ open, onClose, projectKey }: { open: boolean; 
               role="radio"
               aria-checked={kind === k}
               onClick={() => setKind(k)}
-              className={cn("flex items-center gap-2 rounded-md border px-3 py-2 text-sm", kind === k ? "border-accent bg-accent-soft font-medium text-accent" : "border-line hover:border-line-strong")}
+              className={cn(
+                "flex items-center gap-2 rounded-md border px-3 py-2 text-sm",
+                kind === k ? "border-accent bg-accent-soft font-medium text-accent" : "border-line hover:border-line-strong",
+              )}
             >
               <Icon className="size-4" /> {label}
             </button>

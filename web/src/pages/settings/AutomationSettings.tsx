@@ -139,7 +139,13 @@ function RuleCard({ rule, projectKey, onEdit }: { rule: Rule; projectKey: string
           </IconButton>
         </div>
       </div>
-      <button type="button" aria-expanded={open} aria-controls={runsId} onClick={() => setOpen(!open)} className="flex w-full items-center gap-1.5 border-t border-line px-4 py-2 text-left text-[13px] text-muted hover:bg-surface-2/60 hover:text-ink">
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={runsId}
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center gap-1.5 border-t border-line px-4 py-2 text-left text-[13px] text-muted hover:bg-surface-2/60 hover:text-ink"
+      >
         {open ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />} Recent runs
       </button>
       {open && (
@@ -181,7 +187,11 @@ function Runs({ ruleId }: { ruleId: string }) {
                 <span className="mt-0.5 w-14 shrink-0 text-xs text-faint">—</span>
               )}
               <span className="min-w-0 flex-1 break-words text-muted">{r.message || "—"}</span>
-              {r.depth > 0 && <span className="shrink-0 text-xs text-faint" title="Triggered by another rule">chain {r.depth}</span>}
+              {r.depth > 0 && (
+                <span className="shrink-0 text-xs text-faint" title="Triggered by another rule">
+                  chain {r.depth}
+                </span>
+              )}
               <span className="shrink-0 text-xs text-muted">
                 <When iso={r.createdAt} />
               </span>

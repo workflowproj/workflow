@@ -70,7 +70,11 @@ export function NotificationsPage() {
         <PageSpinner />
       ) : items.length === 0 ? (
         <div className="rounded-lg border border-line bg-surface">
-          <EmptyState icon={<Bell className="size-8" />} title={unreadOnly ? "No unread notifications" : "No notifications yet"} body="You're notified about issues you report, are assigned to or watch, and when someone mentions you." />
+          <EmptyState
+            icon={<Bell className="size-8" />}
+            title={unreadOnly ? "No unread notifications" : "No notifications yet"}
+            body="You're notified about issues you report, are assigned to or watch, and when someone mentions you."
+          />
         </div>
       ) : (
         <ul className="divide-y divide-line overflow-hidden rounded-lg border border-line bg-surface">
@@ -78,7 +82,12 @@ export function NotificationsPage() {
             <li key={n.id} className={cn("group relative flex gap-3 px-4 py-3 hover:bg-surface-2/60", !n.readAt && "bg-accent-soft/30")}>
               <UserAvatar user={n.actor} size={32} />
               <div className="min-w-0 flex-1">
-                <button type="button" onClick={() => open(n)} className="block w-full text-left after:absolute after:inset-0 focus-visible:outline-none" aria-label={`${n.title}${n.issueKey ? `, open ${n.issueKey}` : ""}`}>
+                <button
+                  type="button"
+                  onClick={() => open(n)}
+                  className="block w-full text-left after:absolute after:inset-0 focus-visible:outline-none"
+                  aria-label={`${n.title}${n.issueKey ? `, open ${n.issueKey}` : ""}`}
+                >
                   <span className={cn("block text-sm", !n.readAt ? "font-semibold" : "font-medium")}>{n.title}</span>
                 </button>
                 {n.body && <p className="mt-0.5 line-clamp-2 text-[13px] text-muted">{n.body}</p>}

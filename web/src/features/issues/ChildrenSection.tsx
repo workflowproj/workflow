@@ -9,7 +9,8 @@ import { IssueTypeIcon, PriorityIcon, StatusBadge } from "@/components/issue-bit
 import { UserAvatar } from "@/components/UserAvatar";
 import { cn } from "@/lib/cn";
 import { invalidateIssueLists } from "./issue-api";
-import { IssueKeyLink, Section, stopEscape, useIssue, useIssueAction } from "./issue-context";
+import { useEscapeLayer } from "@/lib/escape";
+import { IssueKeyLink, Section, useIssue, useIssueAction } from "./issue-context";
 
 /** ChildrenSection lists sub-tasks (of a standard issue) or child issues (of an epic). */
 export function ChildrenSection() {
@@ -109,7 +110,7 @@ function ChildRow({ child }: { child: Issue }) {
 }
 
 function AddChild({ types, onDone }: { types: { key: string; name: string; icon: string; color: string }[]; onDone: () => void }) {
-  const { issue } = useIssue();
+  const { issue, open } = useIssue();
   const qc = useQueryClient();
   const toast = useToast();
   const [summary, setSummary] = useState("");
@@ -121,12 +122,13 @@ function AddChild({ types, onDone }: { types: { key: string; name: string; icon:
       setSummary("");
       qc.invalidateQueries({ queryKey: ["issue", issue.key] });
       invalidateIssueLists(qc);
-      toast.success(`${created.key} created`);
+      toast.success(`${created.key} created`, { label: "Open", onClick: () => open(created.key) });
       input.current?.focus();
     },
     onError: (err) => toast.error(err),
   });
   const submit = () => summary.trim() && create.mutate(summary.trim());
+  useEscapeLayer(true, onDone);
   const type = types.find((t) => t.key === typeKey);
   return (
     <form
@@ -157,7 +159,6 @@ function AddChild({ types, onDone }: { types: { key: string; name: string; icon:
         autoFocus
         value={summary}
         onChange={(e) => setSummary(e.target.value)}
-        onKeyDown={(e) => stopEscape(e, onDone)}
         maxLength={255}
         placeholder="What needs to be done?"
         aria-label="Summary"

@@ -78,7 +78,7 @@ export function WorkflowsSettings() {
                 const t = typeByKey.get(u.issueTypeKey);
                 return (
                   <span key={u.issueTypeKey} className="inline-flex items-center gap-1 rounded bg-surface-2 px-1.5 py-0.5 text-xs">
-                    {t && <IssueTypeIcon type={t} className="size-3.5" />}
+                    {t && <IssueTypeIcon type={t} className="!size-3.5 [&_svg]:size-2.5" />}
                     {t?.name ?? u.issueTypeKey}
                   </span>
                 );

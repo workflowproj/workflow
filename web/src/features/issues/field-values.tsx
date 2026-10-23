@@ -35,7 +35,19 @@ function useUserById(id: string, project: string): User | undefined {
  * CustomFieldInline renders a custom field in the details sidebar and edits it in place.
  * `onCommit(null)` clears the field.
  */
-export function CustomFieldInline({ def, value, onCommit, disabled, projectKey }: { def: FieldDef; value: FieldValue; onCommit: (v: FieldValue | null) => void; disabled: boolean; projectKey: string }) {
+export function CustomFieldInline({
+  def,
+  value,
+  onCommit,
+  disabled,
+  projectKey,
+}: {
+  def: FieldDef;
+  value: FieldValue;
+  onCommit: (v: FieldValue | null) => void;
+  disabled: boolean;
+  projectKey: string;
+}) {
   const label = def.name;
   switch (def.type) {
     case "number":
@@ -59,9 +71,19 @@ export function CustomFieldInline({ def, value, onCommit, disabled, projectKey }
         </InlineText>
       );
     case "select":
-      return <InlineSelect label={label} value={asString(value) || null} allowNone options={def.options.map((o) => ({ value: o, label: o }))} disabled={disabled} onCommit={onCommit} />;
+      return (
+        <InlineSelect label={label} value={asString(value) || null} allowNone options={def.options.map((o) => ({ value: o, label: o }))} disabled={disabled} onCommit={onCommit} />
+      );
     case "multiselect":
-      return <InlineMulti label={label} values={asList(value)} options={def.options.map((o) => ({ value: o, label: o }))} disabled={disabled} onCommit={(v) => onCommit(v.length ? v : null)} />;
+      return (
+        <InlineMulti
+          label={label}
+          values={asList(value)}
+          options={def.options.map((o) => ({ value: o, label: o }))}
+          disabled={disabled}
+          onCommit={(v) => onCommit(v.length ? v : null)}
+        />
+      );
     case "checkbox":
       return (
         <div className="flex min-h-8 items-center">
@@ -85,7 +107,16 @@ function UserField({ id, label, projectKey, disabled, onCommit }: { id: string; 
 
 function VersionField({ id, label, projectKey, disabled, onCommit }: { id: string; label: string; projectKey: string; disabled: boolean; onCommit: (v: string | null) => void }) {
   const { data: releases = [] } = useQuery(releasesQuery(projectKey));
-  return <InlineSelect label={label} value={id || null} allowNone options={releases.map((r) => ({ value: r.id, label: r.name, hint: r.state === "released" ? "released" : undefined }))} disabled={disabled} onCommit={onCommit} />;
+  return (
+    <InlineSelect
+      label={label}
+      value={id || null}
+      allowNone
+      options={releases.map((r) => ({ value: r.id, label: r.name, hint: r.state === "released" ? "released" : undefined }))}
+      disabled={disabled}
+      onCommit={onCommit}
+    />
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -136,7 +167,12 @@ export function ScreenFieldControl({
       return (
         <div className="flex flex-wrap gap-x-4 gap-y-2 rounded-md border border-line p-2.5" id={id}>
           {options.map((o) => (
-            <Checkbox key={o} label={o} checked={asList(value).includes(o)} onChange={(e) => onChange(e.target.checked ? [...asList(value), o] : asList(value).filter((x) => x !== o))} />
+            <Checkbox
+              key={o}
+              label={o}
+              checked={asList(value).includes(o)}
+              onChange={(e) => onChange(e.target.checked ? [...asList(value), o] : asList(value).filter((x) => x !== o))}
+            />
           ))}
         </div>
       );
@@ -155,7 +191,16 @@ export function ScreenFieldControl({
     case "version":
       return <ReleaseSelect id={id} projectKey={projectKey} value={asString(value)} onChange={onChange} invalid={invalid} />;
     default:
-      return <Input id={id} type={field.type === "url" ? "url" : "text"} invalid={invalid} value={asString(value)} onChange={(e) => onChange(e.target.value)} placeholder={field.type === "url" ? "https://" : undefined} />;
+      return (
+        <Input
+          id={id}
+          type={field.type === "url" ? "url" : "text"}
+          invalid={invalid}
+          value={asString(value)}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={field.type === "url" ? "https://" : undefined}
+        />
+      );
   }
 }
 
@@ -172,7 +217,19 @@ function ReleaseChecklist({ id, projectKey, value, onChange }: { id: string; pro
   );
 }
 
-function ReleaseSelect({ id, projectKey, value, onChange, invalid }: { id: string; projectKey: string; value: string; onChange: (v: string | undefined) => void; invalid?: boolean }) {
+function ReleaseSelect({
+  id,
+  projectKey,
+  value,
+  onChange,
+  invalid,
+}: {
+  id: string;
+  projectKey: string;
+  value: string;
+  onChange: (v: string | undefined) => void;
+  invalid?: boolean;
+}) {
   const { data: releases = [] } = useQuery(releasesQuery(projectKey));
   return (
     <Select id={id} value={value} invalid={invalid} onChange={(e) => onChange(e.target.value || undefined)}>

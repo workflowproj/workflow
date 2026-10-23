@@ -40,7 +40,12 @@ export function GroupsAdmin() {
         <PageSpinner />
       ) : list.length === 0 ? (
         <div className="rounded-lg border border-line bg-surface">
-          <EmptyState icon={<UsersRound className="size-8" />} title={dq ? "No groups match" : "No groups yet"} body="Create local groups here, or provision them from your identity provider." action={!dq && <Button onClick={() => setCreating(true)}>New group</Button>} />
+          <EmptyState
+            icon={<UsersRound className="size-8" />}
+            title={dq ? "No groups match" : "No groups yet"}
+            body="Create local groups here, or provision them from your identity provider."
+            action={!dq && <Button onClick={() => setCreating(true)}>New group</Button>}
+          />
         </div>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-line bg-surface">
