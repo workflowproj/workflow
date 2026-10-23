@@ -1,0 +1,24 @@
+# Incident handling for an operations project.
+kind: Workflow
+name: Incident
+description: Triage → Mitigating → Monitoring → Resolved, with a postmortem gate for major incidents.
+statuses:
+  - { name: Triage, category: todo }
+  - { name: Mitigating, category: in_progress }
+  - { name: Monitoring, category: in_progress }
+  - { name: Resolved, category: done }
+transitions:
+  - name: Acknowledge
+    from: Triage
+    to: Mitigating
+    postFunctions: [{ assignTo: actor }, { notify: watchers }]
+  - { name: Mitigated, from: Mitigating, to: Monitoring, screen: [{ field: comment, required: true }] }
+  - { name: Regressed, from: Monitoring, to: Mitigating }
+  - name: Resolve
+    from: Monitoring
+    to: Resolved
+    validators:
+      - expr: issue.priority != "highest" || issue.links.exists(l, l.type == "relates")
+        message: Highest-priority incidents need a linked postmortem issue.
+    screen: [resolution]
+  - { name: Reopen, from: Resolved, to: Triage }

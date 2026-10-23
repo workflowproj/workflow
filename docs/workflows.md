@@ -123,6 +123,9 @@ wfm workflow apply -f workflows/dev.yaml --project PLAT --map "Ready for QA=In R
 wfm workflow export --id 0b6f…  > workflows/dev.yaml
 ```
 
+Examples to start from are in [`examples/workflows/`](../examples/workflows): a code-review flow
+that requires estimates and a linked pull request, and an incident flow.
+
 `apply` is idempotent: it creates the workflow if the name is new in that scope, publishes a
 version if the document changed, and does nothing (`unchanged`) otherwise — so it fits a GitOps
 pipeline. Without `--project` it manages a shared workflow (organisation admins).
