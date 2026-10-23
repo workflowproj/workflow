@@ -1,0 +1,3192 @@
+openapi: 3.1.0
+info:
+  title: Workflow Platform API
+  version: 1.0.0
+  description: |
+    REST API for the workflow platform: projects, issues, configurable workflows, boards, sprints,
+    releases, JQL search, Git integration, provisioning and automation.
+
+    Authenticate with the browser session cookie or a personal access token
+    (`Authorization: Bearer wfm_pat_...`). Cookie-authenticated mutations must send
+    `X-Requested-With: XMLHttpRequest`.
+
+    Errors use RFC 9457 problem details (`application/problem+json`).
+servers:
+  - url: /api/v1
+security:
+  - cookieAuth: []
+  - bearerAuth: []
+tags:
+  - name: auth
+  - name: me
+  - name: users
+  - name: admin
+  - name: projects
+  - name: workflows
+  - name: boards
+  - name: sprints
+  - name: releases
+  - name: issues
+  - name: search
+  - name: scm
+  - name: automation
+  - name: webhooks
+  - name: fields
+  - name: handwritten
+    description: Implemented outside the generated server (streaming).
+
+paths:
+  # ---------------------------------------------------------------------------
+  # Auth & current user
+  # ---------------------------------------------------------------------------
+  /auth/providers:
+    get:
+      operationId: listAuthProviders
+      tags: [auth]
+      security: []
+      summary: Sign-in options for the login page
+      responses:
+        "200":
+          description: Enabled providers
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthProviders' }
+        default: { $ref: '#/components/responses/Problem' }
+  /auth/dev-login:
+    post:
+      operationId: devLogin
+      tags: [auth]
+      security: []
+      summary: Passwordless login for local development (disabled in production)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+                displayName: { type: string }
+      responses:
+        "200":
+          description: Signed in
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Me' }
+        default: { $ref: '#/components/responses/Problem' }
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      responses:
+        "204": { description: Signed out }
+        default: { $ref: '#/components/responses/Problem' }
+  /me:
+    get:
+      operationId: getMe
+      tags: [me]
+      responses:
+        "200":
+          description: The signed-in user
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Me' }
+        default: { $ref: '#/components/responses/Problem' }
+  /me/tokens:
+    get:
+      operationId: listMyTokens
+      tags: [me]
+      responses:
+        "200":
+          description: Personal access tokens
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ApiToken' }
+        default: { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: createMyToken
+      tags: [me]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ApiTokenCreate' }
+      responses:
+        "201":
+          description: Created; the token value is only returned once
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiTokenCreated' }
+        default: { $ref: '#/components/responses/Problem' }
+  /me/tokens/{tokenId}:
+    delete:
+      operationId: revokeMyToken
+      tags: [me]
+      parameters: [{ $ref: '#/components/parameters/TokenId' }]
+      responses:
+        "204": { description: Revoked }
+        default: { $ref: '#/components/responses/Problem' }
+  /notifications:
+    get:
+      operationId: listNotifications
+      tags: [me]
+      parameters:
+        - { name: unread, in: query, schema: { type: boolean } }
+        - { $ref: '#/components/parameters/Limit' }
+      responses:
+        "200":
+          description: Notifications, newest first
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationList' }
+        default: { $ref: '#/components/responses/Problem' }
+  /notifications/read:
+    post:
+      operationId: markNotificationsRead
+      tags: [me]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ids:
+                  description: Omit to mark everything read.
+                  type: array
+                  items: { type: integer, format: int64 }
+      responses:
+        "204": { description: Marked read }
+        default: { $ref: '#/components/responses/Problem' }
+
+  # ---------------------------------------------------------------------------
+  # Directory
+  # ---------------------------------------------------------------------------
+  /users:
+    get:
+      operationId: listUsers
+      tags: [users]
+      parameters:
+        - { name: q, in: query, schema: { type: string } }
+        - { name: project, in: query, description: Only users who can be assigned in this project, schema: { type: string } }
+        - { $ref: '#/components/parameters/Limit' }
+      responses:
+        "200":
+          description: Active users
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/User' }
+        default: { $ref: '#/components/responses/Problem' }
+  /groups:
+    get:
+      operationId: listGroups
+      tags: [users]
+      parameters:
+        - { name: q, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: Groups
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Group' }
+        default: { $ref: '#/components/responses/Problem' }
+  /groups/{groupId}:
+    get:
+      operationId: getGroup
+      tags: [users]
+      parameters: [{ $ref: '#/components/parameters/GroupId' }]
+      responses:
+        "200":
+          description: Group with members
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GroupDetail' }
+        default: { $ref: '#/components/responses/Problem' }
+  /roles:
+    get:
+      operationId: listRoles
+      tags: [users]
+      responses:
+        "200":
+          description: Project roles
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Role' }
+        default: { $ref: '#/components/responses/Problem' }
+  /permissions:
+    get:
+      operationId: listPermissions
+      tags: [users]
+      responses:
+        "200":
+          description: Named permissions that roles can hold
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PermissionInfo' }
+        default: { $ref: '#/components/responses/Problem' }
+  /statuses:
+    get:
+      operationId: listStatuses
+      tags: [workflows]
+      responses:
+        "200":
+          description: All statuses across workflows
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Status' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  # ---------------------------------------------------------------------------
+  # Administration
+  # ---------------------------------------------------------------------------
+  /admin/users:
+    get:
+      operationId: adminListUsers
+      tags: [admin]
+      parameters:
+        - { name: q, in: query, schema: { type: string } }
+        - { name: kind, in: query, schema: { $ref: '#/components/schemas/UserKind' } }
+      responses:
+        "200":
+          description: All users including inactive
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/AdminUser' }
+        default: { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: adminCreateUser
+      tags: [admin]
+      description: Pre-provision a person, or create a service account (`kind=service`) for CI and the CLI.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [displayName]
+              properties:
+                kind: { $ref: '#/components/schemas/UserKind' }
+                email: { type: string, format: email }
+                displayName: { type: string, minLength: 1, maxLength: 200 }
+                orgRole: { $ref: '#/components/schemas/OrgRole' }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminUser' }
+        default: { $ref: '#/components/responses/Problem' }
+  /admin/users/{userId}:
+    patch:
+      operationId: adminUpdateUser
+      tags: [admin]
+      parameters: [{ $ref: '#/components/parameters/UserId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                displayName: { type: string, minLength: 1, maxLength: 200 }
+                orgRole: { $ref: '#/components/schemas/OrgRole' }
+                active: { type: boolean }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminUser' }
+        default: { $ref: '#/components/responses/Problem' }
+  /admin/users/{userId}/tokens:
+    get:
+      operationId: adminListUserTokens
+      tags: [admin]
+      parameters: [{ $ref: '#/components/parameters/UserId' }]
+      responses:
+        "200":
+          description: Tokens owned by the user
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ApiToken' }
+        default: { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: adminCreateUserToken
+      tags: [admin]
+      description: Issue a token for a service account.
+      parameters: [{ $ref: '#/components/parameters/UserId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ApiTokenCreate' }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiTokenCreated' }
+        default: { $ref: '#/components/responses/Problem' }
+  /admin/tokens/{tokenId}:
+    delete:
+      operationId: adminRevokeToken
+      tags: [admin]
+      parameters: [{ $ref: '#/components/parameters/TokenId' }]
+      responses:
+        "204": { description: Revoked }
+        default: { $ref: '#/components/responses/Problem' }
+  /admin/groups:
+    post:
+      operationId: adminCreateGroup
+      tags: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [displayName]
+              properties:
+                displayName: { type: string, minLength: 1, maxLength: 200 }
+                description: { type: string }
+                orgRole: { $ref: '#/components/schemas/OrgRole' }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Group' }
+        default: { $ref: '#/components/responses/Problem' }
+  /admin/groups/{groupId}:
+    patch:
+      operationId: adminUpdateGroup
+      tags: [admin]
+      description: Provisioned groups only accept `orgRole` (a local mapping); local groups accept everything.
+      parameters: [{ $ref: '#/components/parameters/GroupId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                displayName: { type: string, minLength: 1, maxLength: 200 }
+                description: { type: string }
+                orgRole:
+                  oneOf:
+                    - $ref: '#/components/schemas/OrgRole'
+                    - type: 'null'
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Group' }
+        default: { $ref: '#/components/responses/Problem' }
+    delete:
+      operationId: adminDeleteGroup
+      tags: [admin]
+      parameters: [{ $ref: '#/components/parameters/GroupId' }]
+      responses:
+        "204": { description: Deleted }
+        default: { $ref: '#/components/responses/Problem' }
+  /admin/groups/{groupId}/members/{userId}:
+    put:
+      operationId: adminAddGroupMember
+      tags: [admin]
+      parameters: [{ $ref: '#/components/parameters/GroupId' }, { $ref: '#/components/parameters/UserId' }]
+      responses:
+        "204": { description: Added }
+        default: { $ref: '#/components/responses/Problem' }
+    delete:
+      operationId: adminRemoveGroupMember
+      tags: [admin]
+      parameters: [{ $ref: '#/components/parameters/GroupId' }, { $ref: '#/components/parameters/UserId' }]
+      responses:
+        "204": { description: Removed }
+        default: { $ref: '#/components/responses/Problem' }
+  /admin/roles:
+    post:
+      operationId: adminCreateRole
+      tags: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RoleInput' }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Role' }
+        default: { $ref: '#/components/responses/Problem' }
+  /admin/roles/{roleId}:
+    put:
+      operationId: adminUpdateRole
+      tags: [admin]
+      parameters: [{ $ref: '#/components/parameters/RoleId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RoleInput' }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Role' }
+        default: { $ref: '#/components/responses/Problem' }
+    delete:
+      operationId: adminDeleteRole
+      tags: [admin]
+      parameters: [{ $ref: '#/components/parameters/RoleId' }]
+      responses:
+        "204": { description: Deleted }
+        default: { $ref: '#/components/responses/Problem' }
+  /admin/provisioning:
+    get:
+      operationId: adminGetProvisioning
+      tags: [admin]
+      summary: Google sign-in, SCIM and directory sync configuration and status
+      responses:
+        "200":
+          description: Provisioning overview
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProvisioningStatus' }
+        default: { $ref: '#/components/responses/Problem' }
+  /admin/scim-connections:
+    post:
+      operationId: adminCreateScimConnection
+      tags: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, minLength: 1, maxLength: 100 }
+      responses:
+        "201":
+          description: Created; the bearer token is only returned once
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ScimConnectionCreated' }
+        default: { $ref: '#/components/responses/Problem' }
+  /admin/scim-connections/{connectionId}:
+    delete:
+      operationId: adminRevokeScimConnection
+      tags: [admin]
+      parameters: [{ $ref: '#/components/parameters/ConnectionId' }]
+      responses:
+        "204": { description: Revoked }
+        default: { $ref: '#/components/responses/Problem' }
+  /admin/scim-connections/{connectionId}/rotate:
+    post:
+      operationId: adminRotateScimConnection
+      tags: [admin]
+      parameters: [{ $ref: '#/components/parameters/ConnectionId' }]
+      responses:
+        "200":
+          description: New token
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ScimConnectionCreated' }
+        default: { $ref: '#/components/responses/Problem' }
+  /admin/directory-sync/run:
+    post:
+      operationId: adminRunDirectorySync
+      tags: [admin]
+      responses:
+        "202":
+          description: Sync job enqueued
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [jobId]
+                properties:
+                  jobId: { type: integer, format: int64 }
+        default: { $ref: '#/components/responses/Problem' }
+  /admin/audit:
+    get:
+      operationId: adminListAudit
+      tags: [admin]
+      parameters:
+        - { name: action, in: query, description: Prefix match, e.g. "scim." , schema: { type: string } }
+        - { name: actorId, in: query, schema: { type: string, format: uuid } }
+        - { name: before, in: query, description: Return events with id lower than this, schema: { type: integer, format: int64 } }
+        - { $ref: '#/components/parameters/Limit' }
+      responses:
+        "200":
+          description: Audit events, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/AuditEvent' }
+        default: { $ref: '#/components/responses/Problem' }
+  /admin/scm-connections:
+    get:
+      operationId: adminListScmConnections
+      tags: [scm]
+      responses:
+        "200":
+          description: GitHub Apps and GitLab instances
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ScmConnection' }
+        default: { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: adminCreateScmConnection
+      tags: [scm]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ScmConnectionInput' }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ScmConnection' }
+        default: { $ref: '#/components/responses/Problem' }
+  /admin/scm-connections/{connectionId}:
+    patch:
+      operationId: adminUpdateScmConnection
+      tags: [scm]
+      parameters: [{ $ref: '#/components/parameters/ConnectionId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ScmConnectionPatch' }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ScmConnection' }
+        default: { $ref: '#/components/responses/Problem' }
+    delete:
+      operationId: adminDeleteScmConnection
+      tags: [scm]
+      parameters: [{ $ref: '#/components/parameters/ConnectionId' }]
+      responses:
+        "204": { description: Deleted }
+        default: { $ref: '#/components/responses/Problem' }
+  /admin/scm-connections/{connectionId}/sync:
+    post:
+      operationId: adminSyncScmConnection
+      tags: [scm]
+      summary: Discover repositories and reconcile links from the provider API
+      parameters: [{ $ref: '#/components/parameters/ConnectionId' }]
+      responses:
+        "202":
+          description: Reconcile job enqueued
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [jobId]
+                properties:
+                  jobId: { type: integer, format: int64 }
+        default: { $ref: '#/components/responses/Problem' }
+  /admin/scm-connections/{connectionId}/events:
+    get:
+      operationId: adminListWebhookEvents
+      tags: [scm]
+      parameters: [{ $ref: '#/components/parameters/ConnectionId' }, { $ref: '#/components/parameters/Limit' }]
+      responses:
+        "200":
+          description: Recent inbound webhook deliveries
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/WebhookEvent' }
+        default: { $ref: '#/components/responses/Problem' }
+  /admin/webhook-events/{eventId}/reprocess:
+    post:
+      operationId: adminReprocessWebhookEvent
+      tags: [scm]
+      parameters: [{ $ref: '#/components/parameters/EventId' }]
+      responses:
+        "202": { description: Re-queued }
+        default: { $ref: '#/components/responses/Problem' }
+  /scm/repositories:
+    get:
+      operationId: listScmRepositories
+      tags: [scm]
+      parameters:
+        - { name: q, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: Repositories known from all connections
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ScmRepository' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  # ---------------------------------------------------------------------------
+  # Custom fields
+  # ---------------------------------------------------------------------------
+  /fields:
+    get:
+      operationId: listFields
+      tags: [fields]
+      responses:
+        "200":
+          description: Custom field definitions
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/FieldDefinition' }
+        default: { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: createField
+      tags: [fields]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FieldDefinitionInput' }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FieldDefinition' }
+        default: { $ref: '#/components/responses/Problem' }
+  /fields/{fieldId}:
+    put:
+      operationId: updateField
+      tags: [fields]
+      parameters: [{ $ref: '#/components/parameters/FieldId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FieldDefinitionInput' }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FieldDefinition' }
+        default: { $ref: '#/components/responses/Problem' }
+    delete:
+      operationId: deleteField
+      tags: [fields]
+      parameters: [{ $ref: '#/components/parameters/FieldId' }]
+      responses:
+        "204": { description: Deleted }
+        default: { $ref: '#/components/responses/Problem' }
+
+  # ---------------------------------------------------------------------------
+  # Projects
+  # ---------------------------------------------------------------------------
+  /project-templates:
+    get:
+      operationId: listProjectTemplates
+      tags: [projects]
+      responses:
+        "200":
+          description: Templates a project can be created from
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ProjectTemplate' }
+        default: { $ref: '#/components/responses/Problem' }
+  /projects:
+    get:
+      operationId: listProjects
+      tags: [projects]
+      responses:
+        "200":
+          description: Projects the caller can browse
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Project' }
+        default: { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: createProject
+      tags: [projects]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProjectCreate' }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Project' }
+        default: { $ref: '#/components/responses/Problem' }
+  /projects/{projectKey}:
+    get:
+      operationId: getProject
+      tags: [projects]
+      parameters: [{ $ref: '#/components/parameters/ProjectKey' }]
+      responses:
+        "200":
+          description: Project
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Project' }
+        default: { $ref: '#/components/responses/Problem' }
+    patch:
+      operationId: updateProject
+      tags: [projects]
+      parameters: [{ $ref: '#/components/parameters/ProjectKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProjectPatch' }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Project' }
+        default: { $ref: '#/components/responses/Problem' }
+    delete:
+      operationId: deleteProject
+      tags: [projects]
+      parameters: [{ $ref: '#/components/parameters/ProjectKey' }]
+      responses:
+        "204": { description: Deleted }
+        default: { $ref: '#/components/responses/Problem' }
+  /projects/{projectKey}/members:
+    get:
+      operationId: listProjectMembers
+      tags: [projects]
+      parameters: [{ $ref: '#/components/parameters/ProjectKey' }]
+      responses:
+        "200":
+          description: Direct and group memberships
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ProjectMember' }
+        default: { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: addProjectMember
+      tags: [projects]
+      parameters: [{ $ref: '#/components/parameters/ProjectKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [roleKey]
+              properties:
+                userId: { type: string, format: uuid }
+                groupId: { type: string, format: uuid }
+                roleKey: { type: string }
+      responses:
+        "201":
+          description: Added
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectMember' }
+        default: { $ref: '#/components/responses/Problem' }
+  /projects/{projectKey}/members/{memberId}:
+    patch:
+      operationId: updateProjectMember
+      tags: [projects]
+      parameters: [{ $ref: '#/components/parameters/ProjectKey' }, { $ref: '#/components/parameters/MemberId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [roleKey]
+              properties:
+                roleKey: { type: string }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectMember' }
+        default: { $ref: '#/components/responses/Problem' }
+    delete:
+      operationId: removeProjectMember
+      tags: [projects]
+      parameters: [{ $ref: '#/components/parameters/ProjectKey' }, { $ref: '#/components/parameters/MemberId' }]
+      responses:
+        "204": { description: Removed }
+        default: { $ref: '#/components/responses/Problem' }
+  /projects/{projectKey}/labels:
+    get:
+      operationId: listProjectLabels
+      tags: [projects]
+      parameters: [{ $ref: '#/components/parameters/ProjectKey' }]
+      responses:
+        "200":
+          description: Labels in use
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { type: string }
+        default: { $ref: '#/components/responses/Problem' }
+  /projects/{projectKey}/issue-types:
+    get:
+      operationId: listIssueTypes
+      tags: [projects]
+      parameters: [{ $ref: '#/components/parameters/ProjectKey' }]
+      responses:
+        "200":
+          description: Issue types and their workflow mapping
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/IssueType' }
+        default: { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: createIssueType
+      tags: [projects]
+      parameters: [{ $ref: '#/components/parameters/ProjectKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/IssueTypeInput' }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IssueType' }
+        default: { $ref: '#/components/responses/Problem' }
+  /projects/{projectKey}/issue-types/{typeId}:
+    patch:
+      operationId: updateIssueType
+      tags: [projects]
+      description: |
+        Changing `workflowId` re-maps existing issues of this type; statuses missing from the new
+        workflow must be mapped in `statusMapping` (old status name -> new status name).
+      parameters: [{ $ref: '#/components/parameters/ProjectKey' }, { $ref: '#/components/parameters/TypeId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, minLength: 1, maxLength: 60 }
+                description: { type: string }
+                icon: { type: string }
+                color: { type: string }
+                workflowId: { type: string, format: uuid }
+                statusMapping:
+                  type: object
+                  additionalProperties: { type: string }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IssueType' }
+        default: { $ref: '#/components/responses/Problem' }
+    delete:
+      operationId: deleteIssueType
+      tags: [projects]
+      parameters: [{ $ref: '#/components/parameters/ProjectKey' }, { $ref: '#/components/parameters/TypeId' }]
+      responses:
+        "204": { description: Deleted }
+        default: { $ref: '#/components/responses/Problem' }
+  /projects/{projectKey}/repositories:
+    get:
+      operationId: listProjectRepositories
+      tags: [scm]
+      parameters: [{ $ref: '#/components/parameters/ProjectKey' }]
+      responses:
+        "200":
+          description: Repositories connected to the project
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ScmRepository' }
+        default: { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: linkProjectRepository
+      tags: [scm]
+      parameters: [{ $ref: '#/components/parameters/ProjectKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [repositoryId]
+              properties:
+                repositoryId: { type: string, format: uuid }
+      responses:
+        "201":
+          description: Linked
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ScmRepository' }
+        default: { $ref: '#/components/responses/Problem' }
+  /projects/{projectKey}/repositories/{repositoryId}:
+    delete:
+      operationId: unlinkProjectRepository
+      tags: [scm]
+      parameters: [{ $ref: '#/components/parameters/ProjectKey' }, { $ref: '#/components/parameters/RepositoryId' }]
+      responses:
+        "204": { description: Unlinked }
+        default: { $ref: '#/components/responses/Problem' }
+  /projects/{projectKey}/reports/cycle-time:
+    get:
+      operationId: getCycleTimeReport
+      tags: [projects]
+      parameters:
+        - { $ref: '#/components/parameters/ProjectKey' }
+        - { name: days, in: query, schema: { type: integer, default: 30, minimum: 1, maximum: 365 } }
+      responses:
+        "200":
+          description: Cycle time of issues resolved in the window, derived from issue history
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CycleTimeReport' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  # ---------------------------------------------------------------------------
+  # Workflows
+  # ---------------------------------------------------------------------------
+  /workflows:
+    get:
+      operationId: listWorkflows
+      tags: [workflows]
+      parameters:
+        - { name: project, in: query, description: Project key; returns its workflows plus shared ones, schema: { type: string } }
+      responses:
+        "200":
+          description: Workflows
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Workflow' }
+        default: { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: createWorkflow
+      tags: [workflows]
+      description: Create a workflow from YAML and publish version 1. Omit `projectKey` for a shared workflow (org admin).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [yaml]
+              properties:
+                projectKey: { type: string }
+                yaml: { type: string }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkflowDetail' }
+        default: { $ref: '#/components/responses/Problem' }
+  /workflows/apply:
+    put:
+      operationId: applyWorkflow
+      tags: [workflows]
+      description: |
+        Workflows as code. Create the named workflow or publish a new version when the document changed;
+        a no-op when it is identical. Used by `wfm workflow apply` from CI.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [yaml]
+              properties:
+                projectKey: { type: string }
+                yaml: { type: string }
+                statusMapping:
+                  type: object
+                  additionalProperties: { type: string }
+                dryRun: { type: boolean, default: false }
+      responses:
+        "200":
+          description: Result of the apply
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkflowApplyResult' }
+        default: { $ref: '#/components/responses/Problem' }
+  /workflows/validate:
+    post:
+      operationId: validateWorkflow
+      tags: [workflows]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [yaml]
+              properties:
+                yaml: { type: string }
+                workflowId:
+                  description: When set, also report statuses removed relative to the current version.
+                  type: string
+                  format: uuid
+      responses:
+        "200":
+          description: Validation result (always 200; check `valid`)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkflowValidation' }
+        default: { $ref: '#/components/responses/Problem' }
+  /workflows/{workflowId}:
+    get:
+      operationId: getWorkflow
+      tags: [workflows]
+      parameters: [{ $ref: '#/components/parameters/WorkflowId' }]
+      responses:
+        "200":
+          description: Workflow with its current version
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkflowDetail' }
+        default: { $ref: '#/components/responses/Problem' }
+    delete:
+      operationId: deleteWorkflow
+      tags: [workflows]
+      parameters: [{ $ref: '#/components/parameters/WorkflowId' }]
+      responses:
+        "204": { description: Deleted }
+        default: { $ref: '#/components/responses/Problem' }
+  /workflows/{workflowId}/versions:
+    get:
+      operationId: listWorkflowVersions
+      tags: [workflows]
+      parameters: [{ $ref: '#/components/parameters/WorkflowId' }]
+      responses:
+        "200":
+          description: Published versions, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/WorkflowVersionSummary' }
+        default: { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: publishWorkflowVersion
+      tags: [workflows]
+      description: |
+        Publish a new version. When it removes a status that issues are in, `statusMapping`
+        (old status name -> new status name) is required; a migration job then moves the issues.
+      parameters: [{ $ref: '#/components/parameters/WorkflowId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [yaml]
+              properties:
+                yaml: { type: string }
+                statusMapping:
+                  type: object
+                  additionalProperties: { type: string }
+      responses:
+        "201":
+          description: Published
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkflowDetail' }
+        default: { $ref: '#/components/responses/Problem' }
+  /workflows/{workflowId}/versions/{version}:
+    get:
+      operationId: getWorkflowVersion
+      tags: [workflows]
+      parameters:
+        - { $ref: '#/components/parameters/WorkflowId' }
+        - { name: version, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: A specific version
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkflowVersion' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  # ---------------------------------------------------------------------------
+  # Boards, sprints, releases
+  # ---------------------------------------------------------------------------
+  /projects/{projectKey}/boards:
+    get:
+      operationId: listBoards
+      tags: [boards]
+      parameters: [{ $ref: '#/components/parameters/ProjectKey' }]
+      responses:
+        "200":
+          description: Boards
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Board' }
+        default: { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: createBoard
+      tags: [boards]
+      parameters: [{ $ref: '#/components/parameters/ProjectKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BoardInput' }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Board' }
+        default: { $ref: '#/components/responses/Problem' }
+  /boards/{boardId}:
+    get:
+      operationId: getBoard
+      tags: [boards]
+      parameters: [{ $ref: '#/components/parameters/BoardId' }]
+      responses:
+        "200":
+          description: Board configuration
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Board' }
+        default: { $ref: '#/components/responses/Problem' }
+    put:
+      operationId: updateBoard
+      tags: [boards]
+      parameters: [{ $ref: '#/components/parameters/BoardId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BoardInput' }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Board' }
+        default: { $ref: '#/components/responses/Problem' }
+    delete:
+      operationId: deleteBoard
+      tags: [boards]
+      parameters: [{ $ref: '#/components/parameters/BoardId' }]
+      responses:
+        "204": { description: Deleted }
+        default: { $ref: '#/components/responses/Problem' }
+  /boards/{boardId}/data:
+    get:
+      operationId: getBoardData
+      tags: [boards]
+      parameters:
+        - { $ref: '#/components/parameters/BoardId' }
+        - { name: jql, in: query, description: Quick filter applied on top of the board filter, schema: { type: string } }
+      responses:
+        "200":
+          description: Columns with issues (Scrum boards show the active sprint)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BoardData' }
+        default: { $ref: '#/components/responses/Problem' }
+  /boards/{boardId}/backlog:
+    get:
+      operationId: getBacklog
+      tags: [boards]
+      parameters:
+        - { $ref: '#/components/parameters/BoardId' }
+        - { name: jql, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: Active and future sprints with their issues, then the backlog
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Backlog' }
+        default: { $ref: '#/components/responses/Problem' }
+  /projects/{projectKey}/sprints:
+    get:
+      operationId: listSprints
+      tags: [sprints]
+      parameters:
+        - { $ref: '#/components/parameters/ProjectKey' }
+        - { name: state, in: query, schema: { $ref: '#/components/schemas/SprintState' } }
+      responses:
+        "200":
+          description: Sprints
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Sprint' }
+        default: { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: createSprint
+      tags: [sprints]
+      parameters: [{ $ref: '#/components/parameters/ProjectKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SprintInput' }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Sprint' }
+        default: { $ref: '#/components/responses/Problem' }
+  /sprints/{sprintId}:
+    patch:
+      operationId: updateSprint
+      tags: [sprints]
+      parameters: [{ $ref: '#/components/parameters/SprintId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SprintInput' }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Sprint' }
+        default: { $ref: '#/components/responses/Problem' }
+    delete:
+      operationId: deleteSprint
+      tags: [sprints]
+      parameters: [{ $ref: '#/components/parameters/SprintId' }]
+      responses:
+        "204": { description: Deleted; its issues return to the backlog }
+        default: { $ref: '#/components/responses/Problem' }
+  /sprints/{sprintId}/start:
+    post:
+      operationId: startSprint
+      tags: [sprints]
+      parameters: [{ $ref: '#/components/parameters/SprintId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [startDate, endDate]
+              properties:
+                startDate: { type: string, format: date }
+                endDate: { type: string, format: date }
+                goal: { type: string }
+      responses:
+        "200":
+          description: Started
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Sprint' }
+        default: { $ref: '#/components/responses/Problem' }
+  /sprints/{sprintId}/complete:
+    post:
+      operationId: completeSprint
+      tags: [sprints]
+      parameters: [{ $ref: '#/components/parameters/SprintId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                moveOpenIssuesTo:
+                  description: Sprint id for unfinished issues; omit to return them to the backlog.
+                  type: string
+                  format: uuid
+      responses:
+        "200":
+          description: Completed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Sprint' }
+        default: { $ref: '#/components/responses/Problem' }
+  /sprints/{sprintId}/report:
+    get:
+      operationId: getSprintReport
+      tags: [sprints]
+      parameters: [{ $ref: '#/components/parameters/SprintId' }]
+      responses:
+        "200":
+          description: Burndown and completion for the sprint
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SprintReport' }
+        default: { $ref: '#/components/responses/Problem' }
+  /projects/{projectKey}/releases:
+    get:
+      operationId: listReleases
+      tags: [releases]
+      parameters: [{ $ref: '#/components/parameters/ProjectKey' }]
+      responses:
+        "200":
+          description: Releases (versions)
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Release' }
+        default: { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: createRelease
+      tags: [releases]
+      parameters: [{ $ref: '#/components/parameters/ProjectKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReleaseInput' }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Release' }
+        default: { $ref: '#/components/responses/Problem' }
+  /releases/{releaseId}:
+    patch:
+      operationId: updateRelease
+      tags: [releases]
+      parameters: [{ $ref: '#/components/parameters/ReleaseId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReleaseInput' }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Release' }
+        default: { $ref: '#/components/responses/Problem' }
+    delete:
+      operationId: deleteRelease
+      tags: [releases]
+      parameters: [{ $ref: '#/components/parameters/ReleaseId' }]
+      responses:
+        "204": { description: Deleted }
+        default: { $ref: '#/components/responses/Problem' }
+  /releases/{releaseId}/release:
+    post:
+      operationId: shipRelease
+      tags: [releases]
+      parameters: [{ $ref: '#/components/parameters/ReleaseId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                moveOpenIssuesTo:
+                  description: Release id for unfinished issues; omit to leave them unassigned.
+                  type: string
+                  format: uuid
+      responses:
+        "200":
+          description: Marked released
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Release' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  # ---------------------------------------------------------------------------
+  # Issues
+  # ---------------------------------------------------------------------------
+  /search:
+    get:
+      operationId: searchIssues
+      tags: [search]
+      parameters:
+        - { name: jql, in: query, schema: { type: string, default: '' } }
+        - { $ref: '#/components/parameters/Limit' }
+        - { $ref: '#/components/parameters/Offset' }
+      responses:
+        "200":
+          description: Matching issues
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SearchResult' }
+        default: { $ref: '#/components/responses/Problem' }
+  /search/fields:
+    get:
+      operationId: getSearchMetadata
+      tags: [search]
+      summary: Fields, operators and functions for JQL autocompletion
+      responses:
+        "200":
+          description: JQL metadata
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SearchMetadata' }
+        default: { $ref: '#/components/responses/Problem' }
+  /filters:
+    get:
+      operationId: listFilters
+      tags: [search]
+      responses:
+        "200":
+          description: The caller's filters and filters shared with everyone
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/SavedFilter' }
+        default: { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: createFilter
+      tags: [search]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SavedFilterInput' }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SavedFilter' }
+        default: { $ref: '#/components/responses/Problem' }
+  /filters/{filterId}:
+    put:
+      operationId: updateFilter
+      tags: [search]
+      parameters: [{ $ref: '#/components/parameters/FilterId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SavedFilterInput' }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SavedFilter' }
+        default: { $ref: '#/components/responses/Problem' }
+    delete:
+      operationId: deleteFilter
+      tags: [search]
+      parameters: [{ $ref: '#/components/parameters/FilterId' }]
+      responses:
+        "204": { description: Deleted }
+        default: { $ref: '#/components/responses/Problem' }
+  /issues:
+    post:
+      operationId: createIssue
+      tags: [issues]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/IssueCreate' }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IssueDetail' }
+        default: { $ref: '#/components/responses/Problem' }
+  /issues/{issueKey}:
+    get:
+      operationId: getIssue
+      tags: [issues]
+      parameters: [{ $ref: '#/components/parameters/IssueKey' }]
+      responses:
+        "200":
+          description: Issue
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IssueDetail' }
+        default: { $ref: '#/components/responses/Problem' }
+    patch:
+      operationId: updateIssue
+      tags: [issues]
+      description: Send `version` to reject the write with 409 if someone else changed the issue first.
+      parameters: [{ $ref: '#/components/parameters/IssueKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/IssuePatch' }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IssueDetail' }
+        default: { $ref: '#/components/responses/Problem' }
+    delete:
+      operationId: deleteIssue
+      tags: [issues]
+      parameters: [{ $ref: '#/components/parameters/IssueKey' }]
+      responses:
+        "204": { description: Deleted }
+        default: { $ref: '#/components/responses/Problem' }
+  /issues/{issueKey}/transitions:
+    get:
+      operationId: listTransitions
+      tags: [issues]
+      parameters: [{ $ref: '#/components/parameters/IssueKey' }]
+      responses:
+        "200":
+          description: Transitions the caller may run (conditions already evaluated)
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/AvailableTransition' }
+        default: { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: transitionIssue
+      tags: [issues]
+      description: Runs conditions and validators; a 422 problem lists failed validators.
+      parameters: [{ $ref: '#/components/parameters/IssueKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TransitionRequest' }
+      responses:
+        "200":
+          description: Transitioned
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IssueDetail' }
+        default: { $ref: '#/components/responses/Problem' }
+  /issues/{issueKey}/move:
+    post:
+      operationId: moveIssue
+      tags: [issues]
+      description: |
+        Board and backlog drag-and-drop: optionally transition to a status, change sprint and re-rank
+        between neighbours, atomically. Moving to a status whose transition needs a screen returns
+        422 with code `screen_required`.
+      parameters: [{ $ref: '#/components/parameters/IssueKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MoveRequest' }
+      responses:
+        "200":
+          description: Moved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Issue' }
+        default: { $ref: '#/components/responses/Problem' }
+  /issues/{issueKey}/comments:
+    get:
+      operationId: listComments
+      tags: [issues]
+      parameters: [{ $ref: '#/components/parameters/IssueKey' }]
+      responses:
+        "200":
+          description: Comments, oldest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Comment' }
+        default: { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: addComment
+      tags: [issues]
+      parameters: [{ $ref: '#/components/parameters/IssueKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CommentInput' }
+      responses:
+        "201":
+          description: Added
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Comment' }
+        default: { $ref: '#/components/responses/Problem' }
+  /comments/{commentId}:
+    patch:
+      operationId: updateComment
+      tags: [issues]
+      parameters: [{ $ref: '#/components/parameters/CommentId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CommentInput' }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Comment' }
+        default: { $ref: '#/components/responses/Problem' }
+    delete:
+      operationId: deleteComment
+      tags: [issues]
+      parameters: [{ $ref: '#/components/parameters/CommentId' }]
+      responses:
+        "204": { description: Deleted }
+        default: { $ref: '#/components/responses/Problem' }
+  /issues/{issueKey}/history:
+    get:
+      operationId: listIssueHistory
+      tags: [issues]
+      parameters: [{ $ref: '#/components/parameters/IssueKey' }]
+      responses:
+        "200":
+          description: Field changes, oldest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/HistoryEntry' }
+        default: { $ref: '#/components/responses/Problem' }
+  /issues/{issueKey}/links:
+    post:
+      operationId: createIssueLink
+      tags: [issues]
+      parameters: [{ $ref: '#/components/parameters/IssueKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type, targetKey]
+              properties:
+                type: { $ref: '#/components/schemas/LinkType' }
+                targetKey: { type: string }
+                direction:
+                  description: outward = "this issue <type> target"; inward reverses it.
+                  type: string
+                  enum: [outward, inward]
+                  default: outward
+      responses:
+        "201":
+          description: Linked
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IssueLink' }
+        default: { $ref: '#/components/responses/Problem' }
+  /issue-links/{linkId}:
+    delete:
+      operationId: deleteIssueLink
+      tags: [issues]
+      parameters: [{ $ref: '#/components/parameters/LinkId' }]
+      responses:
+        "204": { description: Removed }
+        default: { $ref: '#/components/responses/Problem' }
+  /issues/{issueKey}/watchers:
+    get:
+      operationId: listWatchers
+      tags: [issues]
+      parameters: [{ $ref: '#/components/parameters/IssueKey' }]
+      responses:
+        "200":
+          description: Watchers
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/User' }
+        default: { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: addWatcher
+      tags: [issues]
+      parameters: [{ $ref: '#/components/parameters/IssueKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Omit userId to watch the issue yourself.
+              properties:
+                userId: { type: string, format: uuid }
+      responses:
+        "204": { description: Watching }
+        default: { $ref: '#/components/responses/Problem' }
+  /issues/{issueKey}/watchers/{userId}:
+    delete:
+      operationId: removeWatcher
+      tags: [issues]
+      parameters: [{ $ref: '#/components/parameters/IssueKey' }, { $ref: '#/components/parameters/UserId' }]
+      responses:
+        "204": { description: Removed }
+        default: { $ref: '#/components/responses/Problem' }
+  /issues/{issueKey}/attachments:
+    post:
+      operationId: uploadAttachment
+      tags: [issues]
+      parameters: [{ $ref: '#/components/parameters/IssueKey' }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        "201":
+          description: Uploaded
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Attachment' }
+        default: { $ref: '#/components/responses/Problem' }
+  /attachments/{attachmentId}:
+    get:
+      operationId: downloadAttachment
+      tags: [issues]
+      parameters: [{ $ref: '#/components/parameters/AttachmentId' }]
+      responses:
+        "200":
+          description: File content
+          headers:
+            Content-Disposition: { schema: { type: string } }
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "302":
+          description: Redirect to a pre-signed object storage URL
+          headers:
+            Location: { schema: { type: string } }
+        default: { $ref: '#/components/responses/Problem' }
+    delete:
+      operationId: deleteAttachment
+      tags: [issues]
+      parameters: [{ $ref: '#/components/parameters/AttachmentId' }]
+      responses:
+        "204": { description: Deleted }
+        default: { $ref: '#/components/responses/Problem' }
+  /issues/{issueKey}/branches:
+    post:
+      operationId: createIssueBranch
+      tags: [scm]
+      summary: Create a branch named from the issue key and summary
+      parameters: [{ $ref: '#/components/parameters/IssueKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [repositoryId]
+              properties:
+                repositoryId: { type: string, format: uuid }
+                name: { type: string, description: Defaults to <key>-<summary-slug> }
+                fromRef: { type: string, description: Defaults to the repository default branch }
+      responses:
+        "201":
+          description: Branch created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DevLink' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  # ---------------------------------------------------------------------------
+  # Automation & outbound webhooks
+  # ---------------------------------------------------------------------------
+  /projects/{projectKey}/automation-rules:
+    get:
+      operationId: listAutomationRules
+      tags: [automation]
+      parameters: [{ $ref: '#/components/parameters/ProjectKey' }]
+      responses:
+        "200":
+          description: Rules
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/AutomationRule' }
+        default: { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: createAutomationRule
+      tags: [automation]
+      parameters: [{ $ref: '#/components/parameters/ProjectKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AutomationRuleInput' }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AutomationRule' }
+        default: { $ref: '#/components/responses/Problem' }
+  /automation-rules/{ruleId}:
+    put:
+      operationId: updateAutomationRule
+      tags: [automation]
+      parameters: [{ $ref: '#/components/parameters/RuleId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AutomationRuleInput' }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AutomationRule' }
+        default: { $ref: '#/components/responses/Problem' }
+    delete:
+      operationId: deleteAutomationRule
+      tags: [automation]
+      parameters: [{ $ref: '#/components/parameters/RuleId' }]
+      responses:
+        "204": { description: Deleted }
+        default: { $ref: '#/components/responses/Problem' }
+  /automation-rules/{ruleId}/runs:
+    get:
+      operationId: listAutomationRuns
+      tags: [automation]
+      parameters: [{ $ref: '#/components/parameters/RuleId' }, { $ref: '#/components/parameters/Limit' }]
+      responses:
+        "200":
+          description: Recent runs
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/AutomationRun' }
+        default: { $ref: '#/components/responses/Problem' }
+  /webhooks:
+    get:
+      operationId: listWebhooks
+      tags: [webhooks]
+      parameters:
+        - { name: project, in: query, description: Project key; omit for organisation-wide subscriptions, schema: { type: string } }
+      responses:
+        "200":
+          description: Outbound webhook subscriptions
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/WebhookSubscription' }
+        default: { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: createWebhook
+      tags: [webhooks]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WebhookSubscriptionInput' }
+      responses:
+        "201":
+          description: Created; the signing secret is only returned once
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WebhookSubscriptionCreated' }
+        default: { $ref: '#/components/responses/Problem' }
+  /webhooks/{webhookId}:
+    put:
+      operationId: updateWebhook
+      tags: [webhooks]
+      parameters: [{ $ref: '#/components/parameters/WebhookId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WebhookSubscriptionInput' }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WebhookSubscription' }
+        default: { $ref: '#/components/responses/Problem' }
+    delete:
+      operationId: deleteWebhook
+      tags: [webhooks]
+      parameters: [{ $ref: '#/components/parameters/WebhookId' }]
+      responses:
+        "204": { description: Deleted }
+        default: { $ref: '#/components/responses/Problem' }
+  /webhooks/{webhookId}/deliveries:
+    get:
+      operationId: listWebhookDeliveries
+      tags: [webhooks]
+      parameters: [{ $ref: '#/components/parameters/WebhookId' }, { $ref: '#/components/parameters/Limit' }]
+      responses:
+        "200":
+          description: Recent deliveries
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/WebhookDelivery' }
+        default: { $ref: '#/components/responses/Problem' }
+  /webhooks/{webhookId}/test:
+    post:
+      operationId: testWebhook
+      tags: [webhooks]
+      parameters: [{ $ref: '#/components/parameters/WebhookId' }]
+      responses:
+        "202": { description: A ping delivery was queued }
+        default: { $ref: '#/components/responses/Problem' }
+
+  # ---------------------------------------------------------------------------
+  # Live updates
+  # ---------------------------------------------------------------------------
+  /events:
+    get:
+      operationId: streamEvents
+      tags: [handwritten]
+      summary: Server-sent events for open boards and issue views
+      parameters:
+        - { name: project, in: query, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: "`text/event-stream` of `issue.created`, `issue.updated`, `issue.deleted`, `board.updated` events"
+          content:
+            text/event-stream:
+              schema: { type: string }
+        default: { $ref: '#/components/responses/Problem' }
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: wfm_session
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Personal access token or service-account token (`wfm_pat_...`)
+
+  parameters:
+    Limit:
+      { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 500, default: 50 } }
+    Offset:
+      { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+    ProjectKey:
+      { name: projectKey, in: path, required: true, description: Project key (or id), schema: { type: string } }
+    IssueKey:
+      { name: issueKey, in: path, required: true, description: Issue key such as PLAT-12 (or id), schema: { type: string } }
+    UserId: { name: userId, in: path, required: true, schema: { type: string, format: uuid } }
+    GroupId: { name: groupId, in: path, required: true, schema: { type: string, format: uuid } }
+    RoleId: { name: roleId, in: path, required: true, schema: { type: string, format: uuid } }
+    TokenId: { name: tokenId, in: path, required: true, schema: { type: string, format: uuid } }
+    MemberId: { name: memberId, in: path, required: true, schema: { type: string, format: uuid } }
+    TypeId: { name: typeId, in: path, required: true, schema: { type: string, format: uuid } }
+    WorkflowId: { name: workflowId, in: path, required: true, schema: { type: string, format: uuid } }
+    BoardId: { name: boardId, in: path, required: true, schema: { type: string, format: uuid } }
+    SprintId: { name: sprintId, in: path, required: true, schema: { type: string, format: uuid } }
+    ReleaseId: { name: releaseId, in: path, required: true, schema: { type: string, format: uuid } }
+    CommentId: { name: commentId, in: path, required: true, schema: { type: string, format: uuid } }
+    LinkId: { name: linkId, in: path, required: true, schema: { type: string, format: uuid } }
+    AttachmentId: { name: attachmentId, in: path, required: true, schema: { type: string, format: uuid } }
+    FilterId: { name: filterId, in: path, required: true, schema: { type: string, format: uuid } }
+    ConnectionId: { name: connectionId, in: path, required: true, schema: { type: string, format: uuid } }
+    RepositoryId: { name: repositoryId, in: path, required: true, schema: { type: string, format: uuid } }
+    RuleId: { name: ruleId, in: path, required: true, schema: { type: string, format: uuid } }
+    WebhookId: { name: webhookId, in: path, required: true, schema: { type: string, format: uuid } }
+    FieldId: { name: fieldId, in: path, required: true, schema: { type: string, format: uuid } }
+    EventId: { name: eventId, in: path, required: true, schema: { type: string, format: uuid } }
+
+  responses:
+    Problem:
+      description: Error
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+
+  schemas:
+    Problem:
+      type: object
+      required: [title, status]
+      properties:
+        type: { type: string }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        code: { type: string, description: 'Machine-readable error code, e.g. transition_not_allowed' }
+        errors:
+          type: array
+          items: { $ref: '#/components/schemas/FieldError' }
+        position: { type: integer, description: Character offset of a JQL syntax error }
+    FieldError:
+      type: object
+      required: [message]
+      properties:
+        field: { type: string }
+        message: { type: string }
+
+    OrgRole: { type: string, enum: [admin, member, guest] }
+    StatusCategory: { type: string, enum: [todo, in_progress, done] }
+    Priority: { type: string, enum: [highest, high, medium, low, lowest] }
+    LinkDirection: { type: string, enum: [outward, inward] }
+    LinkType: { type: string, enum: [blocks, relates, duplicates, clones] }
+    TokenScope:
+      type: string
+      enum: [read, write, admin]
+      description: read = GET only; write = all project and issue operations; admin = organisation administration (if the owner is an admin).
+
+    AuthProviders:
+      type: object
+      required: [providers, devLogin]
+      properties:
+        providers:
+          type: array
+          items: { $ref: '#/components/schemas/AuthProvider' }
+        devLogin: { type: boolean }
+    AuthProvider:
+      type: object
+      required: [id, name, loginUrl]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        loginUrl: { type: string }
+    UserKind: { type: string, enum: [human, service] }
+    UserSource: { type: string, enum: [jit, scim, google, admin, dev, system] }
+
+    User:
+      type: object
+      required: [id, displayName, email, kind]
+      properties:
+        id: { type: string, format: uuid }
+        displayName: { type: string }
+        email: { type: string }
+        avatarUrl: { type: string }
+        kind: { $ref: '#/components/schemas/UserKind' }
+    Me:
+      allOf:
+        - $ref: '#/components/schemas/User'
+        - type: object
+          required: [orgRole]
+          properties:
+            orgRole: { $ref: '#/components/schemas/OrgRole' }
+    AdminUser:
+      allOf:
+        - $ref: '#/components/schemas/User'
+        - type: object
+          required: [username, orgRole, active, source, createdAt]
+          properties:
+            username: { type: string }
+            orgRole: { $ref: '#/components/schemas/OrgRole' }
+            effectiveOrgRole: { $ref: '#/components/schemas/OrgRole' }
+            active: { type: boolean }
+            source: { $ref: '#/components/schemas/UserSource' }
+            googleLinked: { type: boolean }
+            lastLoginAt: { type: string, format: date-time }
+            deactivatedAt: { type: string, format: date-time }
+            deletedAt: { type: string, format: date-time }
+            createdAt: { type: string, format: date-time }
+    ApiToken:
+      type: object
+      required: [id, name, prefix, scopes, expiresAt, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        prefix: { type: string }
+        scopes: { type: array, items: { $ref: '#/components/schemas/TokenScope' } }
+        expiresAt: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+        lastUsedAt: { type: string, format: date-time }
+    ApiTokenCreate:
+      type: object
+      required: [name, scopes, expiresInDays]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100 }
+        scopes: { type: array, minItems: 1, items: { $ref: '#/components/schemas/TokenScope' } }
+        expiresInDays: { type: integer, minimum: 1, maximum: 366 }
+    ApiTokenCreated:
+      allOf:
+        - $ref: '#/components/schemas/ApiToken'
+        - type: object
+          required: [token]
+          properties:
+            token: { type: string }
+    Group:
+      type: object
+      required: [id, displayName, description, source, memberCount]
+      properties:
+        id: { type: string, format: uuid }
+        displayName: { type: string }
+        description: { type: string }
+        source: { $ref: '#/components/schemas/GroupSource' }
+        email: { type: string }
+        orgRole: { $ref: '#/components/schemas/OrgRole' }
+        memberCount: { type: integer }
+    GroupSource: { type: string, enum: [local, scim, google] }
+    GroupDetail:
+      allOf:
+        - $ref: '#/components/schemas/Group'
+        - type: object
+          required: [members]
+          properties:
+            members: { type: array, items: { $ref: '#/components/schemas/User' } }
+    Role:
+      type: object
+      required: [id, key, name, description, permissions, builtin]
+      properties:
+        id: { type: string, format: uuid }
+        key: { type: string }
+        name: { type: string }
+        description: { type: string }
+        permissions: { type: array, items: { type: string } }
+        builtin: { type: boolean }
+    RoleInput:
+      type: object
+      required: [key, name, permissions]
+      properties:
+        key: { type: string, pattern: '^[a-z][a-z0-9_-]{1,40}$' }
+        name: { type: string, minLength: 1, maxLength: 80 }
+        description: { type: string }
+        permissions: { type: array, items: { type: string } }
+    PermissionInfo:
+      type: object
+      required: [key, description]
+      properties:
+        key: { type: string }
+        description: { type: string }
+    AuditEvent:
+      type: object
+      required: [id, actorType, action, data, createdAt]
+      properties:
+        id: { type: integer, format: int64 }
+        actor: { $ref: '#/components/schemas/User' }
+        actorType: { type: string }
+        action: { type: string }
+        targetType: { type: string }
+        targetId: { type: string }
+        projectId: { type: string, format: uuid }
+        data: { type: object, additionalProperties: true }
+        ip: { type: string }
+        createdAt: { type: string, format: date-time }
+    ProvisioningStatus:
+      type: object
+      required: [oidc, scim, directorySync]
+      properties:
+        oidc: { $ref: '#/components/schemas/OidcStatus' }
+        scim: { $ref: '#/components/schemas/ScimStatus' }
+        directorySync: { $ref: '#/components/schemas/DirectorySyncStatus' }
+    OidcStatus:
+      type: object
+      required: [providers, allowedDomains, jitProvisioning, bootstrapAdmins]
+      properties:
+        providers: { type: array, items: { type: string } }
+        allowedDomains: { type: array, items: { type: string } }
+        jitProvisioning: { type: boolean }
+        bootstrapAdmins: { type: array, items: { type: string } }
+    ScimStatus:
+      type: object
+      required: [baseUrl, connections]
+      properties:
+        baseUrl: { type: string }
+        connections: { type: array, items: { $ref: '#/components/schemas/ScimConnection' } }
+    DirectorySyncStatus:
+      type: object
+      required: [configured, intervalMinutes, runs]
+      properties:
+        configured: { type: boolean }
+        intervalMinutes: { type: integer }
+        group: { type: string }
+        orgUnit: { type: string }
+        runs: { type: array, items: { $ref: '#/components/schemas/DirectorySyncRun' } }
+    ScimConnection:
+      type: object
+      required: [id, name, prefix, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        prefix: { type: string }
+        createdAt: { type: string, format: date-time }
+        lastUsedAt: { type: string, format: date-time }
+        userCount: { type: integer }
+        groupCount: { type: integer }
+    ScimConnectionCreated:
+      allOf:
+        - $ref: '#/components/schemas/ScimConnection'
+        - type: object
+          required: [token, baseUrl]
+          properties:
+            token: { type: string }
+            baseUrl: { type: string }
+    DirectorySyncRun:
+      type: object
+      required: [id, trigger, status, stats, startedAt]
+      properties:
+        id: { type: string, format: uuid }
+        trigger: { type: string }
+        status: { type: string, enum: [running, succeeded, failed] }
+        stats: { type: object, additionalProperties: { type: integer } }
+        error: { type: string }
+        startedAt: { type: string, format: date-time }
+        finishedAt: { type: string, format: date-time }
+
+    Status:
+      type: object
+      required: [id, name, category]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        category: { $ref: '#/components/schemas/StatusCategory' }
+
+    ProjectTemplate:
+      type: object
+      required: [id, name, description, boardType, issueTypes, workflows]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        description: { type: string }
+        boardType: { $ref: '#/components/schemas/BoardType' }
+        issueTypes:
+          type: array
+          items: { $ref: '#/components/schemas/TemplateIssueType' }
+        workflows: { type: array, items: { type: string } }
+    TemplateIssueType:
+      type: object
+      required: [key, name, level]
+      properties:
+        key: { type: string }
+        name: { type: string }
+        level: { type: integer }
+    Project:
+      type: object
+      required: [id, key, name, description, template, access, createdAt, myPermissions]
+      properties:
+        id: { type: string, format: uuid }
+        key: { type: string }
+        name: { type: string }
+        description: { type: string }
+        lead: { $ref: '#/components/schemas/User' }
+        template: { type: string }
+        access: { $ref: '#/components/schemas/ProjectAccess' }
+        openRoleKey: { type: string }
+        keyAliases: { type: array, items: { type: string } }
+        createdAt: { type: string, format: date-time }
+        myPermissions: { type: array, items: { type: string } }
+    ProjectAccess: { type: string, enum: [open, private] }
+    ProjectCreate:
+      type: object
+      required: [key, name, template]
+      properties:
+        key: { type: string, pattern: '^[A-Z][A-Z0-9]{1,9}$' }
+        name: { type: string, minLength: 1, maxLength: 120 }
+        description: { type: string }
+        template: { type: string }
+        access: { $ref: '#/components/schemas/ProjectAccess' }
+        openRoleKey: { type: string, default: member }
+    ProjectPatch:
+      type: object
+      properties:
+        key: { type: string, pattern: '^[A-Z][A-Z0-9]{1,9}$', description: Renaming keeps the old key as an alias }
+        name: { type: string, minLength: 1, maxLength: 120 }
+        description: { type: string }
+        leadId: { type: [string, 'null'], format: uuid }
+        access: { $ref: '#/components/schemas/ProjectAccess' }
+        openRoleKey: { type: string }
+    ProjectMember:
+      type: object
+      required: [id, role]
+      properties:
+        id: { type: string, format: uuid }
+        user: { $ref: '#/components/schemas/User' }
+        group: { $ref: '#/components/schemas/Group' }
+        role: { $ref: '#/components/schemas/Role' }
+    IssueType:
+      type: object
+      required: [id, key, name, description, icon, color, level, position, workflowId, workflowName]
+      properties:
+        id: { type: string, format: uuid }
+        key: { type: string }
+        name: { type: string }
+        description: { type: string }
+        icon: { type: string }
+        color: { type: string }
+        level: { type: integer, description: 'Hierarchy level: epic 1, standard 0, sub-task -1' }
+        position: { type: integer }
+        workflowId: { type: string, format: uuid }
+        workflowName: { type: string }
+    IssueTypeInput:
+      type: object
+      required: [key, name, level, workflowId]
+      properties:
+        key: { type: string, pattern: '^[a-z][a-z0-9_]{0,30}$' }
+        name: { type: string, minLength: 1, maxLength: 60 }
+        description: { type: string }
+        icon: { type: string }
+        color: { type: string }
+        level: { type: integer, minimum: -1, maximum: 2 }
+        workflowId: { type: string, format: uuid }
+    CycleTimeReport:
+      type: object
+      required: [days, issues, averageHours, medianHours, p85Hours]
+      properties:
+        days: { type: integer }
+        averageHours: { type: number, format: double }
+        medianHours: { type: number, format: double }
+        p85Hours: { type: number, format: double }
+        issues:
+          type: array
+          items: { $ref: '#/components/schemas/CycleTimeIssue' }
+    CycleTimeIssue:
+      type: object
+      required: [key, summary, cycleHours, resolvedAt]
+      properties:
+        key: { type: string }
+        summary: { type: string }
+        cycleHours: { type: number, format: double }
+        resolvedAt: { type: string, format: date-time }
+
+    Workflow:
+      type: object
+      required: [id, name, description, shared, currentVersion, updatedAt, usage]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: string }
+        projectKey: { type: string }
+        shared: { type: boolean }
+        currentVersion: { type: integer }
+        updatedAt: { type: string, format: date-time }
+        usage:
+          type: array
+          items: { $ref: '#/components/schemas/WorkflowUsage' }
+    WorkflowUsage:
+      type: object
+      required: [projectKey, issueTypeKey]
+      properties:
+        projectKey: { type: string }
+        issueTypeKey: { type: string }
+    WorkflowDetail:
+      allOf:
+        - $ref: '#/components/schemas/Workflow'
+        - type: object
+          required: [version]
+          properties:
+            version: { $ref: '#/components/schemas/WorkflowVersion' }
+            pendingMigration: { type: boolean }
+    WorkflowVersionSummary:
+      type: object
+      required: [version, publishedAt]
+      properties:
+        version: { type: integer }
+        publishedAt: { type: string, format: date-time }
+        publishedBy: { $ref: '#/components/schemas/User' }
+        issueCount: { type: integer, description: Issues still pinned to this version }
+    WorkflowVersion:
+      allOf:
+        - $ref: '#/components/schemas/WorkflowVersionSummary'
+        - type: object
+          required: [yaml, definition]
+          properties:
+            yaml: { type: string }
+            definition: { $ref: '#/components/schemas/WorkflowDefinition' }
+    WorkflowDefinition:
+      type: object
+      required: [name, statuses, transitions]
+      properties:
+        name: { type: string }
+        description: { type: string }
+        statuses:
+          type: array
+          items: { $ref: '#/components/schemas/WorkflowStatusDef' }
+        transitions:
+          type: array
+          items: { $ref: '#/components/schemas/TransitionDefinition' }
+        layout:
+          description: Node positions for the visual editor, keyed by status name.
+          type: object
+          additionalProperties: { $ref: '#/components/schemas/NodePosition' }
+    WorkflowStatusDef:
+      type: object
+      required: [id, name, category, initial]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        category: { $ref: '#/components/schemas/StatusCategory' }
+        initial: { type: boolean }
+    NodePosition:
+      type: object
+      required: [x, y]
+      properties:
+        x: { type: number, format: double }
+        y: { type: number, format: double }
+    TransitionDefinition:
+      type: object
+      required: [id, name, to]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        from:
+          description: Source status ids; omitted means any status.
+          type: array
+          items: { type: string, format: uuid }
+        to: { type: string, format: uuid }
+        condition: { type: string, description: CEL expression deciding who may see and run the transition }
+        validators:
+          type: array
+          items: { $ref: '#/components/schemas/ValidatorDef' }
+        screen:
+          type: array
+          items: { $ref: '#/components/schemas/ScreenField' }
+        postFunctions:
+          type: array
+          items: { $ref: '#/components/schemas/PostFunction' }
+    ValidatorDef:
+      type: object
+      required: [expr]
+      properties:
+        expr: { type: string, description: CEL expression that must evaluate to true }
+        message: { type: string }
+    ScreenField:
+      type: object
+      required: [field]
+      properties:
+        field: { type: string, description: resolution, comment, assignee, a system field or a custom field key }
+        required: { type: boolean }
+    PostFunction:
+      type: object
+      description: Exactly one key is set.
+      properties:
+        assignTo: { type: string, description: 'actor | reporter | unassigned | <email>' }
+        setField: { $ref: '#/components/schemas/SetFieldAction' }
+        clearField: { type: string }
+        notify: { type: string, description: 'assignee | reporter | watchers' }
+        webhook: { type: string, description: URL receiving a signed JSON POST }
+    SetFieldAction:
+      type: object
+      required: [field]
+      properties:
+        field: { type: string }
+        value: {}
+    WorkflowValidation:
+      type: object
+      required: [valid, errors]
+      properties:
+        valid: { type: boolean }
+        errors:
+          type: array
+          items: { $ref: '#/components/schemas/ValidationError' }
+        definition: { $ref: '#/components/schemas/WorkflowDefinition' }
+        removedStatuses:
+          type: array
+          items: { $ref: '#/components/schemas/RemovedStatus' }
+    ValidationError:
+      type: object
+      required: [message]
+      properties:
+        path: { type: string }
+        message: { type: string }
+    RemovedStatus:
+      type: object
+      required: [name, issueCount]
+      properties:
+        name: { type: string }
+        issueCount: { type: integer }
+    WorkflowApplyResult:
+      type: object
+      required: [action, workflowId, version]
+      properties:
+        action: { type: string, enum: [created, published, unchanged] }
+        workflowId: { type: string, format: uuid }
+        version: { type: integer }
+        migrationQueued: { type: boolean }
+
+    Board:
+      type: object
+      required: [id, projectKey, name, type, filterJql, swimlanes, doneRetentionDays, columns]
+      properties:
+        id: { type: string, format: uuid }
+        projectKey: { type: string }
+        name: { type: string }
+        type: { $ref: '#/components/schemas/BoardType' }
+        filterJql: { type: string }
+        swimlanes: { $ref: '#/components/schemas/Swimlanes' }
+        doneRetentionDays: { type: integer }
+        columns: { type: array, items: { $ref: '#/components/schemas/BoardColumn' } }
+    BoardType: { type: string, enum: [scrum, kanban] }
+    Swimlanes: { type: string, enum: [none, assignee, epic, priority, type] }
+    BoardColumn:
+      type: object
+      required: [name, statusIds]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string, minLength: 1, maxLength: 60 }
+        statusIds: { type: array, items: { type: string, format: uuid } }
+        wipLimit: { type: integer, minimum: 1 }
+    BoardInput:
+      type: object
+      required: [name, type]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80 }
+        type: { $ref: '#/components/schemas/BoardType' }
+        filterJql: { type: string }
+        swimlanes: { $ref: '#/components/schemas/Swimlanes' }
+        doneRetentionDays: { type: integer, minimum: 1, maximum: 365 }
+        columns:
+          description: Omit to derive one column per status from the project's workflows.
+          type: array
+          items: { $ref: '#/components/schemas/BoardColumn' }
+    BoardData:
+      type: object
+      required: [board, columns, unmappedStatusIds]
+      properties:
+        board: { $ref: '#/components/schemas/Board' }
+        sprint: { $ref: '#/components/schemas/Sprint' }
+        columns:
+          type: array
+          items: { $ref: '#/components/schemas/BoardColumnData' }
+        unmappedStatusIds:
+          description: Statuses used by the project but not shown on any column.
+          type: array
+          items: { type: string, format: uuid }
+    BoardColumnData:
+      type: object
+      required: [id, name, statusIds, issues, overLimit]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        statusIds: { type: array, items: { type: string, format: uuid } }
+        wipLimit: { type: integer }
+        overLimit: { type: boolean }
+        issues: { type: array, items: { $ref: '#/components/schemas/Issue' } }
+    Backlog:
+      type: object
+      required: [sprints, backlog]
+      properties:
+        sprints:
+          type: array
+          items: { $ref: '#/components/schemas/BacklogSprint' }
+        backlog: { type: array, items: { $ref: '#/components/schemas/Issue' } }
+    BacklogSprint:
+      type: object
+      required: [sprint, issues]
+      properties:
+        sprint: { $ref: '#/components/schemas/Sprint' }
+        issues: { type: array, items: { $ref: '#/components/schemas/Issue' } }
+    Sprint:
+      type: object
+      required: [id, name, goal, state, position]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        goal: { type: string }
+        state: { $ref: '#/components/schemas/SprintState' }
+        startDate: { type: string, format: date }
+        endDate: { type: string, format: date }
+        completedAt: { type: string, format: date-time }
+        position: { type: integer }
+    SprintState: { type: string, enum: [future, active, closed] }
+    SprintInput:
+      type: object
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80 }
+        goal: { type: string }
+        startDate: { type: [string, 'null'], format: date }
+        endDate: { type: [string, 'null'], format: date }
+    SprintReport:
+      type: object
+      required: [sprint, committedPoints, completedPoints, committedIssues, completedIssues, burndown]
+      properties:
+        sprint: { $ref: '#/components/schemas/Sprint' }
+        committedPoints: { type: number, format: double }
+        completedPoints: { type: number, format: double }
+        committedIssues: { type: integer }
+        completedIssues: { type: integer }
+        burndown:
+          type: array
+          items: { $ref: '#/components/schemas/BurndownPoint' }
+    BurndownPoint:
+      type: object
+      required: [date, remainingPoints, idealPoints]
+      properties:
+        date: { type: string, format: date }
+        remainingPoints: { type: number, format: double }
+        idealPoints: { type: number, format: double }
+    Release:
+      type: object
+      required: [id, name, description, state, position, issueCount, doneCount]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: string }
+        startDate: { type: string, format: date }
+        releaseDate: { type: string, format: date }
+        state: { $ref: '#/components/schemas/ReleaseState' }
+        releasedAt: { type: string, format: date-time }
+        position: { type: integer }
+        issueCount: { type: integer }
+        doneCount: { type: integer }
+    ReleaseState: { type: string, enum: [unreleased, released, archived] }
+    ReleaseInput:
+      type: object
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80 }
+        description: { type: string }
+        startDate: { type: [string, 'null'], format: date }
+        releaseDate: { type: [string, 'null'], format: date }
+        state: { $ref: '#/components/schemas/ReleaseState' }
+
+    IssueTypeRef:
+      type: object
+      required: [id, key, name, icon, color, level]
+      properties:
+        id: { type: string, format: uuid }
+        key: { type: string }
+        name: { type: string }
+        icon: { type: string }
+        color: { type: string }
+        level: { type: integer }
+    IssueRef:
+      type: object
+      required: [id, key, summary, type, status]
+      properties:
+        id: { type: string, format: uuid }
+        key: { type: string }
+        summary: { type: string }
+        type: { $ref: '#/components/schemas/IssueTypeRef' }
+        status: { $ref: '#/components/schemas/Status' }
+    DevSummary:
+      type: object
+      required: [branches, commits, pullRequests, openPullRequests, mergedPullRequests]
+      properties:
+        branches: { type: integer }
+        commits: { type: integer }
+        pullRequests: { type: integer }
+        openPullRequests: { type: integer }
+        mergedPullRequests: { type: integer }
+        pipelineState: { type: string }
+    Issue:
+      type: object
+      required: [id, key, projectKey, type, summary, status, priority, labels, rank, version, fields, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        key: { type: string }
+        projectKey: { type: string }
+        type: { $ref: '#/components/schemas/IssueTypeRef' }
+        summary: { type: string }
+        status: { $ref: '#/components/schemas/Status' }
+        priority: { $ref: '#/components/schemas/Priority' }
+        assignee: { $ref: '#/components/schemas/User' }
+        reporter: { $ref: '#/components/schemas/User' }
+        parent: { $ref: '#/components/schemas/IssueRef' }
+        sprintId: { type: string, format: uuid }
+        storyPoints: { type: number, format: double }
+        startDate: { type: string, format: date }
+        dueDate: { type: string, format: date }
+        labels: { type: array, items: { type: string } }
+        resolution: { type: string }
+        resolvedAt: { type: string, format: date-time }
+        rank: { type: string }
+        version: { type: integer }
+        fields: { type: object, additionalProperties: true }
+        dev: { $ref: '#/components/schemas/DevSummary' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    IssueDetail:
+      allOf:
+        - $ref: '#/components/schemas/Issue'
+        - type: object
+          required: [description, project, children, links, development, attachments, releases, watching, watcherCount, permissions]
+          properties:
+            description: { type: string }
+            project: { $ref: '#/components/schemas/ProjectRef' }
+            sprint: { $ref: '#/components/schemas/Sprint' }
+            releases: { type: array, items: { $ref: '#/components/schemas/Release' } }
+            children: { type: array, items: { $ref: '#/components/schemas/Issue' } }
+            progress: { $ref: '#/components/schemas/IssueProgress' }
+            links: { type: array, items: { $ref: '#/components/schemas/IssueLink' } }
+            development: { type: array, items: { $ref: '#/components/schemas/DevLink' } }
+            attachments: { type: array, items: { $ref: '#/components/schemas/Attachment' } }
+            watching: { type: boolean }
+            watcherCount: { type: integer }
+            suggestedBranch: { type: string }
+            permissions: { $ref: '#/components/schemas/IssuePermissions' }
+    ProjectRef:
+      type: object
+      required: [id, key, name]
+      properties:
+        id: { type: string, format: uuid }
+        key: { type: string }
+        name: { type: string }
+    IssueProgress:
+      type: object
+      required: [total, done, inProgress, points, donePoints]
+      properties:
+        total: { type: integer }
+        done: { type: integer }
+        inProgress: { type: integer }
+        points: { type: number, format: double }
+        donePoints: { type: number, format: double }
+    IssuePermissions:
+      type: object
+      required: [edit, delete, transition, comment, assign]
+      properties:
+        edit: { type: boolean }
+        delete: { type: boolean }
+        transition: { type: boolean }
+        comment: { type: boolean }
+        assign: { type: boolean }
+    IssueCreate:
+      type: object
+      required: [projectKey, typeKey, summary]
+      properties:
+        projectKey: { type: string }
+        typeKey: { type: string }
+        summary: { type: string, minLength: 1, maxLength: 255 }
+        description: { type: string }
+        priority: { $ref: '#/components/schemas/Priority' }
+        assigneeId: { type: string, format: uuid }
+        parentKey: { type: string }
+        sprintId: { type: string, format: uuid }
+        storyPoints: { type: number, format: double }
+        startDate: { type: string, format: date }
+        dueDate: { type: string, format: date }
+        labels: { type: array, items: { type: string } }
+        releaseIds: { type: array, items: { type: string, format: uuid } }
+        fields: { type: object, additionalProperties: true }
+    IssuePatch:
+      type: object
+      properties:
+        version: { type: integer, description: Expected current version (optimistic locking) }
+        typeKey: { type: string }
+        summary: { type: string, minLength: 1, maxLength: 255 }
+        description: { type: string }
+        priority: { $ref: '#/components/schemas/Priority' }
+        assigneeId: { type: [string, 'null'], format: uuid }
+        reporterId: { type: [string, 'null'], format: uuid }
+        parentKey: { type: [string, 'null'] }
+        sprintId: { type: [string, 'null'], format: uuid }
+        storyPoints: { type: [number, 'null'], format: double }
+        startDate: { type: [string, 'null'], format: date }
+        dueDate: { type: [string, 'null'], format: date }
+        labels: { type: array, items: { type: string } }
+        releaseIds: { type: array, items: { type: string, format: uuid } }
+        fields:
+          description: Custom field values to set; a null value clears the field.
+          type: object
+          additionalProperties: true
+    AvailableTransition:
+      type: object
+      required: [id, name, to, screen]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        to: { $ref: '#/components/schemas/Status' }
+        screen:
+          type: array
+          items: { $ref: '#/components/schemas/ScreenFieldInfo' }
+    ScreenFieldInfo:
+      type: object
+      required: [field, name, type, required]
+      properties:
+        field: { type: string }
+        name: { type: string }
+        type: { type: string }
+        required: { type: boolean }
+        options: { type: array, items: { type: string } }
+    TransitionRequest:
+      type: object
+      required: [transitionId]
+      properties:
+        transitionId: { type: string }
+        version: { type: integer }
+        fields: { type: object, additionalProperties: true, description: Values for the transition screen }
+        comment: { type: string }
+    MoveRequest:
+      type: object
+      properties:
+        statusId: { type: string, format: uuid }
+        transitionId: { type: string }
+        sprintId:
+          description: null moves the issue to the backlog; omit to leave the sprint unchanged.
+          type: [string, 'null']
+          format: uuid
+        afterIssueId: { type: string, format: uuid }
+        beforeIssueId: { type: string, format: uuid }
+    Comment:
+      type: object
+      required: [id, body, source, createdAt, canEdit]
+      properties:
+        id: { type: string, format: uuid }
+        author: { $ref: '#/components/schemas/User' }
+        body: { type: string }
+        source: { type: string }
+        createdAt: { type: string, format: date-time }
+        editedAt: { type: string, format: date-time }
+        canEdit: { type: boolean }
+    CommentInput:
+      type: object
+      required: [body]
+      properties:
+        body: { type: string, minLength: 1, maxLength: 50000 }
+    HistoryEntry:
+      type: object
+      required: [id, actorType, field, createdAt]
+      properties:
+        id: { type: integer, format: int64 }
+        actor: { $ref: '#/components/schemas/User' }
+        actorType: { type: string }
+        field: { type: string }
+        from: { type: string }
+        to: { type: string }
+        createdAt: { type: string, format: date-time }
+    IssueLink:
+      type: object
+      required: [id, type, direction, label, issue]
+      properties:
+        id: { type: string, format: uuid }
+        type: { $ref: '#/components/schemas/LinkType' }
+        direction: { $ref: '#/components/schemas/LinkDirection' }
+        label: { type: string }
+        issue: { $ref: '#/components/schemas/IssueRef' }
+    DevLink:
+      type: object
+      required: [id, kind, repository, externalId, title, url, state, authorName, data, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        kind: { $ref: '#/components/schemas/DevLinkKind' }
+        repository: { $ref: '#/components/schemas/RepositoryRef' }
+        externalId: { type: string }
+        title: { type: string }
+        url: { type: string }
+        state: { type: string }
+        authorName: { type: string }
+        data: { type: object, additionalProperties: true }
+        updatedAt: { type: string, format: date-time }
+    DevLinkKind: { type: string, enum: [branch, commit, pull_request, pipeline] }
+    ScmProvider: { type: string, enum: [github, gitlab] }
+    RepositoryRef:
+      type: object
+      required: [id, provider, fullPath, webUrl]
+      properties:
+        id: { type: string, format: uuid }
+        provider: { $ref: '#/components/schemas/ScmProvider' }
+        fullPath: { type: string }
+        webUrl: { type: string }
+    Attachment:
+      type: object
+      required: [id, filename, contentType, size, createdAt, url]
+      properties:
+        id: { type: string, format: uuid }
+        filename: { type: string }
+        contentType: { type: string }
+        size: { type: integer, format: int64 }
+        uploader: { $ref: '#/components/schemas/User' }
+        createdAt: { type: string, format: date-time }
+        url: { type: string }
+
+    SearchResult:
+      type: object
+      required: [issues, total, limit, offset]
+      properties:
+        issues: { type: array, items: { $ref: '#/components/schemas/Issue' } }
+        total: { type: integer }
+        limit: { type: integer }
+        offset: { type: integer }
+    SearchMetadata:
+      type: object
+      required: [fields, functions]
+      properties:
+        fields:
+          type: array
+          items: { $ref: '#/components/schemas/SearchField' }
+        functions: { type: array, items: { type: string } }
+    SearchField:
+      type: object
+      required: [name, type, operators]
+      properties:
+        name: { type: string }
+        type: { type: string }
+        operators: { type: array, items: { type: string } }
+        values: { type: array, items: { type: string } }
+    SavedFilter:
+      type: object
+      required: [id, name, description, jql, shared, owner, mine]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: string }
+        jql: { type: string }
+        shared: { type: boolean }
+        owner: { $ref: '#/components/schemas/User' }
+        mine: { type: boolean }
+    SavedFilterInput:
+      type: object
+      required: [name, jql]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        description: { type: string }
+        jql: { type: string }
+        shared: { type: boolean }
+
+    FieldDefinition:
+      type: object
+      required: [id, key, name, description, type, options]
+      properties:
+        id: { type: string, format: uuid }
+        key: { type: string }
+        name: { type: string }
+        description: { type: string }
+        type: { $ref: '#/components/schemas/FieldType' }
+        options: { type: array, items: { type: string } }
+        projectKeys: { type: array, items: { type: string }, description: Omitted = all projects }
+        issueTypeKeys: { type: array, items: { type: string }, description: Omitted = all issue types }
+    FieldType: { type: string, enum: [text, number, select, multiselect, user, date, version, checkbox, url] }
+    FieldDefinitionInput:
+      type: object
+      required: [key, name, type]
+      properties:
+        key: { type: string, pattern: '^[a-z][a-z0-9_]{0,40}$' }
+        name: { type: string, minLength: 1, maxLength: 80 }
+        description: { type: string }
+        type: { $ref: '#/components/schemas/FieldType' }
+        options: { type: array, items: { type: string } }
+        projectKeys: { type: array, items: { type: string } }
+        issueTypeKeys: { type: array, items: { type: string } }
+
+    Notification:
+      type: object
+      required: [id, kind, title, body, createdAt]
+      properties:
+        id: { type: integer, format: int64 }
+        kind: { type: string }
+        title: { type: string }
+        body: { type: string }
+        issueKey: { type: string }
+        actor: { $ref: '#/components/schemas/User' }
+        readAt: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+    NotificationList:
+      type: object
+      required: [items, unread]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/Notification' } }
+        unread: { type: integer }
+
+    ScmConnection:
+      type: object
+      required: [id, provider, name, apiUrl, webUrl, manageHooks, writeBack, webhookUrl, createdAt, repositoryCount]
+      properties:
+        id: { type: string, format: uuid }
+        provider: { $ref: '#/components/schemas/ScmProvider' }
+        name: { type: string }
+        apiUrl: { type: string }
+        webUrl: { type: string }
+        appId: { type: integer, format: int64 }
+        appSlug: { type: string }
+        manageHooks: { type: boolean }
+        writeBack: { type: boolean }
+        webhookUrl: { type: string, description: URL to configure as the App / hook delivery URL }
+        createdAt: { type: string, format: date-time }
+        lastEventAt: { type: string, format: date-time }
+        repositoryCount: { type: integer }
+    ScmConnectionInput:
+      type: object
+      required: [provider, name]
+      properties:
+        provider: { $ref: '#/components/schemas/ScmProvider' }
+        name: { type: string, minLength: 1, maxLength: 100 }
+        apiUrl: { type: string, description: Defaults to https://api.github.com or https://gitlab.com }
+        webUrl: { type: string }
+        appId: { type: integer, format: int64, description: GitHub App id }
+        appSlug: { type: string }
+        privateKey: { type: string, description: GitHub App private key (PEM) }
+        token: { type: string, description: GitLab group or project access token }
+        webhookSecret: { type: string, description: Generated when omitted }
+        manageHooks: { type: boolean, default: false }
+        writeBack: { type: boolean, default: true }
+    ScmConnectionPatch:
+      type: object
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100 }
+        privateKey: { type: string }
+        token: { type: string }
+        webhookSecret: { type: string }
+        manageHooks: { type: boolean }
+        writeBack: { type: boolean }
+    ScmRepository:
+      type: object
+      required: [id, connectionId, provider, fullPath, webUrl, defaultBranch, projectKeys]
+      properties:
+        id: { type: string, format: uuid }
+        connectionId: { type: string, format: uuid }
+        provider: { $ref: '#/components/schemas/ScmProvider' }
+        fullPath: { type: string }
+        webUrl: { type: string }
+        defaultBranch: { type: string }
+        projectKeys: { type: array, items: { type: string } }
+    WebhookEvent:
+      type: object
+      required: [id, eventType, deliveryId, status, attempts, receivedAt]
+      properties:
+        id: { type: string, format: uuid }
+        eventType: { type: string }
+        deliveryId: { type: string }
+        status: { type: string, enum: [pending, processed, ignored, failed] }
+        error: { type: string }
+        attempts: { type: integer }
+        receivedAt: { type: string, format: date-time }
+        processedAt: { type: string, format: date-time }
+
+    AutomationTrigger:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [issue.created, issue.transitioned, issue.field_changed, pr.opened, pr.merged, commit.pushed, branch.created, pipeline.completed, schedule]
+        toStatus: { type: string, description: 'issue.transitioned: only when entering this status (name)' }
+        field: { type: string, description: 'issue.field_changed: the field to watch' }
+        cron: { type: string, description: 'schedule: 5-field cron expression (UTC)' }
+        jql: { type: string, description: 'schedule: issues to run the actions against' }
+    AutomationAction:
+      type: object
+      required: [type]
+      properties:
+        type: { type: string, enum: [transition, assign, set_field, comment, add_label, webhook, notify] }
+        status: { type: string, description: 'transition: target status name' }
+        assignee: { type: string, description: 'assign: actor | reporter | unassigned | <email>' }
+        field: { type: string }
+        value: {}
+        body: { type: string, description: 'comment: Markdown body' }
+        label: { type: string }
+        url: { type: string }
+        recipients: { type: string, description: 'notify: assignee | reporter | watchers' }
+    AutomationRule:
+      type: object
+      required: [id, name, description, enabled, trigger, condition, actions, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: string }
+        enabled: { type: boolean }
+        trigger: { $ref: '#/components/schemas/AutomationTrigger' }
+        condition: { type: string, description: Optional CEL expression }
+        actions: { type: array, items: { $ref: '#/components/schemas/AutomationAction' } }
+        lastRunAt: { type: string, format: date-time }
+        nextRunAt: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+    AutomationRuleInput:
+      type: object
+      required: [name, trigger, actions]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        description: { type: string }
+        enabled: { type: boolean, default: true }
+        trigger: { $ref: '#/components/schemas/AutomationTrigger' }
+        condition: { type: string }
+        actions: { type: array, minItems: 1, items: { $ref: '#/components/schemas/AutomationAction' } }
+    AutomationRun:
+      type: object
+      required: [id, status, message, depth, createdAt]
+      properties:
+        id: { type: integer, format: int64 }
+        issueKey: { type: string }
+        status: { type: string, enum: [success, skipped, failed] }
+        message: { type: string }
+        depth: { type: integer }
+        createdAt: { type: string, format: date-time }
+
+    WebhookSubscription:
+      type: object
+      required: [id, name, url, events, active, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        projectKey: { type: string }
+        name: { type: string }
+        url: { type: string }
+        events: { type: array, items: { type: string } }
+        active: { type: boolean }
+        createdAt: { type: string, format: date-time }
+    WebhookSubscriptionInput:
+      type: object
+      required: [name, url, events]
+      properties:
+        projectKey: { type: string }
+        name: { type: string, minLength: 1, maxLength: 100 }
+        url: { type: string, format: uri }
+        events:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            enum: ['*', issue.created, issue.updated, issue.transitioned, issue.deleted, comment.created, sprint.started, sprint.completed, release.released]
+        active: { type: boolean, default: true }
+    WebhookSubscriptionCreated:
+      allOf:
+        - $ref: '#/components/schemas/WebhookSubscription'
+        - type: object
+          required: [secret]
+          properties:
+            secret: { type: string }
+    WebhookDelivery:
+      type: object
+      required: [id, event, status, attempts, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        event: { type: string }
+        status: { type: string, enum: [pending, delivered, failed] }
+        attempts: { type: integer }
+        responseStatus: { type: integer }
+        lastError: { type: string }
+        createdAt: { type: string, format: date-time }
+        deliveredAt: { type: string, format: date-time }

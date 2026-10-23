@@ -1,0 +1,4 @@
+// Package api holds the server interfaces and models generated from api/openapi.yaml.
+package api
+
+//go:generate go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen -config ../../api/oapi-codegen.yaml ../../api/openapi.yaml

@@ -1,0 +1,38 @@
+id: kanban
+name: Kanban
+description: Continuous flow with WIP limits; no sprints.
+boardType: kanban
+workflows:
+  - name: Kanban flow
+    description: Backlog → Selected for Development → In Progress → Done; move freely.
+    statuses:
+      - { name: Backlog, category: todo }
+      - { name: Selected for Development, category: todo }
+      - { name: In Progress, category: in_progress }
+      - { name: Done, category: done }
+    transitions:
+      - { name: Backlog, to: Backlog }
+      - { name: Select for development, to: Selected for Development }
+      - name: Start work
+        to: In Progress
+        postFunctions: [{ assignTo: actor }]
+      - { name: Done, to: Done }
+    layout:
+      Backlog: { x: 0, y: 120 }
+      Selected for Development: { x: 260, y: 120 }
+      In Progress: { x: 520, y: 120 }
+      Done: { x: 780, y: 120 }
+issueTypes:
+  - { key: epic, name: Epic, level: 1, icon: epic, color: '#8b5cf6', workflow: Kanban flow }
+  - { key: story, name: Story, level: 0, icon: story, color: '#22a06b', workflow: Kanban flow }
+  - { key: task, name: Task, level: 0, icon: task, color: '#1d7afc', workflow: Kanban flow }
+  - { key: bug, name: Bug, level: 0, icon: bug, color: '#e2483d', workflow: Kanban flow }
+  - { key: subtask, name: Sub-task, level: -1, icon: subtask, color: '#5e8fff', workflow: Kanban flow }
+boards:
+  - name: Kanban board
+    type: kanban
+    columns:
+      - { name: Backlog, statuses: [Backlog] }
+      - { name: Selected for Development, statuses: [Selected for Development] }
+      - { name: In Progress, statuses: [In Progress], wipLimit: 5 }
+      - { name: Done, statuses: [Done] }

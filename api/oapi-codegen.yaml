@@ -1,0 +1,14 @@
+# Generates the Go server interfaces and models: go generate ./internal/api
+package: api
+generate:
+  std-http-server: true
+  strict-server: true
+  models: true
+  embedded-spec: true
+output-options:
+  nullable-type: true
+  exclude-tags:
+    - handwritten
+output: internal/api/api.gen.go
+compatibility:
+  always-prefix-enum-values: true

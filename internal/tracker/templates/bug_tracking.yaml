@@ -1,0 +1,61 @@
+id: bug_tracking
+name: Bug tracking
+description: Triage-first flow for support and QA, with a resolution captured on close.
+boardType: kanban
+workflows:
+  - name: Bug triage
+    description: Open → Triaged → In Progress → Ready for QA → Closed, or Won't Fix from anywhere.
+    statuses:
+      - { name: Open, category: todo }
+      - { name: Triaged, category: todo }
+      - { name: In Progress, category: in_progress }
+      - { name: Ready for QA, category: in_progress }
+      - { name: Closed, category: done }
+      - { name: Won't Fix, category: done }
+    transitions:
+      - { name: Triage, from: [Open], to: Triaged }
+      - name: Start work
+        from: [Triaged]
+        to: In Progress
+        postFunctions: [{ assignTo: actor }]
+      - { name: Ready for QA, from: [In Progress], to: Ready for QA }
+      - { name: Fail QA, from: [Ready for QA], to: In Progress }
+      - name: Pass QA
+        from: [Ready for QA]
+        to: Closed
+        screen: [{ field: resolution, required: true }, comment]
+      - name: Won't fix
+        to: Won't Fix
+        condition: 'actor.hasRole("admin") || actor.hasRole("member")'
+        screen: [{ field: comment, required: true }]
+      - { name: Reopen, from: [Closed, Won't Fix], to: Open }
+    layout:
+      Open: { x: 0, y: 120 }
+      Triaged: { x: 240, y: 120 }
+      In Progress: { x: 480, y: 120 }
+      Ready for QA: { x: 720, y: 120 }
+      Closed: { x: 960, y: 60 }
+      Won't Fix: { x: 960, y: 240 }
+  - name: Simple
+    description: To Do, In Progress, Done; move freely.
+    statuses:
+      - { name: To Do, category: todo }
+      - { name: In Progress, category: in_progress }
+      - { name: Done, category: done }
+    transitions:
+      - { name: To Do, to: To Do }
+      - { name: In Progress, to: In Progress }
+      - { name: Done, to: Done }
+issueTypes:
+  - { key: bug, name: Bug, level: 0, icon: bug, color: '#e2483d', workflow: Bug triage }
+  - { key: task, name: Task, level: 0, icon: task, color: '#1d7afc', workflow: Simple }
+  - { key: subtask, name: Sub-task, level: -1, icon: subtask, color: '#5e8fff', workflow: Simple }
+boards:
+  - name: Triage board
+    type: kanban
+    columns:
+      - { name: Open, statuses: [Open, To Do] }
+      - { name: Triaged, statuses: [Triaged] }
+      - { name: In Progress, statuses: [In Progress], wipLimit: 8 }
+      - { name: Ready for QA, statuses: [Ready for QA] }
+      - { name: Done, statuses: [Closed, Won't Fix, Done] }
