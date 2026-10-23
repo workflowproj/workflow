@@ -2,9 +2,10 @@ package app
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/riverqueue/river"
@@ -53,35 +54,71 @@ func (w *worker[T]) Timeout(*river.Job[T]) time.Duration {
 	return time.Minute
 }
 
-func add[T river.JobArgs](ws *river.Workers, timeout time.Duration, fn func(context.Context, T) error) {
-	river.AddWorker(ws, &worker[T]{fn: fn, timeout: timeout})
+// handler is one job kind: how River runs it and how tests run it directly.
+type handler struct {
+	kind     string
+	register func(*river.Workers)
+	run      func(context.Context, []byte) error
+}
+
+func reg[T river.JobArgs](timeout time.Duration, fn func(context.Context, T) error) handler {
+	var zero T
+	return handler{
+		kind:     zero.Kind(),
+		register: func(ws *river.Workers) { river.AddWorker(ws, &worker[T]{fn: fn, timeout: timeout}) },
+		run: func(ctx context.Context, raw []byte) error {
+			var args T
+			if err := json.Unmarshal(raw, &args); err != nil {
+				return err
+			}
+			return fn(ctx, args)
+		},
+	}
+}
+
+func (a *App) handlers() []handler {
+	return []handler{
+		reg(time.Minute, a.Automation.HandleDomainEvent),
+		reg(2*time.Minute, func(ctx context.Context, j jobs.ProcessWebhook) error { return a.SCM.ProcessEvent(ctx, j.EventID) }),
+		reg(time.Minute, func(ctx context.Context, j jobs.SCMWriteBack) error { return a.SCM.WriteBack(ctx, j.DevLinkID) }),
+		reg(15*time.Minute, func(ctx context.Context, j jobs.SCMReconcile) error { return a.SCM.Reconcile(ctx, j.ConnectionID) }),
+		reg(time.Minute, func(ctx context.Context, j jobs.SCMEnsureHook) error { return a.SCM.EnsureHook(ctx, j.RepositoryID) }),
+		reg(30*time.Minute, func(ctx context.Context, j jobs.WorkflowMigrate) error {
+			n, err := a.Tracker.MigrateWorkflowIssues(ctx, j.WorkflowID, j.Mapping)
+			a.Log.Info("workflow migration", "workflow", j.WorkflowID, "issues", n, "error", err)
+			return err
+		}),
+		reg(time.Minute, a.Automation.HandlePostFunction),
+		reg(time.Minute, func(ctx context.Context, j jobs.DeliverWebhook) error { return a.Automation.Deliver(ctx, j.DeliveryID) }),
+		reg(30*time.Minute, func(ctx context.Context, j jobs.DirectorySync) error {
+			if a.Syncer == nil {
+				return nil
+			}
+			stats, err := a.Syncer.Run(ctx, j.Trigger)
+			a.Log.Info("directory sync", "trigger", j.Trigger, "stats", stats, "error", err)
+			return err
+		}),
+		reg(5*time.Minute, func(ctx context.Context, _ jobs.AutomationSchedule) error { return a.Automation.RunScheduled(ctx) }),
+		reg(10*time.Minute, func(ctx context.Context, _ jobs.Maintenance) error { return a.maintenance(ctx) }),
+	}
 }
 
 func (a *App) workers() *river.Workers {
 	ws := river.NewWorkers()
-	add(ws, time.Minute, a.Automation.HandleDomainEvent)
-	add(ws, 2*time.Minute, func(ctx context.Context, j jobs.ProcessWebhook) error { return a.SCM.ProcessEvent(ctx, j.EventID) })
-	add(ws, time.Minute, func(ctx context.Context, j jobs.SCMWriteBack) error { return a.SCM.WriteBack(ctx, j.DevLinkID) })
-	add(ws, 15*time.Minute, func(ctx context.Context, j jobs.SCMReconcile) error { return a.SCM.Reconcile(ctx, j.ConnectionID) })
-	add(ws, time.Minute, func(ctx context.Context, j jobs.SCMEnsureHook) error { return a.SCM.EnsureHook(ctx, j.RepositoryID) })
-	add(ws, 30*time.Minute, func(ctx context.Context, j jobs.WorkflowMigrate) error {
-		n, err := a.Tracker.MigrateWorkflowIssues(ctx, j.WorkflowID, j.Mapping)
-		a.Log.Info("workflow migration", "workflow", j.WorkflowID, "issues", n, "error", err)
-		return err
-	})
-	add(ws, time.Minute, a.Automation.HandlePostFunction)
-	add(ws, time.Minute, func(ctx context.Context, j jobs.DeliverWebhook) error { return a.Automation.Deliver(ctx, j.DeliveryID) })
-	add(ws, 30*time.Minute, func(ctx context.Context, j jobs.DirectorySync) error {
-		if a.Syncer == nil {
-			return nil
-		}
-		stats, err := a.Syncer.Run(ctx, j.Trigger)
-		a.Log.Info("directory sync", "trigger", j.Trigger, "stats", stats, "error", err)
-		return err
-	})
-	add(ws, 5*time.Minute, func(ctx context.Context, _ jobs.AutomationSchedule) error { return a.Automation.RunScheduled(ctx) })
-	add(ws, 10*time.Minute, func(ctx context.Context, _ jobs.Maintenance) error { return a.maintenance(ctx) })
+	for _, h := range a.handlers() {
+		h.register(ws)
+	}
 	return ws
+}
+
+// RunJob executes a job by kind with its JSON arguments, bypassing the queue (tests, tooling).
+func (a *App) RunJob(ctx context.Context, kind string, args []byte) error {
+	for _, h := range a.handlers() {
+		if h.kind == kind {
+			return h.run(ctx, args)
+		}
+	}
+	return fmt.Errorf("no handler for job kind %q", kind)
 }
 
 func (a *App) periodicJobs() []*river.PeriodicJob {
@@ -129,5 +166,3 @@ func (a *App) maintenance(ctx context.Context) error {
 }
 
 func ptr[T any](v T) *T { return &v }
-
-var _ pgx.Tx

@@ -565,9 +565,9 @@ func (s *Service) UpdateIssue(ctx context.Context, actor *authz.Actor, ref strin
 }
 
 type change struct {
-	field           string
-	from, to        *string
-	fromRef, toRef  *string
+	field          string
+	from, to       *string
+	fromRef, toRef *string
 }
 
 func updateFromIssue(i dbq.Issue) dbq.UpdateIssueParams {

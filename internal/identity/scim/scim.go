@@ -27,14 +27,14 @@ import (
 )
 
 const (
-	SchemaUser      = "urn:ietf:params:scim:schemas:core:2.0:User"
-	SchemaGroup     = "urn:ietf:params:scim:schemas:core:2.0:Group"
+	SchemaUser       = "urn:ietf:params:scim:schemas:core:2.0:User"
+	SchemaGroup      = "urn:ietf:params:scim:schemas:core:2.0:Group"
 	SchemaEnterprise = "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User"
-	SchemaList      = "urn:ietf:params:scim:api:messages:2.0:ListResponse"
-	SchemaError     = "urn:ietf:params:scim:api:messages:2.0:Error"
-	SchemaPatch     = "urn:ietf:params:scim:api:messages:2.0:PatchOp"
-	contentType     = "application/scim+json; charset=utf-8"
-	maxCount        = 1000
+	SchemaList       = "urn:ietf:params:scim:api:messages:2.0:ListResponse"
+	SchemaError      = "urn:ietf:params:scim:api:messages:2.0:Error"
+	SchemaPatch      = "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+	contentType      = "application/scim+json; charset=utf-8"
+	maxCount         = 1000
 )
 
 type Handler struct {

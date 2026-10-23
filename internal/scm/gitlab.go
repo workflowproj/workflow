@@ -54,18 +54,18 @@ func (p glProject) ref() RepoRef {
 }
 
 type glMR struct {
-	IID          int       `json:"iid"`
-	Title        string    `json:"title"`
-	Description  string    `json:"description"`
-	URL          string    `json:"url"`
-	WebURL       string    `json:"web_url"`
-	State        string    `json:"state"`
-	Action       string    `json:"action"`
-	Draft        bool      `json:"draft"`
-	WIP          bool      `json:"work_in_progress"`
-	SourceBranch string    `json:"source_branch"`
-	TargetBranch string    `json:"target_branch"`
-	UpdatedAt    string    `json:"updated_at"`
+	IID          int    `json:"iid"`
+	Title        string `json:"title"`
+	Description  string `json:"description"`
+	URL          string `json:"url"`
+	WebURL       string `json:"web_url"`
+	State        string `json:"state"`
+	Action       string `json:"action"`
+	Draft        bool   `json:"draft"`
+	WIP          bool   `json:"work_in_progress"`
+	SourceBranch string `json:"source_branch"`
+	TargetBranch string `json:"target_branch"`
+	UpdatedAt    string `json:"updated_at"`
 	LastCommit   struct {
 		ID string `json:"id"`
 	} `json:"last_commit"`

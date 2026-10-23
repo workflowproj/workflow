@@ -276,7 +276,9 @@ func Parse(src []byte) (*Document, error) {
 // Validate checks structure and compiles every CEL expression.
 func Validate(doc *Document, ev *Evaluator) Problems {
 	var probs Problems
-	add := func(path, format string, args ...any) { probs = append(probs, Problem{Path: path, Message: fmt.Sprintf(format, args...)}) }
+	add := func(path, format string, args ...any) {
+		probs = append(probs, Problem{Path: path, Message: fmt.Sprintf(format, args...)})
+	}
 
 	if doc.Kind != "" && doc.Kind != "Workflow" {
 		add("kind", "must be Workflow")

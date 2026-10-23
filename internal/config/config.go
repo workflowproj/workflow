@@ -89,7 +89,7 @@ type Config struct {
 	DevLogin       bool
 	Production     bool
 
-	OIDCProviders  []OIDCProvider
+	OIDCProviders   []OIDCProvider
 	JITProvisioning JITMode
 	BootstrapAdmins []string
 

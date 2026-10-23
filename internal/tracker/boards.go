@@ -208,12 +208,12 @@ type BoardColumnData struct {
 }
 
 type BoardData struct {
-	Board     dbq.Board
-	Project   dbq.Project
-	Columns   []BoardColumnData
-	AllCols   []dbq.BoardColumn
-	Sprint    *dbq.Sprint
-	Unmapped  []uuid.UUID
+	Board    dbq.Board
+	Project  dbq.Project
+	Columns  []BoardColumnData
+	AllCols  []dbq.BoardColumn
+	Sprint   *dbq.Sprint
+	Unmapped []uuid.UUID
 }
 
 const boardIssueLimit = 2000

@@ -27,7 +27,6 @@ type Event struct {
 	ActorID   *uuid.UUID `json:"actorId,omitempty"`
 }
 
-
 // Publish queues a notification on the transaction; it is sent only if the transaction commits.
 func Publish(ctx context.Context, tx pgx.Tx, ev Event) error {
 	b, err := json.Marshal(ev)

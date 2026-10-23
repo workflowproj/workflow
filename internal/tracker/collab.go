@@ -272,7 +272,7 @@ func (s *Service) Attach(ctx context.Context, actor *authz.Actor, ref, filename,
 		return dbq.Attachment{}, err
 	}
 	if size > s.Cfg.AttachmentMaxBytes {
-		return dbq.Attachment{}, apperr.Invalid("file", "attachments are limited to %d MB", s.Cfg.AttachmentMaxBytes/1024/1024)
+		return dbq.Attachment{}, apperr.TooLarge("attachments are limited to %d MB", s.Cfg.AttachmentMaxBytes/1024/1024)
 	}
 	filename = path.Base(strings.ReplaceAll(filename, "\\", "/"))
 	if filename == "." || filename == "/" || filename == "" {
@@ -290,7 +290,7 @@ func (s *Service) Attach(ctx context.Context, actor *authz.Actor, ref, filename,
 	}
 	if counter.n > s.Cfg.AttachmentMaxBytes {
 		_ = s.Storage.Delete(ctx, key)
-		return dbq.Attachment{}, apperr.Invalid("file", "attachments are limited to %d MB", s.Cfg.AttachmentMaxBytes/1024/1024)
+		return dbq.Attachment{}, apperr.TooLarge("attachments are limited to %d MB", s.Cfg.AttachmentMaxBytes/1024/1024)
 	}
 	var a dbq.Attachment
 	err = s.tx(ctx, func(tx pgx.Tx, q *dbq.Queries) error {

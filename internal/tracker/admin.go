@@ -132,9 +132,9 @@ type CycleTimeEntry struct {
 }
 
 type CycleTimeReport struct {
-	Days                         int
-	Average, Median, P85         float64
-	Issues                       []CycleTimeEntry
+	Days                 int
+	Average, Median, P85 float64
+	Issues               []CycleTimeEntry
 }
 
 // CycleTime measures, from issue history, the time from first entering an in-progress status

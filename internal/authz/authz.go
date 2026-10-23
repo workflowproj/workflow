@@ -197,8 +197,9 @@ func (r *Resolver) Access(ctx context.Context, actor *Actor, project dbq.Project
 				perms[p] = true
 			}
 		}
-		// Open projects grant their open role to every member of the organisation (not guests).
-		if project.OpenRoleID != nil && actor.OrgRole != "guest" {
+		// Open projects grant their open role to organisation members (not guests) without an explicit
+		// role in the project, so an explicit membership (direct or via a group) can also restrict.
+		if project.OpenRoleID != nil && actor.OrgRole != "guest" && len(rows) == 0 {
 			role, err := r.Q.GetRole(ctx, *project.OpenRoleID)
 			if err == nil {
 				roles = append(roles, role.Key)

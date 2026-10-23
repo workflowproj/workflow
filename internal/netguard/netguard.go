@@ -71,8 +71,10 @@ func Client(timeout time.Duration, allowPrivate bool) *http.Client {
 		},
 	}
 	transport := &http.Transport{
-		Proxy:                 nil, // never route user-supplied URLs through an internal proxy
-		DialContext:           func(ctx context.Context, network, addr string) (net.Conn, error) { return dialer.DialContext(ctx, network, addr) },
+		Proxy: nil, // never route user-supplied URLs through an internal proxy
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			return dialer.DialContext(ctx, network, addr)
+		},
 		TLSHandshakeTimeout:   10 * time.Second,
 		ResponseHeaderTimeout: timeout,
 		MaxIdleConns:          20,

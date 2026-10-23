@@ -45,6 +45,10 @@ func Invalid(field, format string, args ...any) *Error {
 	return &Error{Status: http.StatusBadRequest, Code: "invalid", Message: msg, Fields: []FieldError{{Field: field, Message: msg}}}
 }
 
+func TooLarge(format string, args ...any) *Error {
+	return New(http.StatusRequestEntityTooLarge, "too_large", format, args...)
+}
+
 func Unauthorized() *Error {
 	return New(http.StatusUnauthorized, "unauthorized", "authentication required")
 }

@@ -108,9 +108,9 @@ func New(ctx context.Context, cfg *config.Config, log *slog.Logger, pool *pgxpoo
 	rcfg := &river.Config{Logger: log.With("component", "river"), JobTimeout: 5 * time.Minute}
 	if runWorkers {
 		rcfg.Queues = map[string]river.QueueConfig{
-			river.QueueDefault:   {MaxWorkers: cfg.WorkerConcurrency},
-			jobs.QueueSCM:        {MaxWorkers: cfg.WorkerConcurrency},
-			jobs.QueueOutbound:   {MaxWorkers: max(cfg.WorkerConcurrency/2, 2)},
+			river.QueueDefault: {MaxWorkers: cfg.WorkerConcurrency},
+			jobs.QueueSCM:      {MaxWorkers: cfg.WorkerConcurrency},
+			jobs.QueueOutbound: {MaxWorkers: max(cfg.WorkerConcurrency/2, 2)},
 		}
 		rcfg.Workers = river.NewWorkers()
 	}
@@ -232,4 +232,6 @@ func (a *App) Run(ctx context.Context) error {
 }
 
 // Migrate applies database migrations.
-func Migrate(ctx context.Context, pool *pgxpool.Pool, log *slog.Logger) error { return db.Migrate(ctx, pool, log) }
+func Migrate(ctx context.Context, pool *pgxpool.Pool, log *slog.Logger) error {
+	return db.Migrate(ctx, pool, log)
+}

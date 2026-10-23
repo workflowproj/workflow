@@ -126,6 +126,9 @@ func (s *Service) validate(ctx context.Context, actor *authz.Actor, in RuleInput
 			if a.Status == "" {
 				return nil, apperr.Invalid(field, "transition needs a target status")
 			}
+			if _, err := s.Q.GetStatusByName(ctx, a.Status); err != nil {
+				return nil, apperr.Invalid(field, "unknown status %q", a.Status)
+			}
 		case "assign":
 			if a.Assignee == "" {
 				return nil, apperr.Invalid(field, "assign needs actor, reporter, unassigned or an email")

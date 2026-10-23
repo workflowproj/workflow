@@ -350,6 +350,7 @@ func (h *Handler) writeUser(ctx context.Context, q *dbq.Queries, tx pgx.Tx, exis
 	} else if !db.IsNoRows(err) {
 		return dbq.User{}, err
 	}
+	err = nil
 	role := "member"
 	if h.Prov.IsBootstrapAdmin(a.Email) {
 		role = "admin"
@@ -551,4 +552,3 @@ func (h *Handler) deleteUser(_ http.ResponseWriter, r *http.Request) (any, int, 
 	})
 	return nil, http.StatusNoContent, err
 }
-
