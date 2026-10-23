@@ -32,7 +32,7 @@ build: ## Build the wfm binary (with the UI if built)
 	CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -o bin/wfm ./cmd/wfm
 
 test-unit: ## Unit tests (no database)
-	go test ./internal/rank/... ./internal/workflow/... ./internal/search/... ./internal/netguard/... ./internal/scm/...
+	go test ./internal/rank/... ./internal/workflow/... ./internal/search/... ./internal/netguard/... ./internal/scm/... ./internal/identity/
 
 test-integration: ## Integration tests (TEST_DATABASE_URL, or Testcontainers when Docker is available)
 	go test -count=1 ./internal/integration/...

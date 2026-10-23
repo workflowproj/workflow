@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"regexp"
 	"slices"
 	"strings"
@@ -106,8 +107,15 @@ type oidcState struct {
 
 var safePath = regexp.MustCompile(`^/[^/\\]`)
 
-// SafeReturnTo only allows same-origin relative paths.
+// SafeReturnTo only allows same-origin relative paths. Control characters are refused because
+// browsers strip tabs and newlines from URLs, which would turn "/\t/evil.example" into "//evil.example".
 func SafeReturnTo(s string) string {
+	if strings.ContainsFunc(s, func(r rune) bool { return r < 0x20 || r == 0x7f }) {
+		return "/"
+	}
+	if u, err := url.Parse(s); err != nil || u.Scheme != "" || u.Host != "" {
+		return "/"
+	}
 	if s == "/" || safePath.MatchString(s) {
 		return s
 	}
