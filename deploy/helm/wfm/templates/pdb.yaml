@@ -1,0 +1,22 @@
+{{- range $component := list "web" "hooks" "worker" }}
+{{- $c := index $.Values $component }}
+{{- if and $c.enabled $c.pdb.enabled }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "wfm.fullname" $ }}-{{ $component }}
+  labels:
+    {{- include "wfm.componentLabels" (dict "root" $ "component" $component) | nindent 4 }}
+spec:
+  {{- if not (kindIs "invalid" $c.pdb.minAvailable) }}
+  minAvailable: {{ $c.pdb.minAvailable }}
+  {{- else }}
+  maxUnavailable: {{ $c.pdb.maxUnavailable | default 1 }}
+  {{- end }}
+  unhealthyPodEvictionPolicy: AlwaysAllow
+  selector:
+    matchLabels:
+      {{- include "wfm.componentSelectorLabels" (dict "root" $ "component" $component) | nindent 6 }}
+{{- end }}
+{{- end }}

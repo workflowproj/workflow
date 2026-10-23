@@ -1,0 +1,200 @@
+# EKS overlay: highly available app, 3-instance CloudNativePG cluster across zones with WAL archived
+# to S3 (IRSA), AWS Load Balancer Controller ALBs (internal for web, internet-facing for hooks),
+# External Secrets Operator (AWS Secrets Manager), KEDA queue-depth scaling, Prometheus Operator.
+# Replace every example ARN, CIDR, host and bucket.
+
+image:
+  # Pin the Cosign-verified digest (Argo CD Image Updater / Kargo / Renovate can bump it).
+  digest: ""
+
+config:
+  WFM_ENV: production
+  WFM_PUBLIC_URL: "https://wfm.corp.example.com"
+  WFM_HOOKS_PUBLIC_URL: "https://hooks.example.com"
+  WFM_LOG_LEVEL: info
+  WFM_WORKER_CONCURRENCY: "10"
+  WFM_OIDC_PROVIDERS: google
+  WFM_GOOGLE_CLIENT_ID: "1234567890-example.apps.googleusercontent.com"
+  WFM_ALLOWED_DOMAINS: example.com
+  WFM_JIT_PROVISIONING: "false"
+  WFM_GOOGLE_DIRECTORY_ENABLED: "true"
+  WFM_GOOGLE_ADMIN_SUBJECT: directory-sync@example.com
+  WFM_GOOGLE_GROUP_PREFIX: wfm-
+  WFM_S3_ENDPOINT: s3.eu-west-1.amazonaws.com
+  WFM_S3_BUCKET: example-wfm-attachments
+  WFM_S3_REGION: eu-west-1
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector.observability.svc:4318
+
+# AWS Secrets Manager secret "prod/wfm/app" holds a JSON document whose properties are env vars:
+#   {"WFM_SECRET_KEY": "...", "WFM_GOOGLE_CLIENT_SECRET": "...", "WFM_GOOGLE_SERVICE_ACCOUNT_KEY": "...",
+#    "WFM_S3_ACCESS_KEY": "...", "WFM_S3_SECRET_KEY": "..."}
+secrets:
+  externalSecret:
+    enabled: true
+    refreshInterval: 1h
+    secretStoreRef:
+      kind: ClusterSecretStore
+      name: aws-secrets-manager
+    dataFrom:
+      - extract:
+          key: prod/wfm/app
+
+database:
+  cnpg:
+    enabled: true
+    instances: 3
+    storage:
+      size: 50Gi
+      storageClass: gp3
+    walStorage:
+      enabled: true
+      size: 20Gi
+      storageClass: gp3
+    resources:
+      requests:
+        cpu: 500m
+        memory: 2Gi
+      limits:
+        memory: 4Gi
+    postgresql:
+      parameters:
+        max_connections: "400"
+        shared_buffers: 1GB
+        effective_cache_size: 3GB
+    affinity:
+      enablePodAntiAffinity: true
+      topologyKey: topology.kubernetes.io/zone
+      podAntiAffinityType: required
+    enablePodMonitor: true
+    # IRSA role with s3:PutObject/GetObject/ListBucket/DeleteObject on the backup bucket.
+    serviceAccountAnnotations:
+      eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/wfm-cnpg-backup
+    backup:
+      enabled: true
+      method: barmanObjectStore
+      destinationPath: s3://example-wfm-backups/prod
+      s3Credentials:
+        inheritFromIAMRole: true
+      wal:
+        compression: gzip
+        maxParallel: 4
+      retentionPolicy: "30d"
+      scheduledBackup:
+        enabled: true
+        schedule: "0 0 2 * * *"
+
+web:
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 12
+    targetCPUUtilizationPercentage: 65
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+  # The ALB keeps routing to a terminating target for a few seconds; keep serving meanwhile.
+  preStopSleepSeconds: 15
+  terminationGracePeriodSeconds: 50
+
+hooks:
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 9
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 384Mi
+  preStopSleepSeconds: 15
+  terminationGracePeriodSeconds: 50
+
+worker:
+  keda:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 20
+    targetQueryValue: "10"
+    fallback:
+      enabled: true
+      replicas: 4
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+
+# Two ALBs: web on an internal ALB (private subnets), hooks on an internet-facing ALB with WAF.
+# ACM terminates TLS, so the Ingress tls blocks stay disabled. Label the namespace with
+# elbv2.k8s.aws/pod-readiness-gate-inject=enabled so rollouts wait for target registration.
+ingress:
+  web:
+    className: alb
+    hosts:
+      - wfm.corp.example.com
+    annotations:
+      alb.ingress.kubernetes.io/scheme: internal
+      alb.ingress.kubernetes.io/target-type: ip
+      alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+      alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:eu-west-1:123456789012:certificate/web-example
+      alb.ingress.kubernetes.io/ssl-policy: ELBSecurityPolicy-TLS13-1-2-2021-06
+      alb.ingress.kubernetes.io/healthcheck-path: /readyz
+      # SSE streams send a keep-alive every 25s; a long idle timeout avoids needless reconnects.
+      alb.ingress.kubernetes.io/load-balancer-attributes: idle_timeout.timeout_seconds=3600
+      alb.ingress.kubernetes.io/target-group-attributes: deregistration_delay.timeout_seconds=20
+  hooks:
+    className: alb
+    hosts:
+      - hooks.example.com
+    annotations:
+      alb.ingress.kubernetes.io/scheme: internet-facing
+      alb.ingress.kubernetes.io/target-type: ip
+      alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+      alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:eu-west-1:123456789012:certificate/hooks-example
+      alb.ingress.kubernetes.io/ssl-policy: ELBSecurityPolicy-TLS13-1-2-2021-06
+      alb.ingress.kubernetes.io/healthcheck-path: /readyz
+      alb.ingress.kubernetes.io/wafv2-acl-arn: arn:aws:wafv2:eu-west-1:123456789012:regional/webacl/wfm-hooks/example
+      alb.ingress.kubernetes.io/target-group-attributes: deregistration_delay.timeout_seconds=20
+
+# With IP targets the ALB connects straight to the pods from its ENIs, so the policies allow the
+# subnets each ALB lives in: private subnets for the internal ALB, public subnets for the public one.
+# Requires network policy support in the VPC CNI add-on (enableNetworkPolicy: "true").
+networkPolicy:
+  enabled: true
+  web:
+    ingressFrom:
+      - ipBlock: {cidr: 10.0.0.0/19}
+      - ipBlock: {cidr: 10.0.32.0/19}
+      - ipBlock: {cidr: 10.0.64.0/19}
+  hooks:
+    ingressFrom:
+      - ipBlock: {cidr: 10.0.96.0/24}
+      - ipBlock: {cidr: 10.0.97.0/24}
+      - ipBlock: {cidr: 10.0.98.0/24}
+  metrics:
+    from:
+      - namespaceSelector:
+          matchLabels:
+            kubernetes.io/metadata.name: monitoring
+  egress:
+    extraRules:
+      # OpenTelemetry collector.
+      - to:
+          - namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: observability
+        ports:
+          - {port: 4318, protocol: TCP}
+  database:
+    operatorNamespace: cnpg-system
+    kedaNamespace: keda
+
+serviceMonitor:
+  enabled: true
+  labels:
+    release: kube-prometheus-stack

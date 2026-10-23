@@ -1,0 +1,108 @@
+# Chart values for the local k3d cluster (Tilt) and the CI e2e job: development sign-in, one replica
+# each, Traefik ingress on *.localhost, NetworkPolicies on (k3s enforces them).
+# Database: the throwaway PostgreSQL in postgres.yaml. Add values-cnpg.yaml to use CloudNativePG.
+image:
+  repository: ghcr.io/geoffo-dev/workflow-management
+  tag: dev
+  pullPolicy: IfNotPresent
+
+config:
+  # WFM_DEV_LOGIN is refused when WFM_ENV=production.
+  WFM_ENV: development
+  WFM_DEV_LOGIN: "true"
+  WFM_PUBLIC_URL: "http://wfm.localhost:8081"
+  WFM_HOOKS_PUBLIC_URL: "http://hooks.localhost:8081"
+  WFM_LOG_LEVEL: debug
+  WFM_WORKER_CONCURRENCY: "4"
+  # Local test receivers for outbound webhooks live on private addresses.
+  WFM_WEBHOOK_ALLOW_PRIVATE: "true"
+
+secrets:
+  create: true
+  values:
+    WFM_SECRET_KEY: "development-only-secret-key-not-for-production"
+
+database:
+  cnpg:
+    enabled: false
+  external:
+    existingSecret: wfm-dev-database
+    existingSecretKey: uri
+
+migrations:
+  backoffLimit: 20
+
+web:
+  replicas: 1
+  autoscaling:
+    enabled: false
+  preStopSleepSeconds: 0
+  terminationGracePeriodSeconds: 30
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      memory: 512Mi
+
+hooks:
+  replicas: 1
+  autoscaling:
+    enabled: false
+  preStopSleepSeconds: 0
+  terminationGracePeriodSeconds: 30
+  resources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      memory: 256Mi
+
+worker:
+  replicas: 1
+  keda:
+    enabled: false
+  autoscaling:
+    enabled: false
+  terminationGracePeriodSeconds: 30
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      memory: 512Mi
+
+ingress:
+  web:
+    className: traefik
+    hosts:
+      - wfm.localhost
+  hooks:
+    className: traefik
+    hosts:
+      - hooks.localhost
+
+networkPolicy:
+  enabled: true
+  web:
+    ingressFrom:
+      - namespaceSelector:
+          matchLabels:
+            kubernetes.io/metadata.name: kube-system
+        podSelector:
+          matchLabels:
+            app.kubernetes.io/name: traefik
+  hooks:
+    ingressFrom:
+      - namespaceSelector:
+          matchLabels:
+            kubernetes.io/metadata.name: kube-system
+        podSelector:
+          matchLabels:
+            app.kubernetes.io/name: traefik
+  egress:
+    database:
+      to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: postgres

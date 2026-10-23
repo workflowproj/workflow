@@ -1,0 +1,21 @@
+apiVersion: v2
+name: wfm
+description: >-
+  Workflow management platform: one image running as web (UI + API), hooks (internet-facing
+  webhooks and SCIM) and worker (River jobs), with an optional CloudNativePG database.
+type: application
+# Chart and app versions are overwritten from the git tag by the release workflow.
+version: 0.1.0
+appVersion: "0.1.0"
+# preStop sleep hooks (lifecycle.preStop.sleep) need Kubernetes 1.30+.
+kubeVersion: ">=1.30.0-0"
+home: https://github.com/geoffo-dev/workflow-management
+sources:
+  - https://github.com/geoffo-dev/workflow-management
+keywords:
+  - workflow
+  - issue-tracker
+  - cloudnative-pg
+  - keda
+annotations:
+  artifacthub.io/containsSecurityUpdates: "false"

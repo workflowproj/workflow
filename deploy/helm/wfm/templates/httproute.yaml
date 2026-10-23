@@ -1,0 +1,80 @@
+{{- $fullname := include "wfm.fullname" . }}
+{{- with .Values.gatewayAPI.web }}
+{{- if and .enabled $.Values.web.enabled }}
+{{- if not .parentRefs }}{{ fail "gatewayAPI.web.parentRefs is required" }}{{ end }}
+---
+# Internal entry point (attach to an internal Gateway / listener).
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ $fullname }}-web
+  labels:
+    {{- include "wfm.componentLabels" (dict "root" $ "component" "web") | nindent 4 }}
+  {{- with .annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  parentRefs:
+    {{- toYaml .parentRefs | nindent 4 }}
+  {{- with .hostnames }}
+  hostnames:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  rules:
+    # Server-sent events: long-lived, must not be cut by the default route timeout.
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /api/v1/events
+      {{- with .streamTimeout }}
+      timeouts:
+        request: {{ . | quote }}
+        backendRequest: {{ . | quote }}
+      {{- end }}
+      backendRefs:
+        - name: {{ $fullname }}-web
+          port: {{ $.Values.web.service.port }}
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: {{ $fullname }}-web
+          port: {{ $.Values.web.service.port }}
+{{- end }}
+{{- end }}
+{{- with .Values.gatewayAPI.hooks }}
+{{- if and .enabled $.Values.hooks.enabled }}
+{{- if not .parentRefs }}{{ fail "gatewayAPI.hooks.parentRefs is required" }}{{ end }}
+---
+# PUBLIC entry point (attach to the internet-facing Gateway). Only webhooks and SCIM.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ $fullname }}-hooks
+  labels:
+    {{- include "wfm.componentLabels" (dict "root" $ "component" "hooks") | nindent 4 }}
+  {{- with .annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  parentRefs:
+    {{- toYaml .parentRefs | nindent 4 }}
+  {{- with .hostnames }}
+  hostnames:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  rules:
+    - matches:
+        {{- range .paths }}
+        - path:
+            type: PathPrefix
+            value: {{ . }}
+        {{- end }}
+      backendRefs:
+        - name: {{ $fullname }}-hooks
+          port: {{ $.Values.hooks.service.port }}
+{{- end }}
+{{- end }}

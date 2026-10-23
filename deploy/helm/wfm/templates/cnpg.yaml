@@ -1,0 +1,127 @@
+{{- $db := .Values.database.cnpg }}
+{{- if $db.enabled }}
+{{- $name := include "wfm.cnpgName" . }}
+{{- $b := $db.backup }}
+{{- if and $b.enabled (not $b.destinationPath) }}
+{{- fail "database.cnpg.backup.destinationPath is required when backups are enabled (s3://bucket/prefix)" }}
+{{- end }}
+{{- if not (has $b.method (list "barmanObjectStore" "plugin")) }}
+{{- fail "database.cnpg.backup.method must be barmanObjectStore or plugin" }}
+{{- end }}
+# PostgreSQL 17 managed by CloudNativePG. The operator generates the Secret <name>-app
+# (keys: username, password, host, port, dbname, uri, ...) that the app and KEDA read.
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "wfm.componentLabels" (dict "root" . "component" "database") | nindent 4 }}
+  annotations:
+    {{- include "wfm.syncWave" .Values.argocd.syncWaves.database | nindent 4 }}
+    # Never delete the database with the release or the Argo CD Application.
+    helm.sh/resource-policy: keep
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false
+    {{- with $db.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  instances: {{ $db.instances }}
+  imageName: {{ $db.imageName }}
+  imagePullPolicy: {{ $db.imagePullPolicy }}
+  primaryUpdateStrategy: {{ $db.primaryUpdateStrategy }}
+  enableSuperuserAccess: {{ $db.enableSuperuserAccess }}
+  bootstrap:
+    initdb:
+      database: {{ $db.database }}
+      owner: {{ $db.owner }}
+  storage:
+    size: {{ $db.storage.size }}
+    {{- with $db.storage.storageClass }}
+    storageClass: {{ . }}
+    {{- end }}
+  {{- if $db.walStorage.enabled }}
+  walStorage:
+    size: {{ $db.walStorage.size }}
+    {{- with $db.walStorage.storageClass }}
+    storageClass: {{ . }}
+    {{- end }}
+  {{- end }}
+  {{- with $db.postgresql.parameters }}
+  postgresql:
+    parameters:
+      {{- range $k, $v := . }}
+      {{ $k }}: {{ $v | toString | quote }}
+      {{- end }}
+  {{- end }}
+  {{- with $db.resources }}
+  resources:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with $db.affinity }}
+  affinity:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  monitoring:
+    enablePodMonitor: {{ $db.enablePodMonitor }}
+  inheritedMetadata:
+    labels:
+      {{- include "wfm.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: database
+  {{- with $db.serviceAccountAnnotations }}
+  serviceAccountTemplate:
+    metadata:
+      annotations:
+        {{- toYaml . | nindent 8 }}
+  {{- end }}
+  {{- if $b.enabled }}
+  {{- if eq $b.method "barmanObjectStore" }}
+  backup:
+    retentionPolicy: {{ $b.retentionPolicy | quote }}
+    barmanObjectStore:
+      {{- include "wfm.cnpgBarmanConfig" $b | nindent 6 }}
+  {{- else }}
+  plugins:
+    - name: {{ $b.pluginName }}
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: {{ $name }}-backup
+  {{- end }}
+  {{- end }}
+{{- if and $b.enabled (eq $b.method "plugin") }}
+---
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: {{ $name }}-backup
+  labels:
+    {{- include "wfm.componentLabels" (dict "root" . "component" "database") | nindent 4 }}
+  annotations:
+    {{- include "wfm.syncWave" .Values.argocd.syncWaves.config | nindent 4 }}
+spec:
+  retentionPolicy: {{ $b.retentionPolicy | quote }}
+  configuration:
+    {{- include "wfm.cnpgBarmanConfig" $b | nindent 4 }}
+{{- end }}
+{{- if and $b.enabled $b.scheduledBackup.enabled }}
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: {{ $name }}-daily
+  labels:
+    {{- include "wfm.componentLabels" (dict "root" . "component" "database") | nindent 4 }}
+spec:
+  schedule: {{ $b.scheduledBackup.schedule | quote }}
+  immediate: {{ $b.scheduledBackup.immediate }}
+  backupOwnerReference: self
+  cluster:
+    name: {{ $name }}
+  {{- if eq $b.method "plugin" }}
+  method: plugin
+  pluginConfiguration:
+    name: {{ $b.pluginName }}
+  {{- else }}
+  method: barmanObjectStore
+  {{- end }}
+{{- end }}
+{{- end }}

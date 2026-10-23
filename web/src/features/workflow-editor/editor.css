@@ -1,0 +1,89 @@
+/* React Flow themed with the app's semantic tokens so light and dark mode follow index.css. */
+.wf-canvas {
+  --xy-background-color: var(--color-canvas);
+  --xy-background-pattern-color: var(--color-line-strong);
+  --xy-edge-stroke: var(--color-faint);
+  --xy-edge-stroke-selected: var(--color-accent);
+  --xy-edge-stroke-width: 1.5;
+  --xy-connectionline-stroke: var(--color-accent);
+  --xy-connectionline-stroke-width: 2;
+  --xy-controls-button-background-color: var(--color-surface);
+  --xy-controls-button-background-color-hover: var(--color-surface-2);
+  --xy-controls-button-color: var(--color-muted);
+  --xy-controls-button-color-hover: var(--color-ink);
+  --xy-controls-button-border-color: var(--color-line);
+  --xy-controls-box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
+  --xy-node-background-color: transparent;
+  --xy-node-border: none;
+  --xy-node-boxshadow-selected: none;
+  --xy-handle-background-color: var(--color-accent);
+  --xy-handle-border-color: var(--color-surface);
+  --xy-minimap-background-color: var(--color-surface);
+  --xy-minimap-mask-background-color: color-mix(in srgb, var(--color-canvas) 70%, transparent);
+  --xy-minimap-node-background-color: var(--color-surface-3);
+}
+
+.wf-canvas .react-flow__controls {
+  border: 1px solid var(--color-line);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.wf-canvas .react-flow__controls-button svg {
+  fill: currentColor;
+}
+
+/* The whole status card accepts a dropped connection, but only while one is being drawn. */
+.wf-canvas .react-flow__handle.wf-target-handle {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  transform: none;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  opacity: 0;
+}
+
+.wf-canvas .react-flow__handle.wf-source-handle {
+  width: 14px;
+  height: 14px;
+  right: -7px;
+  border-width: 2px;
+  opacity: 0;
+  transition: opacity 120ms, transform 120ms;
+  cursor: crosshair;
+}
+.wf-canvas .react-flow__node:hover .wf-source-handle,
+.wf-canvas .react-flow__node.selected .wf-source-handle,
+.wf-canvas .react-flow__node:focus-visible .wf-source-handle {
+  opacity: 1;
+}
+.wf-canvas .react-flow__handle.wf-source-handle:hover {
+  transform: translate(0, -50%) scale(1.25);
+}
+
+.wf-canvas .react-flow__node:focus-visible {
+  outline: none;
+}
+.wf-canvas .react-flow__node:focus-visible > div {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+.wf-canvas .react-flow__edge:focus-visible .react-flow__edge-path {
+  stroke: var(--color-accent);
+}
+.wf-canvas .react-flow__edge .react-flow__edge-path {
+  transition: stroke 120ms;
+}
+.wf-canvas .react-flow__edge:hover .react-flow__edge-path {
+  stroke: var(--color-muted);
+}
+.wf-canvas .react-flow__edge.wf-active .react-flow__edge-path {
+  stroke: var(--color-accent);
+}
+.wf-canvas .react-flow__edge.wf-error .react-flow__edge-path {
+  stroke: var(--color-danger);
+}

@@ -1,0 +1,168 @@
+# k3s overlay: a single node (or a small k3s cluster), one CloudNativePG instance, Traefik for both
+# entry points, small resources, no KEDA.
+#
+#   helm upgrade --install wfm deploy/helm/wfm -n wfm --create-namespace \
+#     -f deploy/helm/wfm/values-k3s.yaml -f secrets://deploy/env/k3s/secrets.enc.yaml   # helm-secrets + SOPS
+#
+# Secrets: secrets.values comes from a SOPS-encrypted values file (helm-secrets, or Argo CD with the
+# helm-secrets plugin / KSOPS), e.g.
+#   secrets:
+#     values:
+#       WFM_SECRET_KEY: ENC[AES256_GCM,data:...]
+#       WFM_GOOGLE_CLIENT_SECRET: ENC[AES256_GCM,data:...]
+
+config:
+  WFM_ENV: production
+  # Internal host: only resolvable/reachable on the LAN or VPN.
+  WFM_PUBLIC_URL: "https://wfm.home.example.net"
+  # Public host: the only name with a public DNS record (port-forwarded to Traefik).
+  WFM_HOOKS_PUBLIC_URL: "https://hooks.example.net"
+  WFM_WORKER_CONCURRENCY: "4"
+  WFM_LOG_LEVEL: info
+  # WFM_OIDC_PROVIDERS: google
+  # WFM_GOOGLE_CLIENT_ID: "1234.apps.googleusercontent.com"
+  # WFM_ALLOWED_DOMAINS: example.net
+  # Self-hosted Garage/SeaweedFS/MinIO for attachments (otherwise they are stored in PostgreSQL).
+  # WFM_S3_ENDPOINT: garage.storage.svc:3900
+  # WFM_S3_BUCKET: wfm
+  # WFM_S3_USE_SSL: "false"
+
+secrets:
+  create: true
+  values: {}
+
+database:
+  cnpg:
+    enabled: true
+    instances: 1
+    storage:
+      size: 5Gi
+      # k3s' bundled local-path provisioner.
+      storageClass: local-path
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        memory: 1Gi
+    postgresql:
+      parameters:
+        max_connections: "100"
+        shared_buffers: 128MB
+    affinity:
+      enablePodAntiAffinity: false
+    # Optional: WAL archiving + nightly base backups to an S3-compatible store (Garage, MinIO, B2...).
+    backup:
+      enabled: false
+      method: barmanObjectStore
+      destinationPath: s3://wfm-backups/k3s
+      endpointURL: http://garage.storage.svc:3900
+      s3Credentials:
+        secretName: wfm-backup-s3
+      retentionPolicy: "14d"
+
+web:
+  replicas: 1
+  autoscaling:
+    enabled: false
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 384Mi
+  preStopSleepSeconds: 2
+
+hooks:
+  replicas: 1
+  autoscaling:
+    enabled: false
+  resources:
+    requests:
+      cpu: 25m
+      memory: 48Mi
+    limits:
+      memory: 192Mi
+  preStopSleepSeconds: 2
+
+worker:
+  replicas: 1
+  keda:
+    enabled: false
+  autoscaling:
+    enabled: false
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 384Mi
+
+# k3s ships Traefik in kube-system. One Traefik serves both hosts; the split is by host name:
+# only hooks.example.net is in public DNS/port-forwarded, and the internal router is limited to LAN
+# addresses by the Middleware below. (A second Traefik on another IP works too: set its class.)
+# Traefik streams SSE without buffering, so no extra settings are needed for /api/v1/events.
+ingress:
+  web:
+    className: traefik
+    hosts:
+      - wfm.home.example.net
+    annotations:
+      traefik.ingress.kubernetes.io/router.entrypoints: websecure
+      traefik.ingress.kubernetes.io/router.middlewares: "wfm-lan-only@kubernetescrd"
+    tls:
+      enabled: true
+    # Internal names cannot pass HTTP-01; use a DNS-01 issuer.
+    certManager:
+      clusterIssuer: letsencrypt-dns01
+  hooks:
+    className: traefik
+    hosts:
+      - hooks.example.net
+    annotations:
+      traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    tls:
+      enabled: true
+    certManager:
+      clusterIssuer: letsencrypt-http01
+
+extraObjects:
+  - apiVersion: traefik.io/v1alpha1
+    kind: Middleware
+    metadata:
+      # Referenced above as <namespace>-<name>@kubernetescrd.
+      name: lan-only
+    spec:
+      ipAllowList:
+        sourceRange:
+          - 10.0.0.0/8
+          - 172.16.0.0/12
+          - 192.168.0.0/16
+          - 100.64.0.0/10
+
+networkPolicy:
+  enabled: true
+  web:
+    ingressFrom:
+      - namespaceSelector:
+          matchLabels:
+            kubernetes.io/metadata.name: kube-system
+        podSelector:
+          matchLabels:
+            app.kubernetes.io/name: traefik
+  hooks:
+    ingressFrom:
+      - namespaceSelector:
+          matchLabels:
+            kubernetes.io/metadata.name: kube-system
+        podSelector:
+          matchLabels:
+            app.kubernetes.io/name: traefik
+  metrics:
+    from:
+      - namespaceSelector:
+          matchLabels:
+            kubernetes.io/metadata.name: monitoring
+
+serviceMonitor:
+  enabled: false

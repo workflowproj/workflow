@@ -1,0 +1,148 @@
+{{- range $component := list "web" "hooks" "worker" }}
+{{- $c := index $.Values $component }}
+{{- if $c.enabled }}
+{{- $fullname := printf "%s-%s" (include "wfm.fullname" $) $component }}
+{{- $autoscaled := or $c.autoscaling.enabled (and (eq $component "worker") $.Values.worker.keda.enabled) }}
+{{- $memLimit := dig "limits" "memory" "" ($c.resources | default dict) }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $fullname }}
+  labels:
+    {{- include "wfm.componentLabels" (dict "root" $ "component" $component) | nindent 4 }}
+spec:
+  {{- if not $autoscaled }}
+  replicas: {{ $c.replicas }}
+  {{- end }}
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      {{- include "wfm.componentSelectorLabels" (dict "root" $ "component" $component) | nindent 6 }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 25%
+  template:
+    metadata:
+      labels:
+        {{- include "wfm.componentLabels" (dict "root" $ "component" $component) | nindent 8 }}
+        {{- with $c.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        {{- include "wfm.checksums" $ | nindent 8 }}
+        {{- with $c.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "wfm.serviceAccountName" $ }}
+      automountServiceAccountToken: {{ $.Values.serviceAccount.automountToken }}
+      enableServiceLinks: false
+      {{- with $.Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with ($c.priorityClassName | default $.Values.priorityClassName) }}
+      priorityClassName: {{ . }}
+      {{- end }}
+      securityContext:
+        {{- toYaml $.Values.podSecurityContext | nindent 8 }}
+      terminationGracePeriodSeconds: {{ $c.terminationGracePeriodSeconds }}
+      containers:
+        - name: {{ $component }}
+          image: {{ include "wfm.image" $ }}
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          args:
+            - serve
+            - --mode={{ $component }}
+            {{- with $c.extraArgs }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          ports:
+            {{- if ne $component "worker" }}
+            - name: http
+              containerPort: {{ $.Values.ports.http }}
+              protocol: TCP
+            {{- end }}
+            - name: metrics
+              containerPort: {{ $.Values.ports.metrics }}
+              protocol: TCP
+          envFrom:
+            {{- include "wfm.commonEnvFrom" $ | nindent 12 }}
+            {{- with $c.extraEnvFrom }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          env:
+            {{- include "wfm.commonEnv" $ | nindent 12 }}
+            {{- if $.Values.otelKubernetesAttributes }}
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: {{ printf "k8s.namespace.name=$(POD_NAMESPACE),k8s.pod.name=$(POD_NAME),k8s.node.name=$(NODE_NAME),k8s.deployment.name=%s,service.namespace=%s" $fullname $.Release.Namespace | quote }}
+            {{- end }}
+            {{- if and $.Values.goMemLimitFromResources $memLimit }}
+            # 90% of the memory limit, so the GC works harder before the kernel OOM-kills.
+            - name: GOMEMLIMIT
+              value: {{ include "wfm.goMemLimit" $memLimit | quote }}
+            {{- end }}
+            {{- with $.Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+            {{- with $c.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- with $c.probes.startup }}
+          startupProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $c.probes.liveness }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $c.probes.readiness }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- if gt (int $c.preStopSleepSeconds) 0 }}
+          lifecycle:
+            preStop:
+              sleep:
+                seconds: {{ $c.preStopSleepSeconds }}
+          {{- end }}
+          resources:
+            {{- toYaml $c.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml $.Values.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            {{- with $c.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir:
+            {{- with $c.tmpSizeLimit }}
+            sizeLimit: {{ . }}
+            {{- end }}
+        {{- with $c.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- if $c.topologySpread.enabled }}
+      topologySpreadConstraints:
+        {{- include "wfm.topologySpread" (dict "root" $ "component" $component "c" $c) | trim | nindent 8 }}
+      {{- end }}
+      {{- with ($c.nodeSelector | default $.Values.nodeSelector) }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with ($c.tolerations | default $.Values.tolerations) }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with ($c.affinity | default $.Values.affinity) }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}
+{{- end }}

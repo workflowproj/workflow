@@ -1,0 +1,156 @@
+{{- $np := .Values.networkPolicy }}
+{{- if $np.enabled }}
+{{- $fullname := include "wfm.fullname" . }}
+{{- $wave := .Values.argocd.syncWaves.config }}
+{{- if $np.defaultDenyIngress }}
+---
+# Deny all ingress in the namespace unless a policy below allows it.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $fullname }}-default-deny-ingress
+  labels:
+    {{- include "wfm.labels" . | nindent 4 }}
+  annotations:
+    {{- include "wfm.syncWave" $wave | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes: ["Ingress"]
+{{- end }}
+{{- range $component := list "web" "hooks" "worker" }}
+{{- $c := index $.Values $component }}
+{{- if $c.enabled }}
+{{- $cnp := index $np $component }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $fullname }}-{{ $component }}
+  labels:
+    {{- include "wfm.componentLabels" (dict "root" $ "component" $component) | nindent 4 }}
+  annotations:
+    {{- include "wfm.syncWave" $wave | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "wfm.componentSelectorLabels" (dict "root" $ "component" $component) | nindent 6 }}
+  policyTypes:
+    - Ingress
+    {{- if $np.egress.enabled }}
+    - Egress
+    {{- end }}
+  ingress:
+    {{- if and (ne $component "worker") $cnp.ingressFrom }}
+    # {{ ternary "Internal ingress controller -> UI/API." "PUBLIC ingress controller -> webhooks/SCIM." (eq $component "web") }}
+    - from:
+        {{- toYaml $cnp.ingressFrom | nindent 8 }}
+      ports:
+        - port: http
+          protocol: TCP
+    {{- end }}
+    {{- with $np.metrics.from }}
+    # Prometheus -> /metrics.
+    - from:
+        {{- toYaml . | nindent 8 }}
+      ports:
+        - port: metrics
+          protocol: TCP
+    {{- end }}
+  {{- if $np.egress.enabled }}
+  egress:
+    {{- include "wfm.np.egress" (dict "root" $ "internet" $cnp.internetEgress) | trim | nindent 4 }}
+  {{- end }}
+{{- end }}
+{{- end }}
+{{- if .Values.migrations.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $fullname }}-migrate
+  labels:
+    {{- include "wfm.componentLabels" (dict "root" . "component" "migrate") | nindent 4 }}
+  annotations:
+    {{- include "wfm.syncWave" $wave | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "wfm.componentSelectorLabels" (dict "root" . "component" "migrate") | nindent 6 }}
+  policyTypes:
+    - Ingress
+    {{- if $np.egress.enabled }}
+    - Egress
+    {{- end }}
+  ingress: []
+  {{- if $np.egress.enabled }}
+  egress:
+    {{- include "wfm.np.egress" (dict "root" . "internet" false) | trim | nindent 4 }}
+  {{- end }}
+{{- end }}
+{{- if .Values.database.cnpg.enabled }}
+{{- $cluster := include "wfm.cnpgName" . }}
+---
+# Ingress to the PostgreSQL instances: the app, the CNPG operator, replicas, KEDA and Prometheus.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $fullname }}-database
+  labels:
+    {{- include "wfm.componentLabels" (dict "root" . "component" "database") | nindent 4 }}
+  annotations:
+    {{- include "wfm.syncWave" $wave | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      cnpg.io/cluster: {{ $cluster }}
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "wfm.selectorLabels" . | nindent 14 }}
+            matchExpressions:
+              - key: app.kubernetes.io/component
+                operator: In
+                values: [web, hooks, worker, migrate]
+      ports:
+        - port: 5432
+          protocol: TCP
+    # Replication and the instance manager between members of the cluster (and its jobs).
+    - from:
+        - podSelector:
+            matchLabels:
+              cnpg.io/cluster: {{ $cluster }}
+    # The operator talks to each instance manager (8000) and to PostgreSQL.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ $np.database.operatorNamespace }}
+      ports:
+        - port: 8000
+          protocol: TCP
+        - port: 5432
+          protocol: TCP
+    {{- if and .Values.worker.enabled .Values.worker.keda.enabled }}
+    # KEDA's PostgreSQL scaler runs the queue-depth query from the KEDA namespace.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ $np.database.kedaNamespace }}
+      ports:
+        - port: 5432
+          protocol: TCP
+    {{- end }}
+    {{- with $np.metrics.from }}
+    - from:
+        {{- toYaml . | nindent 8 }}
+      ports:
+        - port: 9187
+          protocol: TCP
+    {{- end }}
+    {{- with $np.database.extraFrom }}
+    - from:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+{{- end }}
+{{- end }}
