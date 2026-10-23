@@ -8,6 +8,7 @@ apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: {{ include "wfm.fullname" $ }}-{{ $component }}
+  namespace: {{ $.Release.Namespace }}
   labels:
     {{- include "wfm.componentLabels" (dict "root" $ "component" $component) | nindent 4 }}
 spec:

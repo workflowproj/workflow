@@ -4,7 +4,7 @@ import { Plus } from "lucide-react";
 import { api, unwrap } from "@/api/client";
 import { hasPermission, issueTypesQuery, useProject } from "@/api/queries";
 import type { Issue } from "@/api/types";
-import { Button, IconButton, Select, useToast } from "@/components/ui";
+import { Button, IconButton, useToast } from "@/components/ui";
 import { IssueTypeIcon, PriorityIcon, StatusBadge } from "@/components/issue-bits";
 import { UserAvatar } from "@/components/UserAvatar";
 import { cn } from "@/lib/cn";
@@ -137,13 +137,18 @@ function AddChild({ types, onDone }: { types: { key: string; name: string; icon:
       }}
     >
       {types.length > 1 ? (
-        <Select aria-label="Issue type" value={typeKey} onChange={(e) => setTypeKey(e.target.value)} className="h-7 w-28 shrink-0 border-transparent bg-surface-2 text-[13px]">
+        <select
+          aria-label="Issue type"
+          value={typeKey}
+          onChange={(e) => setTypeKey(e.target.value)}
+          className="h-7 w-28 shrink-0 rounded border-0 bg-surface-2 px-1.5 text-[13px] text-ink focus:ring-2 focus:ring-accent/25 focus:outline-none"
+        >
           {types.map((t) => (
             <option key={t.key} value={t.key}>
               {t.name}
             </option>
           ))}
-        </Select>
+        </select>
       ) : (
         type && <IssueTypeIcon type={type} className="ml-1" />
       )}

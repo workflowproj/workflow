@@ -103,12 +103,12 @@ export function IssueNavigator({
 
   return (
     <div className="flex h-full min-h-0">
-      <aside className="hidden w-60 shrink-0 overflow-y-auto border-r border-line bg-surface px-2 py-4 lg:block">{panel}</aside>
+      <aside className="hidden w-56 shrink-0 overflow-y-auto border-r border-line bg-surface px-2 py-4 2xl:block">{panel}</aside>
       <div className="min-w-0 flex-1 overflow-y-auto">
         <div className="mx-auto flex max-w-[1400px] flex-col gap-4 p-4 sm:p-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-2">
-              <div className="lg:hidden">
+              <div className="2xl:hidden">
                 <Popover
                   trigger={({ toggle }) => (
                     <Button size="sm" icon={<Filter className="size-3.5" />} onClick={toggle}>
@@ -132,7 +132,7 @@ export function IssueNavigator({
             </div>
             <div className="flex items-center gap-2">
               {active?.mine && modified && (
-                <Button size="sm" variant="primary" icon={<Save className="size-3.5" />} onClick={() => setSaving("update")}>
+                <Button size="sm" variant="primary" icon={<Save className="size-3.5" />} onClick={() => setSaving("update")} disabled={!!queryError}>
                   Save changes
                 </Button>
               )}
@@ -179,7 +179,9 @@ export function IssueNavigator({
           </div>
 
           {results.error && !jqlError && !(mode === "jql" && queryError) && <ErrorBox error={results.error} />}
-          {!(queryError && mode === "jql") && (
+          {queryError && mode === "jql" ? (
+            <div className="rounded-lg border border-dashed border-line-strong px-4 py-10 text-center text-sm text-muted">Fix the query and press Enter to see results.</div>
+          ) : (
             <ResultsTable
               jql={jql}
               issues={issues}

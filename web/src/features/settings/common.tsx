@@ -74,7 +74,7 @@ export function SecretOnce({ label, value, children }: { label: string; value: s
     <div className="flex flex-col gap-2">
       <div className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning-soft px-3 py-2 text-sm text-warning">
         <KeyRound className="mt-0.5 size-4 shrink-0" />
-        <p>Copy the {label.toLowerCase()} now. For your security it is stored hashed and will not be shown again.</p>
+        <p>Copy the {label.toLowerCase()} now and store it somewhere safe; it will not be shown again.</p>
       </div>
       <p className="text-[13px] font-medium">{label}</p>
       <div className="flex items-center gap-2 rounded-md border border-line-strong bg-surface-2 p-1.5 pl-3">

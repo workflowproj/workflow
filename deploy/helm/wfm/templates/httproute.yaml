@@ -8,6 +8,7 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: {{ $fullname }}-web
+  namespace: {{ $.Release.Namespace }}
   labels:
     {{- include "wfm.componentLabels" (dict "root" $ "component" "web") | nindent 4 }}
   {{- with .annotations }}
@@ -53,6 +54,7 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: {{ $fullname }}-hooks
+  namespace: {{ $.Release.Namespace }}
   labels:
     {{- include "wfm.componentLabels" (dict "root" $ "component" "hooks") | nindent 4 }}
   {{- with .annotations }}

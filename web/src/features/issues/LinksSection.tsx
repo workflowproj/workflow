@@ -137,13 +137,15 @@ function AddLink({ onDone }: { onDone: () => void }) {
   const linked = issue.links.filter((l) => l.type === option.type && l.direction === option.direction).map((l) => l.issue.key);
   return (
     <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md border border-line bg-surface-2/60 p-2 sm:flex-nowrap">
-      <Select aria-label="Link type" value={kind} onChange={(e) => setKind(e.target.value)} className="w-40 shrink-0">
-        {LINK_OPTIONS.map((o) => (
-          <option key={o.id} value={o.id}>
-            {o.label}
-          </option>
-        ))}
-      </Select>
+      <div className="w-full shrink-0 sm:w-40">
+        <Select aria-label="Link type" value={kind} onChange={(e) => setKind(e.target.value)}>
+          {LINK_OPTIONS.map((o) => (
+            <option key={o.id} value={o.id}>
+              {o.label}
+            </option>
+          ))}
+        </Select>
+      </div>
       <IssuePicker autoFocus exclude={[issue.key, ...linked]} onPick={(i) => create.mutate(i.key)} onCancel={onDone} />
       <Button size="md" variant="ghost" onClick={onDone} loading={create.isPending}>
         Cancel

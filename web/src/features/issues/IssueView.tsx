@@ -63,7 +63,7 @@ function IssueLayout({ gone }: { gone: boolean }) {
           </div>
           {!!problem && <TransitionProblem error={problem} onDismiss={() => setProblem(null)} />}
         </div>
-        <aside className="min-w-0 [grid-area:side] @4xl/issue:sticky @4xl/issue:top-4 @4xl/issue:self-start">
+        <aside className="min-w-0 [grid-area:side]">
           <DetailsPanel />
         </aside>
         <div className="flex min-w-0 flex-col gap-8 [grid-area:body]">

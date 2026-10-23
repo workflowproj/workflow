@@ -1,0 +1,256 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE: ghcr.io/geoffo-dev/workflow-management
+  HELM_VERSION: v3.19.0
+  KUBECONFORM_VERSION: v0.7.0
+  K3D_VERSION: v5.8.3
+  # CloudNativePG operator used by the e2e cluster (and bundled by scripts/bundle.sh).
+  CNPG_MANIFEST: https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.30/releases/cnpg-1.30.1.yaml
+
+jobs:
+  go:
+    name: Go (vet, generated code, tests)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: wfm
+          POSTGRES_PASSWORD: wfm
+          POSTGRES_DB: wfm_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U wfm -d wfm_test"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      TEST_DATABASE_URL: postgres://wfm:wfm@localhost:5432/wfm_test?sslmode=disable
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: go mod tidy is clean
+        run: |
+          go mod tidy
+          git diff --exit-code -- go.mod go.sum
+      - name: go vet
+        run: go vet ./...
+      - name: Install code generators
+        run: make tools
+      - name: Generated Go code is up to date (sqlc, oapi-codegen)
+        # `make generate-check` also regenerates web/src/api/schema.d.ts; the web job checks that.
+        run: |
+          "$(go env GOPATH)/bin/sqlc" generate
+          "$(go env GOPATH)/bin/oapi-codegen" -config api/oapi-codegen.yaml api/openapi.yaml
+          git diff --exit-code -- internal/db/dbq internal/api
+      - name: Tests (unit + integration against PostgreSQL 17)
+        run: go test -race -count=1 ./...
+      - name: Build
+        run: CGO_ENABLED=0 go build -trimpath -o /dev/null ./cmd/wfm
+
+  web:
+    name: Web (types, tests, build)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - name: API types are up to date
+        run: |
+          npm run generate
+          git diff --exit-code -- src/api/schema.d.ts
+      - run: npm run typecheck
+      - run: npm test --if-present -- --passWithNoTests
+      - run: npm run build
+
+  helm:
+    name: Helm (lint, render, kubeconform)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: azure/setup-helm@v4
+        with:
+          version: ${{ env.HELM_VERSION }}
+      - name: Install kubeconform
+        run: |
+          curl -sSfL "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz" \
+            | sudo tar -xz -C /usr/local/bin kubeconform
+      - name: Lint, render and validate every overlay
+        env:
+          CHART: deploy/helm/wfm
+          # values-k3s.yaml expects the SOPS-encrypted secret overlay; CI supplies a dummy key.
+          DUMMY_SECRET: --set secrets.values.WFM_SECRET_KEY=ci-dummy-secret-key-0123456789abcdef
+        run: |
+          set -euo pipefail
+          mkdir -p rendered
+          declare -A overlays=(
+            [default]=""
+            [k3s]="-f $CHART/values-k3s.yaml $DUMMY_SECRET"
+            [eks]="-f $CHART/values-eks.yaml"
+            [k3d-dev]="-f deploy/k3d/values-dev.yaml"
+            [k3d-cnpg]="-f deploy/k3d/values-dev.yaml -f deploy/k3d/values-cnpg.yaml"
+            [gateway-api]="--set ingress.web.enabled=false --set ingress.hooks.enabled=false --set gatewayAPI.web.enabled=true --set gatewayAPI.web.parentRefs[0].name=internal --set gatewayAPI.hooks.enabled=true --set gatewayAPI.hooks.parentRefs[0].name=public"
+            [cnpg-plugin-backup]="--set database.cnpg.backup.enabled=true --set database.cnpg.backup.method=plugin --set database.cnpg.backup.destinationPath=s3://bucket/wfm --set database.cnpg.backup.s3Credentials.inheritFromIAMRole=true"
+          )
+          for name in "${!overlays[@]}"; do
+            echo "::group::$name"
+            # shellcheck disable=SC2086
+            helm lint --strict "$CHART" ${overlays[$name]}
+            # shellcheck disable=SC2086
+            helm template wfm "$CHART" --namespace wfm ${overlays[$name]} > "rendered/$name.yaml"
+            kubeconform -strict -summary -kubernetes-version 1.33.0 -ignore-missing-schemas \
+              -schema-location default \
+              -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+              "rendered/$name.yaml"
+            echo "::endgroup::"
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rendered-manifests
+          path: rendered/
+          retention-days: 7
+
+  docker:
+    name: Docker image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v3
+      - name: Build (linux/amd64) and export for the e2e job
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: ${{ env.IMAGE }}:ci
+          build-args: |
+            VERSION=ci-${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          outputs: type=docker,dest=${{ runner.temp }}/wfm-image.tar
+      - name: Smoke test the image
+        run: |
+          docker load -i "${{ runner.temp }}/wfm-image.tar"
+          docker run --rm "${IMAGE}:ci" version
+          docker image inspect "${IMAGE}:ci" --format 'user={{.Config.User}} size={{.Size}}'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wfm-image
+          path: ${{ runner.temp }}/wfm-image.tar
+          retention-days: 1
+
+  e2e:
+    name: E2E (k3d + CloudNativePG + Playwright)
+    needs: [docker, helm]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - uses: azure/setup-helm@v4
+        with:
+          version: ${{ env.HELM_VERSION }}
+      - name: Install k3d
+        run: curl -sSfL https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | TAG="${K3D_VERSION}" bash
+      - uses: actions/download-artifact@v4
+        with:
+          name: wfm-image
+          path: ${{ runner.temp }}
+      - name: Create an ephemeral k3d cluster
+        run: |
+          docker load -i "${{ runner.temp }}/wfm-image.tar"
+          k3d cluster create --config deploy/k3d/cluster.yaml
+          k3d image import --cluster wfm "${IMAGE}:ci"
+          kubectl wait --for=condition=Ready nodes --all --timeout=120s
+      - name: Install the CloudNativePG operator
+        run: |
+          kubectl apply --server-side -f "${CNPG_MANIFEST}"
+          kubectl -n cnpg-system rollout status deployment/cnpg-controller-manager --timeout=180s
+      - name: Install the chart (development sign-in, single-instance CNPG)
+        # No --wait: the migration runs as a post-install hook once the release's objects exist,
+        # and helm waits for that Job. The rollout checks below wait for the pods.
+        run: |
+          helm upgrade --install wfm deploy/helm/wfm --namespace wfm --create-namespace \
+            -f deploy/k3d/values-dev.yaml -f deploy/k3d/values-cnpg.yaml \
+            --set image.tag=ci --timeout 10m
+          kubectl -n wfm logs job/wfm-migrate --tail=5
+          for d in web hooks worker; do kubectl -n wfm rollout status "deployment/wfm-$d" --timeout=5m; done
+      - name: Upgrade in place (pre-upgrade migration, rolling update)
+        run: |
+          helm upgrade wfm deploy/helm/wfm --namespace wfm \
+            -f deploy/k3d/values-dev.yaml -f deploy/k3d/values-cnpg.yaml \
+            --set image.tag=ci --set config.WFM_LOG_LEVEL=info --wait --timeout 5m
+      - name: Check the ingress split (Traefik)
+        run: |
+          set -x
+          # web host serves the UI and API
+          test "$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: wfm.localhost' http://localhost:8081/readyz)" = 200
+          # hooks host serves SCIM (bearer token required) ...
+          test "$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: hooks.localhost' http://localhost:8081/scim/v2/Users)" = 401
+          # ... but neither the UI nor the API
+          test "$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: hooks.localhost' http://localhost:8081/api/v1/projects)" = 404
+          test "$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: hooks.localhost' http://localhost:8081/)" = 404
+      - name: Port-forward the web service
+        run: |
+          kubectl -n wfm port-forward svc/wfm-web 8080:80 > "${{ runner.temp }}/port-forward.log" 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://localhost:8080/readyz && exit 0; sleep 2; done
+          cat "${{ runner.temp }}/port-forward.log"; exit 1
+      - name: Playwright
+        working-directory: web
+        env:
+          E2E_BASE_URL: http://localhost:8080
+          CI: "true"
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+          npm run e2e
+      - name: Diagnostics
+        if: failure()
+        run: |
+          kubectl get pods,jobs,svc,ingress,networkpolicy -A -o wide || true
+          kubectl -n wfm get cluster.postgresql.cnpg.io -o yaml || true
+          kubectl -n wfm describe pods || true
+          for c in web hooks worker; do echo "== $c"; kubectl -n wfm logs "deployment/wfm-$c" --all-containers --tail=200 || true; done
+          kubectl -n wfm logs job/wfm-migrate --tail=200 || true
+          kubectl -n cnpg-system logs deployment/cnpg-controller-manager --tail=100 || true
+          kubectl get events -A --sort-by=.lastTimestamp | tail -80 || true
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            web/playwright-report/
+            web/test-results/
+          retention-days: 7
+      - name: Delete the cluster
+        if: always()
+        run: k3d cluster delete wfm || true

@@ -67,7 +67,7 @@ export function BoardsSettings() {
               ))}
             </div>
           )}
-          {selected && <BoardEditor key={selected.id + selected.columns.length} board={selected} projectKey={projectKey} statuses={statuses} onDeleted={() => setPicked(null)} />}
+          {selected && <BoardEditor key={selected.id} board={selected} projectKey={projectKey} statuses={statuses} onDeleted={() => setPicked(null)} />}
         </div>
       )}
       {creating && (
@@ -91,7 +91,7 @@ function CreateBoardDialog({ projectKey, onClose, onCreated }: { projectKey: str
   const create = useMutation({
     mutationFn: () => unwrap(api.POST("/projects/{projectKey}/boards", { params: { path: { projectKey } }, body: { name: name.trim(), type } })),
     onSuccess: async (b) => {
-      await qc.invalidateQueries({ queryKey: ["boards", projectKey] });
+      await Promise.all([["boards", projectKey], ["board"], ["backlog"]].map((key) => qc.invalidateQueries({ queryKey: key })));
       onCreated(b.id);
     },
   });

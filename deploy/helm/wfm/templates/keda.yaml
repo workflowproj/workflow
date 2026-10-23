@@ -8,6 +8,7 @@ apiVersion: keda.sh/v1alpha1
 kind: TriggerAuthentication
 metadata:
   name: {{ $name }}-postgres
+  namespace: {{ $.Release.Namespace }}
   labels:
     {{- include "wfm.componentLabels" (dict "root" . "component" "worker") | nindent 4 }}
 spec:
@@ -21,6 +22,7 @@ apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
 metadata:
   name: {{ $name }}
+  namespace: {{ $.Release.Namespace }}
   labels:
     {{- include "wfm.componentLabels" (dict "root" . "component" "worker") | nindent 4 }}
 spec:

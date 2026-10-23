@@ -11,14 +11,14 @@ import { currentSort } from "./jql";
 type Column = { id: string; label: string; sort: string; desc?: boolean; className?: string; srOnly?: boolean };
 
 const COLUMNS: Column[] = [
-  { id: "type", label: "Type", sort: "type", className: "w-11", srOnly: true },
-  { id: "key", label: "Key", sort: "key", className: "w-28" },
+  { id: "type", label: "Type", sort: "type", className: "w-10", srOnly: true },
+  { id: "key", label: "Key", sort: "key", className: "w-24" },
   { id: "summary", label: "Summary", sort: "summary" },
-  { id: "status", label: "Status", sort: "status", className: "w-40" },
-  { id: "priority", label: "Priority", sort: "priority", desc: true, className: "w-28" },
-  { id: "assignee", label: "Assignee", sort: "assignee", className: "w-44" },
+  { id: "status", label: "Status", sort: "status", className: "w-36" },
+  { id: "priority", label: "Priority", sort: "priority", desc: true, className: "w-20" },
+  { id: "assignee", label: "Assignee", sort: "assignee", className: "w-40" },
   { id: "updated", label: "Updated", sort: "updated", desc: true, className: "w-28" },
-  { id: "points", label: "Points", sort: "storyPoints", desc: true, className: "w-20 text-right" },
+  { id: "points", label: "Points", sort: "storyPoints", desc: true, className: "w-16 text-right" },
 ];
 
 const norm = (s: string) => s.toLowerCase().replace(/[\s_-]/g, "");
@@ -58,7 +58,7 @@ export function ResultsTable({
   return (
     <div className="overflow-hidden rounded-lg border border-line bg-surface">
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[820px] table-fixed border-collapse text-sm">
+        <table className="w-full min-w-[760px] table-fixed border-collapse text-sm">
           <thead>
             <tr className="border-b border-line bg-surface-2/50">
               {COLUMNS.map((c) => {
@@ -68,7 +68,7 @@ export function ResultsTable({
                     <button
                       type="button"
                       onClick={() => onSort(c.sort, !!c.desc)}
-                      title={`Sort by ${c.label.toLowerCase()}`}
+                      title={`Sort by ${c.id === "points" ? "story points" : c.label.toLowerCase()}`}
                       className={cn("-mx-1.5 inline-flex h-9 items-center gap-1 rounded px-1.5 hover:text-ink", c.id === "points" && "flex-row-reverse", active && "text-ink")}
                     >
                       <span className={cn(c.srOnly && "sr-only")}>{c.label}</span>
@@ -172,9 +172,8 @@ function Row({ issue, selected, onOpen }: { issue: Issue; selected: boolean; onO
         <StatusBadge status={issue.status} />
       </td>
       <td className="px-3 py-2">
-        <span className="flex items-center gap-1.5 text-[13px] text-muted">
+        <span title={`${priorityLabel(issue.priority)} priority`} className="flex items-center">
           <PriorityIcon priority={issue.priority} />
-          {priorityLabel(issue.priority)}
         </span>
       </td>
       <td className="px-3 py-2">

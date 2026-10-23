@@ -9,6 +9,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: {{ $fullname }}-default-deny-ingress
+  namespace: {{ $.Release.Namespace }}
   labels:
     {{- include "wfm.labels" . | nindent 4 }}
   annotations:
@@ -26,6 +27,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: {{ $fullname }}-{{ $component }}
+  namespace: {{ $.Release.Namespace }}
   labels:
     {{- include "wfm.componentLabels" (dict "root" $ "component" $component) | nindent 4 }}
   annotations:
@@ -68,6 +70,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: {{ $fullname }}-migrate
+  namespace: {{ $.Release.Namespace }}
   labels:
     {{- include "wfm.componentLabels" (dict "root" . "component" "migrate") | nindent 4 }}
   annotations:
@@ -95,6 +98,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: {{ $fullname }}-database
+  namespace: {{ $.Release.Namespace }}
   labels:
     {{- include "wfm.componentLabels" (dict "root" . "component" "database") | nindent 4 }}
   annotations:

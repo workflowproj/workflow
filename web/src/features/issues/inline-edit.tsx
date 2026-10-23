@@ -117,7 +117,7 @@ export function InlineSelect({
         <button type="button" className={ghost} disabled={disabled} onClick={toggle} aria-label={label} aria-haspopup="menu" aria-expanded={open}>
           {current ? (
             <>
-              {current.icon}
+              {current.icon && <span aria-hidden className="contents">{current.icon}</span>}
               <span className="truncate">{current.label}</span>
             </>
           ) : value ? (
@@ -136,7 +136,7 @@ export function InlineSelect({
           )}
           {options.map((o) => (
             <Option key={o.value} selected={o.value === value} onClick={() => (close(), o.value !== value && onCommit(o.value))}>
-              {o.icon}
+              {o.icon && <span aria-hidden className="contents">{o.icon}</span>}
               <span className="truncate">{o.label}</span>
               {o.hint && <span className="ml-auto text-xs text-faint">{o.hint}</span>}
             </Option>
@@ -194,7 +194,7 @@ export function InlineMulti({
         <MenuKeys close={close} className="max-h-72 w-60 overflow-y-auto">
           {options.map((o) => (
             <Option key={o.value} checkbox selected={values.includes(o.value)} onClick={() => onCommit(values.includes(o.value) ? values.filter((v) => v !== o.value) : [...values, o.value])}>
-              {o.icon}
+              {o.icon && <span aria-hidden className="contents">{o.icon}</span>}
               <span className="truncate">{o.label}</span>
               {o.hint && <span className="ml-auto text-xs text-faint">{o.hint}</span>}
             </Option>
@@ -422,8 +422,11 @@ export function LabelsEditor({
   const suggestions = useMemo(() => {
     const needle = q.trim().toLowerCase();
     const list = known.filter((l) => !value.includes(l) && l.toLowerCase().includes(needle));
-    if (needle && !known.some((l) => l.toLowerCase() === norm(q).toLowerCase()) && !value.includes(norm(q))) list.unshift(norm(q));
-    return list.slice(0, 8);
+    // Existing labels first (prefix matches before others); creating a new one comes last.
+    list.sort((a, b) => Number(!a.toLowerCase().startsWith(needle)) - Number(!b.toLowerCase().startsWith(needle)));
+    const shown = list.slice(0, 7);
+    if (needle && !known.some((l) => l.toLowerCase() === norm(q).toLowerCase()) && !value.includes(norm(q))) shown.push(norm(q));
+    return shown;
   }, [known, q, value]);
   const add = (label: string) => {
     const l = norm(label);

@@ -3,6 +3,7 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   name: {{ include "wfm.fullname" . }}
+  namespace: {{ $.Release.Namespace }}
   labels:
     {{- include "wfm.labels" . | nindent 4 }}
     {{- with .Values.serviceMonitor.labels }}

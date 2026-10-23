@@ -6,6 +6,7 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: {{ include "wfm.fullname" . }}-migrate
+  namespace: {{ $.Release.Namespace }}
   labels:
     {{- include "wfm.componentLabels" (dict "root" . "component" "migrate") | nindent 4 }}
   annotations:

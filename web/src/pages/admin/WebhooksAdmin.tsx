@@ -1,5 +1,5 @@
-import { Placeholder } from "@/components/Placeholder";
+import { WebhooksManager } from "@/features/settings/webhooks/WebhooksManager";
 
 export function WebhooksAdmin() {
-  return <Placeholder name="WebhooksAdmin" />;
+  return <WebhooksManager />;
 }

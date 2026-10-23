@@ -59,17 +59,14 @@ export function BoardEditor({ board, projectKey, statuses, onDeleted }: { board:
     mutationFn: () => unwrap(api.PUT("/boards/{boardId}", { params: { path: { boardId: board.id } }, body })),
     onSuccess: (b) => {
       qc.setQueryData(["boards", projectKey], (list: Board[] | undefined) => list?.map((x) => (x.id === b.id ? b : x)));
-      qc.invalidateQueries({ queryKey: ["boards", projectKey] });
-      qc.invalidateQueries({ queryKey: ["board"] });
-      qc.invalidateQueries({ queryKey: ["backlog"] });
+      for (const key of [["boards", projectKey], ["board"], ["backlog"]]) qc.invalidateQueries({ queryKey: key });
       toast.success(`Saved ${b.name}`);
     },
   });
   const remove = useMutation({
     mutationFn: () => unwrap(api.DELETE("/boards/{boardId}", { params: { path: { boardId: board.id } } })),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["boards", projectKey] });
-      qc.invalidateQueries({ queryKey: ["board"] });
+      for (const key of [["boards", projectKey], ["board"], ["backlog"]]) qc.invalidateQueries({ queryKey: key });
       toast.success(`Deleted ${board.name}`);
       onDeleted();
     },
