@@ -28,10 +28,7 @@ export function useBacklogMove(boardId: string, jql: string) {
     const body: MoveRequest = { ...hint };
     if (to !== from.id) body.sprintId = to === BACKLOG ? null : to;
     if (Object.keys(body).length === 0) return;
-    const back = neighbours(
-      from.issues.map((i) => i.id),
-      issueId,
-    );
+    const back = neighbours(from.issues.map((i) => i.id), issueId);
     qc.cancelQueries({ queryKey: ["backlog", boardId] });
     qc.setQueryData<Backlog>(key, placeInBacklog(data, issueId, to, hint));
     const refresh = () => {

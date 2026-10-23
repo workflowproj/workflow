@@ -2,9 +2,10 @@ import { useMemo, useState, type ReactNode } from "react";
 import { DndContext, DragOverlay, useDroppable, type Announcements, type UniqueIdentifier } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronRight, CircleCheck } from "lucide-react";
+import { ChevronRight, CircleCheck, Columns3 } from "lucide-react";
 import type { Status } from "@/api/types";
 import { IssueTypeIcon, PriorityIcon } from "@/components/issue-bits";
+import { EmptyState } from "@/components/ui";
 import { UserAvatar } from "@/components/UserAvatar";
 import { cn } from "@/lib/cn";
 import { IssueCard, SortableIssueCard } from "./IssueCard";
@@ -75,7 +76,8 @@ export function BoardView({
     onDragCancel: ({ active }) => `Moving ${keyOf(active.id)} was cancelled.`,
   };
 
-  const grid = { gridTemplateColumns: `repeat(${columns.length}, minmax(16.5rem, 1fr))` };
+  if (columns.length === 0) return <EmptyState icon={<Columns3 className="size-8" />} title="This board has no columns" body="Map workflow statuses to columns in the board settings." />;
+  const grid = { gridTemplateColumns: `repeat(${columns.length}, minmax(14.5rem, 1fr))` };
   const lanesOn = mode !== "none";
 
   const cells = (lane: Lane, fill?: boolean) =>

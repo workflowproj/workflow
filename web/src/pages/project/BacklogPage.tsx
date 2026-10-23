@@ -10,7 +10,7 @@ import { Badge, Button, EmptyState, IconButton, MenuItem, MenuLabel, PageSpinner
 import { ErrorBox } from "@/components/ErrorBox";
 import { IssueDrawer } from "@/features/issues/IssueDrawer";
 import { BoardSwitcher } from "@/features/board/BoardSwitcher";
-import { NO_FILTERS, quickFilterJql, type QuickFilters } from "@/features/board/jql";
+import { hasFilters, NO_FILTERS, quickFilterJql, type QuickFilters } from "@/features/board/jql";
 import { BACKLOG, findContainer, sumPoints, type Containers } from "@/features/board/model";
 import { QuickFilterBar } from "@/features/board/QuickFilterBar";
 import { backlogQuery, useBoardSelection, type Board, type Sprint } from "@/features/board/queries";
@@ -168,7 +168,7 @@ function BacklogScreen({ project, boards, board, onSelect, onOpen }: { project: 
       <div className="mb-4">
         <QuickFilterBar value={filters} onChange={setFilters} />
       </div>
-      {!scrum && <p className="mb-4 text-[13px] text-muted">Kanban boards don't use sprints: this is the ranked list of open issues that aren't on the board yet.</p>}
+      {!scrum && <p className="mb-4 text-[13px] text-muted">Kanban boards don't use sprints: this is every open issue in rank order. Drag issues to re-prioritise them.</p>}
       <DndContext
         {...dnd.contextProps}
         accessibility={{ announcements, screenReaderInstructions: { draggable: "To pick up an issue, press Space. Use the arrow keys to move it within or between sprints, Space to drop it and Escape to cancel. Press Enter to open it." } }}
@@ -233,7 +233,7 @@ function BacklogScreen({ project, boards, board, onSelect, onOpen }: { project: 
             canDrag={canDrag}
             highlight={!!active && target === BACKLOG}
             rowActions={scrum ? rowActions : undefined}
-            empty={filters === NO_FILTERS ? "Your backlog is empty." : "No backlog issues match these filters."}
+            empty={hasFilters(filters) ? "No backlog issues match these filters." : "Your backlog is empty."}
             footer={canCreate && <InlineCreate projectKey={project.key} />}
           />
         </div>

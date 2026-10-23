@@ -72,10 +72,7 @@ export function useBoardMove(boardId: string, jql: string) {
       toast.error(new Error(`${issue.key} can't move from ${issue.status.name} to ${column.name}: the workflow has no transition there for you.`));
       return;
     }
-    const back = neighbours(
-      from.issues.map((i) => i.id),
-      issueId,
-    );
+    const back = neighbours(from.issues.map((i) => i.id), issueId);
     const rollback = () => qc.setQueryData<BoardData>(key, (d) => (d ? placeOnBoard(d, issueId, from.id, back, issue.status) : d));
     qc.cancelQueries({ queryKey: ["board", boardId] });
     qc.setQueryData<BoardData>(key, placeOnBoard(data, issueId, column.id, hint, options.length === 1 ? options[0].to : undefined));

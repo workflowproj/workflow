@@ -74,6 +74,7 @@ function BoardScreen({ project, boards, board, onSelect, onOpen }: { project: Pr
   const sprint = data?.sprint;
   const canDrag = ["issue.transition", "issue.edit", "sprint.manage"].some((p) => hasPermission(project, p));
   const total = data?.columns.reduce((n, c) => n + c.issues.length, 0) ?? 0;
+  const noSprint = scrum && !!data && !sprint && !isPlaceholderData;
 
   return (
     <>
@@ -87,7 +88,7 @@ function BoardScreen({ project, boards, board, onSelect, onOpen }: { project: Pr
             </Button>
           )}
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className={cn("flex flex-wrap items-center justify-between gap-2", noSprint && "hidden")}>
           <QuickFilterBar value={filters} onChange={setFilters} />
           <label className="flex items-center gap-2 text-[13px] whitespace-nowrap text-muted">
             Group by

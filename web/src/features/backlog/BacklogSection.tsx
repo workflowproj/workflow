@@ -9,7 +9,8 @@ import { SortableIssueRow } from "./IssueRow";
 
 /**
  * BacklogSection is a sprint or the backlog: a collapsible header with counts and story
- * points, then a sortable, droppable list of issue rows.
+ * points, then a sortable list of issue rows. The whole section is a drop target, so issues
+ * can be dropped on its header, even when it is collapsed.
  */
 export function BacklogSection({
   id,
@@ -50,7 +51,7 @@ export function BacklogSection({
   const { setNodeRef } = useDroppable({ id });
   const list = items.map((i) => issues.get(i)).filter((i): i is Issue => !!i);
   return (
-    <section aria-label={typeof title === "string" ? title : undefined} className={cn("rounded-lg border bg-surface transition-shadow", highlight ? "border-accent/50 ring-2 ring-accent/20" : "border-line")}>
+    <section ref={setNodeRef} aria-label={typeof title === "string" ? title : undefined} className={cn("rounded-lg border bg-surface transition-shadow", highlight ? "border-accent/50 ring-2 ring-accent/20" : "border-line")}>
       <header className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2.5">
         <button type="button" onClick={onToggle} aria-expanded={!collapsed} className="flex min-w-0 items-center gap-1.5 rounded text-left focus-visible:outline-2 focus-visible:outline-accent">
           <ChevronRight className={cn("size-4 shrink-0 text-faint transition-transform", !collapsed && "rotate-90")} />
@@ -70,7 +71,7 @@ export function BacklogSection({
       {!collapsed && (
         <>
           <SortableContext id={id} items={items} strategy={verticalListSortingStrategy}>
-            <div ref={setNodeRef} className={cn("border-t border-line", items.length === 0 && "p-2")}>
+            <div className={cn("border-t border-line", items.length === 0 && "p-2")}>
               {items.length === 0 ? (
                 <div className="flex min-h-14 items-center justify-center rounded-md border border-dashed border-line-strong px-4 text-center text-[13px] text-muted">{empty}</div>
               ) : (

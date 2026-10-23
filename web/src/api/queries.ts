@@ -7,7 +7,7 @@ import { api, unwrap } from "./client";
  *
  *   ["me"], ["projects"], ["project", key], ["issue-types", projectKey], ["statuses"],
  *   ["users", q, project], ["issue", key], ["issue-comments", key], ["issue-history", key],
- *   ["board", boardId, ...], ["backlog", boardId], ["search", jql, ...], ["sprints", projectKey],
+ *   ["boards", projectKey], ["board", boardId, ...], ["backlog", boardId], ["search", jql, ...], ["sprints", projectKey],
  *   ["releases", projectKey], ["notifications"], ["fields"], ["labels", projectKey]
  */
 

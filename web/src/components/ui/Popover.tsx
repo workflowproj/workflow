@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { useEscapeLayer } from "@/lib/escape";
 
 /**
  * Popover renders `content` below `trigger` and closes on outside click or Escape.
@@ -24,18 +25,14 @@ export function Popover({
   const open = controlled ?? inner;
   const set = (v: boolean) => (onOpenChange ? onOpenChange(v) : setInner(v));
   const ref = useRef<HTMLDivElement>(null);
+  useEscapeLayer(open, () => set(false));
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
       if (!ref.current?.contains(e.target as Node)) set(false);
     };
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && set(false);
     document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
+    return () => document.removeEventListener("mousedown", onDown);
   });
   return (
     <div ref={ref} className="relative inline-block">

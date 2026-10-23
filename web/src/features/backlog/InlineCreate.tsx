@@ -52,7 +52,11 @@ export function InlineCreate({ projectKey, sprintId }: { projectKey: string; spr
       onKeyDown={(e) => e.key === "Escape" && close()}
     >
       <span className="relative">
-        {type && <IssueTypeIcon type={type} className="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2" />}
+        {type && (
+          <span aria-hidden className="pointer-events-none absolute top-1/2 left-2 flex -translate-y-1/2">
+            <IssueTypeIcon type={type} />
+          </span>
+        )}
         <select
           aria-label="Issue type"
           value={type?.key ?? ""}
