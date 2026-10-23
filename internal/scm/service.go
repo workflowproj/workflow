@@ -3,7 +3,6 @@ package scm
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -470,4 +469,3 @@ func branchURL(provider string, repo dbq.ScmRepository, branch string) string {
 	return repo.WebUrl + "/tree/" + url.PathEscape(branch)
 }
 
-var errIgnored = errors.New("ignored")

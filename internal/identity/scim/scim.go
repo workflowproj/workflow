@@ -146,16 +146,6 @@ func decode(r *http.Request, v any) error {
 	return nil
 }
 
-func (h *Handler) audit(ctx context.Context, action, targetType, targetID string, data map[string]any) {
-	conn := connectionFrom(ctx)
-	if data == nil {
-		data = map[string]any{}
-	}
-	data["connection"] = conn.Name
-	b, _ := json.Marshal(data)
-	_ = h.Q.InsertAudit(ctx, dbq.InsertAuditParams{ActorType: "scim", Action: action, TargetType: &targetType, TargetID: &targetID, Data: b})
-}
-
 // ---------------------------------------------------------------------------
 // Listing helpers
 

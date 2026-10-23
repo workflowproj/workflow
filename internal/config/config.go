@@ -240,7 +240,7 @@ func LoadFrom(get func(string) string) (*Config, error) {
 		e.errs = append(e.errs, errors.New("WFM_DEV_LOGIN cannot be enabled when WFM_ENV=production"))
 	}
 	if c.GoogleDirectory.Enabled && (c.GoogleDirectory.ServiceAccountKey == "" || c.GoogleDirectory.AdminSubject == "") {
-		e.errs = append(e.errs, errors.New("Google directory sync needs WFM_GOOGLE_SERVICE_ACCOUNT_KEY and WFM_GOOGLE_ADMIN_SUBJECT"))
+		e.errs = append(e.errs, errors.New("WFM_GOOGLE_DIRECTORY_ENABLED needs WFM_GOOGLE_SERVICE_ACCOUNT_KEY and WFM_GOOGLE_ADMIN_SUBJECT"))
 	}
 	if len(e.errs) > 0 {
 		return nil, errors.Join(e.errs...)
