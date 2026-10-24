@@ -98,6 +98,8 @@ function BoardScreen({ project, boards, board, onSelect, onOpen }: { project: Pr
   }, [data, me?.id, filters.people]);
   const columns = useMemo(() => filterColumns(data?.columns ?? [], filters.people), [data, filters.people]);
   const total = columns.reduce((n, c) => n + c.issues.length, 0);
+  // Issues the server sent, before people filters; fewer than data.total when the board is capped.
+  const loaded = data?.columns.reduce((n, c) => n + c.issues.length, 0) ?? 0;
   const noSprint = scrum && !!data && !sprint && !isPlaceholderData;
 
   return (
@@ -142,6 +144,14 @@ function BoardScreen({ project, boards, board, onSelect, onOpen }: { project: Pr
             onMap={mapStatus}
             onConfigure={() => setConfiguring("columns")}
           />
+        )}
+        {data && loaded < data.total && (
+          <p className="flex items-start gap-2 rounded-md border border-warning/30 bg-warning-soft px-3 py-2 text-[13px] text-ink">
+            <TriangleAlert className="mt-px size-4 shrink-0 text-warning" />
+            <span>
+              This board shows the first {loaded.toLocaleString()} of {data.total.toLocaleString()} issues, in rank order. Filter it above, or narrow the board's filter in its settings, to see the rest.
+            </span>
+          </p>
         )}
         {data && hasFilters(filters) && total === 0 && (!scrum || sprint) && (
           <p className="text-sm text-muted">

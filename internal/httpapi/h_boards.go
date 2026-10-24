@@ -136,7 +136,7 @@ func (s *Server) GetBoardData(ctx context.Context, req api.GetBoardDataRequestOb
 	if err != nil {
 		return nil, err
 	}
-	out := api.GetBoardData200JSONResponse{Board: boardView(d.Board, d.Project.Key, d.AllCols), Columns: []api.BoardColumnData{}, UnmappedStatusIds: d.Unmapped}
+	out := api.GetBoardData200JSONResponse{Board: boardView(d.Board, d.Project.Key, d.AllCols), Columns: []api.BoardColumnData{}, UnmappedStatusIds: d.Unmapped, Total: d.Total}
 	if out.UnmappedStatusIds == nil {
 		out.UnmappedStatusIds = []openapiUUID{}
 	}
@@ -174,13 +174,13 @@ func (s *Server) GetBacklog(ctx context.Context, req api.GetBacklogRequestObject
 	if err != nil {
 		return nil, err
 	}
-	out := api.GetBacklog200JSONResponse{Sprints: []api.BacklogSprint{}}
+	out := api.GetBacklog200JSONResponse{Sprints: []api.BacklogSprint{}, BacklogTotal: bl.BacklogTotal}
 	for _, sp := range bl.Sprints {
 		views, err := s.Tracker.IssueViews(ctx, sp.Issues)
 		if err != nil {
 			return nil, err
 		}
-		out.Sprints = append(out.Sprints, api.BacklogSprint{Sprint: tracker.SprintView(sp.Sprint), Issues: views})
+		out.Sprints = append(out.Sprints, api.BacklogSprint{Sprint: tracker.SprintView(sp.Sprint), Issues: views, Total: sp.Total})
 	}
 	if out.Backlog, err = s.Tracker.IssueViews(ctx, bl.Backlog); err != nil {
 		return nil, err

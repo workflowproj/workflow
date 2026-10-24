@@ -110,6 +110,7 @@ describe("applyBoard", () => {
   const data: Schemas["BoardData"] = {
     board,
     unmappedStatusIds: ["qa"],
+    total: 4,
     columns: [
       { id: "c1", name: "To do", statusIds: ["todo"], overLimit: false, issues: [issue("1", "todo", "b"), issue("2", "todo", "d")] },
       { id: "c2", name: "Doing", statusIds: ["doing", "review"], wipLimit: 2, overLimit: false, issues: [issue("3", "doing", "a"), issue("4", "review", "c")] },

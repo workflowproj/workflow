@@ -18,7 +18,7 @@ export function IssueRow({ issue, lifted, actions, reserve }: { issue: Issue; li
     <div className={cn("group flex h-10 items-center gap-2.5 bg-surface pr-2 pl-1.5 text-sm", lifted ? "cursor-grabbing rounded-md border border-line-strong shadow-xl ring-1 ring-accent/30" : "hover:bg-surface-2/60")}>
       <GripVertical className="size-3.5 shrink-0 text-faint opacity-0 group-hover:opacity-100" aria-hidden />
       <IssueTypeIcon type={issue.type} />
-      <span className={cn("w-16 shrink-0 font-mono text-xs text-muted", done && "line-through")}>{issue.key}</span>
+      <span className={cn("min-w-20 shrink-0 font-mono text-xs whitespace-nowrap text-muted", done && "line-through")}>{issue.key}</span>
       <span className={cn("min-w-0 flex-1 truncate", done && "text-muted")}>{issue.summary}</span>
       {issue.parent && <ParentChip parent={issue.parent} className="hidden max-w-[10rem] md:inline-flex" />}
       <DevIndicators dev={issue.dev} />

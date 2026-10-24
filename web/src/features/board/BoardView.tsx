@@ -6,6 +6,7 @@ import { ChevronRight, CircleCheck, Columns3 } from "lucide-react";
 import type { Status } from "@/api/types";
 import { IssueTypeIcon, PriorityIcon } from "@/components/issue-bits";
 import { Button, EmptyState } from "@/components/ui";
+import { ShowMore, useShowMore } from "@/components/ShowMore";
 import { UserAvatar } from "@/components/UserAvatar";
 import { cn } from "@/lib/cn";
 import type { CardField } from "./card-fields";
@@ -103,12 +104,21 @@ export function BoardView({
       const id = cellId(lane.id, c.id);
       const ids = dnd.items[id] ?? [];
       return (
-        <Cell key={id} id={id} label={lanesOn ? `${c.name} column, ${lane.label}` : `${c.name} column`} items={ids} fill={fill} danger={fill && c.overLimit} over={target === id && !!active} dimmed={!!reachable && !reachable.has(c.id)} header={fill ? header(c, i) : undefined}>
-          {ids.map((iid) => {
+        <Cell
+          key={id}
+          id={id}
+          label={lanesOn ? `${c.name} column, ${lane.label}` : `${c.name} column`}
+          items={ids}
+          fill={fill}
+          danger={fill && c.overLimit}
+          over={target === id && !!active}
+          dimmed={!!reachable && !reachable.has(c.id)}
+          header={fill ? header(c, i) : undefined}
+          card={(iid) => {
             const issue = issues.get(iid);
             return issue ? <SortableIssueCard key={iid} issue={issue} fields={cardFields} onOpen={onOpen} disabled={!canDrag} /> : null;
-          })}
-        </Cell>
+          }}
+        />
       );
     });
 
@@ -170,11 +180,14 @@ export function BoardView({
   );
 }
 
+/** Cards drawn per cell at first, and added per "Show more". */
+const CARDS = 50;
+
 function Cell({
   id,
   label,
   items,
-  children,
+  card,
   header,
   fill,
   danger,
@@ -184,7 +197,7 @@ function Cell({
   id: string;
   label: string;
   items: string[];
-  children: ReactNode;
+  card: (id: string) => ReactNode;
   header?: ReactNode;
   fill?: boolean;
   danger?: boolean;
@@ -192,6 +205,8 @@ function Cell({
   dimmed?: boolean;
 }) {
   const { setNodeRef } = useDroppable({ id });
+  const { limit, more } = useShowMore(CARDS);
+  const shown = items.length > limit ? items.slice(0, limit) : items;
   return (
     <div
       role="group"
@@ -205,9 +220,10 @@ function Cell({
       )}
     >
       {header && <div className={cn("sticky top-0 z-[1] rounded-t-lg px-1.5", danger ? "bg-danger-soft" : "bg-surface-2")}>{header}</div>}
-      <SortableContext id={id} items={items} strategy={verticalListSortingStrategy}>
+      <SortableContext id={id} items={shown} strategy={verticalListSortingStrategy}>
         <div ref={setNodeRef} className={cn("flex flex-1 flex-col gap-1.5 p-1.5", header && "pt-0")}>
-          {children}
+          {shown.map(card)}
+          <ShowMore total={items.length} limit={limit} page={CARDS} onMore={more} className="rounded-md px-2 py-1.5 text-[13px] font-medium text-accent hover:bg-surface focus-visible:outline-2 focus-visible:outline-accent" />
         </div>
       </SortableContext>
     </div>

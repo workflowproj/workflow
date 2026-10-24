@@ -184,7 +184,7 @@ function BacklogScreen({ project, boards, board, onSelect, onOpen }: { project: 
         accessibility={{ announcements, screenReaderInstructions: { draggable: "To pick up an issue, press Space. Use the arrow keys to move it within or between sprints, Space to drop it and Escape to cancel. Press Enter to open it." } }}
       >
         <div className={`flex flex-col gap-4 transition-opacity ${isPlaceholderData ? "opacity-60" : ""}`}>
-          {data.sprints.map(({ sprint, issues: list }) => {
+          {data.sprints.map(({ sprint, issues: list, total }) => {
             const isActive = sprint.state === "active";
             const left = isActive ? remainingLabel(sprint.endDate) : null;
             return (
@@ -219,6 +219,7 @@ function BacklogScreen({ project, boards, board, onSelect, onOpen }: { project: 
                       : "Plan this sprint by dragging issues from the backlog, or create new ones below."
                 }
                 footer={canCreate && <InlineCreate projectKey={project.key} sprintId={sprint.id} />}
+                total={total > list.length ? total : undefined}
                 actions={
                   manage && (
                     <>
@@ -251,6 +252,7 @@ function BacklogScreen({ project, boards, board, onSelect, onOpen }: { project: 
             rowActions={scrum ? rowActions : undefined}
             empty={hasFilters(filters) ? "No backlog issues match these filters." : "Your backlog is empty."}
             footer={canCreate && <InlineCreate projectKey={project.key} />}
+            total={data.backlogTotal > data.backlog.length ? data.backlogTotal : undefined}
           />
         </div>
         <DragOverlay dropAnimation={{ duration: 160, easing: "cubic-bezier(0.2, 0, 0, 1)" }}>{active ? <IssueRow issue={active} lifted /> : null}</DragOverlay>

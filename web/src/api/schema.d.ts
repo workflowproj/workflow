@@ -3069,6 +3069,8 @@ export interface components {
         };
         BoardData: {
             board: components["schemas"]["Board"];
+            /** @description Issues on the board; the columns hold at most 2,000 of them, in rank order */
+            total: number;
             sprint?: components["schemas"]["Sprint"];
             columns: components["schemas"]["BoardColumnData"][];
             /** @description Statuses used by the project but not shown on any column. */
@@ -3086,10 +3088,14 @@ export interface components {
         Backlog: {
             sprints: components["schemas"]["BacklogSprint"][];
             backlog: components["schemas"]["Issue"][];
+            /** @description Issues in the backlog; `backlog` holds at most 2,000 of them, in rank order */
+            backlogTotal: number;
         };
         BacklogSprint: {
             sprint: components["schemas"]["Sprint"];
             issues: components["schemas"]["Issue"][];
+            /** @description Issues in the sprint; `issues` holds at most 2,000 of them, in rank order */
+            total: number;
         };
         Sprint: {
             /** Format: uuid */

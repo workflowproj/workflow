@@ -243,8 +243,11 @@ type BoardData struct {
 	AllCols  []dbq.BoardColumn
 	Sprint   *dbq.Sprint
 	Unmapped []uuid.UUID
+	// Total is how many issues match; the columns hold at most boardIssueLimit of them.
+	Total int
 }
 
+// boardIssueLimit caps the issues a board, or one backlog section, loads (in rank order).
 const boardIssueLimit = 2000
 
 // GetBoardData returns the board's columns with issues. Scrum boards show the active sprint;
@@ -275,12 +278,13 @@ func (s *Service) GetBoardData(ctx context.Context, actor *authz.Actor, id uuid.
 		extra = append(extra, "(i.resolved_at IS NULL OR i.resolved_at >= $2::timestamptz)")
 	}
 	jql := combineJQL(b.FilterJql, quickJQL)
-	issues, _, err := s.runSearch(ctx, actor, []uuid.UUID{p.ID}, SearchQuery{
+	issues, total, err := s.runSearch(ctx, actor, []uuid.UUID{p.ID}, SearchQuery{
 		JQL: jql, Extra: extra, ExtraArgs: extraArgs, DefaultOrder: []search.Order{{Field: "rank"}}, Limit: boardIssueLimit,
 	})
 	if err != nil {
 		return data, err
 	}
+	data.Total = total
 	byStatus := map[uuid.UUID]int{}
 	for idx, c := range cols {
 		for _, st := range c.StatusIds {
@@ -335,11 +339,13 @@ func combineJQL(parts ...string) string {
 type BacklogSprint struct {
 	Sprint dbq.Sprint
 	Issues []dbq.Issue
+	Total  int // matching issues; Issues holds at most boardIssueLimit
 }
 
 type Backlog struct {
-	Sprints []BacklogSprint
-	Backlog []dbq.Issue
+	Sprints      []BacklogSprint
+	Backlog      []dbq.Issue
+	BacklogTotal int
 }
 
 // GetBacklog returns active and future sprints with their issues, then unscheduled work.
@@ -361,21 +367,21 @@ func (s *Service) GetBacklog(ctx context.Context, actor *authz.Actor, id uuid.UU
 			if sp.State == "closed" {
 				continue
 			}
-			issues, _, err := s.runSearch(ctx, actor, []uuid.UUID{p.ID}, SearchQuery{
+			issues, total, err := s.runSearch(ctx, actor, []uuid.UUID{p.ID}, SearchQuery{
 				JQL: jql, Extra: []string{"i.sprint_id = $2::uuid", levelCond}, ExtraArgs: []any{sp.ID},
 				DefaultOrder: []search.Order{{Field: "rank"}}, Limit: boardIssueLimit,
 			})
 			if err != nil {
 				return out, err
 			}
-			out.Sprints = append(out.Sprints, BacklogSprint{Sprint: sp, Issues: issues})
+			out.Sprints = append(out.Sprints, BacklogSprint{Sprint: sp, Issues: issues, Total: total})
 		}
 	}
-	backlog, _, err := s.runSearch(ctx, actor, []uuid.UUID{p.ID}, SearchQuery{
+	backlog, total, err := s.runSearch(ctx, actor, []uuid.UUID{p.ID}, SearchQuery{
 		JQL: jql, Extra: []string{"i.sprint_id IS NULL", levelCond, notDone},
 		DefaultOrder: []search.Order{{Field: "rank"}}, Limit: boardIssueLimit,
 	})
-	out.Backlog = backlog
+	out.Backlog, out.BacklogTotal = backlog, total
 	return out, err
 }
 

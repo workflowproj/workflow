@@ -3,9 +3,13 @@ import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { ChevronRight } from "lucide-react";
 import type { Issue } from "@/api/types";
+import { ShowMore, useShowMore } from "@/components/ShowMore";
 import { cn } from "@/lib/cn";
 import { formatPoints, sumPoints } from "@/features/board/model";
 import { SortableIssueRow } from "./IssueRow";
+
+/** Rows drawn at first, and added per "Show more". */
+const ROWS = 100;
 
 /**
  * BacklogSection is a sprint or the backlog: a collapsible header with counts and story
@@ -29,6 +33,7 @@ export function BacklogSection({
   rowActions,
   empty,
   footer,
+  total,
 }: {
   id: string;
   title: ReactNode;
@@ -47,9 +52,13 @@ export function BacklogSection({
   rowActions?: (issue: Issue) => ReactNode;
   empty: ReactNode;
   footer?: ReactNode;
+  /** How many issues the section has when the server sent only the first of them. */
+  total?: number;
 }) {
   const { setNodeRef } = useDroppable({ id });
   const list = items.map((i) => issues.get(i)).filter((i): i is Issue => !!i);
+  const { limit, more } = useShowMore(ROWS);
+  const shown = items.length > limit ? items.slice(0, limit) : items;
   return (
     <section ref={setNodeRef} aria-label={typeof title === "string" ? title : undefined} className={cn("rounded-lg border bg-surface transition-shadow", highlight ? "border-accent/50 ring-2 ring-accent/20" : "border-line")}>
       <header className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2.5">
@@ -60,7 +69,7 @@ export function BacklogSection({
         {badge}
         {meta && <span className="text-xs text-muted">{meta}</span>}
         <span className="text-xs text-faint">
-          {list.length} issue{list.length === 1 ? "" : "s"}
+          {total != null && total > list.length ? `${list.length.toLocaleString()} of ${total.toLocaleString()} issues` : `${list.length} issue${list.length === 1 ? "" : "s"}`}
         </span>
         <div className="ml-auto flex items-center gap-2">
           <PointsBreakdown issues={list} />
@@ -70,15 +79,19 @@ export function BacklogSection({
       </header>
       {!collapsed && (
         <>
-          <SortableContext id={id} items={items} strategy={verticalListSortingStrategy}>
+          <SortableContext id={id} items={shown} strategy={verticalListSortingStrategy}>
             <div className={cn("border-t border-line", items.length === 0 && "p-2")}>
               {items.length === 0 ? (
                 <div className="flex min-h-14 items-center justify-center rounded-md border border-dashed border-line-strong px-4 text-center text-[13px] text-muted">{empty}</div>
               ) : (
-                list.map((issue) => <SortableIssueRow key={issue.id} issue={issue} onOpen={onOpen} disabled={!canDrag} actions={rowActions?.(issue)} />)
+                shown.map((iid) => {
+                  const issue = issues.get(iid);
+                  return issue ? <SortableIssueRow key={iid} issue={issue} onOpen={onOpen} disabled={!canDrag} actions={rowActions?.(issue)} /> : null;
+                })
               )}
             </div>
           </SortableContext>
+          <ShowMore total={items.length} limit={limit} page={ROWS} onMore={more} className="w-full border-t border-line px-3 py-2 text-[13px] font-medium text-accent hover:bg-surface-2/60 focus-visible:outline-2 focus-visible:outline-accent" />
           {footer && <div className="border-t border-line">{footer}</div>}
         </>
       )}

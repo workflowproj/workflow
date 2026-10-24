@@ -3718,9 +3718,10 @@ components:
           items: { $ref: '#/components/schemas/CardField' }
     BoardData:
       type: object
-      required: [board, columns, unmappedStatusIds]
+      required: [board, columns, unmappedStatusIds, total]
       properties:
         board: { $ref: '#/components/schemas/Board' }
+        total: { type: integer, description: 'Issues on the board; the columns hold at most 2,000 of them, in rank order' }
         sprint: { $ref: '#/components/schemas/Sprint' }
         columns:
           type: array
@@ -3741,18 +3742,20 @@ components:
         issues: { type: array, items: { $ref: '#/components/schemas/Issue' } }
     Backlog:
       type: object
-      required: [sprints, backlog]
+      required: [sprints, backlog, backlogTotal]
       properties:
         sprints:
           type: array
           items: { $ref: '#/components/schemas/BacklogSprint' }
         backlog: { type: array, items: { $ref: '#/components/schemas/Issue' } }
+        backlogTotal: { type: integer, description: 'Issues in the backlog; `backlog` holds at most 2,000 of them, in rank order' }
     BacklogSprint:
       type: object
-      required: [sprint, issues]
+      required: [sprint, issues, total]
       properties:
         sprint: { $ref: '#/components/schemas/Sprint' }
         issues: { type: array, items: { $ref: '#/components/schemas/Issue' } }
+        total: { type: integer, description: 'Issues in the sprint; `issues` holds at most 2,000 of them, in rank order' }
     Sprint:
       type: object
       required: [id, name, goal, state, position]
