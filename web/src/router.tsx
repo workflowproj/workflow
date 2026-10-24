@@ -147,6 +147,7 @@ const adminProvisioningRoute = createRoute({ getParentRoute: () => adminRoute, p
 const adminScmRoute = createRoute({ getParentRoute: () => adminRoute, path: "/scm", component: lazyRouteComponent(() => import("@/pages/admin/ScmAdmin"), "ScmAdmin") });
 const adminWebhooksRoute = createRoute({ getParentRoute: () => adminRoute, path: "/webhooks", component: lazyRouteComponent(() => import("@/pages/admin/WebhooksAdmin"), "WebhooksAdmin") });
 const adminAuditRoute = createRoute({ getParentRoute: () => adminRoute, path: "/audit", component: lazyRouteComponent(() => import("@/pages/admin/AuditAdmin"), "AuditAdmin") });
+const adminEmailRoute = createRoute({ getParentRoute: () => adminRoute, path: "/email", component: lazyRouteComponent(() => import("@/pages/admin/EmailAdmin"), "EmailAdmin") });
 
 export const routeTree = rootRoute.addChildren([
   loginRoute,
@@ -191,6 +192,7 @@ export const routeTree = rootRoute.addChildren([
       adminScmRoute,
       adminWebhooksRoute,
       adminAuditRoute,
+      adminEmailRoute,
     ]),
   ]),
 ]);

@@ -134,6 +134,64 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/email-notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Your email notification settings */
+        get: operations["getMyEmailNotifications"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Change your email notification settings
+         * @description Only the fields sent change; preferences are merged by kind.
+         */
+        patch: operations["updateMyEmailNotifications"];
+        trace?: never;
+    };
+    "/admin/email": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** How outgoing email is configured */
+        get: operations["adminGetEmailStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/email/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send a test email to yourself
+         * @description Sent right away rather than queued, so SMTP errors come back in the response (502).
+         */
+        post: operations["adminSendTestEmail"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/users": {
         parameters: {
             query?: never;
@@ -2888,6 +2946,70 @@ export interface components {
             items: components["schemas"]["Notification"][];
             unread: number;
         };
+        /**
+         * @description immediate = within a couple of minutes (changes to one issue are combined); digest = in the daily digest; off = no email.
+         * @enum {string}
+         */
+        EmailDelivery: "immediate" | "digest" | "off";
+        EmailNotificationPreference: {
+            /** @description Notification kind: assigned, commented, transitioned or automation */
+            kind: string;
+            label: string;
+            description: string;
+            delivery: components["schemas"]["EmailDelivery"];
+            defaultDelivery: components["schemas"]["EmailDelivery"];
+        };
+        EmailNotificationSettings: {
+            /** @description Where the emails go (your account's address) */
+            address: string;
+            preferences: components["schemas"]["EmailNotificationPreference"][];
+            /** @description Hour of the day (in timeZone) the digest is sent */
+            digestHour: number;
+            /** @description IANA time zone, e.g. Europe/London */
+            timeZone: string;
+            /** @description No notification emails at all while paused */
+            paused: boolean;
+            /** Format: date-time */
+            lastDigestAt?: string;
+            /**
+             * Format: date-time
+             * @description When the next digest goes out if there is anything to send
+             */
+            nextDigestAt: string;
+            /** @description False when the server has no SMTP server and only keeps mail in memory */
+            emailConfigured: boolean;
+        };
+        EmailNotificationSettingsPatch: {
+            preferences?: {
+                kind: string;
+                delivery: components["schemas"]["EmailDelivery"];
+            }[];
+            digestHour?: number;
+            timeZone?: string;
+            paused?: boolean;
+        };
+        /** @enum {string} */
+        EmailTransport: "smtp" | "memory";
+        EmailStatus: {
+            transport: components["schemas"]["EmailTransport"];
+            host?: string;
+            port?: number;
+            /** @enum {string} */
+            tls?: "starttls" | "tls" | "none";
+            /** @description SMTP user name if set (the password is never shown) */
+            username?: string;
+            from: string;
+            /** @description Links in emails point here (WFM_PUBLIC_URL) */
+            publicUrl: string;
+            /** @description One-click unsubscribe endpoint (on WFM_HOOKS_PUBLIC_URL) */
+            unsubscribeUrl: string;
+            /** @description Immediate emails wait this long so changes to one issue arrive as one email */
+            batchWindowSeconds: number;
+        };
+        EmailTestResult: {
+            to: string;
+            transport: components["schemas"]["EmailTransport"];
+        };
         ScmConnection: {
             /** Format: uuid */
             id: string;
@@ -3396,6 +3518,94 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getMyEmailNotifications: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Settings (the defaults until you change something) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailNotificationSettings"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    updateMyEmailNotifications: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmailNotificationSettingsPatch"];
+            };
+        };
+        responses: {
+            /** @description The saved settings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailNotificationSettings"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    adminGetEmailStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Email configuration (the SMTP password is never returned) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailStatus"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    adminSendTestEmail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sent (or kept in memory when no SMTP server is configured) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailTestResult"];
+                };
             };
             default: components["responses"]["Problem"];
         };

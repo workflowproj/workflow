@@ -1,5 +1,5 @@
 import { Link, Outlet } from "@tanstack/react-router";
-import { FolderGit2, KeyRound, ScrollText, ShieldCheck, TextCursorInput, UserRound, UsersRound, Webhook } from "lucide-react";
+import { FolderGit2, KeyRound, Mail, ScrollText, ShieldCheck, TextCursorInput, UserRound, UsersRound, Webhook } from "lucide-react";
 import { useMe } from "@/api/queries";
 import { EmptyState } from "@/components/ui";
 
@@ -11,6 +11,7 @@ const sections = [
   { label: "Sign-in & provisioning", to: "/admin/provisioning" as const, icon: KeyRound },
   { label: "GitHub & GitLab", to: "/admin/scm" as const, icon: FolderGit2 },
   { label: "Webhooks", to: "/admin/webhooks" as const, icon: Webhook },
+  { label: "Email", to: "/admin/email" as const, icon: Mail },
   { label: "Audit log", to: "/admin/audit" as const, icon: ScrollText },
 ];
 

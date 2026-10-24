@@ -7,6 +7,7 @@ import { Badge, Button, PageHeader, PageSpinner, useToast } from "@/components/u
 import { ErrorBox } from "@/components/ErrorBox";
 import { UserAvatar } from "@/components/UserAvatar";
 import { SettingsSection } from "@/features/settings/common";
+import { EmailNotificationsSection } from "@/features/settings/email/EmailNotificationsSection";
 import { ConnectSnippets } from "@/features/settings/tokens/ConnectSnippets";
 import { CreateTokenDialog, TokenTable } from "@/features/settings/tokens/Tokens";
 import { SourceBadge, sourceLabel } from "@/features/admin/badges";
@@ -63,6 +64,8 @@ export function ProfilePage() {
             : "Your name, email and picture come from your sign-in provider and update when you sign in. Ask an administrator to change your role."}
         </div>
       </SettingsSection>
+
+      <EmailNotificationsSection />
 
       <SettingsSection
         title="Personal access tokens"

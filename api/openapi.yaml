@@ -165,6 +165,64 @@ paths:
         default: { $ref: '#/components/responses/Problem' }
 
   # ---------------------------------------------------------------------------
+  # Email notifications
+  # ---------------------------------------------------------------------------
+  /me/email-notifications:
+    get:
+      operationId: getMyEmailNotifications
+      tags: [me]
+      summary: Your email notification settings
+      responses:
+        "200":
+          description: Settings (the defaults until you change something)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EmailNotificationSettings' }
+        default: { $ref: '#/components/responses/Problem' }
+    patch:
+      operationId: updateMyEmailNotifications
+      tags: [me]
+      summary: Change your email notification settings
+      description: Only the fields sent change; preferences are merged by kind.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EmailNotificationSettingsPatch' }
+      responses:
+        "200":
+          description: The saved settings
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EmailNotificationSettings' }
+        default: { $ref: '#/components/responses/Problem' }
+  /admin/email:
+    get:
+      operationId: adminGetEmailStatus
+      tags: [admin]
+      summary: How outgoing email is configured
+      responses:
+        "200":
+          description: Email configuration (the SMTP password is never returned)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EmailStatus' }
+        default: { $ref: '#/components/responses/Problem' }
+  /admin/email/test:
+    post:
+      operationId: adminSendTestEmail
+      tags: [admin]
+      summary: Send a test email to yourself
+      description: Sent right away rather than queued, so SMTP errors come back in the response (502).
+      responses:
+        "200":
+          description: Sent (or kept in memory when no SMTP server is configured)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EmailTestResult' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  # ---------------------------------------------------------------------------
   # Directory
   # ---------------------------------------------------------------------------
   /users:
@@ -3510,6 +3568,66 @@ components:
       properties:
         items: { type: array, items: { $ref: '#/components/schemas/Notification' } }
         unread: { type: integer }
+
+    EmailDelivery:
+      type: string
+      enum: [immediate, digest, "off"]
+      description: immediate = within a couple of minutes (changes to one issue are combined); digest = in the daily digest; off = no email.
+    EmailNotificationPreference:
+      type: object
+      required: [kind, label, description, delivery, defaultDelivery]
+      properties:
+        kind: { type: string, description: 'Notification kind: assigned, commented, transitioned or automation' }
+        label: { type: string }
+        description: { type: string }
+        delivery: { $ref: '#/components/schemas/EmailDelivery' }
+        defaultDelivery: { $ref: '#/components/schemas/EmailDelivery' }
+    EmailNotificationSettings:
+      type: object
+      required: [address, preferences, digestHour, timeZone, paused, nextDigestAt, emailConfigured]
+      properties:
+        address: { type: string, description: Where the emails go (your account's address) }
+        preferences: { type: array, items: { $ref: '#/components/schemas/EmailNotificationPreference' } }
+        digestHour: { type: integer, minimum: 0, maximum: 23, description: Hour of the day (in timeZone) the digest is sent }
+        timeZone: { type: string, description: 'IANA time zone, e.g. Europe/London' }
+        paused: { type: boolean, description: No notification emails at all while paused }
+        lastDigestAt: { type: string, format: date-time }
+        nextDigestAt: { type: string, format: date-time, description: When the next digest goes out if there is anything to send }
+        emailConfigured: { type: boolean, description: False when the server has no SMTP server and only keeps mail in memory }
+    EmailNotificationSettingsPatch:
+      type: object
+      properties:
+        preferences:
+          type: array
+          items:
+            type: object
+            required: [kind, delivery]
+            properties:
+              kind: { type: string }
+              delivery: { $ref: '#/components/schemas/EmailDelivery' }
+        digestHour: { type: integer, minimum: 0, maximum: 23 }
+        timeZone: { type: string }
+        paused: { type: boolean }
+    EmailTransport: { type: string, enum: [smtp, memory] }
+    EmailStatus:
+      type: object
+      required: [transport, from, publicUrl, unsubscribeUrl, batchWindowSeconds]
+      properties:
+        transport: { $ref: '#/components/schemas/EmailTransport' }
+        host: { type: string }
+        port: { type: integer }
+        tls: { type: string, enum: [starttls, tls, none] }
+        username: { type: string, description: SMTP user name if set (the password is never shown) }
+        from: { type: string }
+        publicUrl: { type: string, description: Links in emails point here (WFM_PUBLIC_URL) }
+        unsubscribeUrl: { type: string, description: One-click unsubscribe endpoint (on WFM_HOOKS_PUBLIC_URL) }
+        batchWindowSeconds: { type: integer, description: Immediate emails wait this long so changes to one issue arrive as one email }
+    EmailTestResult:
+      type: object
+      required: [to, transport]
+      properties:
+        to: { type: string }
+        transport: { $ref: '#/components/schemas/EmailTransport' }
 
     ScmConnection:
       type: object
