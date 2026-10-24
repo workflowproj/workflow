@@ -555,6 +555,176 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/jira-imports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Imports from Jira, newest first */
+        get: operations["adminListJiraImports"];
+        put?: never;
+        /** Connect a Jira site (the connection is tested first; the token is stored encrypted) */
+        post: operations["adminCreateJiraImport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/jira-imports/test-connection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check a Jira site URL and credentials without saving them */
+        post: operations["adminTestJiraConnection"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/jira-imports/{importId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                importId: string;
+            };
+            cookie?: never;
+        };
+        /** An import with its configuration (unset mappings pre-filled), scan, targets and progress */
+        get: operations["adminGetJiraImport"];
+        put?: never;
+        post?: never;
+        /** Delete the import record (imported data stays; re-importing the site still updates instead of duplicating) */
+        delete: operations["adminDeleteJiraImport"];
+        options?: never;
+        head?: never;
+        /** Save the projects and mapping, or enter new credentials */
+        patch: operations["adminUpdateJiraImport"];
+        trace?: never;
+    };
+    "/admin/jira-imports/{importId}/credentials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                importId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Forget the stored Jira token */
+        delete: operations["adminDeleteJiraImportCredentials"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/jira-imports/{importId}/jira-projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                importId: string;
+            };
+            cookie?: never;
+        };
+        /** Projects the Jira account can browse */
+        get: operations["adminListJiraProjects"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/jira-imports/{importId}/scan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                importId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Analyse the selected projects in the background (counts, values in use, people) */
+        post: operations["adminScanJiraImport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/jira-imports/{importId}/dry-run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                importId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** What the import would do and the problems it would meet, without writing anything */
+        post: operations["adminDryRunJiraImport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/jira-imports/{importId}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                importId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start the import, or resume an interrupted one, in the background */
+        post: operations["adminRunJiraImport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/jira-imports/{importId}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                importId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stop the running scan or import after its current step */
+        post: operations["adminCancelJiraImport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/scm/repositories": {
         parameters: {
             query?: never;
@@ -2968,6 +3138,261 @@ export interface components {
             /** Format: date-time */
             processedAt?: string;
         };
+        /**
+         * @description Jira Cloud (REST v3, email + API token) or Jira Data Center / Server (REST v2, personal access token)
+         * @enum {string}
+         */
+        JiraFlavor: "cloud" | "datacenter";
+        JiraConnectionInput: {
+            flavor: components["schemas"]["JiraFlavor"];
+            /** @description Site URL, e.g. https://acme.atlassian.net or https://jira.example.com */
+            baseUrl: string;
+            /** @description Email of the Atlassian account that owns the API token (Cloud only) */
+            email?: string;
+            /** @description API token (Cloud) or personal access token (Data Center) */
+            token: string;
+        };
+        JiraConnectionTest: {
+            serverTitle: string;
+            version: string;
+            deploymentType: string;
+            user: {
+                displayName: string;
+                email?: string;
+            };
+        };
+        /** @enum {string} */
+        JiraImportStatus: "draft" | "scanning" | "scanned" | "running" | "succeeded" | "failed" | "cancelled";
+        JiraImport: {
+            /** Format: uuid */
+            id: string;
+            flavor: components["schemas"]["JiraFlavor"];
+            baseUrl: string;
+            email: string;
+            serverTitle: string;
+            hasCredentials: boolean;
+            status: components["schemas"]["JiraImportStatus"];
+            /**
+             * @description The kind of the current or last run
+             * @enum {string}
+             */
+            mode?: "scan" | "import";
+            /** @description A run stopped checkpointing (worker restarted); it can be resumed or cancelled */
+            stalled: boolean;
+            /** @description The scan is missing or does not cover the selected projects */
+            scanStale: boolean;
+            config: components["schemas"]["JiraImportConfig"];
+            targets: components["schemas"]["JiraImportTarget"][];
+            scan?: components["schemas"]["JiraScan"];
+            people: components["schemas"]["JiraPerson"][];
+            progress?: components["schemas"]["JiraImportProgress"];
+            error?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: date-time */
+            startedAt?: string;
+            /** Format: date-time */
+            finishedAt?: string;
+        };
+        JiraImportPatch: {
+            config?: components["schemas"]["JiraImportConfig"];
+            /** @description New account email (Cloud) */
+            email?: string;
+            /** @description New API token or personal access token */
+            token?: string;
+        };
+        JiraImportConfig: {
+            projects: components["schemas"]["JiraProjectTarget"][];
+            /** @description Jira priority id → priority here */
+            priorities: {
+                [key: string]: components["schemas"]["Priority"];
+            };
+            /** @description Jira field id holding story points; "none" to skip */
+            storyPointsField: string;
+            /** @description Jira person id (account id or user key) → how they are represented here */
+            people: {
+                [key: string]: components["schemas"]["JiraPersonMapping"];
+            };
+            /** @description Import components as labels named "component:<name>" */
+            componentsAsLabels: boolean;
+            /** @description Download attachments (up to the attachment size limit) */
+            attachments: boolean;
+        };
+        JiraProjectTarget: {
+            jiraId: string;
+            jiraKey: string;
+            jiraName: string;
+            /** @description Project key here (issues keep their numbers) */
+            key: string;
+            name: string;
+            /** @description scrum, kanban or bug_tracking; empty = from the Jira boards */
+            template: string;
+            /** @description Open to every organisation member; otherwise private */
+            open: boolean;
+            /** @description Jira status id → status name here */
+            statuses: {
+                [key: string]: string;
+            };
+            /** @description Jira issue type id → issue type key here */
+            types: {
+                [key: string]: string;
+            };
+        };
+        JiraPersonMapping: {
+            /**
+             * @description auto: the account with the same email, else a placeholder; user: a chosen account; placeholder: always a placeholder; skip: leave empty
+             * @enum {string}
+             */
+            action: "auto" | "user" | "placeholder" | "skip";
+            /** Format: uuid */
+            userId?: string;
+            /** @description Email for the placeholder (lets the person claim it by signing in) */
+            email?: string;
+        };
+        JiraImportTarget: {
+            jiraId: string;
+            /** @description Key of the project an earlier run created */
+            existingKey?: string;
+            statuses: {
+                name: string;
+                category: components["schemas"]["StatusCategory"];
+            }[];
+            types: {
+                key: string;
+                name: string;
+                level: number;
+                statuses: string[];
+            }[];
+        };
+        JiraProject: {
+            id: string;
+            key: string;
+            name: string;
+            type: string;
+            teamManaged: boolean;
+            lead?: string;
+            /** @description Key here of the project an earlier import of this site created */
+            importedAs?: string;
+        };
+        JiraValueCount: {
+            id: string;
+            name: string;
+            count: number;
+        };
+        JiraScan: {
+            complete: boolean;
+            /** Format: date-time */
+            scannedAt?: string;
+            projects: components["schemas"]["JiraScanProject"][];
+            priorities: components["schemas"]["JiraValueCount"][];
+            people: components["schemas"]["JiraScanPerson"][];
+            storyPointFields: components["schemas"]["JiraValueCount"][];
+            oversizeAttachments: {
+                issueKey: string;
+                filename: string;
+                /** Format: int64 */
+                size: number;
+            }[];
+            oversizeCount: number;
+        };
+        JiraScanProject: {
+            jiraId: string;
+            key: string;
+            name: string;
+            boardType: string;
+            issues: number;
+            maxNumber: number;
+            comments: number;
+            attachments: number;
+            /** Format: int64 */
+            attachmentBytes: number;
+            sprints: number;
+            versions: number;
+            statuses: {
+                id: string;
+                name: string;
+                category: components["schemas"]["StatusCategory"];
+                count: number;
+            }[];
+            types: {
+                id: string;
+                name: string;
+                level: number;
+                count: number;
+            }[];
+        };
+        JiraScanPerson: {
+            id: string;
+            displayName: string;
+            email: string;
+            active: boolean;
+            app: boolean;
+            count: number;
+        };
+        JiraPerson: components["schemas"]["JiraScanPerson"] & {
+            /** @description The account with the same email, or the one an earlier run mapped the person to */
+            match?: {
+                /** Format: uuid */
+                id: string;
+                displayName: string;
+                email: string;
+                active: boolean;
+            };
+            /** @description The match is an unclaimed placeholder from an earlier import */
+            placeholder: boolean;
+        };
+        JiraImportProblem: {
+            /** @enum {string} */
+            severity: "error" | "warning" | "info";
+            kind: string;
+            project?: string;
+            message: string;
+            count: number;
+            examples?: string[];
+        };
+        JiraImportProgress: {
+            phases: {
+                key: string;
+                label: string;
+                /** @enum {string} */
+                status: "pending" | "running" | "done";
+                done: number;
+                total: number;
+            }[];
+            counters: {
+                [key: string]: number;
+            };
+            problems: components["schemas"]["JiraImportProblem"][];
+        };
+        JiraDryRun: {
+            /** @description No problem blocks the import */
+            ready: boolean;
+            projects: {
+                jiraKey: string;
+                key: string;
+                name: string;
+                template: string;
+                /** @description The project exists from an earlier run and is updated */
+                existing: boolean;
+                issues: number;
+                comments: number;
+                attachments: number;
+                /** Format: int64 */
+                attachmentBytes: number;
+                skippedAttachments: number;
+                sprints: number;
+                versions: number;
+            }[];
+            people: {
+                matched: number;
+                placeholders: number;
+                unclaimable: number;
+                skipped: number;
+            };
+            problems: components["schemas"]["JiraImportProblem"][];
+        };
         AutomationTrigger: {
             /** @enum {string} */
             type: "issue.created" | "issue.transitioned" | "issue.field_changed" | "pr.opened" | "pr.merged" | "commit.pushed" | "branch.created" | "pipeline.completed" | "schedule";
@@ -4196,6 +4621,286 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    adminListJiraImports: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Imports (without scan details) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JiraImport"][];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    adminCreateJiraImport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JiraConnectionInput"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JiraImport"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    adminTestJiraConnection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JiraConnectionInput"];
+            };
+        };
+        responses: {
+            /** @description The site answered and accepted the credentials */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JiraConnectionTest"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    adminGetJiraImport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                importId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The import */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JiraImport"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    adminDeleteJiraImport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                importId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    adminUpdateJiraImport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                importId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JiraImportPatch"];
+            };
+        };
+        responses: {
+            /** @description Updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JiraImport"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    adminDeleteJiraImportCredentials: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                importId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Credentials deleted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JiraImport"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    adminListJiraProjects: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                importId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Jira projects */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JiraProject"][];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    adminScanJiraImport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                importId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Scan started; poll the import for progress */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JiraImport"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    adminDryRunJiraImport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                importId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Dry run */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JiraDryRun"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    adminRunJiraImport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                importId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Import started; poll the import for progress */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JiraImport"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    adminCancelJiraImport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                importId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cancel requested */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JiraImport"];
+                };
             };
             default: components["responses"]["Problem"];
         };

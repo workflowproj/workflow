@@ -105,6 +105,7 @@ func (a *App) handlers() []handler {
 		}),
 		reg(5*time.Minute, func(ctx context.Context, _ jobs.AutomationSchedule) error { return a.Automation.RunScheduled(ctx) }),
 		reg(10*time.Minute, func(ctx context.Context, _ jobs.Maintenance) error { return a.maintenance(ctx) }),
+		reg(a.JiraImport.Budget+5*time.Minute, a.JiraImport.Work),
 	}
 }
 
