@@ -83,6 +83,7 @@ To run the production build locally: `make web embed-web build` then
 | [JQL](docs/jql.md) | Query language reference |
 | [Automation and webhooks](docs/automation.md) | Rules, actions, outbound webhook signatures |
 | [Slack and Mattermost](docs/chat.md) | Channel notifications and the `/wfm` command |
+| [Notifications and email](docs/notifications.md) | Email preferences, immediate emails, daily digests, unsubscribe |
 | [Metrics and dashboards](docs/metrics.md) | Issue timing, sprint reports, flow metrics, dashboards |
 | [Time tracking](docs/time-tracking.md) | Estimates, logging work, the hours burndown and the timesheet |
 | [AI assistants (MCP)](docs/mcp.md) | Connecting Claude and other assistants; the tools |

@@ -130,6 +130,9 @@ type Config struct {
 	OAuth OAuth
 	// TimeTracking sets the working day and week that durations such as "1w 2d" use.
 	TimeTracking TimeTracking
+	// EmailBatchWindow delays immediate notification emails so that several changes to one
+	// issue within the window reach a person as one email.
+	EmailBatchWindow time.Duration
 }
 
 // RateLimit is requests per minute (0 = no limit), each with a burst of half that.
@@ -291,6 +294,7 @@ func LoadFrom(get func(string) string) (*Config, error) {
 			Username: e.str("WFM_SMTP_USERNAME", ""), Password: e.str("WFM_SMTP_PASSWORD", ""),
 			From: e.str("WFM_SMTP_FROM", "Workflow <workflow@localhost>"), TLS: e.str("WFM_SMTP_TLS", "starttls"),
 		},
+		EmailBatchWindow: e.duration("WFM_EMAIL_BATCH_WINDOW", 2*time.Minute),
 	}
 	c.HooksPublicURL = strings.TrimRight(e.str("WFM_HOOKS_PUBLIC_URL", c.PublicURL), "/")
 	// Limits are on by default in production only, so development and tests are not throttled.
@@ -344,6 +348,9 @@ func LoadFrom(get func(string) string) (*Config, error) {
 	}
 	if _, err := netmail.ParseAddress(c.SMTP.From); err != nil {
 		e.errs = append(e.errs, fmt.Errorf("WFM_SMTP_FROM: %v", err))
+	}
+	if c.EmailBatchWindow < time.Second {
+		e.errs = append(e.errs, fmt.Errorf("WFM_EMAIL_BATCH_WINDOW: must be at least 1s, got %s", c.EmailBatchWindow))
 	}
 	switch c.Mode {
 	case ModeWeb, ModeHooks, ModeWorker, ModeAll:

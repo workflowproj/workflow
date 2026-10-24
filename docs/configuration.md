@@ -118,7 +118,8 @@ causes it and retried on failure.
 | `WFM_SMTP_PORT` | `587` | |
 | `WFM_SMTP_TLS` | `starttls` | `starttls`, `tls` (implicit, usually port 465) or `none` |
 | `WFM_SMTP_USERNAME`, `WFM_SMTP_PASSWORD` | — | omit for an unauthenticated relay |
-| `WFM_SMTP_FROM` | `Workflow <workflow@localhost>` | sender address |
+| `WFM_SMTP_FROM` | `Workflow <workflow@localhost>` | sender address; its display name also signs notification emails |
+| `WFM_EMAIL_BATCH_WINDOW` | `2m` | immediate notification emails wait this long so several changes to one issue arrive as one email ([Notifications](notifications.md)) |
 
 ## Slack and Mattermost
 

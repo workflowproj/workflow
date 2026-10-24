@@ -247,10 +247,11 @@ created its tables, then starts processing jobs.
 
 ## Traffic
 
-Only `hooks` faces the internet, and it serves nothing but webhook deliveries and SCIM. The UI,
-the API and OIDC sign-in are on `web` behind an internal entry point. Set
-`WFM_PUBLIC_URL` to the internal URL and `WFM_HOOKS_PUBLIC_URL` to the public one: webhook URLs
-shown to admins and the SCIM base URL use the latter.
+Only `hooks` faces the internet, and it serves nothing but webhook deliveries, SCIM and the
+signed one-click unsubscribe links of notification emails (`/hooks/email/unsubscribe`, which
+mail providers call from the internet). The UI, the API and OIDC sign-in are on `web` behind an
+internal entry point. Set `WFM_PUBLIC_URL` to the internal URL and `WFM_HOOKS_PUBLIC_URL` to the
+public one: webhook URLs shown to admins, the SCIM base URL and unsubscribe links use the latter.
 
 Server-sent events (`/api/v1/events`) need a proxy that streams: no response buffering and an
 idle timeout above the 25-second keep-alive the server sends. The server also sets

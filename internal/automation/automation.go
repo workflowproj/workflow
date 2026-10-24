@@ -659,12 +659,20 @@ func (s *Service) notifyRecipients(ctx context.Context, issue dbq.Issue, who str
 		if issue.ReporterID != nil {
 			ids = append(ids, *issue.ReporterID)
 		}
-	case "watchers":
+	case "watchers", "involved":
+		// involved: the reporter and assignee too, even if they stopped watching.
+		if who == "involved" {
+			for _, u := range []*uuid.UUID{issue.ReporterID, issue.AssigneeID} {
+				if u != nil {
+					ids = append(ids, *u)
+				}
+			}
+		}
 		w, err := s.Q.WatcherIDs(ctx, issue.ID)
 		if err != nil {
 			return err
 		}
-		ids = w
+		ids = append(ids, w...)
 	}
 	return s.Tracker.Notify(ctx, s.Q, ids, except, &issue.ID, kind, title, body)
 }
@@ -689,9 +697,9 @@ func (s *Service) notifyForEvent(ctx context.Context, ev jobs.DomainEvent, data 
 			return s.Tracker.Notify(ctx, s.Q, []uuid.UUID{*issue.AssigneeID}, ev.ActorID, &issue.ID, "assigned", title, "You were assigned this issue")
 		}
 	case "issue.transitioned":
-		return s.notifyRecipients(ctx, issue, "watchers", ev.ActorID, "transitioned", title, fmt.Sprintf("Moved from %v to %v", data["from"], data["to"]))
+		return s.notifyRecipients(ctx, issue, "involved", ev.ActorID, "transitioned", title, fmt.Sprintf("Moved from %v to %v", data["from"], data["to"]))
 	case "comment.created":
-		return s.notifyRecipients(ctx, issue, "watchers", ev.ActorID, "commented", title, fmt.Sprint(data["body"]))
+		return s.notifyRecipients(ctx, issue, "involved", ev.ActorID, "commented", title, fmt.Sprint(data["body"]))
 	}
 	return nil
 }

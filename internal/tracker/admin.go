@@ -3,15 +3,18 @@ package tracker
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"slices"
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 
 	"github.com/geoffo-dev/workflow-management/internal/apperr"
 	"github.com/geoffo-dev/workflow-management/internal/authz"
 	"github.com/geoffo-dev/workflow-management/internal/db"
 	"github.com/geoffo-dev/workflow-management/internal/db/dbq"
+	"github.com/geoffo-dev/workflow-management/internal/notify"
 )
 
 func isUnique(err error) bool { return db.IsUniqueViolation(err) }
@@ -121,6 +124,8 @@ func (s *Service) DeleteField(ctx context.Context, actor *authz.Actor, id uuid.U
 // ---------------------------------------------------------------------------
 // Notifications
 
+// Notify creates in-app notifications for people (never for the actor, `except`) and decides
+// from each person's email settings whether and when it is emailed (see package notify).
 func (s *Service) Notify(ctx context.Context, q *dbq.Queries, userIDs []uuid.UUID, except *uuid.UUID, issueID *uuid.UUID, kind, title, body string) error {
 	seen := map[uuid.UUID]bool{}
 	for _, u := range userIDs {
@@ -128,8 +133,21 @@ func (s *Service) Notify(ctx context.Context, q *dbq.Queries, userIDs []uuid.UUI
 			continue
 		}
 		seen[u] = true
-		if err := q.CreateNotification(ctx, dbq.CreateNotificationParams{UserID: u, IssueID: issueID, Kind: kind, Title: title, Body: body, ActorID: except}); err != nil {
+		var delivery *string
+		if r, err := q.EmailRecipient(ctx, u); err == nil {
+			if d := notify.DeliveryFor(r, kind, issueID != nil); d != "" {
+				delivery = &d
+			}
+		} else if !errors.Is(err, pgx.ErrNoRows) {
 			return err
+		}
+		if err := q.CreateNotification(ctx, dbq.CreateNotificationParams{UserID: u, IssueID: issueID, Kind: kind, Title: title, Body: body, ActorID: except, EmailDelivery: delivery}); err != nil {
+			return err
+		}
+		if delivery != nil && *delivery == notify.Immediate && s.Jobs != nil {
+			if err := notify.Schedule(ctx, s.Jobs, s.Cfg.EmailBatchWindow, s.Now(), u, *issueID); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

@@ -384,7 +384,8 @@ func (s *Service) AssignableUsers(ctx context.Context, actor *authz.Actor, ref, 
 	return out, nil
 }
 
-// userCanBrowse evaluates another user's access (for assignee validation).
+// userCanBrowse evaluates another user's access (for assignee validation; notify.canBrowse
+// applies the same rule to notification emails).
 func (s *Service) userCanBrowse(ctx context.Context, u dbq.User, p dbq.Project) (bool, error) {
 	if !u.Active || u.DeletedAt != nil {
 		return false, nil

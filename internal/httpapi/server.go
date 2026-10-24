@@ -35,6 +35,7 @@ import (
 	"github.com/geoffo-dev/workflow-management/internal/jobs"
 	"github.com/geoffo-dev/workflow-management/internal/mail"
 	"github.com/geoffo-dev/workflow-management/internal/mcpserver"
+	"github.com/geoffo-dev/workflow-management/internal/notify"
 	"github.com/geoffo-dev/workflow-management/internal/oauth"
 	"github.com/geoffo-dev/workflow-management/internal/scm"
 	"github.com/geoffo-dev/workflow-management/internal/secure"
@@ -56,6 +57,7 @@ type Server struct {
 	Hub        *events.Hub
 	Box        *secure.Box
 	Mailer     mail.Sender
+	Notify     *notify.Service
 	// OAuth is the authorisation server for AI assistants connecting to /mcp.
 	OAuth *oauth.Server
 
@@ -219,13 +221,16 @@ func (s *Server) WebHandler(ui http.Handler) http.Handler {
 	return s.common(s.clientAddress(s.authenticate(mux)))
 }
 
-// HooksHandler serves the internet-facing endpoints: Git webhooks and SCIM.
+// HooksHandler serves the internet-facing endpoints: Git webhooks, SCIM and email unsubscribe.
 func (s *Server) HooksHandler(scimHandler interface {
 	Routes(*http.ServeMux, string)
 }) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /hooks/{provider}/{connection}", s.SCM.HandleWebhook)
 	mux.HandleFunc("POST /hooks/chat/{provider}", s.Automation.HandleChatCommand) // Slack / Mattermost /wfm
+	// One-click unsubscribe from notification emails (RFC 8058): mail providers POST here.
+	mux.HandleFunc("GET "+notify.UnsubscribePath, s.Notify.HandleUnsubscribe)
+	mux.HandleFunc("POST "+notify.UnsubscribePath, s.Notify.HandleUnsubscribe)
 	if scimHandler != nil {
 		scimHandler.Routes(mux, "/scim/v2")
 	}
@@ -272,7 +277,7 @@ func (s *Server) devMailbox(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(box.Messages(r.URL.Query().Get("to")))
+	_ = json.NewEncoder(w).Encode(s.devMessages(r.Context(), box, r.URL.Query().Get("to")))
 }
 
 func (s *Server) health(w http.ResponseWriter, _ *http.Request) {

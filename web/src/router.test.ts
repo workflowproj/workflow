@@ -23,6 +23,7 @@ describe("router", () => {
       "/app/browse/$issueKey",
       "/app/admin/users",
       "/app/admin/connected-apps",
+      "/app/admin/email",
       "/oauth/consent",
       "/oauth/consent/$request",
     ]) {

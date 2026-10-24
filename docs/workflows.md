@@ -66,7 +66,7 @@ Post-functions:
 | `assignTo: actor \| reporter \| unassigned \| <email>` | in the transaction | |
 | `setField: {field, value}` | in the transaction | `priority`, `storyPoints`, `dueDate`, `labels`, `assignee`, `resolution` or a custom field key |
 | `clearField: <field>` | in the transaction | |
-| `notify: assignee \| reporter \| watchers` | as a background job | in-app notification |
+| `notify: assignee \| reporter \| watchers` | as a background job | in-app notification, emailed per the recipients' [settings](notifications.md) |
 | `webhook: <url>` | as a background job | POST of the issue as JSON (unsigned — use a [webhook subscription](automation.md#outbound-webhooks) when the receiver needs to verify the sender) |
 
 ## CEL reference

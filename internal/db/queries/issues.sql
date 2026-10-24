@@ -170,7 +170,7 @@ INSERT INTO issue_releases (issue_id, release_id) VALUES ($1, $2) ON CONFLICT DO
 -- Notifications & saved filters
 
 -- name: CreateNotification :exec
-INSERT INTO notifications (user_id, issue_id, kind, title, body, actor_id) VALUES ($1, $2, $3, $4, $5, $6);
+INSERT INTO notifications (user_id, issue_id, kind, title, body, actor_id, email_delivery) VALUES ($1, $2, $3, $4, $5, $6, $7);
 
 -- name: ListNotifications :many
 SELECT n.*, coalesce(p.key || '-' || i.number, '')::text AS issue_key

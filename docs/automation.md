@@ -50,7 +50,7 @@ sub-task is done, stretch an epic's dates over its stories.
 | `set_field` | `field`, `value` (system fields like `priority`, `labels`, `storyPoints`, `dueDate`, or a custom field) |
 | `comment` | `body` (Markdown); `{{issue.key}}` / `{{issue.summary}}` (the issue the action runs on), `{{trigger.key}}` / `{{trigger.summary}}` (the issue that fired the rule) and `{{event.<name>}}` are replaced |
 | `add_label` | `label` |
-| `notify` | `recipients`: `assignee`, `reporter` or `watchers` |
+| `notify` | `recipients`: `assignee`, `reporter` or `watchers` (in-app, and emailed per their [settings](notifications.md)) |
 | `webhook` | `url`: POSTs `{event: "automation", issue, trigger, data, sentAt}` (unsigned) |
 | `chat` | `channelId` (one of the project's [Slack/Mattermost channels](chat.md)), `body`: message with the same templates as comments |
 | `rollup_dates` | sets the target's start and due dates to span its children's dates — typically with target `parent`, so epics on the timeline cover their stories |

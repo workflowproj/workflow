@@ -403,16 +403,17 @@ func (q *Queries) CreateIssueLink(ctx context.Context, arg CreateIssueLinkParams
 
 const createNotification = `-- name: CreateNotification :exec
 
-INSERT INTO notifications (user_id, issue_id, kind, title, body, actor_id) VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO notifications (user_id, issue_id, kind, title, body, actor_id, email_delivery) VALUES ($1, $2, $3, $4, $5, $6, $7)
 `
 
 type CreateNotificationParams struct {
-	UserID  uuid.UUID
-	IssueID *uuid.UUID
-	Kind    string
-	Title   string
-	Body    string
-	ActorID *uuid.UUID
+	UserID        uuid.UUID
+	IssueID       *uuid.UUID
+	Kind          string
+	Title         string
+	Body          string
+	ActorID       *uuid.UUID
+	EmailDelivery *string
 }
 
 // ---------------------------------------------------------------------------
@@ -425,6 +426,7 @@ func (q *Queries) CreateNotification(ctx context.Context, arg CreateNotification
 		arg.Title,
 		arg.Body,
 		arg.ActorID,
+		arg.EmailDelivery,
 	)
 	return err
 }
@@ -1050,7 +1052,7 @@ func (q *Queries) ListHistory(ctx context.Context, issueID uuid.UUID) ([]IssueHi
 }
 
 const listNotifications = `-- name: ListNotifications :many
-SELECT n.id, n.user_id, n.issue_id, n.kind, n.title, n.body, n.actor_id, n.read_at, n.created_at, coalesce(p.key || '-' || i.number, '')::text AS issue_key
+SELECT n.id, n.user_id, n.issue_id, n.kind, n.title, n.body, n.actor_id, n.read_at, n.created_at, n.email_delivery, n.emailed_at, coalesce(p.key || '-' || i.number, '')::text AS issue_key
 FROM notifications n
 LEFT JOIN issues i ON i.id = n.issue_id
 LEFT JOIN projects p ON p.id = i.project_id
@@ -1066,16 +1068,18 @@ type ListNotificationsParams struct {
 }
 
 type ListNotificationsRow struct {
-	ID        int64
-	UserID    uuid.UUID
-	IssueID   *uuid.UUID
-	Kind      string
-	Title     string
-	Body      string
-	ActorID   *uuid.UUID
-	ReadAt    *time.Time
-	CreatedAt time.Time
-	IssueKey  string
+	ID            int64
+	UserID        uuid.UUID
+	IssueID       *uuid.UUID
+	Kind          string
+	Title         string
+	Body          string
+	ActorID       *uuid.UUID
+	ReadAt        *time.Time
+	CreatedAt     time.Time
+	EmailDelivery *string
+	EmailedAt     *time.Time
+	IssueKey      string
 }
 
 func (q *Queries) ListNotifications(ctx context.Context, arg ListNotificationsParams) ([]ListNotificationsRow, error) {
@@ -1097,6 +1101,8 @@ func (q *Queries) ListNotifications(ctx context.Context, arg ListNotificationsPa
 			&i.ActorID,
 			&i.ReadAt,
 			&i.CreatedAt,
+			&i.EmailDelivery,
+			&i.EmailedAt,
 			&i.IssueKey,
 		); err != nil {
 			return nil, err

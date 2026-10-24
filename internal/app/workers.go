@@ -92,6 +92,9 @@ func (a *App) handlers() []handler {
 		reg(time.Minute, a.Automation.HandlePostFunction),
 		reg(time.Minute, func(ctx context.Context, j jobs.DeliverWebhook) error { return a.Automation.Deliver(ctx, j.DeliveryID) }),
 		reg(time.Minute, func(ctx context.Context, j jobs.SendEmail) error { return a.Mailer.Send(ctx, mail.FromJob(j)) }),
+		reg(time.Minute, a.Notify.SendImmediate),
+		reg(5*time.Minute, func(ctx context.Context, _ jobs.EmailDigests) error { return a.Notify.QueueDigests(ctx) }),
+		reg(2*time.Minute, a.Notify.SendDigest),
 		reg(time.Minute, func(ctx context.Context, j jobs.DeliverChat) error {
 			return a.Automation.DeliverChat(ctx, j.DeliveryID)
 		}),
@@ -133,6 +136,7 @@ func (a *App) periodicJobs() []*river.PeriodicJob {
 	out := []*river.PeriodicJob{
 		every(time.Minute, jobs.AutomationSchedule{}),
 		every(time.Hour, jobs.Maintenance{}),
+		every(5*time.Minute, jobs.EmailDigests{}),
 	}
 	if a.Cfg.SCMReconcileInterval > 0 {
 		out = append(out, every(a.Cfg.SCMReconcileInterval, jobs.SCMReconcile{}))
