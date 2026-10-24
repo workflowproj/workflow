@@ -26,8 +26,15 @@ CEL, with the same variables as workflow conditions plus `event` — the trigger
 
 ```cel
 issue.type == "bug" && issue.priority in ["highest", "high"]
-event.status == "failed" && issue.statusCategory != "done"
+event.status == "failed" && issue.statusCategory != "done"          // pipeline.completed
+has(issue.parent.key) && issue.parent.category != "done"            // guard before using parent fields
 ```
+
+`issue.parent` is `{}` for issues without a parent, so check `has(issue.parent.key)` before
+reading its fields. `issue.parent.openChildren` counts the parent's children that are not in a
+done status — including this issue while it is still open; when a sub-task enters a done status,
+the count already excludes it. When several children close at the same moment, each run may see
+`openChildren == 0`; adding `issue.parent.category != "done"` keeps the parent action to one run.
 
 ### Actions
 
