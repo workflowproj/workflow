@@ -784,6 +784,12 @@ func (s *Service) detectTemplate(ctx context.Context, c *Client, key string) str
 // Runs
 
 func (s *Service) startRun(ctx context.Context, actor *authz.Actor, imp dbq.JiraImport, mode, status string, cur cursor, prog *Progress) (dbq.JiraImport, error) {
+	// Two runs writing the same site's mapping at once would race; one at a time.
+	if n, err := s.Q.BusyJiraImportsOfSite(ctx, dbq.BusyJiraImportsOfSiteParams{Site: imp.Site, ID: imp.ID, FreshAfter: ptrTime(s.Now().Add(-stallAfter))}); err != nil {
+		return imp, err
+	} else if n > 0 {
+		return imp, apperr.Conflict("import_running", "another import of this Jira site is running; wait for it to finish")
+	}
 	runID := uuid.New()
 	rawCur, _ := json.Marshal(cur)
 	rawProg, _ := json.Marshal(prog)
@@ -880,3 +886,5 @@ func (s *Service) Cancel(ctx context.Context, actor *authz.Actor, id uuid.UUID) 
 	}
 	return s.Q.RequestJiraImportCancel(ctx, id)
 }
+
+func ptrTime(t time.Time) *time.Time { return &t }

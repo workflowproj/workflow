@@ -498,6 +498,7 @@ func (r *run) importIssuesStep(ctx context.Context) error {
 		}
 		r.cur.After = max(r.cur.After, is.Number())
 		ph.Done++
+		r.heartbeat(ctx)
 	}
 	if page.Last || len(page.Issues) == 0 {
 		r.cur.Project++
@@ -558,7 +559,10 @@ func (r *run) importIssue(ctx context.Context, pc *projectCtx, is Issue) error {
 				return nil
 			}
 			if i.ProjectID != pc.project.ID {
-				r.prog.add("warning", "moved", pc.target.JiraKey, "Issues moved between Jira projects since an earlier import were updated where they are.", is.Key)
+				// Its types and statuses belong to the other project: leave it as it is.
+				r.prog.add("warning", "moved", pc.target.JiraKey, "Issues moved between Jira projects since an earlier import were left where they are.", is.Key)
+				r.prog.count("issuesSkipped", 1)
+				return nil
 			}
 		}
 	} else if !db.IsNoRows(err) {
@@ -1213,7 +1217,11 @@ func linkType(name string) (string, bool) {
 // Ranks
 
 // rankProject orders the imported issues as Jira ranks them (LexoRank strings sort bytewise).
+// Without a rank field (no Jira Software) issues keep the order they were imported in.
 func (r *run) rankProject(ctx context.Context, pc *projectCtx) error {
+	if r.meta.rankField == "" {
+		return nil
+	}
 	q := r.s.Q
 	ids, err := q.JiraMapIssuesByRank(ctx, dbq.JiraMapIssuesByRankParams{Site: r.site, ProjectID: &pc.project.ID})
 	if err != nil || len(ids) == 0 {

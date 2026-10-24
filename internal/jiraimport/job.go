@@ -53,6 +53,7 @@ type run struct {
 	finger   string
 	// Set when the scan column changes in a step.
 	scanDirty bool
+	lastBeat  time.Time
 }
 
 // Work runs a scan or import job: steps until done, cancelled or out of time, checkpointing
@@ -207,6 +208,14 @@ func (r *run) save(ctx context.Context) (bool, error) {
 		r.scanDirty = false
 	}
 	return r.s.Q.SaveJiraImportStep(ctx, params)
+}
+
+// heartbeat marks the run alive inside a long step, at most every 30 seconds.
+func (r *run) heartbeat(ctx context.Context) {
+	if now := r.s.Now(); now.Sub(r.lastBeat) > 30*time.Second {
+		r.lastBeat = now
+		_ = r.s.Q.TouchJiraImportRun(ctx, dbq.TouchJiraImportRunParams{ID: r.imp.ID, RunID: &r.runID})
+	}
 }
 
 // complete records the final state of a successful run.

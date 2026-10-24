@@ -101,7 +101,7 @@ mapping step (the dry run lists them).
 - An issue number already taken by an issue created here (outside the import) is skipped and
   reported.
 - Moving issues between Jira projects after an import, or deleting issues or links in Jira, is
-  not mirrored: moved issues are updated where they are, deleted ones stay.
+  not mirrored: moved issues stay where they were imported (and are reported), deleted ones stay.
 - The importer reads Jira with JQL `project = "KEY" AND key > "KEY-n" ORDER BY key`; it needs the
   enhanced search (`/rest/api/3/search/jql`) on Cloud and `/rest/api/2/search` on Data Center,
   and Jira Software's agile API for sprints (without it, sprints come only from issues).

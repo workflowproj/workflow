@@ -13,6 +13,25 @@ import (
 	"github.com/google/uuid"
 )
 
+const busyJiraImportsOfSite = `-- name: BusyJiraImportsOfSite :one
+SELECT count(*)::int FROM jira_imports
+WHERE site = $1 AND id <> $2 AND status IN ('scanning', 'running') AND heartbeat_at > $3
+`
+
+type BusyJiraImportsOfSiteParams struct {
+	Site       string
+	ID         uuid.UUID
+	FreshAfter *time.Time
+}
+
+// Other runs of the same site that are still checkpointing.
+func (q *Queries) BusyJiraImportsOfSite(ctx context.Context, arg BusyJiraImportsOfSiteParams) (int32, error) {
+	row := q.db.QueryRow(ctx, busyJiraImportsOfSite, arg.Site, arg.ID, arg.FreshAfter)
+	var column_1 int32
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const claimUserPlaceholder = `-- name: ClaimUserPlaceholder :one
 UPDATE users SET active = true, deactivated_at = NULL, source = $1, updated_at = now()
 WHERE id = $2 AND NOT active AND deleted_at IS NULL
@@ -1330,6 +1349,21 @@ func (q *Queries) StartJiraImportRun(ctx context.Context, arg StartJiraImportRun
 		&i.HeartbeatAt,
 	)
 	return i, err
+}
+
+const touchJiraImportRun = `-- name: TouchJiraImportRun :exec
+UPDATE jira_imports SET heartbeat_at = now() WHERE id = $1 AND run_id = $2
+`
+
+type TouchJiraImportRunParams struct {
+	ID    uuid.UUID
+	RunID *uuid.UUID
+}
+
+// Heartbeat inside a long step (many attachments), so the run does not look stalled.
+func (q *Queries) TouchJiraImportRun(ctx context.Context, arg TouchJiraImportRunParams) error {
+	_, err := q.db.Exec(ctx, touchJiraImportRun, arg.ID, arg.RunID)
+	return err
 }
 
 const updateJiraImportConfig = `-- name: UpdateJiraImportConfig :one

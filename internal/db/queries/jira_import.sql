@@ -44,6 +44,15 @@ UPDATE jira_imports SET status = @status, error = @error, progress = @progress, 
     finished_at = now(), heartbeat_at = now(), updated_at = now()
 WHERE id = @id AND run_id = @run_id;
 
+-- name: TouchJiraImportRun :exec
+-- Heartbeat inside a long step (many attachments), so the run does not look stalled.
+UPDATE jira_imports SET heartbeat_at = now() WHERE id = @id AND run_id = @run_id;
+
+-- name: BusyJiraImportsOfSite :one
+-- Other runs of the same site that are still checkpointing.
+SELECT count(*)::int FROM jira_imports
+WHERE site = @site AND id <> @id AND status IN ('scanning', 'running') AND heartbeat_at > @fresh_after;
+
 -- name: RequestJiraImportCancel :one
 UPDATE jira_imports SET cancel_requested = true, updated_at = now() WHERE id = $1 RETURNING *;
 

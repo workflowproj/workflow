@@ -479,6 +479,18 @@ func TestJiraImportDataCenter(t *testing.T) {
 	eq(t, str(created, "id"), eveID, "SCIM adopted the placeholder")
 	eq(t, e.count(`SELECT count(*) FROM user_placeholders`), 1, "only Dora's placeholder is left")
 	eq(t, e.count(`SELECT count(*) FROM users WHERE email = 'eve@example.com' AND active AND source = 'scim'`), 1, "Eve active via SCIM")
+
+	// One run per site at a time: a second import of the site waits for a running one.
+	var other obj
+	admin.must("POST", "/api/v1/admin/jira-imports", obj{"flavor": "datacenter", "baseUrl": srv.URL, "token": site.Token}, 201, &other)
+	admin.must("PATCH", "/api/v1/admin/jira-imports/"+str(other, "id"), obj{"config": cfg}, 200, nil)
+	e.exec(`UPDATE jira_imports SET status = 'running', heartbeat_at = now() WHERE id = $1`, w.id)
+	r := admin.do("POST", "/api/v1/admin/jira-imports/"+str(other, "id")+"/scan", nil)
+	eq(t, r.Status, 409, "concurrent run of the same site")
+	// A run that stopped checkpointing is reported as stalled and can be resumed.
+	e.exec(`UPDATE jira_imports SET heartbeat_at = now() - interval '1 hour' WHERE id = $1`, w.id)
+	eq(t, w.get()["stalled"].(bool), true, "stalled run")
+	admin.must("POST", "/api/v1/admin/jira-imports/"+str(other, "id")+"/scan", nil, 202, nil)
 }
 
 // A placeholder (an imported person without an account) is claimed by signing in with its email
