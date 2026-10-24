@@ -84,6 +84,14 @@ const projectIssuesRoute = createRoute({
   validateSearch: (s: Record<string, unknown>): { jql?: string; issue?: string } => ({ jql: str(s.jql), issue: str(s.issue) }),
   component: ProjectIssuesPage,
 });
+export type TimelineSearch = { projects?: string; jql?: string; issue?: string };
+const timelineSearch = (s: Record<string, unknown>): TimelineSearch => ({ projects: str(s.projects), jql: str(s.jql), issue: str(s.issue) });
+const projectTimelineRoute = createRoute({
+  getParentRoute: () => projectRoute,
+  path: "/timeline",
+  validateSearch: (s: Record<string, unknown>): { jql?: string; issue?: string } => ({ jql: str(s.jql), issue: str(s.issue) }),
+  component: lazyRouteComponent(() => import("@/pages/project/ProjectTimelinePage"), "ProjectTimelinePage"),
+});
 const releasesRoute = createRoute({ getParentRoute: () => projectRoute, path: "/releases", validateSearch: issueSearch, component: lazyRouteComponent(() => import("@/pages/project/ReleasesPage"), "ReleasesPage") });
 const reportsRoute = createRoute({ getParentRoute: () => projectRoute, path: "/reports", component: lazyRouteComponent(() => import("@/pages/project/ReportsPage"), "ReportsPage") });
 
@@ -103,6 +111,12 @@ const searchRoute = createRoute({
   path: "/issues",
   validateSearch: (s: Record<string, unknown>): { jql?: string; filter?: string; issue?: string } => ({ jql: str(s.jql), filter: str(s.filter), issue: str(s.issue) }),
   component: SearchPage,
+});
+const timelineRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/timeline",
+  validateSearch: timelineSearch,
+  component: lazyRouteComponent(() => import("@/pages/TimelinePage"), "TimelinePage"),
 });
 const browseRoute = createRoute({ getParentRoute: () => appRoute, path: "/browse/$issueKey", component: IssuePage });
 const notificationsRoute = createRoute({ getParentRoute: () => appRoute, path: "/notifications", component: lazyRouteComponent(() => import("@/pages/me/NotificationsPage"), "NotificationsPage") });
@@ -134,6 +148,7 @@ export const routeTree = rootRoute.addChildren([
       projectIndexRoute,
       boardRoute,
       backlogRoute,
+      projectTimelineRoute,
       projectIssuesRoute,
       releasesRoute,
       reportsRoute,
@@ -150,6 +165,7 @@ export const routeTree = rootRoute.addChildren([
       ]),
     ]),
     searchRoute,
+    timelineRoute,
     browseRoute,
     notificationsRoute,
     profileRoute,

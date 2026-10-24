@@ -14,6 +14,8 @@ describe("router", () => {
       "/app/projects/$projectKey/settings",
       "/app/projects/$projectKey/settings/workflows/$workflowId",
       "/app/issues",
+      "/app/timeline",
+      "/app/projects/$projectKey/timeline",
       "/app/browse/$issueKey",
       "/app/admin/users",
     ]) {

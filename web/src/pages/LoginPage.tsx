@@ -6,6 +6,7 @@ import { api, unwrap } from "@/api/client";
 import { providersQuery } from "@/api/queries";
 import { Button, Field, Input, PageSpinner } from "@/components/ui";
 import { ErrorBox } from "@/components/ErrorBox";
+import { ThemeMenu } from "@/layout/ThemeMenu";
 
 const route = getRouteApi("/login");
 
@@ -25,7 +26,10 @@ export function LoginPage() {
   const safeReturn = returnTo && returnTo.startsWith("/") && !returnTo.startsWith("//") ? returnTo : "/projects";
 
   return (
-    <div className="flex min-h-full items-center justify-center bg-canvas p-4">
+    <div className="relative flex min-h-full items-center justify-center bg-canvas p-4">
+      <div className="absolute top-3 right-3">
+        <ThemeMenu />
+      </div>
       <div className="w-full max-w-sm">
         <div className="mb-6 flex flex-col items-center gap-3 text-center">
           <span className="flex size-11 items-center justify-center rounded-xl bg-accent text-accent-ink shadow-sm">

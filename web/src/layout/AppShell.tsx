@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, Outlet, useNavigate, useParams, useRouterState } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bell, FolderKanban, LogOut, Menu, Plus, Search, Settings, Shield, UserRound } from "lucide-react";
+import { Bell, FolderKanban, GanttChart, LogOut, Menu, Plus, Search, Settings, Shield, UserRound } from "lucide-react";
 import { api, unwrap } from "@/api/client";
 import { projectsQuery, useMe } from "@/api/queries";
 import { Button, IconButton, MenuItem, Popover } from "@/components/ui";
 import { UserAvatar } from "@/components/UserAvatar";
 import { CreateIssueDialog } from "@/features/issues/CreateIssueDialog";
+import { ThemeMenu } from "./ThemeMenu";
 import { cn } from "@/lib/cn";
 
 const ISSUE_KEY = /^[A-Za-z][A-Za-z0-9_]{1,9}-\d+$/;
@@ -56,6 +57,7 @@ export function AppShell() {
             <Button variant="primary" size="sm" icon={<Plus className="size-3.5" />} onClick={() => setCreating(true)} title="Create issue (c)">
               Create
             </Button>
+            <ThemeMenu />
             <NotificationBell />
             <UserMenu />
           </div>
@@ -89,6 +91,9 @@ function Sidebar({ className }: { className?: string }) {
         </Link>
         <Link to="/issues" className={navItem} activeProps={active}>
           <Search className="size-4" /> Issues
+        </Link>
+        <Link to="/timeline" className={navItem} activeProps={active}>
+          <GanttChart className="size-4" /> Timeline
         </Link>
         <Link to="/notifications" className={navItem} activeProps={active}>
           <Bell className="size-4" /> Notifications

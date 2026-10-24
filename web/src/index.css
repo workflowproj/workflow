@@ -35,37 +35,39 @@
   --color-done-soft: #e1f4e7;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --color-canvas: #0f1115;
-    --color-surface: #171a20;
-    --color-surface-2: #1e222a;
-    --color-surface-3: #272c36;
-    --color-line: #2a2f39;
-    --color-line-strong: #3a404c;
-    --color-ink: #e8eaee;
-    --color-muted: #a3aab6;
-    --color-faint: #7a8291;
-    --color-accent: #4c8dff;
-    --color-accent-hover: #6aa0ff;
-    --color-accent-soft: #1b2a47;
-    --color-accent-ink: #0b1020;
-    --color-danger: #f26d6d;
-    --color-danger-soft: #3a1d1f;
-    --color-success: #4ccb7a;
-    --color-success-soft: #173323;
-    --color-warning: #f0a83a;
-    --color-warning-soft: #3a2c15;
-    --color-todo: #a3aab6;
-    --color-todo-soft: #262b34;
-    --color-progress: #6aa0ff;
-    --color-progress-soft: #1b2a47;
-    --color-done: #4ccb7a;
-    --color-done-soft: #173323;
-  }
+:root {
+  color-scheme: light;
 }
+
+/* Dark theme. public/theme-init.js sets data-theme before first paint from the saved choice
+   (System, Light or Dark; see src/lib/theme.ts), so there is no flash of the wrong theme. */
 :root[data-theme="dark"] {
   color-scheme: dark;
+  --color-canvas: #0f1115;
+  --color-surface: #171a20;
+  --color-surface-2: #1e222a;
+  --color-surface-3: #272c36;
+  --color-line: #2a2f39;
+  --color-line-strong: #3a404c;
+  --color-ink: #e8eaee;
+  --color-muted: #a3aab6;
+  --color-faint: #7a8291;
+  --color-accent: #4c8dff;
+  --color-accent-hover: #6aa0ff;
+  --color-accent-soft: #1b2a47;
+  --color-accent-ink: #0b1020;
+  --color-danger: #f26d6d;
+  --color-danger-soft: #3a1d1f;
+  --color-success: #4ccb7a;
+  --color-success-soft: #173323;
+  --color-warning: #f0a83a;
+  --color-warning-soft: #3a2c15;
+  --color-todo: #a3aab6;
+  --color-todo-soft: #262b34;
+  --color-progress: #6aa0ff;
+  --color-progress-soft: #1b2a47;
+  --color-done: #4ccb7a;
+  --color-done-soft: #173323;
 }
 
 html,

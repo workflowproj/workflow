@@ -18,6 +18,7 @@ export function ProjectLayout() {
   const tabs = [
     { label: "Board", to: "/projects/$projectKey/board" as const, params },
     { label: "Backlog", to: "/projects/$projectKey/backlog" as const, params },
+    { label: "Timeline", to: "/projects/$projectKey/timeline" as const, params },
     { label: "Issues", to: "/projects/$projectKey/issues" as const, params },
     { label: "Releases", to: "/projects/$projectKey/releases" as const, params },
     { label: "Reports", to: "/projects/$projectKey/reports" as const, params },

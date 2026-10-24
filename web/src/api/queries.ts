@@ -8,7 +8,8 @@ import { api, unwrap } from "./client";
  *   ["me"], ["projects"], ["project", key], ["issue-types", projectKey], ["statuses"],
  *   ["users", q, project], ["issue", key], ["issue-comments", key], ["issue-history", key],
  *   ["boards", projectKey], ["board", boardId, ...], ["backlog", boardId], ["search", jql, ...], ["sprints", projectKey],
- *   ["releases", projectKey], ["notifications"], ["fields"], ["labels", projectKey]
+ *   ["releases", projectKey], ["notifications"], ["fields"], ["labels", projectKey],
+ *   ["timeline", projects, jql, doneDays]
  */
 
 export const meQuery = queryOptions({

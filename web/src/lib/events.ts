@@ -24,7 +24,7 @@ export function useProjectEvents(projectKey: string | undefined, onEvent?: (e: L
     const pending = new Set<string>();
     // Coalesce bursts (a drag can emit several events) into one refetch.
     const flush = () => {
-      for (const k of ["board", "backlog", "search", "sprints", "releases"]) qc.invalidateQueries({ queryKey: [k] });
+      for (const k of ["board", "backlog", "search", "sprints", "releases", "timeline"]) qc.invalidateQueries({ queryKey: [k] });
       for (const key of pending) {
         qc.invalidateQueries({ queryKey: ["issue", key] });
         qc.invalidateQueries({ queryKey: ["issue-comments", key] });

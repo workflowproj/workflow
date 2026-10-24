@@ -64,13 +64,13 @@ var ActionTargets = []string{"", "issue", "parent", "children"}
 var categories = []string{"todo", "in_progress", "done"}
 
 type Trigger struct {
-	Type     string `json:"type"`
+	Type       string `json:"type"`
 	ToStatus   string `json:"toStatus,omitempty"`
 	ToCategory string `json:"toCategory,omitempty"`
 	Field      string `json:"field,omitempty"` // comma-separated
 
-	Cron     string `json:"cron,omitempty"`
-	JQL      string `json:"jql,omitempty"`
+	Cron string `json:"cron,omitempty"`
+	JQL  string `json:"jql,omitempty"`
 }
 
 type Action struct {
