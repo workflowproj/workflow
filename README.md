@@ -31,6 +31,10 @@ search and live updates all run on Postgres.
   Entra ID and others; Google Workspace directory sync; just-in-time provisioning when neither is
   used. Organisation roles, project roles, custom roles, groups mapped to roles, personal access
   tokens and service accounts with scopes and expiry, and an audit log.
+- **Local accounts.** People outside your identity provider (or a whole team without SSO) sign in
+  with email and password: email invitations or temporary passwords, argon2id hashing with a
+  common-password check, TOTP two-factor with recovery codes, self-service password reset,
+  throttling and lockout.
 - **Metrics and dashboards.** Lead time, cycle time and time in status for every issue; scope-aware
   sprint burndown and burnup, velocity, cumulative flow, created vs resolved, cycle time and
   breakdowns; personal and shared dashboards built from gadgets.
@@ -73,7 +77,7 @@ To run the production build locally: `make web embed-web build` then
 | [Architecture](docs/architecture.md) | Components, modes, data flow, the job queue and live updates |
 | [Configuration](docs/configuration.md) | Every `WFM_*` environment variable |
 | [Deployment](docs/deployment.md) | Kubernetes with Helm, upgrades, backups, air-gapped installs |
-| [Sign-in and provisioning](docs/identity.md) | Google / OIDC, SCIM, Google directory sync, roles and tokens |
+| [Sign-in and provisioning](docs/identity.md) | Google / OIDC, SCIM, Google directory sync, local accounts, roles and tokens |
 | [GitHub and GitLab](docs/scm.md) | Connecting a GitHub App or GitLab, smart commits, write-back |
 | [Workflows as code](docs/workflows.md) | The YAML format, CEL reference, versioning and migration |
 | [JQL](docs/jql.md) | Query language reference |

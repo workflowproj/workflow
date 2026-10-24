@@ -99,6 +99,102 @@ With neither a group nor an org unit, every user in the domain gets an account. 
 keep their membership in sync and can be used in project roles. Runs are listed under
 Administration → Sign-in & provisioning, with a *Run now* button.
 
+## Local accounts
+
+Local accounts sign in with an email address and a password: contractors and others outside
+your identity provider, or a small team without single sign-on. They are on by default
+(`WFM_LOCAL_LOGIN=true`); with `false` the sign-in page shows no password form and every
+password, reset and invitation endpoint answers 404.
+
+**Adding someone.** Administration → Users → *Add person*, then choose how they sign in:
+
+- *Email invitation* — a signed, single-use link valid for 7 days. *Resend invitation* replaces
+  the link, *Revoke invitation* cancels it. Following the link, they choose a password and then
+  sign in.
+- *Temporary password* — generated and shown to you once; give it to them through a channel you
+  trust. They must choose their own password at their first sign-in.
+- *Single sign-on* (when an OIDC provider is configured) — no password; they are matched by email
+  when they first sign in.
+
+Local groups can be picked at the same time (`groupIds` on `POST /api/v1/admin/users`).
+
+**Which people can have a password.** Anyone who is not managed by an identity provider:
+people an admin added, people created just in time by single sign-on, and development
+accounts. *Send invitation* or *Set temporary password* in a person's actions menu makes them a
+local account; they then sign in either way, since single sign-on keeps matching their verified
+email. *Remove password* makes them single sign-on only again (and signs them out). People
+provisioned by SCIM or Google directory sync can never get a password, and when directory sync
+takes over an existing local account (by matching its email) the account's password,
+two-factor settings, recovery codes and open links are deleted.
+
+**The first admin without single sign-on.** Run, with the server's configuration:
+
+```sh
+wfm create-admin --email you@example.com --name "Your Name"
+```
+
+It creates (or promotes) an organisation admin with a local account and prints a temporary
+password. Running it again issues a new one — the recovery path if every admin is locked out.
+
+**Passwords** are 12–128 characters and may not be one of the most common passwords (a compact
+list from Have I Been Pwned's top 100,000 is built in), a common word padded with digits or
+symbols (`Summer2024!!`, `P@ssw0rd123`), one character or a short pattern repeated, a run such as
+`abcdefghijkl`, or contain the person's name, the local part of their email or their company's
+domain name. Password fields show the strength while you type (the server's own check). Passwords
+are hashed with argon2id (19 MiB, 2 iterations, 1 lane — the OWASP recommendation) and
+re-hashed at the next sign-in if those parameters change.
+
+- *Change password* (Profile → Sign-in and security) needs the current password, signs you out
+  everywhere else and emails you.
+- *Forgot password?* on the sign-in page emails a reset link valid for one hour. The answer is the
+  same, and takes as long, whether or not the address has an account; at most three emails per
+  address per 15 minutes. Resetting signs the person out everywhere and emails them; two-factor
+  authentication still applies at the next sign-in. Admins can also *Send password reset*.
+
+**Two-factor authentication** (TOTP, RFC 6238: SHA-1, 30-second steps, 6 digits, ±1 step for clock
+drift, each code accepted once). Profile → Sign-in and security → *Set up*: scan the QR code (or
+type the key) into an authenticator app, confirm with a code, and save the 10 one-time recovery
+codes shown (stored hashed; *New recovery codes* replaces them). Once on, sign-in asks for a code
+— or a recovery code — after the password. Turning it off needs the password and a code. Secrets
+are encrypted with `WFM_SECRET_KEY`. With `WFM_LOCAL_REQUIRE_2FA=true`, every local account must
+set it up at its next sign-in and cannot turn it off. Admins can *Reset two-factor* for someone who
+lost their phone.
+
+**Sign-in protection.**
+
+- Throttling: 30 attempts a minute per client address across the sign-in endpoints, and a burst of
+  10 (then 5 a minute) per email and address; beyond that the API answers 429 with `Retry-After`.
+  Limits are kept in memory per replica. The client address is the last `X-Forwarded-For` entry
+  (the one your ingress adds), else the peer address.
+- Lockout: `WFM_LOCAL_LOCKOUT_ATTEMPTS` (10) failed passwords or codes in a row — failures more
+  than `WFM_LOCAL_LOCKOUT_DURATION` (15 minutes) apart start the count again — lock the account
+  for `WFM_LOCAL_LOCKOUT_DURATION`, from any address (429, code `locked`). The lock is stored in
+  the database; admins see it in the user list and can *Unlock*. Addresses without an account lock
+  the same way, so a lockout reveals nothing.
+- Errors are generic: a wrong email and a wrong password get the same 401, after the same argon2id
+  work. Only someone who knows the right password learns that an account is deactivated.
+- A finished sign-in is the same server-side session as single sign-on. Until then (a code, a
+  password change or two-factor enrolment is still needed) the browser holds only a short-lived
+  HttpOnly challenge cookie for `/api/v1/auth/local`, good for 5 attempts in 10 minutes.
+- Personal access tokens cannot change passwords or two-factor settings.
+
+**Audit log.** `user.login` (with `method: password`), `user.login_failed`, `user.locked`,
+`user.password_changed`, `user.password_reset_requested`, `user.password_reset`,
+`user.invitation_accepted`, `user.totp_enabled`, `user.totp_disabled`,
+`user.recovery_code_used`, `user.recovery_codes_regenerated`, and the admin actions
+`user.invitation_sent`, `user.invitation_revoked`, `user.temporary_password_set`,
+`user.password_reset_sent`, `user.unlocked`, `user.totp_reset` and `user.password_removed`, each
+with the client address.
+
+**API.** Sign-in: `POST /api/v1/auth/local/login`, then `…/login/totp`, `…/login/new-password`,
+`…/login/totp-setup` and `…/login/totp-setup/confirm` as the result's `status` asks;
+`…/forgot-password`, `…/link` and `…/link/redeem` for emailed links; `…/password-check` for the
+strength meter. Profile: `GET /api/v1/me/security`, `POST /api/v1/me/password`,
+`/me/totp/setup`, `/me/totp/confirm`, `/me/totp/disable`, `/me/totp/recovery-codes`.
+Administration: `/api/v1/admin/users/{id}/invitation` (POST, DELETE), `…/temporary-password`,
+`…/password-reset`, `…/unlock`, `…/totp` (DELETE) and `…/password` (DELETE); the user list's
+`localAccount` field reports each person's status.
+
 ## Roles and permissions
 
 **Organisation roles**: `admin` (everything, including administration), `member` (sees open
