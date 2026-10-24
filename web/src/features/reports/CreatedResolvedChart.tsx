@@ -8,7 +8,7 @@ type CreatedResolved = Schemas["CreatedResolved"];
 
 const M = { top: 12, right: 16, bottom: 30, left: 40 };
 const STRIP = 48;
-const STRIP_GAP = 24;
+const STRIP_GAP = 34;
 const GAP = 2;
 
 /**

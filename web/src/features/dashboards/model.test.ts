@@ -70,6 +70,7 @@ describe("titles and scope", () => {
   it("derives titles from type and settings", () => {
     expect(defaultTitle(gadget({ type: "sprint_burndown", config: { projectKey: "PLAT" } }), "Sprint 4")).toBe("Burndown · PLAT Sprint 4");
     expect(defaultTitle(gadget({ type: "sprint_burnup", config: {} }))).toBe("Burnup");
+    expect(defaultTitle(gadget({ type: "sprint_health", config: { projectKey: "PLAT" } }), "PLAT Sprint 4")).toBe("Sprint health · PLAT Sprint 4");
     expect(defaultTitle(gadget({ type: "breakdown", config: { by: "priority", measure: "points", projectKeys: ["A", "B"] } }))).toBe("Points by priority · A, B");
     expect(defaultTitle(gadget({ type: "cumulative_flow", config: { projectKeys: ["A", "B", "C", "D"] } }))).toBe("Cumulative flow · 4 projects");
     expect(defaultTitle(gadget({ type: "stat", config: { stat: "median_cycle_hours" } }))).toBe("Median cycle time");

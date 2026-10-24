@@ -43,7 +43,8 @@ export function CumulativeFlowChart({ data, height: H = 260 }: { data: Cumulativ
   };
   const edge = (k: number) => bands[k].upper.map((v, i) => `${i === 0 ? "M" : "L"}${x(i)},${y(v)}`).join("");
   const tickEvery = Math.max(1, Math.ceil(n / Math.max(2, Math.floor((width - M.left - right) / 80))));
-  const xTicks = data.dates.map((_, i) => i).filter((i) => i % tickEvery === 0 && last - i >= tickEvery / 2).concat(last > 0 ? [last] : []);
+  // Every few days, plus the last day (dropping a tick that would crowd it).
+  const xTicks = data.dates.map((_, i) => i).filter((i) => i % tickEvery === 0 && last - i >= tickEvery).concat(last > 0 ? [last] : []);
 
   const move = (e: PointerEvent<SVGRectElement>) => {
     const box = e.currentTarget.ownerSVGElement!.getBoundingClientRect();

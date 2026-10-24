@@ -1,6 +1,6 @@
 import { useMemo } from "react";
-import { closestCenter, DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors, type Announcements, type DragEndEvent } from "@dnd-kit/core";
-import { rectSortingStrategy, SortableContext, sortableKeyboardCoordinates, useSortable } from "@dnd-kit/sortable";
+import { closestCenter, DndContext, KeyboardSensor, PointerSensor, pointerWithin, useSensor, useSensors, type Announcements, type CollisionDetection, type DragEndEvent } from "@dnd-kit/core";
+import { SortableContext, sortableKeyboardCoordinates, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { ArrowLeft, ArrowRight, Check, CopyPlus, Ellipsis, GripVertical, Settings2, Trash2 } from "lucide-react";
 import { IconButton, MenuItem, MenuLabel, Popover } from "@/components/ui";
@@ -12,6 +12,15 @@ import { SprintChartGadget, SprintHealthGadget, VelocityGadget } from "./SprintG
 
 // Widths are columns of three; at two columns a wide gadget fills the row, at one all stack.
 const SPAN: Record<number, string> = { 1: "", 2: "@3xl:col-span-2", 3: "@3xl:col-span-2 @5xl:col-span-3" };
+// Gadgets differ in size, so the others stay put while one is dragged (a shifting preview
+// assumes equal sizes) and the gadget it would take the place of is outlined instead.
+const noShift = () => null;
+// The gadget under the pointer; for the keyboard, which has no pointer, the nearest one.
+const collision: CollisionDetection = (args) => {
+  const within = pointerWithin(args);
+  return within.length > 0 ? within : closestCenter(args);
+};
+
 const WIDTHS: { value: 1 | 2 | 3; label: string }[] = [
   { value: 1, label: "Narrow (one column)" },
   { value: 2, label: "Wide (two columns)" },
@@ -112,14 +121,14 @@ export function DashboardGrid({
     <div className="@container">
       <DndContext
         sensors={sensors}
-        collisionDetection={closestCenter}
+        collisionDetection={collision}
         onDragEnd={onDragEnd}
         accessibility={{
           announcements,
           screenReaderInstructions: { draggable: "To move a gadget, press Space or Enter on its handle, use the arrow keys to move it, then Space or Enter to drop it, or Escape to cancel." },
         }}
       >
-        <SortableContext items={ids} strategy={rectSortingStrategy}>
+        <SortableContext items={ids} strategy={noShift}>
           {grid}
         </SortableContext>
       </DndContext>
@@ -148,7 +157,7 @@ function EditableGadget({
   onDuplicate: () => void;
   onRemove: () => void;
 }) {
-  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: gadget.id });
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging, isOver } = useSortable({ id: gadget.id });
   const title = gadgetTitle(gadget);
   const handle = (
     <button
@@ -205,7 +214,7 @@ function EditableGadget({
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Translate.toString(transform), transition }}
-      className={cn("min-w-0 rounded-lg", SPAN[gadget.width], isDragging && "relative z-10 opacity-80 shadow-xl ring-2 ring-accent")}
+      className={cn("min-w-0 rounded-lg", SPAN[gadget.width], isDragging ? "relative z-10 opacity-80 shadow-xl ring-2 ring-accent" : isOver && "ring-2 ring-accent/50 ring-offset-2 ring-offset-canvas")}
       data-gadget-type={gadgetMeta(gadget.type).type}
     >
       <GadgetContext.Provider value={{ gadget, openIssue, handle, controls }}>

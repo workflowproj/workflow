@@ -224,7 +224,9 @@ const withScope = (name: string, scope: string) => (scope ? `${name} · ${scope}
 /** defaultTitle names a gadget from its type and settings, e.g. "Burndown · PLAT Sprint 4". */
 export function defaultTitle(g: Gadget, sprintName?: string): string {
   const c = g.config;
-  const sprint = [c.projectKey, sprintName].filter(Boolean).join(" ");
+  // Sprints are often named after the project already ("PLAT Sprint 4").
+  const named = !!sprintName && !!c.projectKey && sprintName.toUpperCase().startsWith(`${c.projectKey.toUpperCase()} `);
+  const sprint = named ? sprintName : [c.projectKey, sprintName].filter(Boolean).join(" ");
   switch (g.type) {
     case "sprint_burndown":
       return withScope("Burndown", sprint);

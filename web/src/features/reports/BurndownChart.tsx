@@ -105,10 +105,14 @@ function SprintDayChart({ report, kind, measure, height: H = 280 }: { report: Sp
   const hoveredPoint = hover != null && hover <= last.i ? at(hover) : undefined;
   const round = (n: number) => m.format(Math.round(n * 10) / 10);
 
+  const endText = (key: string, v: number) => `${m.format(v)} ${key === "remaining" ? "left" : key === "completed" ? "done" : "scope"}`;
   // End labels: the primary line always; the scope too when it is clear of the first.
   const endLabels = lines
     .map((l, k) => ({ l, k, v: l.value(last.p) }))
     .filter((e, k, all) => k === 0 || Math.abs(y(e.v) - y(all[0].v)) >= 14);
+  // Beside the dot when the days ahead leave room (the line ends there), else above it, or
+  // below it near the top so it clears the "Today" label.
+  const labelBeside = width - x(last.i) - 10 >= Math.max(...endLabels.map((e) => endText(e.l.key, e.v).length)) * 6.4;
   const summary =
     kind === "burndown"
       ? `Burndown: ${m.format(m.remaining(last.p))} of ${m.format(m.scope(last.p))} ${m.unit} remaining, ${m.format(m.committed)} committed`
@@ -167,14 +171,15 @@ function SprintDayChart({ report, kind, measure, height: H = 280 }: { report: Sp
             <g key={l.key}>
               <circle cx={x(last.i)} cy={y(v)} r={4} fill={l.color} stroke={C.surface} strokeWidth={2} />
               <text
-                x={x(last.i) + (last.i > days * 0.8 ? -8 : 8)}
-                y={y(v) - 8}
-                textAnchor={last.i > days * 0.8 ? "end" : "start"}
+                x={x(last.i) + (labelBeside ? 8 : -6)}
+                y={y(v) + (labelBeside ? 0 : y(v) - M.top > 24 ? -9 : 17)}
+                dy={labelBeside ? "0.32em" : undefined}
+                textAnchor={labelBeside ? "start" : "end"}
                 fontSize={11}
                 fontWeight={600}
                 fill="var(--color-ink)"
               >
-                {m.format(v)} {l.key === "remaining" ? "left" : l.key === "completed" ? "done" : "scope"}
+                {endText(l.key, v)}
               </text>
             </g>
           ))}

@@ -37,6 +37,7 @@ export function VelocityChart({ data, unit = "points", average: avg, height: H =
           items={[
             { label: "Committed", color: C.reference, shape: "rect" },
             { label: "Completed", color: C.series, shape: "rect" },
+            ...(data.length > 1 ? [{ label: `Average ${formatPoints(Math.round(average * 10) / 10)}`, color: C.text, shape: "line" as const }] : []),
           ]}
         />
       </div>
@@ -81,14 +82,8 @@ export function VelocityChart({ data, unit = "points", average: avg, height: H =
               </g>
             );
           })}
-          {data.length > 1 && (
-            <g pointerEvents="none">
-              <line x1={M.left} x2={width - M.right} y1={y(average)} y2={y(average)} stroke={C.text} strokeWidth={1} />
-              <text x={width - M.right} y={y(average) - 5} textAnchor="end" fontSize={11} fill={C.text}>
-                Average {formatPoints(Math.round(average * 10) / 10)}
-              </text>
-            </g>
-          )}
+          {/* The average is keyed in the legend: a label here would sit on the bars. */}
+          {data.length > 1 && <line x1={M.left} x2={width - M.right} y1={y(average)} y2={y(average)} stroke={C.text} strokeWidth={1} pointerEvents="none" />}
         </svg>
         {h && hover != null && (
           <Tooltip x={center(hover) + bar} y={y(Math.max(committedOf(h), completedOf(h)))} width={width}>
