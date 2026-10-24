@@ -412,24 +412,39 @@ func TestLocalSignInThrottling(t *testing.T) {
 	admin.must("POST", "/api/v1/admin/users", obj{"displayName": "Fay", "email": "fay@example.com"}, 201, &u)
 	admin.must("POST", "/api/v1/admin/users/"+str(u, "id")+"/temporary-password", nil, 200, nil)
 
-	// Per email and address: a burst of 10, then 429 with Retry-After.
-	for range 10 {
-		wantCode(t, e.anon().passwordLogin("fay@example.com", "wrong", "192.0.2.1"), 401, "invalid_credentials")
+	// untilThrottled tries until an attempt gets 429 (with Retry-After) and returns how many got
+	// through first. Buckets refill while the test runs, so a slow run may get one or two more.
+	untilThrottled := func(limit int, try func(i int) Response) int {
+		t.Helper()
+		for i := 0; i < limit; i++ {
+			r := try(i)
+			if r.Status == 429 {
+				wantCode(t, r, 429, "rate_limited")
+				if s, _ := strconv.Atoi(r.Header.Get("Retry-After")); s < 1 {
+					t.Fatalf("Retry-After = %q", r.Header.Get("Retry-After"))
+				}
+				return i
+			}
+			wantCode(t, r, 401, "invalid_credentials")
+		}
+		t.Fatalf("not throttled after %d attempts", limit)
+		return 0
 	}
-	r := e.anon().passwordLogin("fay@example.com", "wrong", "192.0.2.1")
-	wantCode(t, r, 429, "rate_limited")
-	if s, _ := strconv.Atoi(r.Header.Get("Retry-After")); s < 1 {
-		t.Fatalf("Retry-After = %q", r.Header.Get("Retry-After"))
+
+	// Per email and address: a burst of 10, then 429.
+	if n := untilThrottled(14, func(int) Response { return e.anon().passwordLogin("fay@example.com", "wrong", "192.0.2.1") }); n < 10 {
+		t.Fatalf("throttled after %d attempts", n)
 	}
 	// Another address may still try that email.
 	wantCode(t, e.anon().passwordLogin("fay@example.com", "wrong", "192.0.2.2"), 401, "invalid_credentials")
 
-	// Per address: 30 attempts a minute whatever the email.
-	for i := range 29 {
-		wantCode(t, e.anon().passwordLogin(fmt.Sprintf("p%d@example.com", i), "wrong", "192.0.2.3"), 401, "invalid_credentials")
+	// Per address: 30 attempts a minute whatever the email, across the sign-in endpoints.
+	if n := untilThrottled(40, func(i int) Response {
+		return e.anon().passwordLogin(fmt.Sprintf("p%d@example.com", i), "wrong", "192.0.2.3")
+	}); n < 30 {
+		t.Fatalf("throttled after %d attempts", n)
 	}
-	wantCode(t, e.anon().do("POST", "/api/v1/auth/local/forgot-password", obj{"email": "x@example.com"}, "X-Forwarded-For", "192.0.2.3"), 202, "")
-	wantCode(t, e.anon().passwordLogin("fay@example.com", "wrong", "192.0.2.3"), 429, "rate_limited")
+	wantCode(t, e.anon().do("POST", "/api/v1/auth/local/forgot-password", obj{"email": "x@example.com"}, "X-Forwarded-For", "192.0.2.3"), 429, "rate_limited")
 }
 
 func TestLocalAccountsAndIdentityProviders(t *testing.T) {
@@ -478,6 +493,7 @@ func TestLocalLoginDisabled(t *testing.T) {
 	wantCode(t, e.anon().passwordLogin("admin@example.com", "whatever-password"), 404, "local_login_disabled")
 	wantCode(t, e.anon().do("POST", "/api/v1/auth/local/forgot-password", obj{"email": "admin@example.com"}), 404, "local_login_disabled")
 	wantCode(t, admin.do("POST", "/api/v1/admin/users/"+admin.id()+"/invitation", nil), 404, "local_login_disabled")
+	wantCode(t, e.anon().do("POST", "/api/v1/auth/local/password-check", obj{"password": "anything-long-enough"}), 404, "local_login_disabled")
 	var sec obj
 	admin.get("/api/v1/me/security", &sec)
 	eq(t, sec["localLoginEnabled"], any(false), "profile knows")
