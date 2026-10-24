@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/geoffo-dev/workflow-management/internal/timetrack"
 )
 
 // CustomField describes a custom field the compiler may reference by key or name.
@@ -23,6 +25,8 @@ type Env struct {
 	UserID       *uuid.UUID
 	Now          time.Time
 	CustomFields []CustomField
+	// Units turn durations such as 1d into seconds (the default 8-hour day when unset).
+	Units timetrack.Units
 }
 
 // Compiled is a WHERE expression and ORDER BY list over the issues table aliased as `i`.
@@ -48,6 +52,9 @@ func (b *builder) arg(v any) string {
 func Compile(q *Query, env Env, argOffset int, defaultOrder []Order) (*Compiled, error) {
 	if env.Now.IsZero() {
 		env.Now = time.Now().UTC()
+	}
+	if env.Units.HoursPerDay <= 0 || env.Units.DaysPerWeek <= 0 {
+		env.Units = timetrack.Default
 	}
 	b := &builder{env: env, base: argOffset}
 	where := "TRUE"
@@ -268,6 +275,22 @@ func (b *builder) clause(c Clause) (string, error) {
 		return b.dateField(c, "i.start_date", true)
 	case "storypoints", "points", "estimate":
 		return b.numberField(c, "i.story_points")
+	case "originalestimate", "timeoriginalestimate":
+		return b.durationField(c, "i.original_estimate_seconds", false)
+	case "remainingestimate", "timeestimate":
+		return b.durationField(c, "i.remaining_estimate_seconds", false)
+	case "timespent":
+		return b.durationField(c, timeSpentExpr, true)
+	case "worklogauthor":
+		return b.setField(c, func(v Value) (string, error) {
+			u, err := b.userSet(v)
+			if err != nil {
+				return "", err
+			}
+			return worklogExists + " AND w.author_id IN (" + u + "))", nil
+		}, "NOT "+worklogExists+")")
+	case "worklogdate":
+		return b.worklogDate(c)
 	}
 	if cf, ok := b.customField(c.Field); ok {
 		return b.customClause(c, cf)
@@ -547,6 +570,72 @@ func (b *builder) numberField(c Clause, col string) (string, error) {
 	}, col+" IS NULL")
 }
 
+// timeSpentExpr is an issue's time spent: the sum of its worklogs (NULL without any).
+const timeSpentExpr = "(SELECT sum(w.duration_seconds) FROM worklogs w WHERE w.issue_id = i.id)"
+
+// worklogExists opens a condition on the issue's worklogs (alias w); callers close it.
+const worklogExists = "EXISTS (SELECT 1 FROM worklogs w WHERE w.issue_id = i.id"
+
+// durationField compares a duration column (seconds) with values such as 2h, "1d 4h" or a
+// bare number of minutes. With zeroWhenEmpty an issue without a value compares as 0 (time
+// spent); is EMPTY still means no value.
+func (b *builder) durationField(c Clause, col string, zeroWhenEmpty bool) (string, error) {
+	dur := func(v Value) (int64, error) {
+		if v.Kind != VNumber && v.Kind != VString {
+			return 0, errAt(v.Pos, "expected a duration such as 2h or \"1d 4h\"")
+		}
+		n, err := timetrack.Parse(v.Text, b.env.Units)
+		if err != nil {
+			return 0, errAt(v.Pos, "%q is not a duration (use w, d, h and m, e.g. 4h or \"1d 2h\"; a bare number is minutes)", v.Text)
+		}
+		return n, nil
+	}
+	cmp := col
+	if zeroWhenEmpty {
+		cmp = "coalesce(" + col + ", 0)"
+	}
+	switch c.Op {
+	case ">", ">=", "<", "<=":
+		n, err := dur(c.Values[0])
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("%s %s %s::bigint", cmp, c.Op, b.arg(n)), nil
+	}
+	return b.setField(c, func(v Value) (string, error) {
+		n, err := dur(v)
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("%s = %s::bigint", cmp, b.arg(n)), nil
+	}, col+" IS NULL")
+}
+
+// worklogDate matches issues with work logged on (or before, after...) a date; != and not in
+// match issues with no work logged then, and is EMPTY issues with no work logged at all.
+func (b *builder) worklogDate(c Clause) (string, error) {
+	switch c.Op {
+	case "is", "is not":
+		if c.Op == "is" {
+			return "NOT " + worklogExists + ")", nil
+		}
+		return worklogExists + ")", nil
+	case "!=", "not in":
+		pos := c
+		pos.Op = map[string]string{"!=": "=", "not in": "in"}[c.Op]
+		cond, err := b.dateField(pos, "w.started_at", false)
+		if err != nil {
+			return "", err
+		}
+		return "(NOT " + worklogExists + " AND " + cond + "))", nil
+	}
+	cond, err := b.dateField(c, "w.started_at", false)
+	if err != nil {
+		return "", err
+	}
+	return worklogExists + " AND " + cond + ")", nil
+}
+
 var relativePattern = regexp.MustCompile(`^([+-]?\d+)\s*([mhdwMy])$`)
 
 // dateValue resolves a date literal, relative offset or date function.
@@ -760,6 +849,12 @@ func orderExpr(o Order) (string, error) {
 		return "i.story_points", nil
 	case "type", "issuetype":
 		return "(SELECT t.level FROM issue_types t WHERE t.id = i.type_id)", nil
+	case "originalestimate", "timeoriginalestimate":
+		return "i.original_estimate_seconds", nil
+	case "remainingestimate", "timeestimate":
+		return "i.remaining_estimate_seconds", nil
+	case "timespent":
+		return timeSpentExpr, nil
 	}
 	return "", errAt(o.Pos, "cannot order by %q", o.Field)
 }
@@ -795,6 +890,11 @@ var Fields = []struct {
 	{"due", "date", []string{"=", ">", ">=", "<", "<=", "is", "is not"}},
 	{"start", "date", []string{"=", ">", ">=", "<", "<=", "is", "is not"}},
 	{"storyPoints", "number", []string{"=", "!=", ">", ">=", "<", "<=", "is", "is not"}},
+	{"originalEstimate", "duration", []string{"=", "!=", ">", ">=", "<", "<=", "is", "is not"}},
+	{"remainingEstimate", "duration", []string{"=", "!=", ">", ">=", "<", "<=", "is", "is not"}},
+	{"timeSpent", "duration", []string{"=", "!=", ">", ">=", "<", "<=", "is", "is not"}},
+	{"worklogAuthor", "user", []string{"=", "!=", "in", "not in", "is", "is not"}},
+	{"worklogDate", "date", []string{"=", "!=", ">", ">=", "<", "<=", "is", "is not"}},
 }
 
 var Functions = []string{

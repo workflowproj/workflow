@@ -1883,6 +1883,100 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/IssueMetrics' }
         default: { $ref: '#/components/responses/Problem' }
+  # Time tracking: worklogs, the timesheet and the working day/week durations use.
+  /issues/{issueKey}/worklogs:
+    get:
+      operationId: listWorklogs
+      tags: [issues]
+      parameters: [{ $ref: '#/components/parameters/IssueKey' }]
+      responses:
+        "200":
+          description: Work logged on the issue, in the order it was done
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Worklog' }
+        default: { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: addWorklog
+      tags: [issues]
+      description: |
+        Log work on an issue (needs permission to edit it). The remaining estimate goes down by the
+        time logged (never below zero) unless the request sets it (`remainingEstimateSeconds`) or
+        asks to leave it (`adjustEstimate: leave`).
+      parameters: [{ $ref: '#/components/parameters/IssueKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WorklogInput' }
+      responses:
+        "201":
+          description: Logged
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Worklog' }
+        default: { $ref: '#/components/responses/Problem' }
+  /worklogs/{worklogId}:
+    patch:
+      operationId: updateWorklog
+      tags: [issues]
+      description: Change your own worklog (project admins can change anyone's). With `adjustEstimate` auto, the remaining estimate absorbs the difference.
+      parameters: [{ name: worklogId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WorklogPatch' }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Worklog' }
+        default: { $ref: '#/components/responses/Problem' }
+    delete:
+      operationId: deleteWorklog
+      tags: [issues]
+      description: Delete your own worklog (project admins can delete anyone's). By default the remaining estimate grows back by its time.
+      parameters:
+        - { name: worklogId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: adjustEstimate, in: query, schema: { $ref: '#/components/schemas/AdjustEstimate' } }
+        - { name: remainingEstimateSeconds, in: query, description: 'Set the remaining estimate to this', schema: { type: integer, format: int64, minimum: 0 } }
+      responses:
+        "204": { description: Deleted }
+        default: { $ref: '#/components/responses/Problem' }
+  /worklogs:
+    get:
+      operationId: getTimesheet
+      tags: [metrics]
+      summary: Timesheet, the time logged per person per day (and per issue) on issues you can browse
+      parameters:
+        - { name: from, in: query, required: true, description: First day, schema: { type: string, format: date } }
+        - { name: to, in: query, required: true, description: 'Last day (inclusive); at most 366 days after from', schema: { type: string, format: date } }
+        - { $ref: '#/components/parameters/MetricProjects' }
+        - { name: user, in: query, description: Only this person's work, schema: { type: string, format: uuid } }
+        - { name: tz, in: query, description: 'IANA time zone that days are counted in (default UTC)', schema: { type: string } }
+      responses:
+        "200":
+          description: Totals per person and day
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Timesheet' }
+        default: { $ref: '#/components/responses/Problem' }
+  /time-tracking/settings:
+    get:
+      operationId: getTimeTrackingSettings
+      tags: [issues]
+      summary: The working day and week behind durations such as 1w 2d (WFM_TIME_HOURS_PER_DAY, WFM_TIME_DAYS_PER_WEEK)
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TimeTrackingSettings' }
+        default: { $ref: '#/components/responses/Problem' }
   /issues/{issueKey}/links:
     post:
       operationId: createIssueLink
@@ -2735,7 +2829,7 @@ components:
         interval: { type: string, enum: [day, week] }
         by: { $ref: '#/components/schemas/BreakdownBy' }
         flowBy: { type: string, enum: [category, status] }
-        measure: { type: string, enum: [issues, points] }
+        measure: { type: string, enum: [issues, points, hours], description: 'hours (remaining estimate and time logged) applies to sprint gadgets' }
         chart: { type: string, enum: [bar, donut] }
         stat: { $ref: '#/components/schemas/MetricStat' }
         count: { type: integer, minimum: 1, maximum: 20, description: Sprints shown by velocity }
@@ -3005,7 +3099,7 @@ components:
         columns: { type: array, items: { $ref: '#/components/schemas/BoardColumn' } }
         cardFields: { type: array, items: { $ref: '#/components/schemas/CardField' }, description: What cards show besides the summary, type and key, in this order }
     BoardType: { type: string, enum: [scrum, kanban] }
-    CardField: { type: string, enum: [epic, labels, priority, dev, points, assignee, dueDate, daysInColumn] }
+    CardField: { type: string, enum: [epic, labels, priority, dev, points, assignee, dueDate, daysInColumn, timeTracking] }
     Swimlanes: { type: string, enum: [none, assignee, epic, priority, type] }
     BoardColumn:
       type: object
@@ -3092,7 +3186,7 @@ components:
         endDate: { type: [string, 'null'], format: date }
     SprintReport:
       type: object
-      required: [sprint, committedPoints, completedPoints, committedIssues, completedIssues, addedPoints, removedPoints, addedIssues, removedIssues, burndown]
+      required: [sprint, committedPoints, completedPoints, committedIssues, completedIssues, addedPoints, removedPoints, addedIssues, removedIssues, burndown, committedSeconds, completedSeconds, addedSeconds, removedSeconds]
       properties:
         sprint: { $ref: '#/components/schemas/Sprint' }
         committedPoints: { type: number, format: double, description: Story points in the sprint when it started }
@@ -3103,13 +3197,17 @@ components:
         removedPoints: { type: number, format: double, description: Points of issues taken out after the start }
         addedIssues: { type: integer }
         removedIssues: { type: integer }
+        committedSeconds: { type: integer, format: int64, description: Remaining estimate of the open issues in the sprint when it started }
+        completedSeconds: { type: integer, format: int64, description: Time logged on the sprint's issues during the sprint }
+        addedSeconds: { type: integer, format: int64, description: 'Remaining estimate of issues added after the start, when they were added' }
+        removedSeconds: { type: integer, format: int64, description: 'Remaining estimate of issues taken out after the start, when they left' }
         burndown:
           type: array
           items: { $ref: '#/components/schemas/BurndownPoint' }
     BurndownPoint:
       type: object
       description: The sprint at the end of each day (today so far for an active sprint).
-      required: [date, remainingPoints, idealPoints, scopePoints, completedPoints, remainingIssues, scopeIssues, completedIssues]
+      required: [date, remainingPoints, idealPoints, scopePoints, completedPoints, remainingIssues, scopeIssues, completedIssues, remainingSeconds, idealSeconds, scopeSeconds, completedSeconds]
       properties:
         date: { type: string, format: date }
         remainingPoints: { type: number, format: double, description: Scope minus completed }
@@ -3119,6 +3217,10 @@ components:
         remainingIssues: { type: integer }
         scopeIssues: { type: integer }
         completedIssues: { type: integer }
+        remainingSeconds: { type: integer, format: int64, description: Remaining estimate of the issues in the sprint that are not done }
+        idealSeconds: { type: integer, format: int64, description: Committed hours falling linearly to zero at the end date }
+        scopeSeconds: { type: integer, format: int64, description: Time logged in the sprint so far plus the remaining estimate }
+        completedSeconds: { type: integer, format: int64, description: Time logged on the sprint's issues since it started }
     Release:
       type: object
       required: [id, name, description, state, position, issueCount, doneCount]
@@ -3198,6 +3300,7 @@ components:
         fields: { type: object, additionalProperties: true }
         dev: { $ref: '#/components/schemas/DevSummary' }
         statusChangedAt: { type: string, format: date-time, description: When the issue entered its current status }
+        timeTracking: { $ref: '#/components/schemas/TimeTracking', description: Always present }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
     IssueDetail:
@@ -3262,6 +3365,8 @@ components:
         labels: { type: array, items: { type: string } }
         releaseIds: { type: array, items: { type: string, format: uuid } }
         fields: { type: object, additionalProperties: true }
+        originalEstimate: { type: integer, format: int64, minimum: 0, description: Seconds; the remaining estimate starts equal to it unless given }
+        remainingEstimate: { type: integer, format: int64, minimum: 0, description: Seconds }
     IssuePatch:
       type: object
       properties:
@@ -3283,6 +3388,8 @@ components:
           description: Custom field values to set; a null value clears the field.
           type: object
           additionalProperties: true
+        originalEstimate: { type: [integer, 'null'], format: int64, minimum: 0, description: 'Seconds; setting it on an issue without a remaining estimate sets that too' }
+        remainingEstimate: { type: [integer, 'null'], format: int64, minimum: 0, description: Seconds }
     AvailableTransition:
       type: object
       required: [id, name, to, screen]
@@ -3348,6 +3455,85 @@ components:
         from: { type: string }
         to: { type: string }
         createdAt: { type: string, format: date-time }
+    TimeTracking:
+      type: object
+      description: Estimates and time logged, in seconds. A missing estimate was never set.
+      required: [spentSeconds]
+      properties:
+        originalSeconds: { type: integer, format: int64, description: Original estimate }
+        remainingSeconds: { type: integer, format: int64, description: Remaining estimate }
+        spentSeconds: { type: integer, format: int64, description: "Time spent: the sum of the issue's worklogs" }
+    TimeTrackingSettings:
+      type: object
+      required: [hoursPerDay, daysPerWeek]
+      properties:
+        hoursPerDay: { type: number, format: double, description: Hours in a working day (1d) }
+        daysPerWeek: { type: number, format: double, description: Working days in a week (1w) }
+    AdjustEstimate:
+      type: string
+      enum: [auto, leave]
+      description: 'auto (the default) moves the remaining estimate by the time logged, never below zero; leave keeps it'
+    Worklog:
+      type: object
+      required: [id, issueKey, startedAt, timeSpentSeconds, comment, createdAt, updatedAt, canEdit]
+      properties:
+        id: { type: string, format: uuid }
+        issueKey: { type: string }
+        author: { $ref: '#/components/schemas/User' }
+        startedAt: { type: string, format: date-time, description: When the work was done }
+        timeSpentSeconds: { type: integer, format: int64 }
+        comment: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        canEdit: { type: boolean, description: The caller may change or delete it }
+    WorklogInput:
+      type: object
+      required: [timeSpentSeconds]
+      properties:
+        timeSpentSeconds: { type: integer, format: int64, minimum: 60 }
+        startedAt: { type: string, format: date-time, description: Defaults to now }
+        comment: { type: string, maxLength: 10000 }
+        adjustEstimate: { $ref: '#/components/schemas/AdjustEstimate' }
+        remainingEstimateSeconds: { type: integer, format: int64, minimum: 0, description: Set the remaining estimate to this instead of adjusting it }
+    WorklogPatch:
+      type: object
+      properties:
+        timeSpentSeconds: { type: integer, format: int64, minimum: 60 }
+        startedAt: { type: string, format: date-time }
+        comment: { type: string, maxLength: 10000 }
+        adjustEstimate: { $ref: '#/components/schemas/AdjustEstimate' }
+        remainingEstimateSeconds: { type: integer, format: int64, minimum: 0 }
+    Timesheet:
+      type: object
+      required: [from, to, timeZone, dates, dayTotals, total, people]
+      properties:
+        from: { type: string, format: date }
+        to: { type: string, format: date }
+        timeZone: { type: string }
+        dates: { type: array, items: { type: string, format: date }, description: Every day from..to }
+        dayTotals: { type: array, items: { type: integer, format: int64 }, description: Seconds logged each day }
+        total: { type: integer, format: int64 }
+        people:
+          type: array
+          description: People who logged time, most first
+          items: { $ref: '#/components/schemas/TimesheetPerson' }
+    TimesheetPerson:
+      type: object
+      required: [days, total, issues]
+      properties:
+        user: { $ref: '#/components/schemas/User', description: Missing when the author's account is gone }
+        days: { type: array, items: { type: integer, format: int64 }, description: Seconds per date }
+        total: { type: integer, format: int64 }
+        issues:
+          type: array
+          items: { $ref: '#/components/schemas/TimesheetIssue' }
+    TimesheetIssue:
+      type: object
+      required: [issue, days, total]
+      properties:
+        issue: { $ref: '#/components/schemas/IssueRef' }
+        days: { type: array, items: { type: integer, format: int64 } }
+        total: { type: integer, format: int64 }
     IssueLink:
       type: object
       required: [id, type, direction, label, issue]

@@ -148,6 +148,17 @@ func (s *Service) celIssue(ctx context.Context, q *dbq.Queries, p dbq.Project, i
 		resolution = *i.Resolution
 	}
 	due := dateStr(i.DueDate)
+	spent, err := s.TimeSpent(ctx, q, []uuid.UUID{i.ID})
+	if err != nil {
+		return nil, err
+	}
+	var original, remaining int64
+	if i.OriginalEstimateSeconds != nil {
+		original = *i.OriginalEstimateSeconds
+	}
+	if i.RemainingEstimateSeconds != nil {
+		remaining = *i.RemainingEstimateSeconds
+	}
 	return map[string]any{
 		"key": issueKey(p, i), "project": p.Key, "type": it.Key, "typeLevel": int64(it.Level),
 		"summary": i.Summary, "description": i.Description, "priority": i.Priority,
@@ -155,6 +166,7 @@ func (s *Service) celIssue(ctx context.Context, q *dbq.Queries, p dbq.Project, i
 		"assignee": email(i.AssigneeID), "reporter": email(i.ReporterID),
 		"labels": labels, "storyPoints": points, "resolution": resolution, "startDate": dateStr(i.StartDate), "dueDate": due, "fields": fields,
 		"subtasks": subtasks, "children": subtasks, "devLinks": devLinks, "links": links, "parent": parent,
+		"originalEstimate": original, "remainingEstimate": remaining, "timeSpent": spent[i.ID],
 	}, nil
 }
 

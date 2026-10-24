@@ -26,7 +26,8 @@ const jqlHelp = `JQL examples:
 Fields: project, key, type, status, statusCategory ("To Do", "In Progress", Done), assignee, reporter
 (email or currentUser()), priority (Highest..Lowest, comparable), labels, sprint (name, openSprints(),
 closedSprints(), futureSprints()), fixVersion, parent, summary/description/comment (~ contains), text ~
-(full text), created/updated/resolved/due/start (dates: "2026-11-01", -7d, startOfWeek()), storyPoints.
+(full text), created/updated/resolved/due/start (dates: "2026-11-01", -7d, startOfWeek()), storyPoints,
+originalEstimate/remainingEstimate/timeSpent (durations: 2h, "1d 4h"), worklogAuthor, worklogDate.
 Operators: = != in "not in" ~ !~ < <= > >= "is EMPTY" "is not EMPTY"; combine with AND, OR, NOT, ().`
 
 func (t *tools) register(s *mcp.Server) {
@@ -51,6 +52,7 @@ func (t *tools) register(s *mcp.Server) {
 	mcp.AddTool(s, &mcp.Tool{Name: "update_issue", Description: "Change an issue's fields; only the fields you pass change. Use `clear` to empty fields. Status changes use transition_issue instead.", Annotations: write("Update issue", true)}, t.updateIssue)
 	mcp.AddTool(s, &mcp.Tool{Name: "transition_issue", Description: "Move an issue through its workflow, by transition id, name or target status (get_issue lists the available ones). Some transitions ask for screen fields such as a resolution.", Annotations: write("Transition issue", false)}, t.transitionIssue)
 	mcp.AddTool(s, &mcp.Tool{Name: "add_comment", Description: "Comment on an issue (Markdown).", Annotations: write("Add comment", false)}, t.addComment)
+	mcp.AddTool(s, &mcp.Tool{Name: "log_work", Description: "Log time spent on an issue, e.g. 2h or 1d 4h (a day is the team's working day). The remaining estimate goes down by the time logged unless you set it or leave it.", Annotations: write("Log work", false)}, t.logWork)
 	mcp.AddTool(s, &mcp.Tool{Name: "link_issues", Description: "Link two issues: key <type> targetKey, e.g. PLAT-3 blocks PLAT-7.", Annotations: write("Link issues", true)}, t.linkIssues)
 }
 
@@ -263,6 +265,9 @@ func (t *tools) getIssue(ctx context.Context, _ *mcp.CallToolRequest, in issueIn
 			parts = append(parts, k+"="+string(v))
 		}
 		b.WriteString("Custom fields: " + strings.Join(parts, ", ") + "\n")
+	}
+	if tt := t.timeTrackingText(ctx, i.TimeTracking); tt != "" {
+		b.WriteString("Time tracking: " + tt + "\n")
 	}
 	if i.Parent != nil {
 		fmt.Fprintf(&b, "Parent: %s %s (%s)\n", i.Parent.Key, i.Parent.Summary, i.Parent.Type.Name)

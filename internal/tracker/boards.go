@@ -3,6 +3,7 @@ package tracker
 import (
 	"context"
 	"fmt"
+	"math"
 	"slices"
 	"strings"
 	"time"
@@ -35,7 +36,7 @@ type BoardInput struct {
 }
 
 // CardFields are what board cards can show besides the summary, type and key.
-var CardFields = []string{"epic", "labels", "priority", "dev", "points", "assignee", "dueDate", "daysInColumn"}
+var CardFields = []string{"epic", "labels", "priority", "dev", "points", "assignee", "dueDate", "daysInColumn", "timeTracking"}
 
 func (s *Service) deriveColumns(ctx context.Context, q *dbq.Queries, projectID uuid.UUID) ([]BoardColumnInput, error) {
 	sts, err := s.projectStatuses(ctx, q, projectID)
@@ -552,6 +553,9 @@ type BurndownPoint struct {
 	Date                                     time.Time
 	Remaining, Ideal, Scope, Completed       float64
 	RemainingIssues, ScopeIssues, DoneIssues int
+	// Hours, in seconds: remaining estimate of open issues, time logged in the sprint so far,
+	// their sum (scope) and the guideline.
+	RemainingSeconds, SpentSeconds, ScopeSeconds, IdealSeconds int64
 }
 
 type SprintReport struct {
@@ -563,6 +567,9 @@ type SprintReport struct {
 	AddedPoints, RemovedPoints float64
 	AddedIssues, RemovedIssues int
 	Burndown                   []BurndownPoint
+	// Hours, in seconds: remaining estimate at the start, time logged during the sprint, and
+	// the remaining estimate of issues added or taken out (when they were).
+	CommittedSeconds, SpentSeconds, AddedSeconds, RemovedSeconds int64
 }
 
 // SprintReport is the burndown and completion of a sprint the actor can see.
@@ -606,6 +613,10 @@ func (s *Service) sprintReport(ctx context.Context, sp dbq.Sprint) (SprintReport
 	if err != nil {
 		return rep, err
 	}
+	worklogs, err := s.Q.WorklogsOfIssues(ctx, ids)
+	if err != nil {
+		return rep, err
+	}
 	statuses, err := s.statusMap(ctx)
 	if err != nil {
 		return rep, err
@@ -631,6 +642,7 @@ func (s *Service) sprintReport(ctx context.Context, sp dbq.Sprint) (SprintReport
 		initial  bool
 		changes  []historyRow
 		timeline []statusChange
+		worklogs []dbq.WorklogsOfIssuesRow
 	}
 	members := make([]member, 0, len(issues))
 	for _, i := range issues {
@@ -648,6 +660,11 @@ func (s *Service) sprintReport(ctx context.Context, sp dbq.Sprint) (SprintReport
 			}
 			if i.CreatedAt.After(start) {
 				m.from = i.CreatedAt
+			}
+		}
+		for _, w := range worklogs {
+			if w.IssueID == i.ID {
+				m.worklogs = append(m.worklogs, w)
 			}
 		}
 		members = append(members, m)
@@ -674,6 +691,24 @@ func (s *Service) sprintReport(ctx context.Context, sp dbq.Sprint) (SprintReport
 	if sp.EndDate != nil {
 		totalDays = max(int(sp.EndDate.Sub(start).Hours()/24)+1, 1)
 	}
+	// Hours: the remaining estimate of the open committed issues when the sprint started, and
+	// the time logged on the sprint's issues while they were in it.
+	for _, m := range members {
+		if committed[m.issue.ID] && !doneAt(m, start) {
+			rep.CommittedSeconds += remainingAt(m.issue.RemainingEstimateSeconds, hist[m.issue.ID], start)
+		}
+	}
+	spentUntil := func(t time.Time) int64 {
+		var n int64
+		for _, m := range members {
+			for _, w := range m.worklogs {
+				if !w.StartedAt.Before(start) && w.StartedAt.Before(t) && inAt(m, w.StartedAt) {
+					n += w.DurationSeconds
+				}
+			}
+		}
+		return n
+	}
 	for d := 0; d < 120; d++ {
 		day := start.AddDate(0, 0, d)
 		if day.After(end) {
@@ -694,10 +729,15 @@ func (s *Service) sprintReport(ctx context.Context, sp dbq.Sprint) (SprintReport
 			if doneAt(m, at) {
 				pt.Completed += pts
 				pt.DoneIssues++
+			} else {
+				pt.RemainingSeconds += remainingAt(m.issue.RemainingEstimateSeconds, hist[m.issue.ID], at)
 			}
 		}
 		pt.Remaining, pt.RemainingIssues = pt.Scope-pt.Completed, pt.ScopeIssues-pt.DoneIssues
 		pt.Ideal = max(rep.CommittedPoints*(1-float64(d)/float64(max(totalDays-1, 1))), 0)
+		pt.SpentSeconds = spentUntil(at)
+		pt.ScopeSeconds = pt.SpentSeconds + pt.RemainingSeconds
+		pt.IdealSeconds = max(int64(math.Round(float64(rep.CommittedSeconds)*(1-float64(d)/float64(max(totalDays-1, 1))))), 0)
 		rep.Burndown = append(rep.Burndown, pt)
 	}
 
@@ -709,6 +749,7 @@ func (s *Service) sprintReport(ctx context.Context, sp dbq.Sprint) (SprintReport
 			completedSet[cid] = true
 		}
 	}
+	rep.SpentSeconds = spentUntil(end.Add(time.Nanosecond))
 	for _, m := range members {
 		id := m.issue.ID
 		pts := pointsAt(m.issue.StoryPoints, hist[id], end)
@@ -724,10 +765,24 @@ func (s *Service) sprintReport(ctx context.Context, sp dbq.Sprint) (SprintReport
 		if !committed[id] && everIn && !m.from.After(end) {
 			rep.AddedIssues++
 			rep.AddedPoints += pts
+			joined := m.from
+			if !m.initial {
+				if k := slices.IndexFunc(m.changes, func(h historyRow) bool { return deref(h.ToRef) == sprintRef }); k >= 0 {
+					joined = m.changes[k].CreatedAt
+				}
+			}
+			rep.AddedSeconds += remainingAt(m.issue.RemainingEstimateSeconds, hist[id], joined)
 		}
 		if everIn && !inEnd && !completedSet[id] {
 			rep.RemovedIssues++
 			rep.RemovedPoints += pts
+			left := end
+			for _, h := range m.changes {
+				if deref(h.FromRef) == sprintRef && !h.CreatedAt.After(end) {
+					left = h.CreatedAt
+				}
+			}
+			rep.RemovedSeconds += remainingAt(m.issue.RemainingEstimateSeconds, hist[id], left)
 		}
 	}
 	return rep, nil

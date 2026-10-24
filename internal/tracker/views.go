@@ -88,6 +88,7 @@ type lookups struct {
 	users    map[uuid.UUID]dbq.User
 	parents  map[uuid.UUID]dbq.Issue
 	dev      map[uuid.UUID]dbq.DevSummariesRow
+	spent    map[uuid.UUID]int64
 }
 
 func (s *Service) loadLookups(ctx context.Context, issues []dbq.Issue) (*lookups, error) {
@@ -149,6 +150,9 @@ func (s *Service) loadLookups(ctx context.Context, issues []dbq.Issue) (*lookups
 	for _, d := range dev {
 		l.dev[d.IssueID] = d
 	}
+	if l.spent, err = s.TimeSpent(ctx, s.Q, issueIDs); err != nil {
+		return nil, err
+	}
 	return l, nil
 }
 
@@ -167,6 +171,7 @@ func (l *lookups) issue(i dbq.Issue) api.Issue {
 		StoryPoints: i.StoryPoints, StartDate: dateView(i.StartDate), DueDate: dateView(i.DueDate),
 		Labels: i.Labels, Resolution: i.Resolution, ResolvedAt: i.ResolvedAt, Rank: i.Rank, Version: int(i.Version),
 		Fields: map[string]any{}, CreatedAt: i.CreatedAt, UpdatedAt: i.UpdatedAt, StatusChangedAt: &i.StatusChangedAt,
+		TimeTracking: &api.TimeTracking{OriginalSeconds: i.OriginalEstimateSeconds, RemainingSeconds: i.RemainingEstimateSeconds, SpentSeconds: l.spent[i.ID]},
 	}
 	if v.Labels == nil {
 		v.Labels = []string{}
@@ -282,7 +287,7 @@ func (s *Service) IssueDetail(ctx context.Context, actor *authz.Actor, i dbq.Iss
 		Priority: base.Priority, Assignee: base.Assignee, Reporter: base.Reporter, Parent: base.Parent, SprintId: base.SprintId,
 		StoryPoints: base.StoryPoints, StartDate: base.StartDate, DueDate: base.DueDate, Labels: base.Labels,
 		Resolution: base.Resolution, ResolvedAt: base.ResolvedAt, Rank: base.Rank, Version: base.Version, Fields: base.Fields,
-		Dev: base.Dev, StatusChangedAt: base.StatusChangedAt, CreatedAt: base.CreatedAt, UpdatedAt: base.UpdatedAt,
+		Dev: base.Dev, StatusChangedAt: base.StatusChangedAt, CreatedAt: base.CreatedAt, UpdatedAt: base.UpdatedAt, TimeTracking: base.TimeTracking,
 		Description: i.Description,
 		Project:     api.ProjectRef{Id: p.ID, Key: p.Key, Name: p.Name},
 		Children:    []api.Issue{}, Links: []api.IssueLink{}, Development: []api.DevLink{}, Attachments: []api.Attachment{}, Releases: []api.Release{},

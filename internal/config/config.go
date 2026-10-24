@@ -119,6 +119,14 @@ type Config struct {
 
 	// Email. Without a host, messages are kept in memory (and logged) instead of sent.
 	SMTP SMTP
+
+	// TimeTracking sets the working day and week that durations such as "1w 2d" use.
+	TimeTracking TimeTracking
+}
+
+type TimeTracking struct {
+	HoursPerDay float64
+	DaysPerWeek float64
 }
 
 type SMTP struct {
@@ -163,6 +171,19 @@ func (e *env) integer(key string, def int) int {
 		return def
 	}
 	return n
+}
+
+func (e *env) float(key string, def float64) float64 {
+	v := strings.TrimSpace(e.get(key))
+	if v == "" {
+		return def
+	}
+	f, err := strconv.ParseFloat(v, 64)
+	if err != nil {
+		e.errs = append(e.errs, fmt.Errorf("%s: expected a number, got %q", key, v))
+		return def
+	}
+	return f
 }
 
 func (e *env) duration(key string, def time.Duration) time.Duration {
@@ -244,6 +265,13 @@ func LoadFrom(get func(string) string) (*Config, error) {
 		},
 	}
 	c.HooksPublicURL = strings.TrimRight(e.str("WFM_HOOKS_PUBLIC_URL", c.PublicURL), "/")
+	c.TimeTracking = TimeTracking{HoursPerDay: e.float("WFM_TIME_HOURS_PER_DAY", 8), DaysPerWeek: e.float("WFM_TIME_DAYS_PER_WEEK", 5)}
+	if h := c.TimeTracking.HoursPerDay; !(h > 0 && h <= 24) {
+		e.errs = append(e.errs, fmt.Errorf("WFM_TIME_HOURS_PER_DAY: must be more than 0 and at most 24, got %v", h))
+	}
+	if d := c.TimeTracking.DaysPerWeek; !(d > 0 && d <= 7) {
+		e.errs = append(e.errs, fmt.Errorf("WFM_TIME_DAYS_PER_WEEK: must be more than 0 and at most 7, got %v", d))
+	}
 	c.OIDCProviders = loadOIDC(e)
 
 	switch c.SMTP.TLS {

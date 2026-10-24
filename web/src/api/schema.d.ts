@@ -1432,6 +1432,79 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/issues/{issueKey}/worklogs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listWorklogs"];
+        put?: never;
+        /**
+         * @description Log work on an issue (needs permission to edit it). The remaining estimate goes down by the
+         *     time logged (never below zero) unless the request sets it (`remainingEstimateSeconds`) or
+         *     asks to leave it (`adjustEstimate: leave`).
+         */
+        post: operations["addWorklog"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/worklogs/{worklogId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description Delete your own worklog (project admins can delete anyone's). By default the remaining estimate grows back by its time. */
+        delete: operations["deleteWorklog"];
+        options?: never;
+        head?: never;
+        /** @description Change your own worklog (project admins can change anyone's). With `adjustEstimate` auto, the remaining estimate absorbs the difference. */
+        patch: operations["updateWorklog"];
+        trace?: never;
+    };
+    "/worklogs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Timesheet, the time logged per person per day (and per issue) on issues you can browse */
+        get: operations["getTimesheet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/time-tracking/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The working day and week behind durations such as 1w 2d (WFM_TIME_HOURS_PER_DAY, WFM_TIME_DAYS_PER_WEEK) */
+        get: operations["getTimeTrackingSettings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/issues/{issueKey}/links": {
         parameters: {
             query?: never;
@@ -2141,8 +2214,11 @@ export interface components {
             by?: components["schemas"]["BreakdownBy"];
             /** @enum {string} */
             flowBy?: "category" | "status";
-            /** @enum {string} */
-            measure?: "issues" | "points";
+            /**
+             * @description hours (remaining estimate and time logged) applies to sprint gadgets
+             * @enum {string}
+             */
+            measure?: "issues" | "points" | "hours";
             /** @enum {string} */
             chart?: "bar" | "donut";
             stat?: components["schemas"]["MetricStat"];
@@ -2380,7 +2456,7 @@ export interface components {
         /** @enum {string} */
         BoardType: "scrum" | "kanban";
         /** @enum {string} */
-        CardField: "epic" | "labels" | "priority" | "dev" | "points" | "assignee" | "dueDate" | "daysInColumn";
+        CardField: "epic" | "labels" | "priority" | "dev" | "points" | "assignee" | "dueDate" | "daysInColumn" | "timeTracking";
         /** @enum {string} */
         Swimlanes: "none" | "assignee" | "epic" | "priority" | "type";
         BoardColumn: {
@@ -2475,6 +2551,26 @@ export interface components {
             removedPoints: number;
             addedIssues: number;
             removedIssues: number;
+            /**
+             * Format: int64
+             * @description Remaining estimate of the open issues in the sprint when it started
+             */
+            committedSeconds: number;
+            /**
+             * Format: int64
+             * @description Time logged on the sprint's issues during the sprint
+             */
+            completedSeconds: number;
+            /**
+             * Format: int64
+             * @description Remaining estimate of issues added after the start, when they were added
+             */
+            addedSeconds: number;
+            /**
+             * Format: int64
+             * @description Remaining estimate of issues taken out after the start, when they left
+             */
+            removedSeconds: number;
             burndown: components["schemas"]["BurndownPoint"][];
         };
         /** @description The sprint at the end of each day (today so far for an active sprint). */
@@ -2498,6 +2594,26 @@ export interface components {
             remainingIssues: number;
             scopeIssues: number;
             completedIssues: number;
+            /**
+             * Format: int64
+             * @description Remaining estimate of the issues in the sprint that are not done
+             */
+            remainingSeconds: number;
+            /**
+             * Format: int64
+             * @description Committed hours falling linearly to zero at the end date
+             */
+            idealSeconds: number;
+            /**
+             * Format: int64
+             * @description Time logged in the sprint so far plus the remaining estimate
+             */
+            scopeSeconds: number;
+            /**
+             * Format: int64
+             * @description Time logged on the sprint's issues since it started
+             */
+            completedSeconds: number;
         };
         Release: {
             /** Format: uuid */
@@ -2586,6 +2702,8 @@ export interface components {
              * @description When the issue entered its current status
              */
             statusChangedAt?: string;
+            /** @description Always present */
+            timeTracking?: components["schemas"]["TimeTracking"];
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -2650,6 +2768,16 @@ export interface components {
             fields?: {
                 [key: string]: unknown;
             };
+            /**
+             * Format: int64
+             * @description Seconds; the remaining estimate starts equal to it unless given
+             */
+            originalEstimate?: number;
+            /**
+             * Format: int64
+             * @description Seconds
+             */
+            remainingEstimate?: number;
         };
         IssuePatch: {
             /** @description Expected current version (optimistic locking) */
@@ -2677,6 +2805,16 @@ export interface components {
             fields?: {
                 [key: string]: unknown;
             };
+            /**
+             * Format: int64
+             * @description Seconds; setting it on an issue without a remaining estimate sets that too
+             */
+            originalEstimate?: number | null;
+            /**
+             * Format: int64
+             * @description Seconds
+             */
+            remainingEstimate?: number | null;
         };
         AvailableTransition: {
             id: string;
@@ -2739,6 +2877,117 @@ export interface components {
             to?: string;
             /** Format: date-time */
             createdAt: string;
+        };
+        /** @description Estimates and time logged, in seconds. A missing estimate was never set. */
+        TimeTracking: {
+            /**
+             * Format: int64
+             * @description Original estimate
+             */
+            originalSeconds?: number;
+            /**
+             * Format: int64
+             * @description Remaining estimate
+             */
+            remainingSeconds?: number;
+            /**
+             * Format: int64
+             * @description Time spent: the sum of the issue's worklogs
+             */
+            spentSeconds: number;
+        };
+        TimeTrackingSettings: {
+            /**
+             * Format: double
+             * @description Hours in a working day (1d)
+             */
+            hoursPerDay: number;
+            /**
+             * Format: double
+             * @description Working days in a week (1w)
+             */
+            daysPerWeek: number;
+        };
+        /**
+         * @description auto (the default) moves the remaining estimate by the time logged, never below zero; leave keeps it
+         * @enum {string}
+         */
+        AdjustEstimate: "auto" | "leave";
+        Worklog: {
+            /** Format: uuid */
+            id: string;
+            issueKey: string;
+            author?: components["schemas"]["User"];
+            /**
+             * Format: date-time
+             * @description When the work was done
+             */
+            startedAt: string;
+            /** Format: int64 */
+            timeSpentSeconds: number;
+            comment: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description The caller may change or delete it */
+            canEdit: boolean;
+        };
+        WorklogInput: {
+            /** Format: int64 */
+            timeSpentSeconds: number;
+            /**
+             * Format: date-time
+             * @description Defaults to now
+             */
+            startedAt?: string;
+            comment?: string;
+            adjustEstimate?: components["schemas"]["AdjustEstimate"];
+            /**
+             * Format: int64
+             * @description Set the remaining estimate to this instead of adjusting it
+             */
+            remainingEstimateSeconds?: number;
+        };
+        WorklogPatch: {
+            /** Format: int64 */
+            timeSpentSeconds?: number;
+            /** Format: date-time */
+            startedAt?: string;
+            comment?: string;
+            adjustEstimate?: components["schemas"]["AdjustEstimate"];
+            /** Format: int64 */
+            remainingEstimateSeconds?: number;
+        };
+        Timesheet: {
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            timeZone: string;
+            /** @description Every day from..to */
+            dates: string[];
+            /** @description Seconds logged each day */
+            dayTotals: number[];
+            /** Format: int64 */
+            total: number;
+            /** @description People who logged time, most first */
+            people: components["schemas"]["TimesheetPerson"][];
+        };
+        TimesheetPerson: {
+            /** @description Missing when the author's account is gone */
+            user?: components["schemas"]["User"];
+            /** @description Seconds per date */
+            days: number[];
+            /** Format: int64 */
+            total: number;
+            issues: components["schemas"]["TimesheetIssue"][];
+        };
+        TimesheetIssue: {
+            issue: components["schemas"]["IssueRef"];
+            days: number[];
+            /** Format: int64 */
+            total: number;
         };
         IssueLink: {
             /** Format: uuid */
@@ -6325,6 +6574,163 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["IssueMetrics"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listWorklogs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Issue key such as PLAT-12 (or id) */
+                issueKey: components["parameters"]["IssueKey"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Work logged on the issue, in the order it was done */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Worklog"][];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    addWorklog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Issue key such as PLAT-12 (or id) */
+                issueKey: components["parameters"]["IssueKey"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorklogInput"];
+            };
+        };
+        responses: {
+            /** @description Logged */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Worklog"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    deleteWorklog: {
+        parameters: {
+            query?: {
+                adjustEstimate?: components["schemas"]["AdjustEstimate"];
+                /** @description Set the remaining estimate to this */
+                remainingEstimateSeconds?: number;
+            };
+            header?: never;
+            path: {
+                worklogId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    updateWorklog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                worklogId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorklogPatch"];
+            };
+        };
+        responses: {
+            /** @description Updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Worklog"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getTimesheet: {
+        parameters: {
+            query: {
+                /** @description First day */
+                from: string;
+                /** @description Last day (inclusive); at most 366 days after from */
+                to: string;
+                /** @description Comma-separated project keys; omit for every project you can browse */
+                projects?: components["parameters"]["MetricProjects"];
+                /** @description Only this person's work */
+                user?: string;
+                /** @description IANA time zone that days are counted in (default UTC) */
+                tz?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Totals per person and day */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Timesheet"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getTimeTrackingSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Settings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TimeTrackingSettings"];
                 };
             };
             default: components["responses"]["Problem"];

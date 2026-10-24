@@ -287,11 +287,13 @@ func (s *Server) GetSprintReport(ctx context.Context, req api.GetSprintReportReq
 		Sprint: tracker.SprintView(rep.Sprint), CommittedPoints: rep.CommittedPoints, CompletedPoints: rep.CompletedPoints,
 		CommittedIssues: rep.CommittedIssues, CompletedIssues: rep.CompletedIssues, AddedPoints: rep.AddedPoints, RemovedPoints: rep.RemovedPoints,
 		AddedIssues: rep.AddedIssues, RemovedIssues: rep.RemovedIssues, Burndown: []api.BurndownPoint{},
+		CommittedSeconds: rep.CommittedSeconds, CompletedSeconds: rep.SpentSeconds, AddedSeconds: rep.AddedSeconds, RemovedSeconds: rep.RemovedSeconds,
 	}
 	for _, b := range rep.Burndown {
 		out.Burndown = append(out.Burndown, api.BurndownPoint{
 			Date: openapiDate(b.Date), RemainingPoints: b.Remaining, IdealPoints: b.Ideal, ScopePoints: b.Scope, CompletedPoints: b.Completed,
 			RemainingIssues: b.RemainingIssues, ScopeIssues: b.ScopeIssues, CompletedIssues: b.DoneIssues,
+			RemainingSeconds: b.RemainingSeconds, IdealSeconds: b.IdealSeconds, ScopeSeconds: b.ScopeSeconds, CompletedSeconds: b.SpentSeconds,
 		})
 	}
 	return out, nil
