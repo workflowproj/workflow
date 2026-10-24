@@ -287,6 +287,13 @@ func (s *Site) Server() *httptest.Server {
 	return srv
 }
 
+// Handler serves the site at baseURL (for a long-running fake, see cmd fakejira).
+func (s *Site) Handler(baseURL string) http.Handler {
+	s.baseURL = baseURL
+	s.FixContentURLs(baseURL)
+	return http.HandlerFunc(s.serve)
+}
+
 // FailSearches lets the next `after` searches succeed, then fails `times` searches with 500.
 func (s *Site) FailSearches(after, times int) {
 	s.mu.Lock()

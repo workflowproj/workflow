@@ -41,7 +41,7 @@ func (r *run) scanMetadata(ctx context.Context) error {
 	issues := r.prog.phase("issues")
 	issues.Total = 0
 	for _, p := range r.cfg.Projects {
-		sp := ScanProject{JiraID: p.JiraID, Key: p.JiraKey, Name: p.JiraName, Statuses: []StatusCount{}, Types: []TypeCount{}}
+		sp := ScanProject{JiraID: p.JiraID, Key: p.JiraKey, Name: p.JiraName, Statuses: []StatusCount{}, Types: []TypeCount{}, Pairs: []PairCount{}}
 		proj, err := r.client.Project(ctx, p.JiraKey)
 		if err != nil {
 			return err
@@ -148,6 +148,11 @@ func (r *run) scanIssues(ctx context.Context) (bool, error) {
 			sp.Statuses[k].Count++
 		} else {
 			sp.Statuses = append(sp.Statuses, StatusCount{ID: f.Status.ID, Name: f.Status.Name, Category: f.Status.Category(), Count: 1})
+		}
+		if k := slices.IndexFunc(sp.Pairs, func(p PairCount) bool { return p.Type == f.IssueType.ID && p.Status == f.Status.ID }); k >= 0 {
+			sp.Pairs[k].Count++
+		} else {
+			sp.Pairs = append(sp.Pairs, PairCount{Type: f.IssueType.ID, Status: f.Status.ID, Count: 1})
 		}
 		if k := slices.IndexFunc(sp.Types, func(t TypeCount) bool { return t.ID == f.IssueType.ID }); k >= 0 {
 			sp.Types[k].Count++

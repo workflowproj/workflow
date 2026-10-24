@@ -104,24 +104,26 @@ func (s *Service) dryRun(ctx context.Context, imp dbq.JiraImport) (DryRun, error
 		if dp.Key != p.JiraKey {
 			prog.add("info", "key", p.JiraKey, fmt.Sprintf("Issues keep their numbers but move to the key %s (%s-12 becomes %s-12); the old key keeps resolving.", dp.Key, p.JiraKey, dp.Key), "")
 		}
-		// Statuses: mapped to a status the target has, and in each type's workflow.
+		// Statuses: mapped to a status the target has, and in the workflow of each type using it.
 		for _, st := range sp.Statuses {
-			target := p.Statuses[st.ID]
-			if target == "" || !hasStatus(t, target) {
+			if target := p.Statuses[st.ID]; target == "" || !hasStatus(t, target) {
 				prog.add("warning", "status", p.JiraKey, fmt.Sprintf("Status %q is not mapped; its issues use the first %s status.", st.Name, categoryLabel(st.Category)), "")
+			}
+		}
+		for _, pair := range sp.Pairs {
+			target := p.Statuses[pair.Status]
+			tt := targetType(t, p.Types[pair.Type])
+			if target == "" || tt == nil || slices.ContainsFunc(tt.Statuses, func(n string) bool { return strings.EqualFold(n, target) }) {
 				continue
 			}
-			if st.Count == 0 {
-				continue
-			}
-			for _, ty := range sp.Types {
-				tt := targetType(t, p.Types[ty.ID])
-				if ty.Count == 0 || tt == nil || slices.ContainsFunc(tt.Statuses, func(n string) bool { return strings.EqualFold(n, target) }) {
-					continue
+			jiraStatus := pair.Status
+			for _, st := range sp.Statuses {
+				if st.ID == pair.Status {
+					jiraStatus = st.Name
 				}
-				fallback := fallbackStatus(t, *tt, target)
-				prog.add("info", "status", p.JiraKey, fmt.Sprintf("The %s workflow has no %q: %s issues in Jira's %q become %q.", tt.Name, target, tt.Name, st.Name, fallback), "")
 			}
+			prog.add("info", "status", p.JiraKey, fmt.Sprintf("The %s workflow has no %q: %d %s issue(s) in Jira's %q become %q.",
+				tt.Name, target, pair.Count, tt.Name, jiraStatus, fallbackStatus(t, *tt, target)), "")
 		}
 		levels := map[int]bool{}
 		for _, tt := range t.Types {

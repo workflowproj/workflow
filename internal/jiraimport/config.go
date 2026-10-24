@@ -134,6 +134,14 @@ type ScanProject struct {
 	Versions        int           `json:"versions"`
 	Statuses        []StatusCount `json:"statuses"`
 	Types           []TypeCount   `json:"types"`
+	// Issues per (issue type, status), to tell which workflows lack a mapped status.
+	Pairs []PairCount `json:"pairs"`
+}
+
+type PairCount struct {
+	Type   string `json:"type"`
+	Status string `json:"status"`
+	Count  int    `json:"count"`
 }
 
 type ValueCount struct {

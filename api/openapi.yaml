@@ -3924,7 +3924,7 @@ components:
         oversizeCount: { type: integer }
     JiraScanProject:
       type: object
-      required: [jiraId, key, name, boardType, issues, maxNumber, comments, attachments, attachmentBytes, sprints, versions, statuses, types]
+      required: [jiraId, key, name, boardType, issues, maxNumber, comments, attachments, attachmentBytes, sprints, versions, statuses, types, pairs]
       properties:
         jiraId: { type: string }
         key: { type: string }
@@ -3956,6 +3956,16 @@ components:
               id: { type: string }
               name: { type: string }
               level: { type: integer }
+              count: { type: integer }
+        pairs:
+          type: array
+          description: Issues per Jira issue type and status
+          items:
+            type: object
+            required: [type, status, count]
+            properties:
+              type: { type: string }
+              status: { type: string }
               count: { type: integer }
     JiraScanPerson:
       type: object

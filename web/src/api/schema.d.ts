@@ -3322,6 +3322,12 @@ export interface components {
                 level: number;
                 count: number;
             }[];
+            /** @description Issues per Jira issue type and status */
+            pairs: {
+                type: string;
+                status: string;
+                count: number;
+            }[];
         };
         JiraScanPerson: {
             id: string;

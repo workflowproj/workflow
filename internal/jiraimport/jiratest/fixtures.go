@@ -1,10 +1,14 @@
 package jiratest
 
 import (
+	"encoding/base64"
 	"fmt"
 	"strconv"
 	"time"
 )
+
+// DesignPNG is the content of PLAT-2's design.png (a 48×32 blue PNG).
+var DesignPNG, _ = base64.StdEncoding.DecodeString("iVBORw0KGgoAAAANSUhEUgAAADAAAAAgCAIAAADbtmxLAAAAN0lEQVR4nO3OQQ0AMAgEMMygDPkzMRccjyYV0Op5p1R8ICQkJJQeCAkJCaUHQkJCQumBkJDQsg8sI7J53MuNmgAAAABJRU5ErkJggg==")
 
 // ADF helpers.
 
@@ -163,7 +167,7 @@ func NewCloud(base time.Time) *Site {
 	issue(plat, 1, "10001", "10001", "Authentication", at(-5, 0), map[string]any{FieldRank: "0|i00010:"})
 
 	// PLAT-2: a story done in the closed sprint; points raised after the sprint started.
-	s.Content["40001"] = []byte("\x89PNG fake image bytes")
+	s.Content["40001"] = DesignPNG
 	p2 := issue(plat, 2, "10002", "10003", "Login page", at(-2, 0), map[string]any{
 		"description": Doc(Para(Text("Build the "), Text("login", "strong"), Text(" page. See the mock-up:")), Media("design.png")),
 		"parent":      ref("30000", "PLAT-1"), "assignee": s.UserJSON("acc-ada"), "reporter": s.UserJSON("acc-bob"),

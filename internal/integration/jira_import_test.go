@@ -234,7 +234,7 @@ func TestJiraImportCloud(t *testing.T) {
 	}
 	body, _ := io.ReadAll(res.Body)
 	res.Body.Close()
-	eq(t, string(body), "\x89PNG fake image bytes", "attachment content")
+	eq(t, string(body), string(jiratest.DesignPNG), "attachment content")
 	links := i2["links"].([]any)
 	eq(t, len(links), 1, "PLAT-2 links")
 	eq(t, str(links[0].(obj), "type")+" "+str(links[0].(obj), "direction")+" "+str(links[0].(obj), "issue", "key"), "blocks outward PLAT-3", "blocks link")
