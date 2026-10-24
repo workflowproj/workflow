@@ -20,6 +20,22 @@ are comma-separated. Invalid configuration stops the process at startup with eve
 | `WFM_SESSION_TTL` | `168h` | browser session lifetime |
 | `WFM_DEV_LOGIN` | `false` | passwordless sign-in for development; refused when `WFM_ENV=production` |
 
+## Request limits
+
+Requests to the API, sign-in, MCP, SCIM and webhooks are limited per process (with several
+replicas, multiply by the replica count). Over a limit the server answers 429 with `Retry-After`
+and counts it in `wfm_rate_limited_total`. Limits are on by default when `WFM_ENV=production` and
+off otherwise; each value is requests per minute, with bursts of half that, and `0` turns a
+limit off.
+
+| Variable | Default (production) | |
+|---|---|---|
+| `WFM_RATE_LIMIT_PER_MINUTE` | `600` | per access token or browser session |
+| `WFM_RATE_LIMIT_ANONYMOUS_PER_MINUTE` | `120` | per client address, requests without credentials (sign-in pages, metadata) |
+| `WFM_RATE_LIMIT_ADDRESS_PER_MINUTE` | `3000` | per client address, all requests (offices behind one address share it) |
+| `WFM_RATE_LIMIT_HOOKS_PER_MINUTE` | `1200` | per webhook endpoint (`/hooks/...`) |
+| `WFM_TRUSTED_PROXIES` | private and loopback ranges | CIDRs of proxies allowed to set `X-Forwarded-For` (the ingress controller, a load balancer). Requests from anywhere else are their own client, whatever the header says |
+
 ## Sign-in and provisioning
 
 See [identity.md](identity.md).

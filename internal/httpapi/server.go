@@ -55,6 +55,8 @@ type Server struct {
 	Hub        *events.Hub
 	Box        *secure.Box
 	Mailer     mail.Sender
+
+	limitState limitState
 }
 
 var _ api.StrictServerInterface = (*Server)(nil)
@@ -209,7 +211,7 @@ func (s *Server) WebHandler(ui http.Handler) http.Handler {
 	if ui != nil {
 		mux.Handle("/", ui)
 	}
-	return s.common(s.authenticate(mux))
+	return s.common(s.clientAddress(s.authenticate(mux)))
 }
 
 // HooksHandler serves the internet-facing endpoints: Git webhooks and SCIM.
@@ -224,7 +226,7 @@ func (s *Server) HooksHandler(scimHandler interface {
 	}
 	mux.HandleFunc("GET /healthz", s.health)
 	mux.HandleFunc("GET /readyz", s.ready)
-	return s.common(mux)
+	return s.common(s.clientAddress(mux))
 }
 
 // openAPI publishes the API description (YAML, or JSON for tools that want it).

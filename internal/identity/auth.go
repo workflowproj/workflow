@@ -23,6 +23,7 @@ import (
 	"github.com/geoffo-dev/workflow-management/internal/authz"
 	"github.com/geoffo-dev/workflow-management/internal/config"
 	"github.com/geoffo-dev/workflow-management/internal/db/dbq"
+	"github.com/geoffo-dev/workflow-management/internal/ratelimit"
 	"github.com/geoffo-dev/workflow-management/internal/secure"
 	"github.com/geoffo-dev/workflow-management/internal/tracker"
 )
@@ -265,9 +266,11 @@ func (a *Auth) EndSession(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{Name: SessionCookie, Path: "/", MaxAge: -1, HttpOnly: true, Secure: a.secureCookies(), SameSite: http.SameSiteLaxMode})
 }
 
+// clientIP is the client address the HTTP layer resolved (X-Forwarded-For counts only from
+// trusted proxies), else the connection's peer address.
 func clientIP(r *http.Request) string {
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		return strings.TrimSpace(strings.Split(xff, ",")[0])
+	if ip := ratelimit.ClientIPFrom(r.Context()); ip != "" {
+		return ip
 	}
 	host := r.RemoteAddr
 	if i := strings.LastIndexByte(host, ':'); i > 0 {

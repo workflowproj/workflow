@@ -5,11 +5,14 @@ import (
 	"errors"
 	"fmt"
 	netmail "net/mail"
+	"net/netip"
 	"os"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/geoffo-dev/workflow-management/internal/ratelimit"
 )
 
 type Mode string
@@ -119,6 +122,18 @@ type Config struct {
 
 	// Email. Without a host, messages are kept in memory (and logged) instead of sent.
 	SMTP SMTP
+
+	RateLimit RateLimit
+	// TrustedProxies may set X-Forwarded-For (client addresses for limits, sessions and audit).
+	TrustedProxies []netip.Prefix
+}
+
+// RateLimit is requests per minute (0 = no limit), each with a burst of half that.
+type RateLimit struct {
+	PerCredential int // per access token or browser session
+	Anonymous     int // per client address, requests without credentials
+	PerAddress    int // per client address, everything
+	Hooks         int // per webhook endpoint (/hooks/...)
 }
 
 type SMTP struct {
@@ -244,6 +259,28 @@ func LoadFrom(get func(string) string) (*Config, error) {
 		},
 	}
 	c.HooksPublicURL = strings.TrimRight(e.str("WFM_HOOKS_PUBLIC_URL", c.PublicURL), "/")
+	// Limits are on by default in production only, so development and tests are not throttled.
+	on := func(n int) int {
+		if c.Production {
+			return n
+		}
+		return 0
+	}
+	c.RateLimit = RateLimit{
+		PerCredential: e.integer("WFM_RATE_LIMIT_PER_MINUTE", on(600)),
+		Anonymous:     e.integer("WFM_RATE_LIMIT_ANONYMOUS_PER_MINUTE", on(120)),
+		PerAddress:    e.integer("WFM_RATE_LIMIT_ADDRESS_PER_MINUTE", on(3000)),
+		Hooks:         e.integer("WFM_RATE_LIMIT_HOOKS_PER_MINUTE", on(1200)),
+	}
+	proxies := e.list("WFM_TRUSTED_PROXIES")
+	if len(proxies) == 0 {
+		proxies = ratelimit.DefaultTrustedProxies
+	}
+	if p, err := ratelimit.ParsePrefixes(proxies); err != nil {
+		e.errs = append(e.errs, fmt.Errorf("WFM_TRUSTED_PROXIES: %v", err))
+	} else {
+		c.TrustedProxies = p
+	}
 	c.OIDCProviders = loadOIDC(e)
 
 	switch c.SMTP.TLS {
