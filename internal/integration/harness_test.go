@@ -33,7 +33,7 @@ import (
 )
 
 var (
-	baseURL    string // admin connection URL
+	baseURL string // admin connection URL
 	// One template per test process, so parallel runs (other checkouts, other branches with
 	// other migrations) never drop each other's template.
 	templateDB = fmt.Sprintf("wfm_it_template_%d", os.Getpid())
