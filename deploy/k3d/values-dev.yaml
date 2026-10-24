@@ -16,6 +16,8 @@ config:
   WFM_WORKER_CONCURRENCY: "4"
   # Local test receivers for outbound webhooks live on private addresses.
   WFM_WEBHOOK_ALLOW_PRIVATE: "true"
+  # Immediate notification emails after 10 seconds rather than 2 minutes (faster e2e runs).
+  WFM_EMAIL_BATCH_WINDOW: "10s"
 
 secrets:
   create: true

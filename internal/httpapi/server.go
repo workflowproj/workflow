@@ -270,7 +270,7 @@ func (s *Server) devMailbox(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(box.Messages(r.URL.Query().Get("to")))
+	_ = json.NewEncoder(w).Encode(s.devMessages(r.Context(), box, r.URL.Query().Get("to")))
 }
 
 func (s *Server) health(w http.ResponseWriter, _ *http.Request) {
