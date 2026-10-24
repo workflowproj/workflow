@@ -75,7 +75,8 @@ INSERT INTO issue_history (issue_id, actor_id, actor_type, field, from_value, to
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, sqlc.narg(via));
 
 -- name: ListHistory :many
-SELECT * FROM issue_history WHERE issue_id = $1 ORDER BY id;
+-- By time, then insertion order (imported history carries the original timestamps).
+SELECT * FROM issue_history WHERE issue_id = $1 ORDER BY created_at, id;
 
 -- ---------------------------------------------------------------------------
 -- Links

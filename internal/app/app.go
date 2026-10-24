@@ -34,6 +34,7 @@ import (
 	"github.com/geoffo-dev/workflow-management/internal/identity/directory"
 	"github.com/geoffo-dev/workflow-management/internal/identity/local"
 	"github.com/geoffo-dev/workflow-management/internal/identity/scim"
+	"github.com/geoffo-dev/workflow-management/internal/jiraimport"
 	"github.com/geoffo-dev/workflow-management/internal/jobs"
 	"github.com/geoffo-dev/workflow-management/internal/mail"
 	"github.com/geoffo-dev/workflow-management/internal/notify"
@@ -70,6 +71,8 @@ type App struct {
 	Scim   *scim.Handler
 	// OAuth signs AI assistants in to /mcp.
 	OAuth *oauth.Server
+	// JiraImport imports projects from Jira Cloud or Data Center.
+	JiraImport *jiraimport.Service
 }
 
 // Options let tests substitute collaborators.
@@ -165,6 +168,7 @@ func New(ctx context.Context, cfg *config.Config, log *slog.Logger, pool *pgxpoo
 	}
 	a.Hub = events.NewHub(pool, log.With("module", "events"))
 	a.Scim = &scim.Handler{Pool: pool, Q: dbq.New(pool), Prov: a.Prov, BaseURL: cfg.HooksPublicURL + "/scim/v2", Log: log.With("module", "scim")}
+	a.JiraImport = jiraimport.New(pool, box, cfg, a.Tracker, enq, log.With("module", "jira-import"))
 
 	if runWorkers {
 		rcfg.Workers = a.workers()
@@ -182,7 +186,7 @@ func New(ctx context.Context, cfg *config.Config, log *slog.Logger, pool *pgxpoo
 	a.Server = &httpapi.Server{
 		Cfg: cfg, Log: log.With("module", "http"), Pool: pool, Q: dbq.New(pool), Tracker: a.Tracker, Auth: a.Auth, Prov: a.Prov,
 		SCM: a.SCM, Automation: a.Automation, Jobs: enq, Hub: a.Hub, Box: box, Mailer: a.Mailer, OAuth: a.OAuth,
-		Notify: a.Notify, Local: a.Local,
+		Notify: a.Notify, Local: a.Local, JiraImport: a.JiraImport,
 	}
 	return a, nil
 }

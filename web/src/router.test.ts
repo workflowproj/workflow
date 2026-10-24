@@ -27,6 +27,8 @@ describe("router", () => {
       "/app/admin/users",
       "/app/admin/connected-apps",
       "/app/admin/email",
+      "/app/admin/import",
+      "/app/admin/import/$importId",
       "/oauth/consent",
       "/oauth/consent/$request",
     ]) {

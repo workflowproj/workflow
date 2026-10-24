@@ -1,5 +1,5 @@
 import { Link, Outlet } from "@tanstack/react-router";
-import { FolderGit2, KeyRound, Mail, Plug, ScrollText, ShieldCheck, TextCursorInput, UserRound, UsersRound, Webhook } from "lucide-react";
+import { FolderGit2, Import, KeyRound, Mail, Plug, ScrollText, ShieldCheck, TextCursorInput, UserRound, UsersRound, Webhook } from "lucide-react";
 import { useMe } from "@/api/queries";
 import { EmptyState } from "@/components/ui";
 
@@ -14,6 +14,7 @@ const sections = [
   { label: "Email", to: "/admin/email" as const, icon: Mail },
   { label: "Connected apps", to: "/admin/connected-apps" as const, icon: Plug },
   { label: "Audit log", to: "/admin/audit" as const, icon: ScrollText },
+  { label: "Import from Jira", to: "/admin/import" as const, icon: Import },
 ];
 
 export function AdminLayout() {

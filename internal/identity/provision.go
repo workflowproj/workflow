@@ -129,6 +129,10 @@ func (p *Provisioner) SignIn(ctx context.Context, c Claims, allowedDomains []str
 			}
 		}
 		if found {
+			var err error
+			if user, err = p.claimPlaceholder(ctx, q, user, "jit", true); err != nil {
+				return err
+			}
 			if !user.Active || user.DeletedAt != nil {
 				return &LoginError{"deactivated"}
 			}
@@ -204,6 +208,9 @@ func (p *Provisioner) DevSignIn(ctx context.Context, email, name string) (dbq.Us
 	email = strings.ToLower(strings.TrimSpace(email))
 	u, err := p.Q.GetUserByEmail(ctx, email)
 	if err == nil {
+		if u, err = p.claimPlaceholder(ctx, p.Q, u, "dev", false); err != nil {
+			return u, err
+		}
 		if !u.Active || u.DeletedAt != nil {
 			return u, apperr.Forbidden("this account is deactivated")
 		}

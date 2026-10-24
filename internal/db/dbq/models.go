@@ -307,6 +307,43 @@ type IssueType struct {
 	CreatedAt   time.Time
 }
 
+type JiraImport struct {
+	ID              uuid.UUID
+	Flavor          string
+	BaseUrl         string
+	Site            string
+	Email           string
+	TokenEnc        *string
+	ServerTitle     string
+	Status          string
+	Config          json.RawMessage
+	Scan            []byte
+	Progress        []byte
+	Cursor          json.RawMessage
+	RunID           *uuid.UUID
+	Mode            *string
+	CancelRequested bool
+	Error           *string
+	CreatedBy       *uuid.UUID
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	StartedAt       *time.Time
+	FinishedAt      *time.Time
+	HeartbeatAt     *time.Time
+}
+
+type JiraImportMap struct {
+	Site      string
+	Kind      string
+	JiraID    string
+	LocalID   uuid.UUID
+	ProjectID *uuid.UUID
+	ImportID  *uuid.UUID
+	Data      json.RawMessage
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
 type LocalCredential struct {
 	UserID            uuid.UUID
 	PasswordHash      *string
@@ -585,6 +622,13 @@ type UserIdentity struct {
 	Email      *string
 	CreatedAt  time.Time
 	LastUsedAt *time.Time
+}
+
+type UserPlaceholder struct {
+	UserID     uuid.UUID
+	Source     string
+	ExternalID string
+	CreatedAt  time.Time
 }
 
 type Watcher struct {

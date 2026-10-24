@@ -200,3 +200,19 @@ func (AutomationSchedule) Kind() string { return "automation_schedule" }
 type Maintenance struct{}
 
 func (Maintenance) Kind() string { return "maintenance" }
+
+// JiraImport runs a scan or an import of a Jira site (see the jiraimport package) in
+// checkpointed steps; when a job has worked for its time budget it enqueues the next Seq.
+type JiraImport struct {
+	ImportID uuid.UUID `json:"importId"`
+	RunID    uuid.UUID `json:"runId"`
+	Mode     string    `json:"mode"`
+	ActorID  uuid.UUID `json:"actorId"`
+	Seq      int       `json:"seq"`
+}
+
+func (JiraImport) Kind() string { return "jira_import" }
+
+func (JiraImport) InsertOpts() river.InsertOpts {
+	return river.InsertOpts{Queue: QueueOutbound, MaxAttempts: 5, UniqueOpts: river.UniqueOpts{ByArgs: true}}
+}

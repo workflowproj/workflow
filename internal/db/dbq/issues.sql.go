@@ -1016,9 +1016,10 @@ func (q *Queries) ListFilters(ctx context.Context, ownerID uuid.UUID) ([]SavedFi
 }
 
 const listHistory = `-- name: ListHistory :many
-SELECT id, issue_id, actor_id, actor_type, field, from_value, to_value, from_ref, to_ref, created_at, via FROM issue_history WHERE issue_id = $1 ORDER BY id
+SELECT id, issue_id, actor_id, actor_type, field, from_value, to_value, from_ref, to_ref, created_at, via FROM issue_history WHERE issue_id = $1 ORDER BY created_at, id
 `
 
+// By time, then insertion order (imported history carries the original timestamps).
 func (q *Queries) ListHistory(ctx context.Context, issueID uuid.UUID) ([]IssueHistory, error) {
 	rows, err := q.db.Query(ctx, listHistory, issueID)
 	if err != nil {

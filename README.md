@@ -85,6 +85,7 @@ To run the production build locally: `make web embed-web build` then
 | [GitHub and GitLab](docs/scm.md) | Connecting a GitHub App or GitLab, smart commits, write-back |
 | [Workflows as code](docs/workflows.md) | The YAML format, CEL reference, versioning and migration |
 | [JQL](docs/jql.md) | Query language reference |
+| [Import from Jira](docs/import.md) | Moving projects from Jira Cloud or Data Center with their history; placeholders for people |
 | [Automation and webhooks](docs/automation.md) | Rules, actions, outbound webhook signatures |
 | [Slack and Mattermost](docs/chat.md) | Channel notifications and the `/wfm` command |
 | [Notifications and email](docs/notifications.md) | Email preferences, immediate emails, daily digests, unsubscribe |

@@ -193,6 +193,8 @@ const adminWebhooksRoute = createRoute({ getParentRoute: () => adminRoute, path:
 const adminAuditRoute = createRoute({ getParentRoute: () => adminRoute, path: "/audit", component: lazyRouteComponent(() => import("@/pages/admin/AuditAdmin"), "AuditAdmin") });
 const adminConnectedAppsRoute = createRoute({ getParentRoute: () => adminRoute, path: "/connected-apps", component: lazyRouteComponent(() => import("@/pages/admin/ConnectedAppsAdmin"), "ConnectedAppsAdmin") });
 const adminEmailRoute = createRoute({ getParentRoute: () => adminRoute, path: "/email", component: lazyRouteComponent(() => import("@/pages/admin/EmailAdmin"), "EmailAdmin") });
+const adminImportRoute = createRoute({ getParentRoute: () => adminRoute, path: "/import", component: lazyRouteComponent(() => import("@/pages/admin/JiraImportAdmin"), "JiraImportAdmin") });
+const adminImportWizardRoute = createRoute({ getParentRoute: () => adminRoute, path: "/import/$importId", component: lazyRouteComponent(() => import("@/pages/admin/JiraImportWizard"), "JiraImportWizard") });
 
 export const routeTree = rootRoute.addChildren([
   loginRoute,
@@ -245,6 +247,8 @@ export const routeTree = rootRoute.addChildren([
       adminAuditRoute,
       adminConnectedAppsRoute,
       adminEmailRoute,
+      adminImportRoute,
+      adminImportWizardRoute,
     ]),
   ]),
 ]);

@@ -343,10 +343,11 @@ func (h *Handler) writeUser(ctx context.Context, q *dbq.Queries, tx pgx.Tx, exis
 		a.Email, a.UserName, idOrNil(existing)).Scan(&clash)
 	if err == nil {
 		other, _ := q.GetUser(ctx, clash)
-		if other.DeletedAt == nil || existing != nil {
+		placeholder, _ := q.IsUserPlaceholder(ctx, clash)
+		if (other.DeletedAt == nil && !placeholder) || existing != nil {
 			return dbq.User{}, errf(http.StatusConflict, "uniqueness", "a user with userName %q or email %q already exists", a.UserName, a.Email)
 		}
-		existing = &other // restore the soft-deleted account
+		existing = &other // restore the soft-deleted account, or adopt a placeholder from an import
 	} else if !db.IsNoRows(err) {
 		return dbq.User{}, err
 	}
