@@ -7,13 +7,17 @@ type Var = { name: string; desc: string };
 
 const issueVars: Var[] = [
   { name: "issue.key / summary / type / priority", desc: 'strings, e.g. issue.type == "bug"' },
+  { name: "issue.typeLevel", desc: "1 epic, 0 story / task / bug, -1 sub-task" },
   { name: "issue.status / statusCategory", desc: "current status name and its category (todo, in_progress, done)" },
-  { name: "issue.assignee / reporter", desc: 'email addresses, "" when unset' },
-  { name: "issue.labels", desc: "list of strings" },
-  { name: "issue.storyPoints / resolution / fields", desc: "custom fields by key: issue.fields.team" },
+  { name: "issue.assignee / reporter", desc: '"" when unset, otherwise an email address' },
+  { name: "issue.labels / storyPoints / resolution", desc: "list of strings, number, string" },
+  { name: "issue.startDate / dueDate", desc: '"YYYY-MM-DD", "" when unset' },
+  { name: "issue.fields", desc: "custom fields by key: issue.fields.team" },
   { name: "issue.subtasks / children", desc: "[{key, summary, type, status, category}]" },
+  { name: "issue.parent", desc: "{key, type, status, category, childCount, openChildren, startDate, dueDate}; {} without a parent, so guard with has(issue.parent.key)" },
+  { name: "issue.parent.openChildren", desc: "children of the parent not done, this issue included: 0 = all done" },
   { name: "issue.devLinks", desc: "[{kind: branch|commit|pr|pipeline, state, title, merged}]" },
-  { name: "issue.links / parent", desc: "[{type, direction, key, category}] and {key, type, status, category}" },
+  { name: "issue.links", desc: "[{type, direction, key, category}]" },
 ];
 const actorVars: Var[] = [
   { name: "actor.email / name / orgRole", desc: "who runs the transition" },
@@ -24,9 +28,12 @@ const actorVars: Var[] = [
 const transitionVars: Var[] = [{ name: "transition.id / name / from / to", desc: "the transition being run" }];
 const eventVars: Var[] = [
   { name: "event.type / actorType", desc: 'e.g. "issue.transitioned", "user"' },
-  { name: "event.from / to / transition", desc: "issue.transitioned: status names" },
-  { name: "event.fields", desc: "issue.field_changed: changed field names" },
-  { name: "event.branch / title / url / state / number", desc: "development events (branch, PR, commit, pipeline)" },
+  { name: "event.from / to / fromCategory / toCategory", desc: "issue.transitioned: status names and categories" },
+  { name: "event.transition", desc: "issue.transitioned: the transition's name" },
+  { name: "event.fields", desc: "issue.field_changed: the changed field names" },
+  { name: "event.title / url / state / number / branch", desc: "pull requests" },
+  { name: "event.status / pipeline / url / branch", desc: 'pipelines; status is "success" or "failed"' },
+  { name: "event.sha / message / branch", desc: "commits" },
 ];
 
 /**

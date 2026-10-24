@@ -1,12 +1,17 @@
 import { useState } from "react";
 import { getRouteApi, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bot, ChevronDown, ChevronRight, Clock, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { Bot, ChevronDown, ChevronRight, Clock, Pencil, Plus, RefreshCw, Sparkles, Trash2 } from "lucide-react";
 import { api, unwrap } from "@/api/client";
-import { Badge, Button, EmptyState, IconButton, PageHeader, PageSpinner, Spinner, useConfirm, useToast } from "@/components/ui";
+import { Badge, Button, IconButton, Modal, PageHeader, PageSpinner, Spinner, useConfirm, useToast } from "@/components/ui";
 import { ErrorBox } from "@/components/ErrorBox";
 import { Switch, When } from "@/features/settings/common";
-import { cleanAction, cleanTrigger, describeAction, describeTrigger, type Rule } from "@/features/settings/automation/meta";
+import { describeRule } from "@/features/settings/automation/describe";
+import { cleanAction, cleanTrigger, type Rule } from "@/features/settings/automation/meta";
+import { RuleSentenceView } from "@/features/settings/automation/RuleSentence";
+import { TemplateGallery } from "@/features/settings/automation/TemplateGallery";
+import type { RuleTemplate } from "@/features/settings/automation/templates";
+import { useProjectStatuses } from "@/features/settings/queries";
 import { RuleDialog } from "@/features/settings/automation/RuleDialog";
 
 const route = getRouteApi("/app/projects/$projectKey/settings/automation");
@@ -17,40 +22,69 @@ export function AutomationSettings() {
     queryKey: ["automation-rules", projectKey],
     queryFn: () => unwrap(api.GET("/projects/{projectKey}/automation-rules", { params: { path: { projectKey } } })),
   });
-  const [editing, setEditing] = useState<Rule | "new" | null>(null);
+  const project = useProjectStatuses(projectKey);
+  const [dialog, setDialog] = useState<{ rule?: Rule; template?: RuleTemplate } | null>(null);
+  const [gallery, setGallery] = useState(false);
   const list = rules.data ?? [];
+  const existingNames = new Set(list.map((r) => r.name.toLowerCase()));
+  const statusNames = project.loading ? null : project.statuses.map((s) => s.name);
+  const pick = (t: RuleTemplate) => {
+    setGallery(false);
+    setDialog({ template: t });
+  };
 
   return (
-    <div className="flex max-w-4xl flex-col gap-5">
+    <div className="flex max-w-5xl flex-col gap-5">
       <PageHeader
         title="Automation"
-        subtitle="Rules react to issue and development events (or run on a schedule), check an optional condition and run actions."
+        subtitle="Rules react to issue and development events (or run on a schedule), check an optional condition and run actions on the issue, its parent or its children."
         actions={
-          <Button variant="primary" icon={<Plus className="size-4" />} onClick={() => setEditing("new")}>
-            New rule
-          </Button>
+          <>
+            {list.length > 0 && (
+              <Button icon={<Sparkles className="size-4" />} onClick={() => setGallery(true)}>
+                Start from a template
+              </Button>
+            )}
+            <Button variant="primary" icon={<Plus className="size-4" />} onClick={() => setDialog({})}>
+              New rule
+            </Button>
+          </>
         }
       />
       {rules.error && <ErrorBox error={rules.error} />}
       {rules.isLoading ? (
         <PageSpinner />
       ) : list.length === 0 ? (
-        <div className="rounded-lg border border-line bg-surface">
-          <EmptyState
-            icon={<Bot className="size-8" />}
-            title="No automation rules yet"
-            body="For example: when a pull request merges, move the issue to Done and comment with the link; or every Monday, flag issues stuck in review."
-            action={<Button onClick={() => setEditing("new")}>New rule</Button>}
-          />
-        </div>
+        <section className="rounded-lg border border-line bg-surface">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3">
+            <div className="flex items-center gap-2.5">
+              <span className="flex size-8 items-center justify-center rounded-md bg-accent-soft text-accent">
+                <Bot className="size-4" />
+              </span>
+              <div>
+                <h2 className="text-sm font-semibold">No automation rules yet — start from a template</h2>
+                <p className="text-[13px] text-muted">Each template opens pre-filled so you can review it before creating the rule.</p>
+              </div>
+            </div>
+            <Button size="sm" onClick={() => setDialog({})}>
+              Build a rule from scratch
+            </Button>
+          </div>
+          <div className="p-4">
+            <TemplateGallery onPick={pick} existingNames={existingNames} statusNames={statusNames} />
+          </div>
+        </section>
       ) : (
         <ul className="flex flex-col gap-3">
           {list.map((r) => (
-            <RuleCard key={r.id} rule={r} projectKey={projectKey} onEdit={() => setEditing(r)} />
+            <RuleCard key={r.id} rule={r} projectKey={projectKey} onEdit={() => setDialog({ rule: r })} />
           ))}
         </ul>
       )}
-      {editing && <RuleDialog projectKey={projectKey} rule={editing === "new" ? undefined : editing} onClose={() => setEditing(null)} />}
+      <Modal open={gallery} onClose={() => setGallery(false)} title="Start from a template" size="xl">
+        <TemplateGallery onPick={pick} existingNames={existingNames} statusNames={statusNames} />
+      </Modal>
+      {dialog && <RuleDialog projectKey={projectKey} rule={dialog.rule} initial={dialog.template?.rule} templateTitle={dialog.template?.title} onClose={() => setDialog(null)} />}
     </div>
   );
 }
@@ -95,23 +129,7 @@ function RuleCard({ rule, projectKey, onEdit }: { rule: Rule; projectKey: string
             {!rule.enabled && <Badge>Disabled</Badge>}
           </div>
           {rule.description && <p className="text-[13px] text-muted">{rule.description}</p>}
-          <p className="mt-1.5 text-[13px]">
-            <span className="font-medium">{describeTrigger(rule.trigger)}</span>
-            {rule.condition && (
-              <>
-                {" "}
-                <span className="text-muted">if</span> <code className="rounded bg-surface-2 px-1 font-mono text-[12px]">{rule.condition}</code>
-              </>
-            )}
-          </p>
-          <ol className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[13px]">
-            {rule.actions.map((a, i) => (
-              <li key={i} className="inline-flex items-center gap-1.5">
-                {i > 0 && <ChevronRight className="size-3.5 text-faint" />}
-                <span className="rounded bg-surface-2 px-1.5 py-0.5">{describeAction(a)}</span>
-              </li>
-            ))}
-          </ol>
+          <RuleSentenceView sentence={describeRule(rule)} className="mt-1.5" />
           <p className="mt-2 flex flex-wrap gap-x-4 text-xs text-muted">
             <span>
               Last run: <When iso={rule.lastRunAt} empty="never" />
