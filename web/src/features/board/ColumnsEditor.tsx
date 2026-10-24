@@ -171,7 +171,7 @@ export function ColumnsEditor({
           <button
             type="button"
             onClick={add}
-            className="flex min-h-40 flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-line-strong text-sm text-muted hover:border-accent hover:text-accent focus-visible:outline-2 focus-visible:outline-accent"
+            className="flex min-h-24 flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-line-strong text-sm text-muted hover:border-accent hover:text-accent focus-visible:outline-2 focus-visible:outline-accent"
           >
             <Plus className="size-4" /> Add column
           </button>

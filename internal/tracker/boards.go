@@ -87,13 +87,13 @@ func (s *Service) validateBoard(ctx context.Context, actor *authz.Actor, in *Boa
 		in.DoneRetentionDays = 14
 	}
 	seen := map[uuid.UUID]string{}
-	for _, c := range in.Columns {
+	for k, c := range in.Columns {
 		if strings.TrimSpace(c.Name) == "" {
-			return apperr.Invalid("columns", "every column needs a name")
+			return apperr.Invalid(fmt.Sprintf("columns[%d].name", k), "every column needs a name")
 		}
 		for _, id := range c.StatusIDs {
 			if other, ok := seen[id]; ok {
-				return apperr.Invalid("columns", "a status can only be in one column (it is in %q and %q)", other, c.Name)
+				return apperr.Invalid(fmt.Sprintf("columns[%d].statusIds", k), "a status can only be in one column (it is in %q and %q)", other, c.Name)
 			}
 			seen[id] = c.Name
 		}

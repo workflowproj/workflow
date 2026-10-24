@@ -46,7 +46,9 @@ export function BoardEditor({ board, projectKey, statuses, onDeleted }: { board:
     }),
     [name, type, filterJql, swimlanes, retention, columns, cardFields],
   );
-  const original = JSON.stringify({
+  // Column ids are left out: the server issues new ones on every save.
+  const comparable = (b: Schemas["BoardInput"]) => JSON.stringify({ ...b, columns: b.columns?.map(({ id: _id, ...c }) => c) });
+  const original = comparable({
     name: board.name,
     type: board.type,
     filterJql: board.filterJql,
@@ -55,7 +57,7 @@ export function BoardEditor({ board, projectKey, statuses, onDeleted }: { board:
     columns: columnInputs(draftColumns(board.columns)),
     cardFields: normalizeCardFields(board.cardFields),
   });
-  const dirty = JSON.stringify(body) !== original;
+  const dirty = comparable(body) !== original;
 
   const save = useMutation({
     mutationFn: () => unwrap(api.PUT("/boards/{boardId}", { params: { path: { boardId: board.id } }, body })),
@@ -164,7 +166,7 @@ export function BoardEditor({ board, projectKey, statuses, onDeleted }: { board:
 
       <SettingsSection
         title="Columns"
-        description="Each status shows in at most one column. Drag statuses between columns, or use the menus. A WIP limit highlights a column when it holds too many issues."
+        description="Each status shows in at most one column. Drag columns by their handle and statuses by their chips, or use the buttons and menus. A WIP limit highlights a column when it holds too many issues."
       >
         <div className="p-4">
           <ColumnsEditor columns={columns} onChange={setColumns} statuses={statuses} errors={colErrors.byIndex} />

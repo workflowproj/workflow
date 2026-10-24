@@ -1,9 +1,9 @@
 import { useRef } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, unwrap } from "@/api/client";
+import { api, ApiError, unwrap } from "@/api/client";
 import type { Status } from "@/api/types";
 import { useConfirm, useToast } from "@/components/ui";
-import { applyBoard, assignStatus, boardInput, draftColumns, insertColumn, insertionIndex, joinNames, moveColumn, removeColumn, renameColumn, setWipLimit, withChanges, type ColumnDraft } from "./board-config";
+import { applyBoard, assignStatus, boardInput, columnInputs, draftColumns, insertColumn, insertionIndex, joinNames, moveColumn, removeColumn, renameColumn, setWipLimit, withChanges, type ColumnDraft } from "./board-config";
 import type { ColumnTools } from "./ColumnMenu";
 import type { Board, BoardData } from "./queries";
 
@@ -44,6 +44,12 @@ export function useSaveBoard(projectKey: string, boardId: string) {
   });
 }
 
+/** readable turns field errors ("columns[1].name: …") into a sentence for a toast. */
+function readable(err: unknown) {
+  const fields = err instanceof ApiError && !err.problem.detail ? (err.problem.errors ?? []) : [];
+  return fields.length ? new Error(`Couldn't change the board: ${fields.map((f) => f.message).join("; ")}`) : err;
+}
+
 /**
  * useColumnTools backs the column header menus and the unmapped-status notice: each edit is
  * applied to the board as currently shown and saved straight away. Deleting a column asks
@@ -61,10 +67,12 @@ export function useColumnTools({ board, statuses, onConfigure }: { board: Board;
   const change = (edit: (cols: ColumnDraft[]) => ColumnDraft[], done?: (undo: () => void) => void) => {
     const base = latest.current;
     const before = draftColumns(base.columns);
-    const next = withChanges(base, { columns: edit(before) });
+    const after = edit(before);
+    if (JSON.stringify(columnInputs(after)) === JSON.stringify(columnInputs(before))) return;
+    const next = withChanges(base, { columns: after });
     latest.current = next;
     save.mutate(next, {
-      onError: (err) => toast.error(err),
+      onError: (err) => toast.error(readable(err)),
       onSuccess: () => done?.(() => change(() => before)),
     });
   };
@@ -115,5 +123,5 @@ export function useColumnTools({ board, statuses, onConfigure }: { board: Board;
     });
   };
 
-  return { tools, mapStatus, save };
+  return { tools, mapStatus };
 }

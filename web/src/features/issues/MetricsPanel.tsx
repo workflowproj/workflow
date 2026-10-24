@@ -94,7 +94,7 @@ function MetricsBody({ m, stale }: { m: IssueMetrics; stale: boolean }) {
       ? { label: "Cycle time", value: null, title: resolved ? "Never in progress" : "Not started yet" }
       : resolved
         ? { label: "Cycle time", value: formatHours(m.cycleTimeHours), title: "First in progress to resolved" }
-        : { label: "In progress for", value: formatHours(m.cycleTimeHours), title: `First in progress ${formatDateTime(m.startedAt)}` };
+        : { label: "Cycle time so far", value: formatHours(m.cycleTimeHours), title: `First in progress ${formatDateTime(m.startedAt)}` };
   const tiles = [
     { label: "Lead time", value: m.leadTimeHours != null ? formatHours(m.leadTimeHours) : null, title: m.leadTimeHours != null ? "Created to resolved" : "Not resolved yet" },
     cycle,

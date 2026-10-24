@@ -124,7 +124,7 @@ test("issue metrics: lead time, cycle time and time in each status", async ({ pa
   await expect(statuses.getByRole("listitem")).toHaveText([/^Backlog/, /^Selected for Development/, /^In Progress.*now.*×2/, /^Done/]);
   // Reopened and in progress again: cycle time counts on, no lead time yet.
   await expect(metrics.getByText("Reopened once")).toBeVisible();
-  await expect(metrics.getByText("In progress for", { exact: true })).toBeVisible();
+  await expect(metrics.getByText("Cycle time so far", { exact: true })).toBeVisible();
   await expect(metrics.getByRole("definition").first()).toHaveText("—");
 
   // Resolving it gives a lead time; the panel follows the issue.
