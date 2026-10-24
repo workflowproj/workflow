@@ -16,6 +16,7 @@ export const CARD_FIELDS: { field: CardField; label: string; hint: string }[] = 
   { field: "assignee", label: "Assignee", hint: "" },
   { field: "dueDate", label: "Due date", hint: "Red once overdue" },
   { field: "daysInColumn", label: "Days in column", hint: "Time since the issue entered its status" },
+  { field: "timeTracking", label: "Time tracking", hint: "Time logged of the estimate, or what is left; red when over" },
 ];
 
 export const DEFAULT_CARD_FIELDS: CardField[] = ["epic", "labels", "priority", "dev", "points", "assignee"];

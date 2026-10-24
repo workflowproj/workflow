@@ -259,6 +259,7 @@ function ConfigForm({ gadget, onClose, onSave }: { gadget: Gadget; onClose: () =
                   {meta.scope !== "query" && <option value="">Story points, or issues if not estimated</option>}
                   <option value="issues">Issue count</option>
                   <option value="points">Story points</option>
+                  {meta.scope === "sprint" && <option value="hours">Hours (remaining estimate and time logged)</option>}
                 </Select>
               )}
             </Field>

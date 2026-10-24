@@ -94,11 +94,14 @@ function SprintHealth({ report, sprint }: { report: SprintReport; sprint: Sprint
   const pct = scope > 0 ? Math.round((done / scope) * 100) : null;
   const left = sprint.state === "active" ? remainingLabel(sprint.endDate) : null;
   const byStatus = useQuery(breakdownQuery({ projectKeys: [gadget.config.projectKey!], jql: `sprint = "${sprint.id}"` }, "statusCategory"));
+  // The status bar counts issues when the sprint is measured in hours (estimates are per issue, not per status).
   const values = Object.fromEntries((byStatus.data?.groups ?? []).map((g) => [g.key, measure === "points" ? g.points : g.count]));
   const unit = m.unit;
+  const barUnit = measure === "hours" ? "issues" : unit;
+  const barFormat = measure === "hours" ? (n: number) => String(Math.round(n)) : m.format;
   const facts: [string, string, string?][] = [
     ["Committed", `${m.format(m.committed)} ${unit}`],
-    ["Completed", `${m.format(m.completed)} ${unit}`],
+    [m.doneLabel, `${m.format(m.completed)} ${unit}`],
     ["Added", m.added > 0 ? `+${m.format(m.added)} ${unit}` : "None", m.added > 0 ? "text-warning" : undefined],
     ["Removed", m.removed > 0 ? `−${m.format(m.removed)} ${unit}` : "None"],
   ];
@@ -108,7 +111,7 @@ function SprintHealth({ report, sprint }: { report: SprintReport; sprint: Sprint
         <div>
           <p className="text-4xl leading-none font-semibold tracking-tight">{pct === null ? "–" : `${pct}%`}</p>
           <p className="mt-1.5 text-xs text-muted">
-            done · {m.format(done)} of {m.format(scope)} {unit}
+            {measure === "hours" ? "logged" : "done"} · {m.format(done)} of {m.format(scope)} {unit}
           </p>
         </div>
         <div className="text-right">
@@ -122,7 +125,7 @@ function SprintHealth({ report, sprint }: { report: SprintReport; sprint: Sprint
           )}
         </div>
       </div>
-      {byStatus.error ? <ErrorBox error={byStatus.error} /> : <CategoryBar values={values} unit={unit} format={m.format} />}
+      {byStatus.error ? <ErrorBox error={byStatus.error} /> : <CategoryBar values={values} unit={barUnit} format={barFormat} />}
       <dl className="grid grid-cols-2 gap-x-4 gap-y-2 border-t border-line pt-3 text-[13px]">
         {facts.map(([k, v, cls]) => (
           <div key={k} className="flex items-baseline justify-between gap-2">
@@ -141,7 +144,9 @@ export function VelocityGadget() {
   const projectKey = gadget.config.projectKey ?? "";
   const count = gadget.config.count ?? 7;
   const q = useQuery({ ...velocityQuery(projectKey, count), enabled: !!projectKey });
-  const measure = gadget.config.measure ?? (q.data?.sprints.some((s) => s.committedPoints > 0 || s.completedPoints > 0) ? "points" : "issues");
+  // Velocity counts points or issues; hours (a sprint gadget measure) falls back to the default.
+  const chosen = gadget.config.measure === "hours" ? undefined : gadget.config.measure;
+  const measure = chosen ?? (q.data?.sprints.some((s) => s.committedPoints > 0 || s.completedPoints > 0) ? "points" : "issues");
   const average = measure === "points" ? q.data?.averagePoints : q.data?.averageIssues;
   const subtitle = q.data?.sprints.length
     ? `Average ${formatPoints(Math.round((average ?? 0) * 10) / 10)} ${measure === "points" ? "pts" : "issues"} per sprint · last ${q.data.sprints.length} sprints`

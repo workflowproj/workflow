@@ -119,6 +119,13 @@ const timelineRoute = createRoute({
   validateSearch: timelineSearch,
   component: lazyRouteComponent(() => import("@/pages/TimelinePage"), "TimelinePage"),
 });
+export type TimesheetSearch = { from?: string; period?: "month"; projects?: string; user?: string };
+const timesheetRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/timesheet",
+  validateSearch: (s: Record<string, unknown>): TimesheetSearch => ({ from: str(s.from), period: s.period === "month" ? "month" : undefined, projects: str(s.projects), user: str(s.user) }),
+  component: lazyRouteComponent(() => import("@/pages/TimesheetPage"), "TimesheetPage"),
+});
 export type DashboardSearch = { edit?: boolean; issue?: string };
 const dashboardsRoute = createRoute({ getParentRoute: () => appRoute, path: "/dashboards", component: lazyRouteComponent(() => import("@/pages/DashboardsPage"), "DashboardsPage") });
 const dashboardRoute = createRoute({
@@ -176,6 +183,7 @@ export const routeTree = rootRoute.addChildren([
     ]),
     searchRoute,
     timelineRoute,
+    timesheetRoute,
     dashboardsRoute,
     dashboardRoute,
     browseRoute,

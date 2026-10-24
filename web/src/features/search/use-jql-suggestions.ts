@@ -38,9 +38,18 @@ const aliases: Record<string, string> = {
   comments: "comment",
   title: "summary",
   hierarchylevel: "level",
+  timeoriginalestimate: "originalestimate",
+  timeestimate: "remainingestimate",
 };
 
-const ORDER_FIELDS = ["created", "updated", "priority", "key", "summary", "status", "assignee", "storyPoints", "type", "rank", "due", "start", "resolved"];
+const ORDER_FIELDS = ["created", "updated", "priority", "key", "summary", "status", "assignee", "storyPoints", "type", "rank", "due", "start", "resolved", "originalEstimate", "remainingEstimate", "timeSpent"];
+const DURATION_VALUES: [string, string][] = [
+  ["30m", "30 minutes"],
+  ["2h", "2 hours"],
+  ["1d", "a working day"],
+  ["1d 4h", ""],
+  ["1w", "a working week"],
+];
 const RESOLUTIONS = ["Unresolved", "Done", "Won't Do", "Duplicate", "Cannot Reproduce"];
 const DATE_VALUES: [string, string][] = [
   ["-1d", "24 hours ago"],
@@ -185,6 +194,10 @@ export function useJqlSuggestions(ctx: Context | null, projectKey?: string): { i
           break;
         case "number":
           hint = "Type a number";
+          break;
+        case "duration":
+          items = [...DURATION_VALUES.map(([v, d]) => val(v, d || undefined)), kw("EMPTY")];
+          hint = 'A duration: 30m, 2h, 1d, "1w 2d" (a bare number is minutes)';
           break;
       }
       if (tightValues) items = items.map((i) => ({ ...i, tight: true }));

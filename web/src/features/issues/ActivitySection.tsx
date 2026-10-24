@@ -13,17 +13,21 @@ import { formatDate, formatDateTime, relativeTime } from "@/lib/format";
 import { commentsQuery, historyQuery } from "./issue-api";
 import { useEscapeLayer } from "@/lib/escape";
 import { useIssue } from "./issue-context";
+import { worklogsQuery } from "@/features/time/api";
+import { WorklogList } from "@/features/time/WorklogList";
 
 type Comment = Schemas["Comment"];
 type HistoryEntry = Schemas["HistoryEntry"];
 
-/** ActivitySection holds the Comments and History tabs. */
+/** ActivitySection holds the Comments, Work log and History tabs. */
 export function ActivitySection() {
   const { issue } = useIssue();
-  const [tab, setTab] = useState<"comments" | "history">("comments");
+  const [tab, setTab] = useState<"comments" | "worklog" | "history">("comments");
   const comments = useQuery(commentsQuery(issue.key));
+  const worklogs = useQuery(worklogsQuery(issue.key));
   const tabs = [
     { id: "comments" as const, label: "Comments", count: comments.data?.length },
+    { id: "worklog" as const, label: "Work log", count: worklogs.data?.length },
     { id: "history" as const, label: "History" },
   ];
   return (
@@ -49,7 +53,7 @@ export function ActivitySection() {
           ))}
         </div>
       </div>
-      <div role="tabpanel">{tab === "comments" ? <Comments query={comments} /> : <History />}</div>
+      <div role="tabpanel">{tab === "comments" ? <Comments query={comments} /> : tab === "worklog" ? <WorklogList issue={issue} /> : <History />}</div>
     </section>
   );
 }
@@ -241,6 +245,8 @@ const FIELD_LABELS: Record<string, string> = {
   parent: "parent",
   type: "type",
   resolution: "resolution",
+  originalEstimate: "original estimate",
+  remainingEstimate: "remaining estimate",
 };
 
 const actorNames: Record<string, string> = { automation: "Automation", system: "System", scm: "Git integration" };
@@ -291,6 +297,25 @@ function Change({ entry: h }: { entry: HistoryEntry }) {
       ) : (
         <span className="text-muted">
           removed attachment <Value v={h.from} field={h.field} />
+        </span>
+      );
+    case "worklog":
+      return h.to && !h.from ? (
+        <span className="text-muted">
+          logged work <Value v={h.to} field={h.field} />
+        </span>
+      ) : h.to ? (
+        <span className="text-muted">
+          changed logged work{" "}
+          <span className="inline-flex flex-wrap items-center gap-1.5 align-middle">
+            <Value v={h.from} field={h.field} />
+            <ArrowRight className="size-3 text-faint" />
+            <Value v={h.to} field={h.field} />
+          </span>
+        </span>
+      ) : (
+        <span className="text-muted">
+          deleted logged work <Value v={h.from} field={h.field} />
         </span>
       );
     case "link":

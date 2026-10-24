@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
-import { getRouteApi, useNavigate } from "@tanstack/react-router";
+import { getRouteApi, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { BarChart3, Timer, TrendingDown } from "lucide-react";
+import { ArrowUpRight, BarChart3, CalendarClock, Timer, TrendingDown } from "lucide-react";
 import { api, unwrap, type Schemas } from "@/api/client";
 import { Card, EmptyState, PageHeader, PageSpinner, Select } from "@/components/ui";
 import { ErrorBox } from "@/components/ErrorBox";
@@ -42,7 +42,33 @@ export function ReportsPage() {
         </Card>
       )}
       <CycleTime projectKey={projectKey} />
+      <TimesheetLink projectKey={projectKey} />
     </div>
+  );
+}
+
+/** TimesheetLink points to the timesheet of the project's logged work. */
+function TimesheetLink({ projectKey }: { projectKey: string }) {
+  return (
+    <Card
+      title={
+        <span className="inline-flex items-center gap-2">
+          <CalendarClock className="size-4 text-muted" /> Timesheet
+        </span>
+      }
+    >
+      <div className="flex flex-wrap items-center justify-between gap-3 p-4">
+        <p className="text-sm text-muted">Time logged on {projectKey} issues, per person and day. Export it as CSV for invoicing or payroll.</p>
+        <Link
+          to="/timesheet"
+          search={{ projects: projectKey }}
+          className="inline-flex h-7 items-center gap-1.5 rounded-md border border-line-strong bg-surface px-2.5 text-[13px] font-medium shadow-sm hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+        >
+          Open timesheet
+          <ArrowUpRight className="size-3.5" aria-hidden />
+        </Link>
+      </div>
+    </Card>
   );
 }
 
@@ -115,7 +141,7 @@ function SprintNumbers({
   const remaining = last ? m.remaining(last) : Math.max(0, scope - m.completed);
   const pct = scope > 0 ? Math.round((m.completed / scope) * 100) : null;
   const n = (v: number, word: string) => `${v} ${word}${v === 1 ? "" : "s"}`;
-  const issuesOf = (pts: number, issues: number) => (measure === "points" ? ` (${n(issues, "issue")})` : pts > 0 ? ` (${formatPoints(pts)} pts)` : "");
+  const issuesOf = (pts: number, issues: number) => (measure !== "issues" ? ` (${n(issues, "issue")})` : pts > 0 ? ` (${formatPoints(pts)} pts)` : "");
   const change =
     m.added === 0 && m.removed === 0
       ? "No scope change since the sprint started."
@@ -125,8 +151,8 @@ function SprintNumbers({
   return (
     <>
       <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-        <StatTile label="Committed" value={`${m.format(m.committed)} ${m.unit}`} sub={measure === "points" ? `${n(report.committedIssues, "issue")} at sprint start` : "at sprint start"} />
-        <StatTile label="Completed" value={`${m.format(m.completed)} ${m.unit}`} sub={pct == null ? undefined : `${pct}% of the current scope`} />
+        <StatTile label="Committed" value={`${m.format(m.committed)} ${m.unit}`} sub={measure !== "issues" ? `${n(report.committedIssues, "issue")} at sprint start` : "at sprint start"} />
+        <StatTile label={m.doneLabel} value={`${m.format(m.completed)} ${m.unit}`} sub={pct == null ? undefined : `${pct}% of the current scope`} />
         <StatTile label="Scope change" value={m.added === 0 && m.removed === 0 ? "None" : `${m.added - m.removed >= 0 ? "+" : "−"}${m.format(Math.abs(m.added - m.removed))} ${m.unit}`} sub={`now ${m.format(scope)} ${m.unit} in scope`} />
         <StatTile label="Remaining" value={`${m.format(remaining)} ${m.unit}`} sub={left ?? (report.sprint.state === "closed" ? "Sprint completed" : undefined)} />
       </div>
@@ -150,6 +176,7 @@ function SprintNumbers({
               options={[
                 { value: "points", label: "Story points" },
                 { value: "issues", label: "Issues" },
+                { value: "hours", label: "Hours" },
               ]}
             />
           </div>

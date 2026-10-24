@@ -6,6 +6,10 @@ describe("normalizeCardFields", () => {
     expect(normalizeCardFields(undefined)).toEqual(DEFAULT_CARD_FIELDS);
     expect(normalizeCardFields([])).toEqual([]);
     expect(normalizeCardFields(["points", "colour", "points", "dueDate"])).toEqual(["points", "dueDate"]);
+    expect(normalizeCardFields(["timeTracking", "assignee"])).toEqual(["timeTracking", "assignee"]);
+  });
+  it("puts time tracking in the footer after the key", () => {
+    expect(cardLayout(["epic", "timeTracking", "points", "assignee"])).toEqual({ tags: ["epic"], left: ["timeTracking"], right: ["points", "assignee"] });
   });
 });
 

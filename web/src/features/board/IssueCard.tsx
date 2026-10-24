@@ -1,13 +1,15 @@
 import type { KeyboardEvent } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { CalendarDays, CircleCheck, CircleDot, CircleX, CornerDownRight, GitBranch, GitMerge, GitPullRequest } from "lucide-react";
+import { CalendarDays, CircleCheck, CircleDot, CircleX, Clock3, CornerDownRight, GitBranch, GitMerge, GitPullRequest } from "lucide-react";
 import type { Issue } from "@/api/types";
 import { IssueTypeIcon, PriorityIcon } from "@/components/issue-bits";
 import { UserAvatar } from "@/components/UserAvatar";
 import { cn } from "@/lib/cn";
 import { ageDots, cardLayout, daysLabel, daysSince, daysTitle, DEFAULT_CARD_FIELDS, dueLabel, type CardField } from "./card-fields";
 import { formatPoints } from "./model";
+import { useFormatDuration } from "@/features/time/api";
+import { cardTimeLabel } from "@/features/time/model";
 
 /**
  * IssueCard is the visual card on a board; SortableIssueCard makes it draggable and openable.
@@ -57,6 +59,8 @@ function FieldValue({ field, issue }: { field: CardField; issue: Issue }) {
       return issue.dueDate ? <DueDate due={issue.dueDate} done={issue.status.category === "done"} /> : null;
     case "daysInColumn":
       return <DaysInColumn issue={issue} />;
+    case "timeTracking":
+      return <TimeTracking issue={issue} />;
     default:
       return null;
   }
@@ -68,6 +72,19 @@ function DueDate({ due, done }: { due: string; done: boolean }) {
     <span title={d.title} aria-label={d.title} className={cn("inline-flex h-5 items-center gap-1 rounded px-1 text-[11px] font-medium whitespace-nowrap", d.overdue ? "bg-danger-soft text-danger" : "text-muted")}>
       <CalendarDays className="size-3" aria-hidden />
       {d.text}
+    </span>
+  );
+}
+
+/** TimeTracking: time logged of the original estimate ("3h / 1d"), else what is left; red once over. */
+function TimeTracking({ issue }: { issue: Issue }) {
+  const fmt = useFormatDuration();
+  const t = cardTimeLabel(issue.timeTracking, fmt);
+  if (!t) return null;
+  return (
+    <span title={t.title} aria-label={t.title} className={cn("inline-flex h-5 items-center gap-1 rounded px-1 text-[11px] font-medium whitespace-nowrap tabular-nums", t.over ? "bg-danger-soft text-danger" : "text-muted")}>
+      <Clock3 className="size-3" aria-hidden />
+      {t.text}
     </span>
   );
 }

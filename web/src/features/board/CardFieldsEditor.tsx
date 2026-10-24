@@ -125,6 +125,7 @@ function sampleIssue(projectKey: string): Issue {
     version: 1,
     fields: {},
     dev: { branches: 1, commits: 4, pullRequests: 1, openPullRequests: 1, mergedPullRequests: 0, pipelineState: "success" },
+    timeTracking: { originalSeconds: 8 * 3600, remainingSeconds: 5 * 3600, spentSeconds: 3 * 3600 },
     statusChangedAt: new Date(Date.now() - 3 * DAY - 3_600_000).toISOString(),
     createdAt: new Date(Date.now() - 9 * DAY).toISOString(),
     updatedAt: new Date().toISOString(),
