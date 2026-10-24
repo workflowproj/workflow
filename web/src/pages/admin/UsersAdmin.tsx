@@ -8,6 +8,7 @@ import { ErrorBox } from "@/components/ErrorBox";
 import { UserAvatar } from "@/components/UserAvatar";
 import { isDirectoryManaged, SourceBadge, sourceLabel } from "@/features/admin/badges";
 import { CreateUserDialog, EditNameDialog, ServiceTokensDialog, type AdminUser } from "@/features/admin/UserDialogs";
+import { LockedBadge, SignInSummary, useLocalAccountActions } from "@/features/admin/LocalAccount";
 import { useDebounced, When } from "@/features/settings/common";
 
 type Kind = "" | "human" | "service";
@@ -23,6 +24,7 @@ export function UsersAdmin() {
   const qc = useQueryClient();
   const toast = useToast();
   const confirm = useConfirm();
+  const local = useLocalAccountActions();
   const users = useQuery({
     queryKey: ["admin-users", dq, kind],
     queryFn: () => unwrap(api.GET("/admin/users", { params: { query: { q: dq || undefined, kind: kind || undefined } } })),
@@ -125,6 +127,7 @@ export function UsersAdmin() {
                     </td>
                     <td>
                       <SourceBadge source={u.source} />
+                      <SignInSummary user={u} />
                     </td>
                     <td>
                       <Select
@@ -141,7 +144,7 @@ export function UsersAdmin() {
                             return;
                           update.mutate({ user: u, body: { orgRole } });
                         }}
-                        className="!h-8"
+                        className="!h-8 min-w-28"
                       >
                         {u.kind !== "service" && <option value="admin">Admin</option>}
                         <option value="member">Member</option>
@@ -149,13 +152,19 @@ export function UsersAdmin() {
                       </Select>
                       {u.effectiveOrgRole && u.effectiveOrgRole !== u.orgRole && <p className="mt-0.5 text-[11px] text-muted">Effective: {u.effectiveOrgRole} (via a group)</p>}
                     </td>
-                    <td>{u.active ? <Badge tone="success">Active</Badge> : <Badge tone="danger">Deactivated</Badge>}</td>
+                    <td>
+                      <span className="flex flex-wrap gap-1">
+                        {u.active ? <Badge tone="success">Active</Badge> : <Badge tone="danger">Deactivated</Badge>}
+                        <LockedBadge user={u} />
+                      </span>
+                    </td>
                     <td className="text-muted">
                       <When iso={u.lastLoginAt} empty={u.kind === "service" ? "—" : "Never"} />
                     </td>
                     <td className="text-right">
                       <Popover
                         align="end"
+                        portal
                         trigger={({ toggle }) => (
                           <IconButton label={`Actions for ${u.displayName}`} size="sm" onClick={toggle}>
                             <MoreHorizontal className="size-4" />
@@ -201,6 +210,7 @@ export function UsersAdmin() {
                                 Reactivate
                               </MenuItem>
                             )}
+                            {local.menu(u, close)}
                           </div>
                         )}
                       />
@@ -218,6 +228,7 @@ export function UsersAdmin() {
       {dialog?.kind === "create" && <CreateUserDialog initialKind={dialog.initial} onClose={() => setDialog(null)} />}
       {dialog?.kind === "rename" && <EditNameDialog user={dialog.user} onClose={() => setDialog(null)} />}
       {dialog?.kind === "tokens" && <ServiceTokensDialog user={dialog.user} onClose={() => setDialog(null)} />}
+      {local.dialogs}
     </div>
   );
 }

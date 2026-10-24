@@ -49,6 +49,10 @@ See [identity.md](identity.md).
 | `WFM_ALLOWED_DOMAINS` | — | default allowed domains for every provider |
 | `WFM_JIT_PROVISIONING` | `auto` | `auto`, `true`, `false` |
 | `WFM_BOOTSTRAP_ADMINS` | — | emails that are always organisation admins |
+| `WFM_LOCAL_LOGIN` | `true` | email and password sign-in for local accounts ([identity.md](identity.md#local-accounts)); `false` hides the form and refuses it |
+| `WFM_LOCAL_REQUIRE_2FA` | `false` | local accounts must set up two-factor authentication at their next sign-in |
+| `WFM_LOCAL_LOCKOUT_ATTEMPTS` | `10` | consecutive failed sign-ins that lock a local account (`0` disables the lockout) |
+| `WFM_LOCAL_LOCKOUT_DURATION` | `15m` | how long a lockout lasts |
 | `WFM_DELETED_USER_RETENTION` | `2160h` (90 days) | then deleted users are anonymised |
 | `WFM_GOOGLE_DIRECTORY_ENABLED` | `false` | Google Workspace directory sync |
 | `WFM_GOOGLE_SERVICE_ACCOUNT_KEY` | — | path, JSON or base64 JSON |

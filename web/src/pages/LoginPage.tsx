@@ -1,12 +1,15 @@
 import { useState } from "react";
 import { getRouteApi, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { FolderKanban, KeyRound } from "lucide-react";
+import { KeyRound } from "lucide-react";
 import { api, unwrap } from "@/api/client";
 import { providersQuery } from "@/api/queries";
 import { Button, Field, Input, PageSpinner } from "@/components/ui";
 import { ErrorBox } from "@/components/ErrorBox";
-import { ThemeMenu } from "@/layout/ThemeMenu";
+import { AuthShell } from "@/features/auth/AuthShell";
+import { LocalSignIn } from "@/features/auth/LocalSignIn";
+import { Callout } from "@/features/settings/common";
+import { cn } from "@/lib/cn";
 
 const route = getRouteApi("/login");
 
@@ -20,50 +23,93 @@ const loginErrors: Record<string, string> = {
   provider_unavailable: "The sign-in provider is unavailable right now.",
 };
 
+type Method = "password" | "dev";
+const methodKey = "wfm.signInMethod";
+
+function storedMethod(): Method | null {
+  try {
+    const v = localStorage.getItem(methodKey);
+    return v === "password" || v === "dev" ? v : null;
+  } catch {
+    return null;
+  }
+}
+
 export function LoginPage() {
-  const { error, returnTo } = route.useSearch();
+  const { error, returnTo, notice, email } = route.useSearch();
   const { data, isLoading } = useQuery(providersQuery);
+  const [chosen, setChosen] = useState<Method | null>(storedMethod);
   const safeReturn = returnTo && returnTo.startsWith("/") && !returnTo.startsWith("//") ? returnTo : "/projects";
+  const local = !!data?.localLogin;
+  const dev = !!data?.devLogin;
+  // Development sign-in stays the default where it is on, so local set-ups work as before.
+  const method: Method = local && dev ? (chosen ?? "dev") : local ? "password" : "dev";
+  const choose = (m: Method) => {
+    setChosen(m);
+    try {
+      localStorage.setItem(methodKey, m);
+    } catch {
+      /* private mode */
+    }
+  };
 
   return (
-    <div className="relative flex min-h-full items-center justify-center bg-canvas p-4">
-      <div className="absolute top-3 right-3">
-        <ThemeMenu />
-      </div>
-      <div className="w-full max-w-sm">
-        <div className="mb-6 flex flex-col items-center gap-3 text-center">
-          <span className="flex size-11 items-center justify-center rounded-xl bg-accent text-accent-ink shadow-sm">
-            <FolderKanban className="size-6" />
-          </span>
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight">Sign in to Workflow</h1>
-            <p className="mt-1 text-sm text-muted">Plan, track and ship software together.</p>
-          </div>
-        </div>
-        <div className="rounded-lg border border-line bg-surface p-5 shadow-sm">
-          {error && <p className="mb-4 rounded-md bg-danger-soft px-3 py-2 text-sm text-danger">{loginErrors[error] ?? "Sign-in failed."}</p>}
-          {isLoading ? (
-            <PageSpinner />
-          ) : (
-            <div className="flex flex-col gap-2">
-              {data?.providers.map((p) => (
-                <a key={p.id} href={`${p.loginUrl}?returnTo=${encodeURIComponent(safeReturn)}`}>
-                  <Button className="w-full" icon={<KeyRound className="size-4" />}>
-                    Continue with {p.name}
-                  </Button>
-                </a>
-              ))}
-              {data && data.providers.length === 0 && !data.devLogin && <p className="text-sm text-muted">No sign-in method is configured. See the deployment guide.</p>}
-              {data?.devLogin && <DevLogin returnTo={safeReturn} separated={data.providers.length > 0} />}
+    <AuthShell title="Sign in to Workflow" subtitle="Plan, track and ship software together.">
+      {error && <p className="mb-4 rounded-md bg-danger-soft px-3 py-2 text-sm text-danger">{loginErrors[error] ?? "Sign-in failed."}</p>}
+      {notice === "password_set" && (
+        <Callout className="mb-4" title="Your password is set">
+          Sign in with it to continue.
+        </Callout>
+      )}
+      {isLoading ? (
+        <PageSpinner />
+      ) : (
+        <div className="flex flex-col gap-2">
+          {data?.providers.map((p) => (
+            <a key={p.id} href={`${p.loginUrl}?returnTo=${encodeURIComponent(safeReturn)}`}>
+              <Button className="w-full" icon={<KeyRound className="size-4" />}>
+                Continue with {p.name}
+              </Button>
+            </a>
+          ))}
+          {data && data.providers.length === 0 && !local && !dev && <p className="text-sm text-muted">No sign-in method is configured. See the deployment guide.</p>}
+          {data && data.providers.length > 0 && (local || dev) && (
+            <div className="my-2 flex items-center gap-3 text-xs text-faint" aria-hidden>
+              <span className="h-px flex-1 bg-line" />
+              or
+              <span className="h-px flex-1 bg-line" />
             </div>
           )}
+          {local && dev && (
+            <div role="tablist" aria-label="Sign-in method" className="mb-2 grid grid-cols-2 gap-1 rounded-md bg-surface-2 p-1">
+              {(
+                [
+                  ["password", "Password"],
+                  ["dev", "Development"],
+                ] as const
+              ).map(([m, label]) => (
+                <button
+                  key={m}
+                  type="button"
+                  role="tab"
+                  aria-selected={method === m}
+                  onClick={() => choose(m)}
+                  className={cn("rounded px-2 py-1 text-[13px] font-medium", method === m ? "bg-surface text-ink shadow-sm" : "text-muted hover:text-ink")}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+          {local && method === "password" && <LocalSignIn returnTo={safeReturn} initialEmail={email} />}
+          {dev && method === "dev" && <DevLogin returnTo={safeReturn} />}
         </div>
-      </div>
-    </div>
+      )}
+    </AuthShell>
   );
 }
 
-function DevLogin({ returnTo, separated }: { returnTo: string; separated: boolean }) {
+function DevLogin({ returnTo }: { returnTo: string }) {
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const qc = useQueryClient();
@@ -81,7 +127,6 @@ function DevLogin({ returnTo, separated }: { returnTo: string; separated: boolea
         e.preventDefault();
         login.mutate();
       }}
-      className={separated ? "mt-3 border-t border-line pt-4" : ""}
     >
       <p className="mb-3 text-xs font-medium tracking-wide text-warning uppercase">Development sign-in</p>
       <div className="flex flex-col gap-3">

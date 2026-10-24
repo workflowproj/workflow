@@ -32,6 +32,7 @@ import (
 	"github.com/geoffo-dev/workflow-management/internal/httpapi"
 	"github.com/geoffo-dev/workflow-management/internal/identity"
 	"github.com/geoffo-dev/workflow-management/internal/identity/directory"
+	"github.com/geoffo-dev/workflow-management/internal/identity/local"
 	"github.com/geoffo-dev/workflow-management/internal/identity/scim"
 	"github.com/geoffo-dev/workflow-management/internal/jobs"
 	"github.com/geoffo-dev/workflow-management/internal/mail"
@@ -63,6 +64,8 @@ type App struct {
 	Mailer mail.Sender
 	// Notify emails notifications (immediately or in digests) per people's settings.
 	Notify *notify.Service
+	// Local handles local accounts (email and password sign-in).
+	Local  *local.Service
 	Server *httpapi.Server
 	Scim   *scim.Handler
 	// OAuth signs AI assistants in to /mcp.
@@ -175,10 +178,11 @@ func New(ctx context.Context, cfg *config.Config, log *slog.Logger, pool *pgxpoo
 	enq.Enqueuer = client
 
 	a.OAuth = oauth.New(cfg, pool, dbq.New(pool), box, a.Auth, a.Tracker, log.With("module", "oauth"))
+	a.Local = local.New(pool, cfg, box, enq, log.With("module", "local-accounts"))
 	a.Server = &httpapi.Server{
 		Cfg: cfg, Log: log.With("module", "http"), Pool: pool, Q: dbq.New(pool), Tracker: a.Tracker, Auth: a.Auth, Prov: a.Prov,
 		SCM: a.SCM, Automation: a.Automation, Jobs: enq, Hub: a.Hub, Box: box, Mailer: a.Mailer, OAuth: a.OAuth,
-		Notify: a.Notify,
+		Notify: a.Notify, Local: a.Local,
 	}
 	return a, nil
 }

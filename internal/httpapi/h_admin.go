@@ -46,8 +46,11 @@ func (s *Server) AdminListUsers(ctx context.Context, req api.AdminListUsersReque
 		return nil, err
 	}
 	out := api.AdminListUsers200JSONResponse{}
+	local := s.localStatuses(ctx, users)
 	for _, u := range users {
-		out = append(out, s.adminUserView(ctx, u))
+		v := s.adminUserView(ctx, u)
+		v.LocalAccount = local[u.ID]
+		out = append(out, v)
 	}
 	return out, nil
 }
@@ -80,16 +83,30 @@ func (s *Server) AdminCreateUser(ctx context.Context, req api.AdminCreateUserReq
 	} else if email == "" {
 		return nil, apperr.Invalid("email", "email is required")
 	}
-	u, err := s.Q.CreateUser(ctx, dbq.CreateUserParams{
-		Kind: kind, Email: email, Username: email, DisplayName: strings.TrimSpace(b.DisplayName), OrgRole: role, Source: "admin", Active: true,
+	var u dbq.User
+	err = db.Tx(ctx, s.Pool, func(_ pgx.Tx, q *dbq.Queries) error {
+		if u, err = q.CreateUser(ctx, dbq.CreateUserParams{
+			Kind: kind, Email: email, Username: email, DisplayName: strings.TrimSpace(b.DisplayName), OrgRole: role, Source: "admin", Active: true,
+		}); err != nil {
+			if db.IsUniqueViolation(err) {
+				return apperr.Conflict("duplicate_user", "a user with that email already exists")
+			}
+			return err
+		}
+		for _, gid := range deref(b.GroupIds) {
+			if g, err := q.GetGroup(ctx, gid); err != nil || g.Source != "local" {
+				return apperr.Invalid("groupIds", "people can only be added to local groups here")
+			}
+			if err := q.AddGroupMember(ctx, dbq.AddGroupMemberParams{GroupID: gid, UserID: u.ID}); err != nil {
+				return err
+			}
+		}
+		tracker.Audit(ctx, q, a, "user.create", "user", u.ID.String(), nil, map[string]any{"email": email, "kind": kind, "orgRole": role, "groupIds": deref(b.GroupIds)})
+		return nil
 	})
 	if err != nil {
-		if db.IsUniqueViolation(err) {
-			return nil, apperr.Conflict("duplicate_user", "a user with that email already exists")
-		}
 		return nil, err
 	}
-	tracker.Audit(ctx, s.Q, a, "user.create", "user", u.ID.String(), nil, map[string]any{"email": email, "kind": kind, "orgRole": role})
 	return api.AdminCreateUser201JSONResponse(s.adminUserView(ctx, u)), nil
 }
 
@@ -149,7 +166,9 @@ func (s *Server) AdminUpdateUser(ctx context.Context, req api.AdminUpdateUserReq
 	if err != nil {
 		return nil, err
 	}
-	return api.AdminUpdateUser200JSONResponse(s.adminUserView(ctx, out)), nil
+	v := s.adminUserView(ctx, out)
+	v.LocalAccount = s.localStatuses(ctx, []dbq.User{out})[out.ID]
+	return api.AdminUpdateUser200JSONResponse(v), nil
 }
 
 func (s *Server) AdminListUserTokens(ctx context.Context, req api.AdminListUserTokensRequestObject) (api.AdminListUserTokensResponseObject, error) {

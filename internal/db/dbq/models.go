@@ -11,6 +11,17 @@ import (
 	"github.com/google/uuid"
 )
 
+type AccountToken struct {
+	ID        uuid.UUID
+	UserID    uuid.UUID
+	Purpose   string
+	TokenHash string
+	ExpiresAt time.Time
+	UsedAt    *time.Time
+	CreatedBy *uuid.UUID
+	CreatedAt time.Time
+}
+
 type ApiToken struct {
 	ID          uuid.UUID
 	UserID      uuid.UUID
@@ -296,6 +307,31 @@ type IssueType struct {
 	CreatedAt   time.Time
 }
 
+type LocalCredential struct {
+	UserID            uuid.UUID
+	PasswordHash      *string
+	MustChange        bool
+	PasswordChangedAt *time.Time
+	FailedAttempts    int32
+	LastFailedAt      *time.Time
+	LockedUntil       *time.Time
+	TotpSecret        *string
+	TotpEnabledAt     *time.Time
+	TotpLastStep      *int64
+	TotpPending       *string
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+}
+
+type LoginChallenge struct {
+	ID        string
+	UserID    uuid.UUID
+	Stage     string
+	Attempts  int32
+	ExpiresAt time.Time
+	CreatedAt time.Time
+}
+
 type Notification struct {
 	ID            int64
 	UserID        uuid.UUID
@@ -400,6 +436,13 @@ type ProjectRepository struct {
 	ProjectID    uuid.UUID
 	RepositoryID uuid.UUID
 	CreatedAt    time.Time
+}
+
+type RecoveryCode struct {
+	UserID    uuid.UUID
+	CodeHash  string
+	UsedAt    *time.Time
+	CreatedAt time.Time
 }
 
 type Release struct {

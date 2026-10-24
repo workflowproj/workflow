@@ -32,6 +32,7 @@ import (
 	"github.com/geoffo-dev/workflow-management/internal/db/dbq"
 	"github.com/geoffo-dev/workflow-management/internal/events"
 	"github.com/geoffo-dev/workflow-management/internal/identity"
+	"github.com/geoffo-dev/workflow-management/internal/identity/local"
 	"github.com/geoffo-dev/workflow-management/internal/jobs"
 	"github.com/geoffo-dev/workflow-management/internal/mail"
 	"github.com/geoffo-dev/workflow-management/internal/mcpserver"
@@ -58,6 +59,7 @@ type Server struct {
 	Box        *secure.Box
 	Mailer     mail.Sender
 	Notify     *notify.Service
+	Local      *local.Service
 	// OAuth is the authorisation server for AI assistants connecting to /mcp.
 	OAuth *oauth.Server
 

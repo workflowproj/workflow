@@ -7,6 +7,9 @@ describe("router", () => {
     const ids = Object.keys(makeRouter(new QueryClient()).routesById);
     for (const id of [
       "/login",
+      "/forgot-password",
+      "/invite",
+      "/reset-password",
       "/app/projects/$projectKey",
       "/app/projects/$projectKey/board",
       "/app/projects/$projectKey/backlog",

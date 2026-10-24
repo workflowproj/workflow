@@ -38,6 +38,173 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/local/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign in with an email address and a password (local accounts)
+         * @description On success the session cookie is set (`status: signed_in`). Otherwise the result says what
+         *     comes next - `totp_required`, `password_change_required` (a temporary password) or
+         *     `totp_enrollment_required` (`WFM_LOCAL_REQUIRE_2FA`) - and an HttpOnly cookie carries the
+         *     unfinished sign-in to that step. Wrong credentials always get the same 401. Throttled per
+         *     client address and per email (429 with `Retry-After`); repeated failures lock the account
+         *     for a while (429, code `locked`). 404 when `WFM_LOCAL_LOGIN=false`.
+         */
+        post: operations["localLogin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/local/login/totp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Second sign-in step - an authenticator code or a recovery code */
+        post: operations["localLoginTotp"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/local/login/new-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Replace a temporary password during sign-in */
+        post: operations["localLoginNewPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/local/login/totp-setup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start the two-factor enrolment required at sign-in */
+        post: operations["localLoginTotpSetup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/local/login/totp-setup/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Finish two-factor enrolment at sign-in; the result carries the recovery codes once */
+        post: operations["localLoginTotpConfirm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/local/forgot-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Email a password-reset link (valid for one hour) to a local account
+         * @description Answers 202 whether or not an account exists for the address.
+         */
+        post: operations["localForgotPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/local/link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check an invitation or password-reset link */
+        post: operations["localLinkInfo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/local/link/redeem": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Choose a password with an invitation or reset link (single use)
+         * @description Ends every session of the person; they then sign in with the new password (and two-factor if on).
+         */
+        post: operations["localRedeemLink"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/local/password-check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Rate a password against the policy while someone types it */
+        post: operations["localCheckPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/logout": {
         parameters: {
             query?: never;
@@ -97,6 +264,108 @@ export interface paths {
         put?: never;
         post?: never;
         delete: operations["revokeMyToken"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/security": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** How the signed-in person signs in (password, two-factor) */
+        get: operations["getMySecurity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Change your password (local accounts); ends your other sessions */
+        post: operations["changeMyPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/totp/setup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start setting up two-factor authentication */
+        post: operations["setupMyTotp"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/totp/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Turn two-factor authentication on with a code from the new secret */
+        post: operations["confirmMyTotp"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/totp/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Turn two-factor authentication off (needs your password and a code) */
+        post: operations["disableMyTotp"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/totp/recovery-codes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Replace your recovery codes (needs a code) */
+        post: operations["regenerateMyRecoveryCodes"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -319,6 +588,111 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["adminUpdateUser"];
+        trace?: never;
+    };
+    "/admin/users/{userId}/invitation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Email a person an invitation to choose a password (makes them a local account)
+         * @description A new invitation replaces any open one. Refused for people managed by SCIM or Google directory sync.
+         */
+        post: operations["adminInviteUser"];
+        delete: operations["adminRevokeInvitation"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/users/{userId}/temporary-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Set a generated temporary password (returned once; changed at next sign-in) */
+        post: operations["adminSetTemporaryPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/users/{userId}/password-reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Email a local account a password-reset link */
+        post: operations["adminSendPasswordReset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/users/{userId}/unlock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Clear a lockout after repeated failed sign-ins */
+        post: operations["adminUnlockUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/users/{userId}/totp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Turn off a person's two-factor authentication (lost device) */
+        delete: operations["adminResetTotp"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/users/{userId}/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a person's password and two-factor (back to single sign-on only) */
+        delete: operations["adminRemovePassword"];
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/admin/users/{userId}/tokens": {
@@ -1994,6 +2368,8 @@ export interface components {
         AuthProviders: {
             providers: components["schemas"]["AuthProvider"][];
             devLogin: boolean;
+            /** @description Email and password sign-in for local accounts (WFM_LOCAL_LOGIN) */
+            localLogin: boolean;
         };
         AuthProvider: {
             id: string;
@@ -2032,6 +2408,72 @@ export interface components {
             deletedAt?: string;
             /** Format: date-time */
             createdAt: string;
+            localAccount?: components["schemas"]["LocalAccountStatus"];
+        };
+        /** @description Present for people who sign in with a password here (or are invited to). */
+        LocalAccountStatus: {
+            /**
+             * @description invited = no password yet; password_change_required = a temporary password is set
+             * @enum {string}
+             */
+            status: "invited" | "active" | "password_change_required";
+            /** Format: date-time */
+            invitationExpiresAt?: string;
+            totpEnabled: boolean;
+            /**
+             * Format: date-time
+             * @description Set while locked after repeated failures
+             */
+            lockedUntil?: string;
+            /** Format: date-time */
+            passwordChangedAt?: string;
+        };
+        LocalLoginResult: {
+            /** @enum {string} */
+            status: "signed_in" | "totp_required" | "password_change_required" | "totp_enrollment_required";
+            me?: components["schemas"]["Me"];
+            /** @description With password_change_required: the name a new password must not contain */
+            displayName?: string;
+            /** @description After two-factor enrolment at sign-in; shown only once. */
+            recoveryCodes?: string[];
+        };
+        TotpSetup: {
+            /** @description Base32 secret for manual entry */
+            secret: string;
+            otpauthUri: string;
+            /** @description The otpauth URI as a QR code: a data: URI of an SVG image */
+            qrCode: string;
+        };
+        RecoveryCodes: {
+            codes: string[];
+        };
+        MySecurity: {
+            localLoginEnabled: boolean;
+            /** @description You have a password here */
+            localAccount: boolean;
+            /** Format: date-time */
+            passwordChangedAt?: string;
+            totpEnabled: boolean;
+            /** Format: date-time */
+            totpEnabledAt?: string;
+            recoveryCodesRemaining: number;
+            /** @description Two-factor authentication is required for local accounts */
+            require2fa: boolean;
+        };
+        LocalLink: {
+            /** @enum {string} */
+            purpose: "invite" | "reset";
+            email: string;
+            displayName: string;
+            /** Format: date-time */
+            expiresAt?: string;
+        };
+        PasswordCheck: {
+            /** @description 0 not allowed, 1 weak, 2 fair, 3 good, 4 strong */
+            score: number;
+            label: string;
+            problems: string[];
+            acceptable: boolean;
         };
         ApiToken: {
             /** Format: uuid */
@@ -3765,6 +4207,246 @@ export interface operations {
             default: components["responses"]["Problem"];
         };
     };
+    localLogin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    email: string;
+                    password: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Signed in, or the next step */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LocalLoginResult"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    localLoginTotp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description 6-digit code, or a recovery code such as k7dmr-x3qpa */
+                    code: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Signed in, or the next step */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LocalLoginResult"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    localLoginNewPassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    newPassword: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Signed in, or the next step */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LocalLoginResult"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    localLoginTotpSetup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The secret to add to an authenticator app */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TotpSetup"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    localLoginTotpConfirm: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    code: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Signed in */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LocalLoginResult"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    localForgotPassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    email: string;
+                };
+            };
+        };
+        responses: {
+            /** @description If the address has a local account */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    localLinkInfo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    token: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Who the link is for (404 `invalid_link` when used, expired or unknown) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LocalLink"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    localRedeemLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    token: string;
+                    password: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Password set */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LocalLink"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    localCheckPassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    password: string;
+                    email?: string;
+                    displayName?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Strength and policy problems */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasswordCheck"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
     logout: {
         parameters: {
             query?: never;
@@ -3868,6 +4550,155 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getMySecurity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sign-in and two-factor status */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MySecurity"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    changeMyPassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    currentPassword: string;
+                    newPassword: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Changed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    setupMyTotp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The secret to add to an authenticator app; confirm it with a code */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TotpSetup"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    confirmMyTotp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    code: string;
+                };
+            };
+        };
+        responses: {
+            /** @description On; the recovery codes are shown only now */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecoveryCodes"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    disableMyTotp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    password: string;
+                    /** @description Authenticator code or a recovery code */
+                    code: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Off */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    regenerateMyRecoveryCodes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    code: string;
+                };
+            };
+        };
+        responses: {
+            /** @description New codes; the old ones stop working */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecoveryCodes"];
+                };
             };
             default: components["responses"]["Problem"];
         };
@@ -4184,6 +5015,8 @@ export interface operations {
                     email?: string;
                     displayName: string;
                     orgRole?: components["schemas"]["OrgRole"];
+                    /** @description Local groups to add the person to. */
+                    groupIds?: string[];
                 };
             };
         };
@@ -4227,6 +5060,162 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["AdminUser"];
                 };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    adminInviteUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sent */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: date-time */
+                        expiresAt: string;
+                    };
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    adminRevokeInvitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Revoked */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    adminSetTemporaryPassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The temporary password */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        password: string;
+                    };
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    adminSendPasswordReset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sent */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    adminUnlockUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Unlocked */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    adminResetTotp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Reset */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    adminRemovePassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             default: components["responses"]["Problem"];
         };

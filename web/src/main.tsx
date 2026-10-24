@@ -17,9 +17,10 @@ const queryClient = new QueryClient({
     },
   },
   mutationCache: new MutationCache({
-    onError: (err) => {
-      // A session that expired mid-use: send people to sign in again.
-      if (err instanceof ApiError && err.status === 401) {
+    onError: (err, _vars, _ctx, mutation) => {
+      // A session that expired mid-use: send people to sign in again. Sign-in forms (meta.signIn)
+      // show their own 401s (a wrong password or code).
+      if (err instanceof ApiError && err.status === 401 && !mutation.meta?.signIn) {
         window.location.assign(`/login?returnTo=${encodeURIComponent(window.location.pathname + window.location.search)}`);
       }
     },

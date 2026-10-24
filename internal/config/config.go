@@ -133,6 +133,8 @@ type Config struct {
 	// EmailBatchWindow delays immediate notification emails so that several changes to one
 	// issue within the window reach a person as one email.
 	EmailBatchWindow time.Duration
+	// Local accounts: email and password sign-in for people an admin adds.
+	Local LocalAccounts
 }
 
 // RateLimit is requests per minute (0 = no limit), each with a burst of half that.
@@ -158,6 +160,16 @@ type OAuth struct {
 type TimeTracking struct {
 	HoursPerDay float64
 	DaysPerWeek float64
+}
+
+type LocalAccounts struct {
+	// Enabled shows the password form and accepts password sign-in (WFM_LOCAL_LOGIN).
+	Enabled bool
+	// Require2FA makes every local account set up two-factor authentication at sign-in.
+	Require2FA bool
+	// LockoutAttempts consecutive failures lock an account for LockoutDuration (0 disables).
+	LockoutAttempts int
+	LockoutDuration time.Duration
 }
 
 type SMTP struct {
@@ -295,6 +307,10 @@ func LoadFrom(get func(string) string) (*Config, error) {
 			From: e.str("WFM_SMTP_FROM", "Workflow <workflow@localhost>"), TLS: e.str("WFM_SMTP_TLS", "starttls"),
 		},
 		EmailBatchWindow: e.duration("WFM_EMAIL_BATCH_WINDOW", 2*time.Minute),
+		Local: LocalAccounts{
+			Enabled: e.boolean("WFM_LOCAL_LOGIN", true), Require2FA: e.boolean("WFM_LOCAL_REQUIRE_2FA", false),
+			LockoutAttempts: e.integer("WFM_LOCAL_LOCKOUT_ATTEMPTS", 10), LockoutDuration: e.duration("WFM_LOCAL_LOCKOUT_DURATION", 15*time.Minute),
+		},
 	}
 	c.HooksPublicURL = strings.TrimRight(e.str("WFM_HOOKS_PUBLIC_URL", c.PublicURL), "/")
 	// Limits are on by default in production only, so development and tests are not throttled.
@@ -351,6 +367,9 @@ func LoadFrom(get func(string) string) (*Config, error) {
 	}
 	if c.EmailBatchWindow < time.Second {
 		e.errs = append(e.errs, fmt.Errorf("WFM_EMAIL_BATCH_WINDOW: must be at least 1s, got %s", c.EmailBatchWindow))
+	}
+	if c.Local.LockoutAttempts < 0 || c.Local.LockoutDuration <= 0 {
+		e.errs = append(e.errs, errors.New("WFM_LOCAL_LOCKOUT_ATTEMPTS must be 0 or more and WFM_LOCAL_LOCKOUT_DURATION positive"))
 	}
 	switch c.Mode {
 	case ModeWeb, ModeHooks, ModeWorker, ModeAll:

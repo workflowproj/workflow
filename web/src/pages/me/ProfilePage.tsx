@@ -12,6 +12,7 @@ import { ConnectSnippets } from "@/features/settings/tokens/ConnectSnippets";
 import { CreateTokenDialog, TokenTable } from "@/features/settings/tokens/Tokens";
 import { ConnectedAppsSection } from "@/features/settings/connected-apps/ConnectedAppsSection";
 import { SourceBadge, sourceLabel } from "@/features/admin/badges";
+import { securityKey, SignInSecurity } from "@/features/auth/SignInSecurity";
 
 const managed = new Set(["scim", "google"]);
 
@@ -21,6 +22,7 @@ export function ProfilePage() {
   const toast = useToast();
   const [creating, setCreating] = useState(false);
   const tokens = useQuery({ queryKey: ["my-tokens"], queryFn: () => unwrap(api.GET("/me/tokens")) });
+  const localAccount = useQuery({ queryKey: securityKey, queryFn: () => unwrap(api.GET("/me/security")) }).data?.localAccount;
   const revoke = useMutation({
     mutationFn: (id: string) => unwrap(api.DELETE("/me/tokens/{tokenId}", { params: { path: { tokenId: id } } })),
     onSuccess: () => {
@@ -62,9 +64,13 @@ export function ProfilePage() {
           <Lock className="mt-0.5 size-3.5 shrink-0" />
           {source && managed.has(source)
             ? `Your profile is managed by ${sourceLabel(source)}: name, email and status come from your identity provider and are read-only here.`
-            : "Your name, email and picture come from your sign-in provider and update when you sign in. Ask an administrator to change your role."}
+            : localAccount
+              ? "Ask an administrator to change your name, email or role."
+              : "Your name, email and picture come from your sign-in provider and update when you sign in. Ask an administrator to change your role."}
         </div>
       </SettingsSection>
+
+      <SignInSecurity />
 
       <EmailNotificationsSection />
 

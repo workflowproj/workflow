@@ -37,9 +37,24 @@ const rootRoute = createRootRouteWithContext<{ queryClient: QueryClient }>()({
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/login",
-  validateSearch: (s: Record<string, unknown>): { error?: string; returnTo?: string } => ({ error: str(s.error), returnTo: str(s.returnTo) }),
+  validateSearch: (s: Record<string, unknown>): { error?: string; returnTo?: string; notice?: string; email?: string } => ({
+    error: str(s.error),
+    returnTo: str(s.returnTo),
+    notice: str(s.notice),
+    email: str(s.email),
+  }),
   component: LoginPage,
 });
+// Local accounts: invitation and password-reset links, and asking for a reset (signed out).
+const forgotPasswordRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/forgot-password",
+  validateSearch: (s: Record<string, unknown>): { email?: string } => ({ email: str(s.email) }),
+  component: lazyRouteComponent(() => import("@/pages/auth/ForgotPasswordPage"), "ForgotPasswordPage"),
+});
+const tokenSearch = (s: Record<string, unknown>): { token?: string } => ({ token: str(s.token) });
+const inviteRoute = createRoute({ getParentRoute: () => rootRoute, path: "/invite", validateSearch: tokenSearch, component: lazyRouteComponent(() => import("@/pages/auth/SetPasswordPage"), "InvitePage") });
+const resetPasswordRoute = createRoute({ getParentRoute: () => rootRoute, path: "/reset-password", validateSearch: tokenSearch, component: lazyRouteComponent(() => import("@/pages/auth/SetPasswordPage"), "ResetPasswordPage") });
 
 // OAuth consent for AI assistants, outside the app shell: /oauth/consent/<request> asks the
 // signed-in person (signing in first if needed); /oauth/consent?error=… explains a refused request.
@@ -183,6 +198,9 @@ export const routeTree = rootRoute.addChildren([
   loginRoute,
   consentErrorRoute,
   consentRoute,
+  forgotPasswordRoute,
+  inviteRoute,
+  resetPasswordRoute,
   appRoute.addChildren([
     indexRoute,
     projectsRoute,
