@@ -8,6 +8,11 @@ describe("niceTicks", () => {
     expect(niceTicks(4)).toEqual([0, 1, 2, 3, 4]);
     expect(niceTicks(0.6)).toEqual([0, 0.2, 0.4, 0.6]);
   });
+  it("keeps whole steps for counts", () => {
+    expect(niceTicks(10, 4, true)).toEqual([0, 2, 4, 6, 8, 10]);
+    expect(niceTicks(3, 5, true)).toEqual([0, 1, 2, 3]);
+    expect(niceTicks(90, 4, true)).toEqual([0, 20, 40, 60, 80, 100]);
+  });
   it("handles empty data", () => {
     expect(niceTicks(0)).toEqual([0, 1]);
   });

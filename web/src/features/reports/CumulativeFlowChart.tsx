@@ -1,7 +1,7 @@
 import { useState, type KeyboardEvent, type PointerEvent } from "react";
 import type { Schemas } from "@/api/client";
 import { formatDay } from "@/features/backlog/dates";
-import { C, CATEGORICAL, categoryColor, DataTable, Legend, Tooltip, TooltipRow } from "./ChartBits";
+import { C, categoryColor, DataTable, Legend, Tooltip, TooltipRow } from "./ChartBits";
 import { linear, niceTicks, useElementWidth } from "./chart-utils";
 import { foldSeries, stackSeries } from "./series";
 
@@ -9,20 +9,34 @@ type CumulativeFlow = Schemas["CumulativeFlow"];
 
 const M = { top: 12, bottom: 30, left: 40 };
 
+const MAX_SERIES = 8;
+
+/**
+ * statusShade colours the k-th of n statuses in a category: the category's hue, lighter for
+ * earlier stages (mixed toward the surface, so it works in both themes), full for the last.
+ * Statuses are ordered stages, so an ordinal ramp, not unrelated hues: green still means done.
+ */
+function statusShade(color: string, k: number, n: number): string {
+  if (n <= 1) return color;
+  return `color-mix(in oklab, ${color} ${Math.round(55 + (45 * k) / (n - 1))}%, var(--color-surface))`;
+}
+
 /**
  * CumulativeFlowChart stacks the number of issues in each category (or status) at the end of
  * each day, done at the bottom. A band that widens is work piling up in that state. Colours
- * keep their meaning by category; by status, statuses take the categorical slots in workflow
- * order. Hover or arrow keys read a day.
+ * keep their category meaning (grey to do, blue in progress, green done); statuses step
+ * through their category's hue in workflow order. Hover or arrow keys read a day.
  */
 export function CumulativeFlowChart({ data, height: H = 260 }: { data: CumulativeFlow; height?: number }) {
   const [ref, width] = useElementWidth<HTMLDivElement>();
   const [hover, setHover] = useState<number | null>(null);
   const byCategory = data.series.every((s) => s.key === s.category);
-  const series = foldSeries(data.series, CATEGORICAL.length).map((s, k) => ({
-    ...s,
-    color: s.key === "" ? C.reference : byCategory ? categoryColor[s.category] : CATEGORICAL[k],
-  }));
+  const folded = foldSeries(data.series, MAX_SERIES);
+  const series = folded.map((s) => {
+    const family = folded.filter((x) => x.key !== "" && x.category === s.category);
+    const color = s.key === "" ? C.reference : byCategory ? categoryColor[s.category] : statusShade(categoryColor[s.category], family.indexOf(s), family.length);
+    return { ...s, color };
+  });
   const n = data.dates.length;
   // Done sits at the bottom: stack in reverse workflow order.
   const bands = stackSeries([...series].reverse().map((s) => s.counts));
@@ -30,7 +44,7 @@ export function CumulativeFlowChart({ data, height: H = 260 }: { data: Cumulativ
   const labelled = width >= 440 && series.length <= 4;
   const right = labelled ? 96 : 16;
   const x = linear([0, Math.max(1, n - 1)], [M.left, width - right]);
-  const ticks = niceTicks(Math.max(1, ...totals), H < 240 ? 4 : 5);
+  const ticks = niceTicks(Math.max(1, ...totals), H < 240 ? 4 : 5, true);
   const y = linear([0, ticks[ticks.length - 1]], [H - M.bottom, M.top]);
   const last = n - 1;
   if (n === 0) return null;

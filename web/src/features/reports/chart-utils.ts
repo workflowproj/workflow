@@ -1,11 +1,15 @@
 import { useLayoutEffect, useRef, useState } from "react";
 
-/** niceTicks returns 0..max in round steps (1, 2, 2.5, 5 × 10^n), about `count` of them. */
-export function niceTicks(max: number, count = 5): number[] {
+/**
+ * niceTicks returns 0..max in round steps (1, 2, 2.5, 5 × 10^n), about `count` of them.
+ * `integer` keeps steps whole for counts (no 2.5 issues).
+ */
+export function niceTicks(max: number, count = 5, integer = false): number[] {
   if (!(max > 0)) return [0, 1];
   const raw = max / count;
   const mag = 10 ** Math.floor(Math.log10(raw));
-  const step = ([1, 2, 2.5, 5, 10].find((m) => m * mag >= raw) ?? 10) * mag;
+  let step = ([1, 2, 2.5, 5, 10].find((m) => m * mag >= raw) ?? 10) * mag;
+  if (integer) step = step < 1 ? 1 : step === 2.5 ? 2 : step === 25 ? 20 : step;
   const top = Math.ceil(max / step - 1e-9) * step;
   const out: number[] = [];
   for (let v = 0; v <= top + step / 2; v += step) out.push(Math.round(v * 1000) / 1000);

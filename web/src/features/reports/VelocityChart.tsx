@@ -22,7 +22,7 @@ export function VelocityChart({ data, unit = "points", average: avg, height: H =
   const plotW = Math.max(0, width - M.left - M.right);
   const slot = plotW / Math.max(1, data.length);
   const bar = Math.max(4, Math.min(24, (slot - 20) / 2));
-  const ticks = niceTicks(Math.max(1, ...data.flatMap((d) => [committedOf(d), completedOf(d)])), H < 240 ? 4 : 5);
+  const ticks = niceTicks(Math.max(1, ...data.flatMap((d) => [committedOf(d), completedOf(d)])), H < 240 ? 4 : 5, !pts);
   const y = linear([0, ticks[ticks.length - 1]], [H - M.bottom, M.top]);
   const average = avg ?? (data.length ? data.reduce((n, d) => n + completedOf(d), 0) / data.length : 0);
   const center = (i: number) => M.left + slot * (i + 0.5);

@@ -92,6 +92,8 @@ export function BreakdownGadget() {
       <GadgetBody query={q} empty={(d) => (d.total === 0 ? nothing() : points && d.totalPoints === 0 ? nothing("None of the matching issues are estimated in story points.") : null)}>
         {(d) => {
           const rows: BreakdownRow[] = d.groups.map((g) => ({ key: g.key, label: g.label, value: points ? g.points : g.count, category: g.category, user: g.user }));
+          // Groups come largest by count; by points, re-rank (priority and category keep their order, None stays last).
+          if (points && by !== "priority" && by !== "statusCategory") rows.sort((x, y) => Number(x.key === "") - Number(y.key === "") || y.value - x.value);
           const props = {
             rows,
             total: points ? d.totalPoints : d.total,
@@ -190,7 +192,7 @@ export function IssueListGadget() {
                       <td className="truncate" title={i.summary}>
                         {i.summary}
                       </td>
-                      <td className="hidden @lg:table-cell">
+                      <td className="hidden @lg:table-cell" title={i.status.name}>
                         <StatusBadge status={i.status} />
                       </td>
                       <td>

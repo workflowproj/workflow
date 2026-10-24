@@ -29,9 +29,9 @@ export function CreatedResolvedChart({ data, height: H = 280 }: { data: CreatedR
   const mainBottom = H - M.bottom - STRIP - STRIP_GAP;
   const stripTop = H - M.bottom - STRIP;
   const stripBottom = H - M.bottom;
-  const ticks = niceTicks(Math.max(1, ...b.flatMap((k) => [k.created, k.resolved])), 4);
+  const ticks = niceTicks(Math.max(1, ...b.flatMap((k) => [k.created, k.resolved])), 4, true);
   const y = linear([0, ticks[ticks.length - 1]], [mainBottom, M.top]);
-  const openTicks = niceTicks(Math.max(1, ...b.map((k) => k.open)), 2);
+  const openTicks = niceTicks(Math.max(1, ...b.map((k) => k.open)), 2, true);
   const yOpen = linear([0, openTicks[openTicks.length - 1]], [stripBottom, stripTop]);
   const last = n - 1;
   if (n === 0) return null;

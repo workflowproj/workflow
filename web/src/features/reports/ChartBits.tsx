@@ -20,8 +20,20 @@ export const C = {
   done: "var(--color-chart-done)",
 };
 
-/** Categorical slots in their fixed order (see index.css); a ninth series folds into "Other". */
-export const CATEGORICAL = [1, 2, 3, 4, 5, 6, 7, 8].map((i) => `var(--color-chart-${i})`);
+/**
+ * Categorical slots in their fixed order (see index.css); a ninth series folds into "Other".
+ * Spelled out: Tailwind only emits the theme variables it finds named in the source.
+ */
+export const CATEGORICAL = [
+  "var(--color-chart-1)",
+  "var(--color-chart-2)",
+  "var(--color-chart-3)",
+  "var(--color-chart-4)",
+  "var(--color-chart-5)",
+  "var(--color-chart-6)",
+  "var(--color-chart-7)",
+  "var(--color-chart-8)",
+];
 
 /** Status categories keep their meaning in charts: grey to do, blue in progress, green done. */
 export const categoryColor: Record<StatusCategory, string> = {

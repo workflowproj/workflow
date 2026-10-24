@@ -78,7 +78,7 @@ function SprintDayChart({ report, kind, measure, height: H = 280 }: { report: Sp
     const f = Math.min(1, i / idealDays);
     return kind === "burndown" ? Math.max(0, m.committed * (1 - f)) : m.committed * f;
   };
-  const ticks = niceTicks(Math.max(m.committed, ...burndown.flatMap((p) => lines.map((l) => l.value(p))), 1), H < 240 ? 4 : 5);
+  const ticks = niceTicks(Math.max(m.committed, ...burndown.flatMap((p) => lines.map((l) => l.value(p))), 1), H < 240 ? 4 : 5, measure === "issues");
   const y = linear([0, ticks[ticks.length - 1]], [H - M.bottom, M.top]);
   const pts = burndown.map((p) => ({ p, i: daysBetween(start, p.date) }));
   const last = pts[pts.length - 1];
