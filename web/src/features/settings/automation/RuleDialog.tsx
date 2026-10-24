@@ -7,6 +7,7 @@ import { Button, Checkbox, Field, Input, Modal, Select, Textarea, useToast } fro
 import { ErrorBox } from "@/components/ErrorBox";
 import { CelHelp, type CelExample } from "../CelHelp";
 import { Callout } from "../common";
+import { chatChannelsQuery } from "../chat/meta";
 import { useProjectStatuses } from "../queries";
 import { ActionRow } from "./ActionFields";
 import { describeRule } from "./describe";
@@ -43,12 +44,7 @@ export function RuleDialog({ projectKey, rule, initial, templateTitle, onClose }
   const [actions, setActions] = useState<Action[]>(start?.actions ?? [emptyAction("comment")]);
 
   const usesChat = actions.some((a) => a.type === "chat");
-  const chat = useQuery({
-    queryKey: ["chat-channels", projectKey],
-    queryFn: () => unwrap(api.GET("/projects/{projectKey}/chat-channels", { params: { path: { projectKey } } })),
-    enabled: usesChat,
-    retry: false,
-  });
+  const chat = useQuery({ ...chatChannelsQuery(projectKey), enabled: usesChat });
   const chatChannels = (chat.data ?? []).map((c) => ({ id: c.id, name: c.name, provider: c.provider }));
   const statusNames = useMemo(() => project.statuses.map((s) => s.name), [project.statuses]);
   // Named statuses that no workflow of this project has (only once the workflows are loaded).
@@ -86,7 +82,7 @@ export function RuleDialog({ projectKey, rule, initial, templateTitle, onClose }
   const shownErrors = new Set(["name", "trigger.type", "trigger.toCategory", "trigger.cron", "trigger.jql", "condition", "actions", ...actions.map((_, i) => `actions[${i}]`)]);
   const otherErrors = save.error && !(save.error instanceof ApiError && Object.keys(fe).some((k) => shownErrors.has(k)));
   const incomplete = actions.some((a) => (a.type === "transition" && !a.category && !a.status) || (a.type === "chat" && !a.channelId));
-  const preview = describeRule({ trigger: cleanTrigger(trigger), condition, actions: actions.map(cleanAction) });
+  const preview = describeRule({ trigger: cleanTrigger(trigger), condition, actions: actions.map(cleanAction) }, { channel: (id) => chatChannels.find((c) => c.id === id)?.name });
 
   return (
     <Modal
@@ -171,6 +167,7 @@ export function RuleDialog({ projectKey, rule, initial, templateTitle, onClose }
                 customFields={fields.map((f) => f.key)}
                 missing={missing}
                 chatChannels={chatChannels}
+                projectKey={projectKey}
                 error={fe[`actions[${i}]`]}
               />
             ))}

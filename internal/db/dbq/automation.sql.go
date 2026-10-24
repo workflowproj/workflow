@@ -153,6 +153,43 @@ func (q *Queries) DeleteWebhookSubscription(ctx context.Context, id uuid.UUID) e
 	return err
 }
 
+const disableRulesUsingChannel = `-- name: DisableRulesUsingChannel :many
+UPDATE automation_rules SET enabled = false, updated_at = now()
+WHERE project_id = $1 AND enabled
+  AND actions @> jsonb_build_array(jsonb_build_object('channelId', $2::text))
+RETURNING id, name
+`
+
+type DisableRulesUsingChannelParams struct {
+	ProjectID uuid.UUID
+	ChannelID string
+}
+
+type DisableRulesUsingChannelRow struct {
+	ID   uuid.UUID
+	Name string
+}
+
+func (q *Queries) DisableRulesUsingChannel(ctx context.Context, arg DisableRulesUsingChannelParams) ([]DisableRulesUsingChannelRow, error) {
+	rows, err := q.db.Query(ctx, disableRulesUsingChannel, arg.ProjectID, arg.ChannelID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []DisableRulesUsingChannelRow{}
+	for rows.Next() {
+		var i DisableRulesUsingChannelRow
+		if err := rows.Scan(&i.ID, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const dueScheduledRules = `-- name: DueScheduledRules :many
 SELECT id, project_id, name, description, enabled, trigger_type, trigger_config, condition, actions, created_by, created_at, updated_at, last_run_at, next_run_at FROM automation_rules
 WHERE enabled AND trigger_type = 'schedule' AND next_run_at IS NOT NULL AND next_run_at <= now()

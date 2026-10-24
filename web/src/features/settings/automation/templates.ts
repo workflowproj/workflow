@@ -1,13 +1,15 @@
-import { CalendarRange, CircleCheckBig, GitMerge, GitPullRequestArrow, ListChecks, OctagonAlert, Play, Siren, Timer, type LucideIcon } from "lucide-react";
+import { CalendarRange, CircleCheckBig, GitMerge, GitPullRequestArrow, ListChecks, Megaphone, OctagonAlert, Play, Siren, Timer, type LucideIcon } from "lucide-react";
 import type { RuleInput } from "./meta";
 
 export interface RuleTemplate {
   id: string;
   title: string;
   description: string;
-  group: "Development" | "Hierarchy" | "Hygiene";
+  group: "Development" | "Hierarchy" | "Hygiene" | "Chat";
   icon: LucideIcon;
   rule: RuleInput;
+  /** Offered only when the project has a chat channel; the first one is pre-selected. */
+  needsChat?: boolean;
 }
 
 /*
@@ -167,6 +169,22 @@ export const RULE_TEMPLATES: RuleTemplate[] = [
         { type: "add_label", label: "ci-failing" },
         { type: "comment", body: "Pipeline {{event.pipeline}} failed on {{event.branch}}: {{event.url}}" },
       ],
+    },
+  },
+  {
+    id: "chat-done",
+    title: "Announce finished work in chat",
+    description: "Posts to a Slack or Mattermost channel whenever an issue reaches a done status.",
+    group: "Chat",
+    icon: Megaphone,
+    needsChat: true,
+    rule: {
+      name: "Announce finished work in chat",
+      description: "Celebrates finished work in the team channel.",
+      enabled: true,
+      trigger: { type: "issue.transitioned", toCategory: "done" },
+      condition: "",
+      actions: [{ type: "chat", channelId: "", body: "🎉 {{issue.key}} {{issue.summary}} is done" }],
     },
   },
 ];

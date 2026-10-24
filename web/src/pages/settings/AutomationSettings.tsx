@@ -11,6 +11,7 @@ import { cleanAction, cleanTrigger, type Rule } from "@/features/settings/automa
 import { RuleSentenceView } from "@/features/settings/automation/RuleSentence";
 import { TemplateGallery } from "@/features/settings/automation/TemplateGallery";
 import type { RuleTemplate } from "@/features/settings/automation/templates";
+import { chatChannelsQuery } from "@/features/settings/chat/meta";
 import { useProjectStatuses } from "@/features/settings/queries";
 import { RuleDialog } from "@/features/settings/automation/RuleDialog";
 
@@ -28,9 +29,13 @@ export function AutomationSettings() {
   const list = rules.data ?? [];
   const existingNames = new Set(list.map((r) => r.name.toLowerCase()));
   const statusNames = project.loading ? null : project.statuses.map((s) => s.name);
+  const chat = useQuery(chatChannelsQuery(projectKey));
+  const channels = chat.data ?? [];
   const pick = (t: RuleTemplate) => {
     setGallery(false);
-    setDialog({ template: t });
+    // Chat templates post to the project's first channel; it can be changed in the dialog.
+    const rule = t.needsChat ? { ...t.rule, actions: t.rule.actions.map((a) => (a.type === "chat" && !a.channelId ? { ...a, channelId: channels[0]?.id ?? "" } : a)) } : t.rule;
+    setDialog({ template: { ...t, rule } });
   };
 
   return (
@@ -71,7 +76,7 @@ export function AutomationSettings() {
             </Button>
           </div>
           <div className="p-4">
-            <TemplateGallery onPick={pick} existingNames={existingNames} statusNames={statusNames} />
+            <TemplateGallery onPick={pick} existingNames={existingNames} statusNames={statusNames} hasChat={channels.length > 0} />
           </div>
         </section>
       ) : (
@@ -82,7 +87,7 @@ export function AutomationSettings() {
         </ul>
       )}
       <Modal open={gallery} onClose={() => setGallery(false)} title="Start from a template" size="xl">
-        <TemplateGallery onPick={pick} existingNames={existingNames} statusNames={statusNames} />
+        <TemplateGallery onPick={pick} existingNames={existingNames} statusNames={statusNames} hasChat={channels.length > 0} />
       </Modal>
       {dialog && <RuleDialog projectKey={projectKey} rule={dialog.rule} initial={dialog.template?.rule} templateTitle={dialog.template?.title} onClose={() => setDialog(null)} />}
     </div>
@@ -116,6 +121,9 @@ function RuleCard({ rule, projectKey, onEdit }: { rule: Rule; projectKey: string
     },
     onError: toast.error,
   });
+  const chat = useQuery({ ...chatChannelsQuery(projectKey), enabled: rule.actions.some((a) => a.type === "chat") });
+  // A channel missing from a loaded list was removed; say so instead of a generic "chat".
+  const channelName = (id: string) => (chat.data ? (chat.data.find((c) => c.id === id)?.name ?? null) : undefined);
   const runsId = `runs-${rule.id}`;
   return (
     <li className="rounded-lg border border-line bg-surface">
@@ -129,7 +137,7 @@ function RuleCard({ rule, projectKey, onEdit }: { rule: Rule; projectKey: string
             {!rule.enabled && <Badge>Disabled</Badge>}
           </div>
           {rule.description && <p className="text-[13px] text-muted">{rule.description}</p>}
-          <RuleSentenceView sentence={describeRule(rule)} className="mt-1.5" />
+          <RuleSentenceView sentence={describeRule(rule, { channel: channelName })} className="mt-1.5" />
           <p className="mt-2 flex flex-wrap gap-x-4 text-xs text-muted">
             <span>
               Last run: <When iso={rule.lastRunAt} empty="never" />

@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { ArrowDown, ArrowUp, X } from "lucide-react";
 import { IconButton, Input, Select, Textarea } from "@/components/ui";
 import { ACTIONS, CATEGORIES, emptyAction, SET_FIELDS, TARGETS, type Action, type ActionType, type Category, type Target } from "./meta";
@@ -23,6 +24,7 @@ export function ActionRow({
   customFields,
   missing,
   chatChannels,
+  projectKey,
   error,
 }: {
   action: Action;
@@ -35,6 +37,7 @@ export function ActionRow({
   customFields: string[];
   missing: Set<string>;
   chatChannels: { id: string; name: string; provider: string }[];
+  projectKey: string;
   error?: string;
 }) {
   const label = `Action ${index + 1}`;
@@ -78,7 +81,7 @@ export function ActionRow({
           </IconButton>
         </div>
       </div>
-      <Options action={a} label={label} onChange={onChange} statuses={statuses} customFields={customFields} missing={missing} chatChannels={chatChannels} />
+      <Options action={a} label={label} onChange={onChange} statuses={statuses} customFields={customFields} missing={missing} chatChannels={chatChannels} projectKey={projectKey} />
       {target === "children" && a.type !== "rollup_dates" && <p className="mt-1.5 text-xs text-muted">Runs once for each child; nothing happens if the issue has none.</p>}
       {target === "parent" && a.type !== "rollup_dates" && <p className="mt-1.5 text-xs text-muted">Runs on the parent (a story's epic, a sub-task's story); nothing happens without one.</p>}
       {error && <p className="mt-1.5 text-xs text-danger">{error}</p>}
@@ -94,6 +97,7 @@ function Options({
   customFields,
   missing,
   chatChannels,
+  projectKey,
 }: {
   action: Action;
   label: string;
@@ -102,6 +106,7 @@ function Options({
   customFields: string[];
   missing: Set<string>;
   chatChannels: { id: string; name: string; provider: string }[];
+  projectKey: string;
 }) {
   switch (a.type) {
     case "transition": {
@@ -226,6 +231,15 @@ function Options({
               </option>
             ))}
           </Select>
+          {chatChannels.length === 0 && (
+            <p className="text-xs text-muted">
+              Add a Slack or Mattermost channel in{" "}
+              <Link to="/projects/$projectKey/settings/chat" params={{ projectKey }} className="text-accent hover:underline">
+                Settings → Chat
+              </Link>{" "}
+              first.
+            </p>
+          )}
           <Textarea
             aria-label={`${label}: message`}
             rows={2}

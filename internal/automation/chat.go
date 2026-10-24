@@ -150,11 +150,23 @@ func (s *Service) DeleteChatChannel(ctx context.Context, actor *authz.Actor, id 
 	if err != nil {
 		return err
 	}
-	if err := s.Q.DeleteChatChannel(ctx, id); err != nil {
-		return err
-	}
-	tracker.Audit(ctx, s.Q, actor, "chat.delete", "chat_channel", id.String(), &p.ID, map[string]any{"name": ch.Name})
-	return nil
+	// Rules that post to this channel could only fail from now on: pause them, visibly.
+	return db.Tx(ctx, s.Pool, func(_ pgx.Tx, q *dbq.Queries) error {
+		disabled, err := q.DisableRulesUsingChannel(ctx, dbq.DisableRulesUsingChannelParams{ProjectID: ch.ProjectID, ChannelID: id.String()})
+		if err != nil {
+			return err
+		}
+		if err := q.DeleteChatChannel(ctx, id); err != nil {
+			return err
+		}
+		names := make([]string, len(disabled))
+		for i, r := range disabled {
+			names[i] = r.Name
+			tracker.Audit(ctx, q, actor, "automation.disable", "automation_rule", r.ID.String(), &p.ID, map[string]any{"name": r.Name, "reason": "chat channel " + ch.Name + " removed"})
+		}
+		tracker.Audit(ctx, q, actor, "chat.delete", "chat_channel", id.String(), &p.ID, map[string]any{"name": ch.Name, "disabledRules": names})
+		return nil
+	})
 }
 
 func (s *Service) ChatDeliveries(ctx context.Context, actor *authz.Actor, id uuid.UUID, limit int) ([]dbq.ChatDelivery, error) {

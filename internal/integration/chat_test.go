@@ -160,6 +160,16 @@ func TestChatChannels(t *testing.T) {
 	e.DrainJobs()
 	eq(t, len(slack.texts()), 0, "paused channel")
 	admin.must("DELETE", "/api/v1/chat-channels/"+str(sc, "id"), nil, 204, nil)
+
+	// Removing a channel pauses the rules that post to it.
+	admin.must("DELETE", "/api/v1/chat-channels/"+str(mc, "id"), nil, 204, nil)
+	var rules []obj
+	admin.get("/api/v1/projects/CHAT/automation-rules", &rules)
+	for _, r := range rules {
+		if str(r, "name") == "Celebrate" && r["enabled"] != false {
+			t.Fatalf("rule posting to a removed channel still enabled: %v", r)
+		}
+	}
 }
 
 func TestChatSlashCommands(t *testing.T) {

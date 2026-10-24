@@ -38,6 +38,9 @@ describe("describeRule", () => {
     expect(describeAction({ type: "assign", assignee: "unassigned", target: "parent" })).toBe("unassign parent");
     expect(describeAction({ type: "notify", recipients: "assignee", target: "parent" })).toBe("notify parent's assignee");
     expect(describeAction({ type: "transition", status: "Blocked" })).toBe("move to “Blocked”");
+    expect(describeAction({ type: "chat", channelId: "c", body: "hi" })).toBe("post to chat");
+    expect(describeAction({ type: "chat", channelId: "c", body: "hi", target: "parent" }, { channel: () => "#team" })).toBe("post to “#team” about parent");
+    expect(describeAction({ type: "chat", channelId: "gone", body: "hi" }, { channel: () => null })).toBe("post to a removed channel");
   });
 });
 

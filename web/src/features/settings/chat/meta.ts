@@ -13,7 +13,11 @@ export const PROVIDERS: { id: ChatProvider; label: string; icon: LucideIcon; url
     label: "Slack",
     icon: Hash,
     urlExample: "https://hooks.slack.com/services/T…/B…/…",
-    steps: ["Create (or reuse) a Slack app for your workspace.", "Open Incoming Webhooks, turn them on, then Add New Webhook to Workspace.", "Pick the channel and copy the webhook URL (https://hooks.slack.com/services/…)."],
+    steps: [
+      "Create (or reuse) a Slack app for your workspace.",
+      "Open Incoming Webhooks, turn them on, then Add New Webhook to Workspace.",
+      "Pick the channel and copy the webhook URL (https://hooks.slack.com/services/…).",
+    ],
   },
   {
     id: "mattermost",
@@ -54,7 +58,10 @@ export const EVENT_GROUPS: { title: string; events: { id: Exclude<ChatEvent, "*"
   },
 ];
 
-export const eventLabel = (e: string) => EVENT_GROUPS.flatMap((g) => g.events).find((x) => x.id === e)?.label ?? e;
+// Deliveries also carry "test" (Send test) and "automation" (a rule's chat action).
+const EXTRA_LABELS: Record<string, string> = { test: "Test message", automation: "Automation rule" };
+
+export const eventLabel = (e: string) => EVENT_GROUPS.flatMap((g) => g.events).find((x) => x.id === e)?.label ?? EXTRA_LABELS[e] ?? e;
 
 export const chatChannelsQuery = (projectKey: string) =>
   queryOptions({

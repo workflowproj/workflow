@@ -83,3 +83,9 @@ SELECT * FROM webhook_deliveries WHERE subscription_id = $1 ORDER BY created_at 
 
 -- name: TouchRuleLastRun :exec
 UPDATE automation_rules SET last_run_at = now() WHERE id = $1;
+
+-- name: DisableRulesUsingChannel :many
+UPDATE automation_rules SET enabled = false, updated_at = now()
+WHERE project_id = @project_id AND enabled
+  AND actions @> jsonb_build_array(jsonb_build_object('channelId', @channel_id::text))
+RETURNING id, name;

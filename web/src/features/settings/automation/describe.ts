@@ -121,7 +121,7 @@ function describeWhen(t: Trigger, s: string): string {
 }
 
 /** describeAction is a short verb phrase for one action, naming its target when it is not the issue itself. */
-export function describeAction(a: Action): string {
+export function describeAction(a: Action, names: Names = {}): string {
   const obj = a.target === "parent" ? "parent" : a.target === "children" ? "children" : "";
   const sp = obj ? `${obj} ` : "";
   switch (a.type) {
@@ -140,8 +140,10 @@ export function describeAction(a: Action): string {
       return obj === "parent" ? "roll up parent dates from its children" : obj === "children" ? "roll up children's dates from theirs" : "roll up its dates from its children";
     case "notify":
       return `notify ${obj ? `${obj}'s` : "the"} ${a.recipients ?? "watchers"}`;
-    case "chat":
-      return `post to chat${obj ? ` about ${obj}` : ""}`;
+    case "chat": {
+      const ch = a.channelId ? names.channel?.(a.channelId) : undefined;
+      return `post to ${ch ? `“${ch}”` : ch === null ? "a removed channel" : "chat"}${obj ? ` about ${obj}` : ""}`;
+    }
     case "webhook": {
       let host = "";
       try {
@@ -154,13 +156,16 @@ export function describeAction(a: Action): string {
   }
 }
 
-export function describeRule(r: Pick<RuleInput, "trigger" | "condition" | "actions">): RuleSentence {
+/** Names resolves ids in actions to display names: undefined when unknown (generic phrase), null when gone. */
+export type Names = { channel?: (id: string) => string | null | undefined };
+
+export function describeRule(r: Pick<RuleInput, "trigger" | "condition" | "actions">, names: Names = {}): RuleSentence {
   const cond = r.condition?.trim() ?? "";
   const human = cond ? humanizeCondition(cond) : { clauses: [] };
   const subject = human?.subject ?? "an issue";
   let when = describeWhen(r.trigger, subject);
   if (human?.clauses.length) when += r.trigger.type === "schedule" ? ` where ${human.clauses.join(" and ")}` : ` and ${human.clauses.join(" and ")}`;
-  return { when, actions: r.actions.map(describeAction), condition: cond && !human ? cond : undefined };
+  return { when, actions: r.actions.map((a) => describeAction(a, names)), condition: cond && !human ? cond : undefined };
 }
 
 /** sentence joins a description into plain text (for titles and tests). */

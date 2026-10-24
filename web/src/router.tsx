@@ -104,6 +104,7 @@ const workflowEditorRoute = createRoute({ getParentRoute: () => settingsRoute, p
 const boardsSettingsRoute = createRoute({ getParentRoute: () => settingsRoute, path: "/boards", component: lazyRouteComponent(() => import("@/pages/settings/BoardsSettings"), "BoardsSettings") });
 const repositoriesRoute = createRoute({ getParentRoute: () => settingsRoute, path: "/repositories", component: lazyRouteComponent(() => import("@/pages/settings/RepositoriesSettings"), "RepositoriesSettings") });
 const automationRoute = createRoute({ getParentRoute: () => settingsRoute, path: "/automation", component: lazyRouteComponent(() => import("@/pages/settings/AutomationSettings"), "AutomationSettings") });
+const chatSettingsRoute = createRoute({ getParentRoute: () => settingsRoute, path: "/chat", component: lazyRouteComponent(() => import("@/pages/settings/ChatSettings"), "ChatSettings") });
 const projectWebhooksRoute = createRoute({ getParentRoute: () => settingsRoute, path: "/webhooks", component: lazyRouteComponent(() => import("@/pages/settings/WebhooksSettings"), "WebhooksSettings") });
 
 const searchRoute = createRoute({
@@ -161,6 +162,7 @@ export const routeTree = rootRoute.addChildren([
         boardsSettingsRoute,
         repositoriesRoute,
         automationRoute,
+        chatSettingsRoute,
         projectWebhooksRoute,
       ]),
     ]),

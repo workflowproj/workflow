@@ -9,23 +9,24 @@ const GROUPS: { id: RuleTemplate["group"]; title: string }[] = [
   { id: "Development", title: "Pull requests and builds" },
   { id: "Hierarchy", title: "Epics, stories and sub-tasks" },
   { id: "Hygiene", title: "Triage and housekeeping" },
+  { id: "Chat", title: "Chat" },
 ];
 
 /**
  * TemplateGallery lists ready-made rules by theme. Picking one opens the rule dialog pre-filled;
  * templates already used (same rule name) and ones naming statuses the project lacks are marked.
  */
-export function TemplateGallery({ onPick, existingNames, statusNames }: { onPick: (t: RuleTemplate) => void; existingNames: Set<string>; statusNames: string[] | null }) {
+export function TemplateGallery({ onPick, existingNames, statusNames, hasChat }: { onPick: (t: RuleTemplate) => void; existingNames: Set<string>; statusNames: string[] | null; hasChat: boolean }) {
   const known = statusNames ? new Set(statusNames.map((s) => s.toLowerCase())) : null;
   return (
     <div className="flex flex-col gap-5">
-      {GROUPS.map((g) => (
+      {GROUPS.filter((g) => RULE_TEMPLATES.some((t) => t.group === g.id && (!t.needsChat || hasChat))).map((g) => (
         <section key={g.id} aria-labelledby={`tpl-${g.id}`}>
           <h3 id={`tpl-${g.id}`} className="mb-2 text-[11px] font-semibold tracking-wide text-faint uppercase">
             {g.title}
           </h3>
           <ul className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
-            {RULE_TEMPLATES.filter((t) => t.group === g.id).map((t) => {
+            {RULE_TEMPLATES.filter((t) => t.group === g.id && (!t.needsChat || hasChat)).map((t) => {
               const used = existingNames.has(t.rule.name.toLowerCase());
               const missing = known ? namedStatuses(t.rule).filter((s) => !known.has(s.toLowerCase())) : [];
               const Icon = t.icon;

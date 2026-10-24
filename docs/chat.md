@@ -28,20 +28,23 @@ Two integrations, each optional:
 | `pr.opened`, `pr.merged` | a linked pull/merge request opens or merges |
 | `pipeline.failed` | a linked CI pipeline fails |
 
-   An optional **JQL filter** limits issue events to matching issues, e.g. `type = Bug AND
-   priority >= High` for an on-call channel. `currentUser()` matches nobody here.
+   *Everything* also covers event types added in later versions. An optional **JQL filter**
+   limits issue events to matching issues, e.g. `type = Bug AND priority >= High` for an
+   on-call channel; it does not apply to sprint and release events, nor to messages from
+   automation rules, and `currentUser()` matches nobody here.
 3. *Send test* posts a test message; the channel's delivery log shows each message's status.
 
 Messages use Slack Block Kit and Mattermost attachments, link to the issue, and are coloured by
 status category. The webhook URL is a credential: it is stored encrypted and never shown again
-(the list shows only its host and last characters). Deliveries are queued after the change
-commits; network errors, 5xx and 429 answers are retried with backoff, while other answers (a
-deleted channel, a revoked webhook) are recorded as failed. Pause a channel to stop messages
-without losing its settings.
+(the list shows only its host and last characters; leave the field empty when editing to keep
+it). Deliveries are queued after the change commits; network errors, 5xx and 429 answers are
+retried with backoff, while other answers (a deleted channel, a revoked webhook) are recorded as
+failed. Pause a channel to stop messages without losing its settings.
 
 **Automation**: the `chat` action posts a message of your own to one of the project's channels,
 with the usual templates — e.g. *when an issue enters a done status, post
-"🎉 {{issue.key}} {{issue.summary}} is done" to #releases*. See [automation.md](automation.md).
+"🎉 {{issue.key}} {{issue.summary}} is done" to #releases* (a template in the gallery). Removing a
+channel pauses the rules that post to it. See [automation.md](automation.md).
 
 ### Self-hosted Mattermost on a private network
 

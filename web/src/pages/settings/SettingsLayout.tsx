@@ -1,5 +1,5 @@
 import { getRouteApi, Link, Outlet, useMatchRoute } from "@tanstack/react-router";
-import { Bot, FolderGit2, GitBranch, KanbanSquare, Layers, Settings, Users, Webhook } from "lucide-react";
+import { Bot, FolderGit2, GitBranch, KanbanSquare, Layers, MessagesSquare, Settings, Users, Webhook } from "lucide-react";
 import { hasPermission, useProject } from "@/api/queries";
 import { EmptyState } from "@/components/ui";
 
@@ -13,6 +13,7 @@ const sections = [
   { label: "Boards", to: "/projects/$projectKey/settings/boards" as const, icon: KanbanSquare },
   { label: "Repositories", to: "/projects/$projectKey/settings/repositories" as const, icon: FolderGit2 },
   { label: "Automation", to: "/projects/$projectKey/settings/automation" as const, icon: Bot },
+  { label: "Chat", to: "/projects/$projectKey/settings/chat" as const, icon: MessagesSquare },
   { label: "Webhooks", to: "/projects/$projectKey/settings/webhooks" as const, icon: Webhook },
 ];
 
