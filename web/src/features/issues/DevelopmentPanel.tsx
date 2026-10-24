@@ -55,7 +55,7 @@ export function DevelopmentPanel() {
             </>
           ) : hasPermission(project, "project.admin") ? (
             <>
-              <Link to="/projects/$projectKey/settings/repositories" params={{ projectKey: issue.projectKey }} className="text-accent hover:underline">
+              <Link to="/projects/$projectKey/settings/repositories" params={{ projectKey: issue.projectKey }} className="text-accent underline underline-offset-2">
                 Connect a repository in project settings
               </Link>{" "}
               to see branches, commits and pull requests here.

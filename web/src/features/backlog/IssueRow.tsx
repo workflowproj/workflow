@@ -8,8 +8,11 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { cn } from "@/lib/cn";
 import { DevIndicators, ParentChip, PointsPill } from "@/features/board/IssueCard";
 
-/** IssueRow is one line of a sprint or the backlog. `actions` renders at the end (e.g. a menu). */
-export function IssueRow({ issue, lifted, actions }: { issue: Issue; lifted?: boolean; actions?: ReactNode }) {
+/**
+ * IssueRow is one line of a sprint or the backlog. `actions` renders at the end (e.g. a menu);
+ * `reserve` keeps that space empty when the actions are rendered outside (SortableIssueRow).
+ */
+export function IssueRow({ issue, lifted, actions, reserve }: { issue: Issue; lifted?: boolean; actions?: ReactNode; reserve?: boolean }) {
   const done = issue.status.category === "done";
   return (
     <div className={cn("group flex h-10 items-center gap-2.5 bg-surface pr-2 pl-1.5 text-sm", lifted ? "cursor-grabbing rounded-md border border-line-strong shadow-xl ring-1 ring-accent/30" : "hover:bg-surface-2/60")}>
@@ -23,15 +26,15 @@ export function IssueRow({ issue, lifted, actions }: { issue: Issue; lifted?: bo
       <span className="flex w-7 justify-center">{issue.storyPoints != null ? <PointsPill points={issue.storyPoints} /> : <span className="text-xs text-faint">–</span>}</span>
       <PriorityIcon priority={issue.priority} className="size-3.5" />
       <UserAvatar user={issue.assignee} size={22} />
-      {/* Clicks and presses on the actions must neither open the issue nor start a drag. */}
-      <span className="flex w-7 justify-center" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
-        {actions}
-      </span>
+      {actions ? <span className="flex w-7 justify-center">{actions}</span> : reserve && <span className="w-7" aria-hidden />}
     </div>
   );
 }
 
-/** SortableIssueRow drags with the pointer or Space (arrows move, Space drops); click or Enter opens. */
+/**
+ * SortableIssueRow drags with the pointer or Space (arrows move, Space drops); click or Enter
+ * opens. The actions sit beside the row's button, not inside it, so no control is nested in another.
+ */
 export function SortableIssueRow({ issue, onOpen, disabled, actions }: { issue: Issue; onOpen: (key: string) => void; disabled?: boolean; actions?: ReactNode }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: issue.id, disabled });
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
@@ -47,19 +50,20 @@ export function SortableIssueRow({ issue, onOpen, disabled, actions }: { issue: 
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Translate.toString(transform), transition }}
-      {...attributes}
-      {...listeners}
-      onKeyDown={onKeyDown}
-      onClick={() => onOpen(issue.key)}
-      aria-label={`${issue.key} ${issue.summary}`}
-      data-issue-key={issue.key}
-      className={cn(
-        "relative cursor-pointer border-b border-line outline-none last:border-b-0 focus-visible:z-[1] focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset",
-        !disabled && "touch-none",
-        isDragging && "opacity-35",
-      )}
+      className={cn("group relative border-b border-line last:border-b-0", isDragging && "opacity-35")}
     >
-      <IssueRow issue={issue} actions={actions} />
+      <div
+        {...attributes}
+        {...listeners}
+        onKeyDown={onKeyDown}
+        onClick={() => onOpen(issue.key)}
+        aria-label={`${issue.key} ${issue.summary}`}
+        data-issue-key={issue.key}
+        className={cn("cursor-pointer outline-none focus-visible:relative focus-visible:z-[1] focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset", !disabled && "touch-none")}
+      >
+        <IssueRow issue={issue} reserve={!!actions} />
+      </div>
+      {actions && <span className="absolute top-1/2 right-2 flex w-7 -translate-y-1/2 justify-center">{actions}</span>}
     </div>
   );
 }

@@ -128,7 +128,8 @@ function Sidebar({ className }: { className?: string }) {
   );
 }
 
-const projectColors = ["#2563eb", "#7c3aed", "#0d9488", "#db2777", "#ea580c", "#4f46e5", "#0891b2", "#65a30d"];
+// White initials stay readable (WCAG AA 4.5:1) on every colour.
+const projectColors = ["#2563eb", "#7c3aed", "#0f766e", "#db2777", "#c2410c", "#4f46e5", "#0e7490", "#4d7c0f"];
 
 export function ProjectAvatar({ projectKey, size = 20 }: { projectKey: string; size?: number }) {
   let h = 0;
@@ -183,7 +184,7 @@ function NotificationBell() {
     <Link to="/notifications" aria-label={unread ? `Notifications (${unread} unread)` : "Notifications"} className="relative inline-flex size-8.5 items-center justify-center rounded-md text-muted hover:bg-surface-2 hover:text-ink">
       <Bell className="size-4.5" />
       {unread > 0 && (
-        <span className="absolute top-1 right-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-bold text-white">
+        <span className="absolute top-1 right-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-bold text-danger-ink">
           {unread > 99 ? "99+" : unread}
         </span>
       )}

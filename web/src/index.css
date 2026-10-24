@@ -13,26 +13,27 @@
   --color-line: #e2e5eb;
   --color-line-strong: #cdd2db;
   --color-ink: #171a21;
-  --color-muted: #5d6573;
-  --color-faint: #8b93a1;
+  --color-muted: #525a68;
+  --color-faint: #646b78;
   --color-accent: #2563eb;
   --color-accent-hover: #1d4ed8;
-  --color-accent-soft: #e8efff;
+  --color-accent-soft: #edf2ff;
   --color-accent-ink: #ffffff;
   --color-danger: #dc2626;
   --color-danger-soft: #fdecec;
+  --color-danger-ink: #ffffff;
   --color-success: #16a34a;
   --color-success-soft: #e7f6ec;
-  --color-warning: #d97706;
+  --color-warning: #b45309;
   --color-warning-soft: #fdf3e2;
 
   /* Status categories */
   --color-todo: #5d6573;
   --color-todo-soft: #eceef2;
   --color-progress: #2563eb;
-  --color-progress-soft: #e3ecfe;
+  --color-progress-soft: #ebf1fe;
   --color-done: #15803d;
-  --color-done-soft: #e1f4e7;
+  --color-done-soft: #eaf7ee;
 
   /* Chart colours, validated as sets with the dataviz palette checks: adjacent slots stay
      apart under colour-blindness in both themes and sit in the lightness band. Categorical
@@ -68,13 +69,14 @@
   --color-line-strong: #3a404c;
   --color-ink: #e8eaee;
   --color-muted: #a3aab6;
-  --color-faint: #7a8291;
+  --color-faint: #868e9c;
   --color-accent: #4c8dff;
   --color-accent-hover: #6aa0ff;
-  --color-accent-soft: #1b2a47;
+  --color-accent-soft: #172440;
   --color-accent-ink: #0b1020;
   --color-danger: #f26d6d;
   --color-danger-soft: #3a1d1f;
+  --color-danger-ink: #1b0b0b;
   --color-success: #4ccb7a;
   --color-success-soft: #173323;
   --color-warning: #f0a83a;

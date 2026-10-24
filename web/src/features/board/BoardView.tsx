@@ -251,7 +251,7 @@ function ColumnHeader({
       {column.wipLimit != null ? (
         <span
           title={column.overLimit ? `Over the work-in-progress limit of ${column.wipLimit}` : `Work-in-progress limit: ${column.wipLimit}`}
-          className={cn("ml-auto shrink-0 rounded px-1.5 py-0.5 text-[11px] font-semibold tabular-nums", column.overLimit ? "bg-danger text-white" : "bg-surface-3 text-muted")}
+          className={cn("ml-auto shrink-0 rounded px-1.5 py-0.5 text-[11px] font-semibold tabular-nums", column.overLimit ? "bg-danger text-danger-ink" : "bg-surface-3 text-muted")}
         >
           {total} / {column.wipLimit}
         </span>

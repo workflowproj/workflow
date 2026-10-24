@@ -4,7 +4,8 @@ import { initials } from "@/lib/format";
 
 type U = { displayName: string; avatarUrl?: string; kind?: string };
 
-const palette = ["#2563eb", "#7c3aed", "#db2777", "#ea580c", "#0d9488", "#4f46e5", "#0891b2", "#65a30d"];
+// White initials stay readable (WCAG AA 4.5:1) on every colour.
+const palette = ["#2563eb", "#7c3aed", "#db2777", "#c2410c", "#0f766e", "#4f46e5", "#0e7490", "#4d7c0f"];
 
 function colorFor(name: string) {
   let h = 0;
