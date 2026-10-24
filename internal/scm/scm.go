@@ -123,20 +123,26 @@ type Client interface {
 	EnsureHook(ctx context.Context, repo RepoRef, url, secret string) (string, error)
 }
 
-var keyPattern = regexp.MustCompile(`(?i)(?:^|[^A-Za-z0-9])([A-Za-z][A-Za-z0-9]{1,9})-([1-9][0-9]{0,8})\b`)
+// keyPattern matches a candidate key; the character after it is checked separately (RE2 has no
+// lookahead), so keys can be followed by "_" or "/" as in branch names like PLAT-12_login.
+var keyPattern = regexp.MustCompile(`(?i)(?:^|[^A-Za-z0-9])([A-Za-z][A-Za-z0-9]{1,9})-([1-9][0-9]{0,8})`)
 
 // ExtractKeys finds issue keys such as PLAT-12 in branch names, commit messages and titles,
-// keeping only keys whose project is in allowed (upper-case project keys).
+// keeping only keys whose project is in allowed (upper-case project keys). Matching ignores case
+// and separators, so feature/plat-12-login, PLAT-12_fix and "Fix PLAT-12: …" all name PLAT-12.
 func ExtractKeys(allowed map[string]bool, texts ...string) []string {
 	var out []string
 	seen := map[string]bool{}
 	for _, t := range texts {
-		for _, m := range keyPattern.FindAllStringSubmatch(t, -1) {
-			project := strings.ToUpper(m[1])
+		for _, m := range keyPattern.FindAllStringSubmatchIndex(t, -1) {
+			if end := m[1]; end < len(t) && isAlphaNum(t[end]) {
+				continue // e.g. PLAT-12abc is not a key
+			}
+			project := strings.ToUpper(t[m[2]:m[3]])
 			if !allowed[project] {
 				continue
 			}
-			key := project + "-" + m[2]
+			key := project + "-" + t[m[4]:m[5]]
 			if !seen[key] {
 				seen[key] = true
 				out = append(out, key)
@@ -144,6 +150,10 @@ func ExtractKeys(allowed map[string]bool, texts ...string) []string {
 		}
 	}
 	return out
+}
+
+func isAlphaNum(c byte) bool {
+	return c >= '0' && c <= '9' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z'
 }
 
 // SmartCommand is one "#command" from a commit message, attached to issue keys.

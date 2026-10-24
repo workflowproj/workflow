@@ -214,3 +214,8 @@ ORDER BY h.issue_id, h.id;
 
 -- name: ResolvedIssuesSince :many
 SELECT * FROM issues WHERE project_id = @project_id AND resolved_at >= @since ORDER BY resolved_at;
+
+-- name: BlockLinksAmong :many
+SELECT * FROM issue_links
+WHERE link_type = 'blocks' AND source_id = ANY(@ids::uuid[]) AND target_id = ANY(@ids::uuid[])
+ORDER BY created_at;

@@ -355,3 +355,75 @@ func TestAttachments(t *testing.T) {
 	admin.must("DELETE", "/api/v1/attachments/"+str(att, "id"), nil, 204, nil)
 	admin.must("GET", "/api/v1/attachments/"+str(att, "id"), nil, 404, nil)
 }
+
+// Rules acting on related issues: an epic starts when a story starts, a story finishes when its
+// last sub-task does, and an epic's dates stretch to cover its stories.
+func TestAutomationTargetsCategoriesAndRollup(t *testing.T) {
+	e := newEnv(t)
+	c := e.login("ada@example.com", "Ada")
+	c.createProject("REL", "scrum")
+	rule := func(body obj) obj {
+		var r obj
+		c.must("POST", "/api/v1/projects/REL/automation-rules", body, 201, &r)
+		return r
+	}
+	c.must("POST", "/api/v1/projects/REL/automation-rules", obj{"name": "bad", "trigger": obj{"type": "issue.created"},
+		"actions": []obj{{"type": "transition", "category": "finished", "target": "parent"}}}, 400, nil)
+	c.must("POST", "/api/v1/projects/REL/automation-rules", obj{"name": "bad", "trigger": obj{"type": "issue.created"},
+		"actions": []obj{{"type": "rollup_dates", "target": "grandparent"}}}, 400, nil)
+
+	rule(obj{"name": "Start the epic with its first story", "trigger": obj{"type": "issue.transitioned", "toCategory": "in_progress"},
+		"condition": `issue.typeLevel == 0 && issue.parent.category == "todo"`,
+		"actions":   []obj{{"type": "transition", "target": "parent", "category": "in_progress"}}})
+	finish := rule(obj{"name": "Finish the parent with its last sub-task", "trigger": obj{"type": "issue.transitioned", "toCategory": "done"},
+		"condition": `issue.typeLevel == -1 && issue.parent.openChildren == 0`,
+		"actions":   []obj{{"type": "transition", "target": "parent", "category": "done"}, {"type": "comment", "target": "parent", "body": "All sub-tasks of {{issue.key}} done ({{trigger.key}} was last)"}}})
+	rule(obj{"name": "Epic dates cover their stories", "trigger": obj{"type": "issue.field_changed", "field": "startDate, dueDate, parent"},
+		"actions": []obj{{"type": "rollup_dates", "target": "parent"}}})
+
+	epic := c.createIssue("REL", "epic", "Checkout", nil)
+	s1 := c.createIssue("REL", "story", "Card payments", obj{"parentKey": epic["key"]})
+	s2 := c.createIssue("REL", "story", "Wallets", obj{"parentKey": epic["key"]})
+	t1 := c.createIssue("REL", "subtask", "Form", obj{"parentKey": s1["key"]})
+	t2 := c.createIssue("REL", "subtask", "Tests", obj{"parentKey": s1["key"]})
+	e.DrainJobs()
+
+	// Dates roll up from stories to the epic.
+	c.must("PATCH", "/api/v1/issues/"+str(s1, "key"), obj{"startDate": "2026-11-02", "dueDate": "2026-11-13"}, 200, nil)
+	e.DrainJobs()
+	got := c.issue(str(epic, "key"))
+	eq(t, str(got, "startDate")+"/"+str(got, "dueDate"), "2026-11-02/2026-11-13", "epic dates from first story")
+	c.must("PATCH", "/api/v1/issues/"+str(s2, "key"), obj{"startDate": "2026-11-09", "dueDate": "2026-11-27"}, 200, nil)
+	e.DrainJobs()
+	got = c.issue(str(epic, "key"))
+	eq(t, str(got, "startDate")+"/"+str(got, "dueDate"), "2026-11-02/2026-11-27", "epic dates span both stories")
+
+	// Starting a story starts its epic (Simple workflow: To Do → In Progress by category).
+	c.transition(str(s1, "key"), "start-work", 200)
+	e.DrainJobs()
+	eq(t, str(c.issue(str(epic, "key")), "status", "category"), "in_progress", "epic started with its story")
+
+	// The story finishes only when its last sub-task does.
+	c.transition(str(t1, "key"), "done", 200)
+	e.DrainJobs()
+	eq(t, str(c.issue(str(s1, "key")), "status", "name"), "In Progress", "one sub-task still open")
+	c.transition(str(t2, "key"), "done", 200)
+	e.DrainJobs()
+	eq(t, str(c.issue(str(s1, "key")), "status", "name"), "Done", "story finished with its last sub-task")
+	var comments []obj
+	c.get("/api/v1/issues/"+str(s1, "key")+"/comments", &comments)
+	eq(t, str(comments[len(comments)-1], "body"), "All sub-tasks of "+str(s1, "key")+" done ("+str(t2, "key")+" was last)", "comment on the parent")
+	eq(t, str(c.issue(str(epic, "key")), "status", "category"), "in_progress", "epic stays open while another story is open")
+
+	var runs []obj
+	c.get("/api/v1/automation-rules/"+str(finish, "id")+"/runs", &runs)
+	found := false
+	for _, r := range runs {
+		if str(r, "status") == "success" && strings.Contains(str(r, "message"), str(s1, "key")+": moved to Done") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("run log does not name the parent it moved: %v", runs)
+	}
+}

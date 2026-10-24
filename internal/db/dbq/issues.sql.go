@@ -44,6 +44,39 @@ func (q *Queries) AddWatcher(ctx context.Context, arg AddWatcherParams) error {
 	return err
 }
 
+const blockLinksAmong = `-- name: BlockLinksAmong :many
+SELECT id, source_id, target_id, link_type, created_by, created_at FROM issue_links
+WHERE link_type = 'blocks' AND source_id = ANY($1::uuid[]) AND target_id = ANY($1::uuid[])
+ORDER BY created_at
+`
+
+func (q *Queries) BlockLinksAmong(ctx context.Context, ids []uuid.UUID) ([]IssueLink, error) {
+	rows, err := q.db.Query(ctx, blockLinksAmong, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []IssueLink{}
+	for rows.Next() {
+		var i IssueLink
+		if err := rows.Scan(
+			&i.ID,
+			&i.SourceID,
+			&i.TargetID,
+			&i.LinkType,
+			&i.CreatedBy,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const childIssues = `-- name: ChildIssues :many
 SELECT id, project_id, number, type_id, parent_id, summary, description, status_id, workflow_version_id, priority, assignee_id, reporter_id, sprint_id, story_points, start_date, due_date, labels, resolution, resolved_at, fields, rank, version, created_at, updated_at FROM issues WHERE parent_id = $1 ORDER BY rank
 `

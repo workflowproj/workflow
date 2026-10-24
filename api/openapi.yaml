@@ -1447,6 +1447,22 @@ paths:
   # ---------------------------------------------------------------------------
   # Issues
   # ---------------------------------------------------------------------------
+  /timeline:
+    get:
+      operationId: getTimeline
+      tags: [boards]
+      summary: Epics and issues with dates, dependencies, sprints and releases across one or more projects
+      parameters:
+        - { name: projects, in: query, description: 'Comma-separated project keys; omit for every project you can browse', schema: { type: string } }
+        - { name: jql, in: query, description: Optional extra JQL filter (e.g. assignee = currentUser()), schema: { type: string } }
+        - { name: doneDays, in: query, description: 'Include issues resolved within this many days (default 90)', schema: { type: integer, minimum: 0, maximum: 3650 } }
+      responses:
+        "200":
+          description: Timeline data. Sub-tasks are not included.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Timeline' }
+        default: { $ref: '#/components/responses/Problem' }
   /search:
     get:
       operationId: searchIssues
@@ -2935,6 +2951,36 @@ components:
         createdAt: { type: string, format: date-time }
         url: { type: string }
 
+    Timeline:
+      type: object
+      required: [projects, issues, links, sprints, releases, truncated]
+      properties:
+        projects: { type: array, items: { $ref: '#/components/schemas/ProjectRef' } }
+        issues: { type: array, items: { $ref: '#/components/schemas/Issue' }, description: 'Epics and standard issues in rank order (children name their parent)' }
+        links: { type: array, items: { $ref: '#/components/schemas/TimelineLink' } }
+        sprints: { type: array, items: { $ref: '#/components/schemas/TimelineSprint' } }
+        releases: { type: array, items: { $ref: '#/components/schemas/TimelineRelease' } }
+        truncated: { type: boolean, description: More issues matched than the timeline shows (2000) }
+    TimelineLink:
+      type: object
+      required: [id, sourceKey, targetKey, type]
+      properties:
+        id: { type: string, format: uuid }
+        sourceKey: { type: string, description: The blocking issue }
+        targetKey: { type: string, description: The blocked issue }
+        type: { type: string, enum: [blocks] }
+    TimelineSprint:
+      type: object
+      required: [projectKey, sprint]
+      properties:
+        projectKey: { type: string }
+        sprint: { $ref: '#/components/schemas/Sprint' }
+    TimelineRelease:
+      type: object
+      required: [projectKey, release]
+      properties:
+        projectKey: { type: string }
+        release: { $ref: '#/components/schemas/Release' }
     SearchResult:
       type: object
       required: [issues, total, limit, offset]
@@ -3103,15 +3149,24 @@ components:
           type: string
           enum: [issue.created, issue.transitioned, issue.field_changed, pr.opened, pr.merged, commit.pushed, branch.created, pipeline.completed, schedule]
         toStatus: { type: string, description: 'issue.transitioned: only when entering this status (name)' }
-        field: { type: string, description: 'issue.field_changed: the field to watch' }
+        toCategory: { $ref: '#/components/schemas/StatusCategory', description: 'issue.transitioned: only when entering a status of this category' }
+        field: { type: string, description: 'issue.field_changed: the field(s) to watch, comma-separated (e.g. "startDate, dueDate")' }
         cron: { type: string, description: 'schedule: 5-field cron expression (UTC)' }
         jql: { type: string, description: 'schedule: issues to run the actions against' }
     AutomationAction:
       type: object
       required: [type]
       properties:
-        type: { type: string, enum: [transition, assign, set_field, comment, add_label, webhook, notify] }
+        type:
+          type: string
+          enum: [transition, assign, set_field, comment, add_label, webhook, notify, rollup_dates]
+          description: 'rollup_dates sets the target issue''s start and due dates to span its children'
+        target:
+          type: string
+          enum: [issue, parent, children]
+          description: 'Which issue(s) the action applies to: the triggering issue (default), its parent (e.g. the epic of a story) or its children'
         status: { type: string, description: 'transition: target status name' }
+        category: { $ref: '#/components/schemas/StatusCategory', description: 'transition: move to a status of this category instead of a named status (the first one the workflow allows)' }
         assignee: { type: string, description: 'assign: actor | reporter | unassigned | <email>' }
         field: { type: string }
         value: {}

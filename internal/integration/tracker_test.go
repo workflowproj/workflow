@@ -441,3 +441,64 @@ func TestJQLSearch(t *testing.T) {
 	eq(t, len(fs), 1, "shared filter visible")
 	bob.must("DELETE", "/api/v1/filters/"+str(f, "id"), nil, 403, nil)
 }
+
+func TestTimeline(t *testing.T) {
+	e := newEnv(t)
+	ada := e.login("ada@example.com", "Ada")
+	bob := e.login("bob@example.com", "Bob")
+	ada.createProject("APP", "scrum")
+	ada.createProject("API", "kanban")
+	ada.must("POST", "/api/v1/projects", obj{"key": "SEC", "name": "Secret", "template": "kanban", "access": "private"}, 201, nil)
+	ada.createIssue("SEC", "task", "Hidden", nil)
+
+	epic := ada.createIssue("APP", "epic", "Mobile checkout", obj{"startDate": "2026-11-02", "dueDate": "2026-12-18"})
+	ui := ada.createIssue("APP", "story", "Checkout screens", obj{"parentKey": epic["key"], "startDate": "2026-11-09", "dueDate": "2026-11-27", "assigneeId": bob.id()})
+	ada.createIssue("APP", "subtask", "Not on the timeline", obj{"parentKey": ui["key"]})
+	endpoint := ada.createIssue("API", "task", "Payments endpoint", obj{"startDate": "2026-11-02", "dueDate": "2026-11-13"})
+	done := ada.createIssue("API", "task", "Already shipped", nil)
+	ada.must("POST", "/api/v1/issues/"+str(done, "key")+"/move", obj{"statusId": ada.statusID("Done")}, 200, nil)
+	ada.must("POST", "/api/v1/issues/"+str(endpoint, "key")+"/links", obj{"type": "blocks", "targetKey": ui["key"]}, 201, nil)
+	ada.must("POST", "/api/v1/projects/APP/releases", obj{"name": "1.0", "releaseDate": "2026-12-18"}, 201, nil)
+
+	type timeline struct {
+		Projects  []obj `json:"projects"`
+		Issues    []obj `json:"issues"`
+		Links     []obj `json:"links"`
+		Sprints   []obj `json:"sprints"`
+		Releases  []obj `json:"releases"`
+		Truncated bool  `json:"truncated"`
+	}
+	var tl timeline
+	bob.get("/api/v1/timeline", &tl)
+	eq(t, len(tl.Projects), 2, "only browsable projects")
+	// Grouped by project in project order, rank order within a project.
+	want := map[string][]string{"APP": {str(epic, "key"), str(ui, "key")}, "API": {str(endpoint, "key"), str(done, "key")}}
+	var expected []string
+	for _, p := range tl.Projects {
+		expected = append(expected, want[str(p, "key")]...)
+	}
+	sameStrings(t, keys(tl.Issues), expected, "epics and standard issues, no sub-tasks")
+	eq(t, len(tl.Links), 1, "cross-project dependency")
+	eq(t, str(tl.Links[0], "sourceKey")+">"+str(tl.Links[0], "targetKey"), str(endpoint, "key")+">"+str(ui, "key"), "blocks direction")
+	eq(t, str(tl.Sprints[0], "projectKey"), "APP", "scrum sprint")
+	eq(t, str(tl.Releases[0], "release", "name"), "1.0", "release")
+	eq(t, tl.Truncated, false, "not truncated")
+	got := map[string]obj{}
+	for _, i := range tl.Issues {
+		got[str(i, "key")] = i
+	}
+	eq(t, str(got[str(ui, "key")], "parent", "key"), str(epic, "key"), "parent reference")
+	eq(t, str(got[str(ui, "key")], "startDate"), "2026-11-09", "dates")
+
+	// One project: links to issues outside it are left out.
+	ada.get("/api/v1/timeline?projects=APP", &tl)
+	eq(t, len(tl.Issues), 2, "single project")
+	eq(t, len(tl.Links), 0, "no dangling links")
+	// Filters.
+	ada.get("/api/v1/timeline?projects=API&doneDays=0", &tl)
+	sameStrings(t, keys(tl.Issues), []string{str(endpoint, "key")}, "recently resolved issues can be hidden")
+	bob.get("/api/v1/timeline?jql="+url.QueryEscape("assignee = currentUser()"), &tl)
+	sameStrings(t, keys(tl.Issues), []string{str(ui, "key")}, "JQL filter")
+	bob.must("GET", "/api/v1/timeline?projects=SEC", nil, 404, nil)
+	ada.must("GET", "/api/v1/timeline?jql="+url.QueryEscape("assignee =="), nil, 400, nil)
+}

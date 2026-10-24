@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -373,5 +374,52 @@ func TestGitLabIntegration(t *testing.T) {
 	card := data["columns"].([]any)[0].(obj)["issues"].([]any)[0].(obj)
 	if card["dev"] == nil {
 		t.Fatalf("board card lacks dev summary: %v", card)
+	}
+}
+
+// A pull/merge request whose title and description never mention the issue is still linked when
+// its source branch carries the key, in any case and with any separator.
+func TestPullRequestsLinkByBranchName(t *testing.T) {
+	e := newEnv(t)
+	admin := e.login("ada@example.com", "Ada")
+	admin.createProject("SHOP", "kanban")
+	for i := 1; i <= 3; i++ {
+		admin.createIssue("SHOP", "task", fmt.Sprintf("Task %d", i), nil)
+	}
+	repoJSON := obj{"id": 101, "full_name": "acme/shop", "html_url": "https://github.com/acme/shop", "default_branch": "main"}
+	gh := newFakeSCM(t, map[string]any{
+		"POST /app/installations/77/access_tokens": obj{"token": "ghs_installation", "expires_at": time.Now().Add(time.Hour)},
+	})
+	var conn obj
+	admin.must("POST", "/api/v1/admin/scm-connections", obj{
+		"provider": "github", "name": "GitHub", "apiUrl": gh.URL, "appId": 4242, "privateKey": rsaPEM(t), "webhookSecret": "s3cret",
+	}, 201, &conn)
+	hook := "/hooks/github/" + str(conn, "id")
+	install := obj{"action": "created", "installation": obj{"id": 77}, "repositories": []obj{{"id": 101, "full_name": "acme/shop"}}}
+	e.deliver(hook, install, githubHeaders("s3cret", "installation", "i-1", install)...)
+	e.DrainJobs()
+	var repos []obj
+	admin.get("/api/v1/scm/repositories", &repos)
+	admin.must("POST", "/api/v1/projects/SHOP/repositories", obj{"repositoryId": repos[0]["id"]}, 201, nil)
+
+	branches := map[string]string{"SHOP-1": "feature/shop-1-add-cart", "SHOP-2": "SHOP-2_fix_totals", "SHOP-3": "users/ada/Shop-3/try"}
+	n := 0
+	for key, branch := range branches {
+		n++
+		pr := obj{"action": "opened", "installation": obj{"id": 77}, "repository": repoJSON, "pull_request": obj{
+			"number": n, "title": "Improve the checkout", "body": "No issue key here", "html_url": fmt.Sprintf("https://github.com/acme/shop/pull/%d", n),
+			"state": "open", "user": obj{"login": "ada"}, "updated_at": time.Now().Format(time.RFC3339),
+			"head": obj{"ref": branch, "sha": "abc"}, "base": obj{"ref": "main"},
+		}}
+		e.deliver(hook, pr, githubHeaders("s3cret", "pull_request", fmt.Sprintf("pr-%d", n), pr)...)
+		e.DrainJobs()
+		prs := devLinks(admin, key)["pull_request"]
+		if len(prs) != 1 || str(prs[0], "data", "sourceBranch") != branch {
+			t.Fatalf("%s: PR from branch %q not linked: %v", key, branch, prs)
+		}
+	}
+	// Each PR links only to its own issue.
+	for key := range branches {
+		eq(t, len(devLinks(admin, key)["pull_request"]), 1, key+" PR count")
 	}
 }

@@ -2,6 +2,9 @@ package httpapi
 
 import (
 	"context"
+	"strings"
+
+	"github.com/google/uuid"
 
 	"github.com/geoffo-dev/workflow-management/internal/api"
 	"github.com/geoffo-dev/workflow-management/internal/db/dbq"
@@ -355,4 +358,51 @@ func (s *Server) ShipRelease(ctx context.Context, req api.ShipReleaseRequestObje
 		return nil, err
 	}
 	return api.ShipRelease200JSONResponse(tracker.ReleaseView(r, 0, 0)), nil
+}
+
+func (s *Server) GetTimeline(ctx context.Context, req api.GetTimelineRequestObject) (api.GetTimelineResponseObject, error) {
+	a, err := actor(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var keys []string
+	if req.Params.Projects != nil && *req.Params.Projects != "" {
+		keys = strings.Split(*req.Params.Projects, ",")
+	}
+	doneDays := 90
+	if req.Params.DoneDays != nil {
+		doneDays = *req.Params.DoneDays
+	}
+	tl, err := s.Tracker.Timeline(ctx, a, keys, deref(req.Params.Jql), doneDays)
+	if err != nil {
+		return nil, err
+	}
+	views, err := s.Tracker.IssueViews(ctx, tl.Issues)
+	if err != nil {
+		return nil, err
+	}
+	keyByID := make(map[uuid.UUID]string, len(views))
+	for _, v := range views {
+		keyByID[v.Id] = v.Key
+	}
+	out := api.GetTimeline200JSONResponse{
+		Projects: []api.ProjectRef{}, Issues: views, Links: []api.TimelineLink{}, Sprints: []api.TimelineSprint{},
+		Releases: []api.TimelineRelease{}, Truncated: tl.Truncated,
+	}
+	for _, p := range tl.Projects {
+		out.Projects = append(out.Projects, api.ProjectRef{Id: p.ID, Key: p.Key, Name: p.Name})
+	}
+	for _, l := range tl.Links {
+		out.Links = append(out.Links, api.TimelineLink{Id: l.ID, SourceKey: keyByID[l.SourceID], TargetKey: keyByID[l.TargetID], Type: api.TimelineLinkTypeBlocks})
+	}
+	for _, sp := range tl.Sprints {
+		out.Sprints = append(out.Sprints, api.TimelineSprint{ProjectKey: sp.ProjectKey, Sprint: tracker.SprintView(sp.Sprint)})
+	}
+	for _, pr := range tl.Releases {
+		r := pr.Release
+		rel := dbq.Release{ID: r.ID, ProjectID: r.ProjectID, Name: r.Name, Description: r.Description, StartDate: r.StartDate, ReleaseDate: r.ReleaseDate,
+			State: r.State, ReleasedAt: r.ReleasedAt, Position: r.Position, CreatedAt: r.CreatedAt}
+		out.Releases = append(out.Releases, api.TimelineRelease{ProjectKey: pr.ProjectKey, Release: tracker.ReleaseView(rel, int(r.IssueCount), int(r.DoneCount))})
+	}
+	return out, nil
 }

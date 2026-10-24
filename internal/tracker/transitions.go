@@ -125,7 +125,18 @@ func (s *Service) celIssue(ctx context.Context, q *dbq.Queries, p dbq.Project, i
 		if par, err := q.GetIssue(ctx, *i.ParentID); err == nil {
 			ps, _ := statusInfo(ctx, q, par.StatusID)
 			pt, _ := q.GetIssueType(ctx, par.TypeID)
-			parent = map[string]any{"key": issueKey(p, par), "type": pt.Key, "status": ps.Name, "category": ps.Category}
+			siblings, err := q.ChildIssues(ctx, &par.ID)
+			if err != nil {
+				return nil, err
+			}
+			open := 0
+			for _, sib := range siblings {
+				if ss, err := statusInfo(ctx, q, sib.StatusID); err == nil && ss.Category != "done" {
+					open++
+				}
+			}
+			parent = map[string]any{"key": issueKey(p, par), "type": pt.Key, "status": ps.Name, "category": ps.Category,
+				"childCount": int64(len(siblings)), "openChildren": int64(open), "startDate": dateStr(par.StartDate), "dueDate": dateStr(par.DueDate)}
 		}
 	}
 	points := 0.0
@@ -136,18 +147,22 @@ func (s *Service) celIssue(ctx context.Context, q *dbq.Queries, p dbq.Project, i
 	if i.Resolution != nil {
 		resolution = *i.Resolution
 	}
-	due := ""
-	if i.DueDate != nil {
-		due = i.DueDate.Format("2006-01-02")
-	}
+	due := dateStr(i.DueDate)
 	return map[string]any{
 		"key": issueKey(p, i), "project": p.Key, "type": it.Key, "typeLevel": int64(it.Level),
 		"summary": i.Summary, "description": i.Description, "priority": i.Priority,
 		"status": st.Name, "statusCategory": st.Category,
 		"assignee": email(i.AssigneeID), "reporter": email(i.ReporterID),
-		"labels": labels, "storyPoints": points, "resolution": resolution, "dueDate": due, "fields": fields,
+		"labels": labels, "storyPoints": points, "resolution": resolution, "startDate": dateStr(i.StartDate), "dueDate": due, "fields": fields,
 		"subtasks": subtasks, "children": subtasks, "devLinks": devLinks, "links": links, "parent": parent,
 	}, nil
+}
+
+func dateStr(d *time.Time) string {
+	if d == nil {
+		return ""
+	}
+	return d.Format("2006-01-02")
 }
 
 // ---------------------------------------------------------------------------
@@ -648,6 +663,30 @@ func (s *Service) TransitionToStatus(ctx context.Context, actor *authz.Actor, is
 	return s.runNamedTransition(ctx, actor, issueID, func(at AvailableTransition) bool {
 		return strings.EqualFold(at.To.Name, statusName)
 	}, comment)
+}
+
+// TransitionToCategory runs the first available transition into a status of the category,
+// returning the status entered ("" when the issue is already in that category or none is allowed).
+func (s *Service) TransitionToCategory(ctx context.Context, actor *authz.Actor, issueID uuid.UUID, category string) (string, error) {
+	i, err := s.Q.GetIssue(ctx, issueID)
+	if err != nil {
+		return "", apperr.NotFound("issue")
+	}
+	if cur, err := statusInfo(ctx, s.Q, i.StatusID); err != nil || cur.Category == category {
+		return "", err
+	}
+	var entered string
+	ran, err := s.runNamedTransition(ctx, actor, issueID, func(at AvailableTransition) bool {
+		if at.To.Category == category {
+			entered = at.To.Name
+			return true
+		}
+		return false
+	}, "")
+	if err != nil || !ran {
+		return "", err
+	}
+	return entered, nil
 }
 
 // TransitionByName runs a transition matched by smart-commit name: the slug of the transition

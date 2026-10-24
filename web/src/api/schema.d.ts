@@ -1080,6 +1080,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/timeline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Epics and issues with dates, dependencies, sprints and releases across one or more projects */
+        get: operations["getTimeline"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/search": {
         parameters: {
             query?: never;
@@ -2307,6 +2324,34 @@ export interface components {
             createdAt: string;
             url: string;
         };
+        Timeline: {
+            projects: components["schemas"]["ProjectRef"][];
+            /** @description Epics and standard issues, ranked; parents come before their children */
+            issues: components["schemas"]["Issue"][];
+            links: components["schemas"]["TimelineLink"][];
+            sprints: components["schemas"]["TimelineSprint"][];
+            releases: components["schemas"]["TimelineRelease"][];
+            /** @description More issues matched than the timeline shows (2000) */
+            truncated: boolean;
+        };
+        TimelineLink: {
+            /** Format: uuid */
+            id: string;
+            /** @description The blocking issue */
+            sourceKey: string;
+            /** @description The blocked issue */
+            targetKey: string;
+            /** @enum {string} */
+            type: "blocks";
+        };
+        TimelineSprint: {
+            projectKey: string;
+            sprint: components["schemas"]["Sprint"];
+        };
+        TimelineRelease: {
+            projectKey: string;
+            release: components["schemas"]["Release"];
+        };
         SearchResult: {
             issues: components["schemas"]["Issue"][];
             total: number;
@@ -2465,7 +2510,9 @@ export interface components {
             type: "issue.created" | "issue.transitioned" | "issue.field_changed" | "pr.opened" | "pr.merged" | "commit.pushed" | "branch.created" | "pipeline.completed" | "schedule";
             /** @description issue.transitioned: only when entering this status (name) */
             toStatus?: string;
-            /** @description issue.field_changed: the field to watch */
+            /** @description issue.transitioned: only when entering a status of this category */
+            toCategory?: components["schemas"]["StatusCategory"];
+            /** @description issue.field_changed: the field(s) to watch, comma-separated (e.g. "startDate, dueDate") */
             field?: string;
             /** @description schedule: 5-field cron expression (UTC) */
             cron?: string;
@@ -2473,10 +2520,20 @@ export interface components {
             jql?: string;
         };
         AutomationAction: {
-            /** @enum {string} */
-            type: "transition" | "assign" | "set_field" | "comment" | "add_label" | "webhook" | "notify";
+            /**
+             * @description rollup_dates sets the target issue's start and due dates to span its children
+             * @enum {string}
+             */
+            type: "transition" | "assign" | "set_field" | "comment" | "add_label" | "webhook" | "notify" | "rollup_dates";
+            /**
+             * @description Which issue(s) the action applies to: the triggering issue (default), its parent (e.g. the epic of a story) or its children
+             * @enum {string}
+             */
+            target?: "issue" | "parent" | "children";
             /** @description transition: target status name */
             status?: string;
+            /** @description transition: move to a status of this category instead of a named status (the first one the workflow allows) */
+            category?: components["schemas"]["StatusCategory"];
             /** @description assign: actor | reporter | unassigned | <email> */
             assignee?: string;
             field?: string;
@@ -4960,6 +5017,34 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Release"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getTimeline: {
+        parameters: {
+            query?: {
+                /** @description Comma-separated project keys; omit for every project you can browse */
+                projects?: string;
+                /** @description Optional extra JQL filter (e.g. assignee = currentUser()) */
+                jql?: string;
+                /** @description Include issues resolved within this many days (default 90) */
+                doneDays?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Timeline data. Sub-tasks are not included. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Timeline"];
                 };
             };
             default: components["responses"]["Problem"];

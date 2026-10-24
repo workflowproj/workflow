@@ -56,19 +56,28 @@ func New(pool *pgxpool.Pool, tr *tracker.Service, eval *workflow.Evaluator, enq 
 // Rules
 
 var TriggerTypes = []string{"issue.created", "issue.transitioned", "issue.field_changed", "pr.opened", "pr.merged", "commit.pushed", "branch.created", "pipeline.completed", "schedule"}
-var ActionTypes = []string{"transition", "assign", "set_field", "comment", "add_label", "webhook", "notify"}
+var ActionTypes = []string{"transition", "assign", "set_field", "comment", "add_label", "webhook", "notify", "rollup_dates"}
+
+// ActionTargets are the issues an action can apply to, relative to the one that triggered the rule.
+var ActionTargets = []string{"", "issue", "parent", "children"}
+
+var categories = []string{"todo", "in_progress", "done"}
 
 type Trigger struct {
 	Type     string `json:"type"`
-	ToStatus string `json:"toStatus,omitempty"`
-	Field    string `json:"field,omitempty"`
+	ToStatus   string `json:"toStatus,omitempty"`
+	ToCategory string `json:"toCategory,omitempty"`
+	Field      string `json:"field,omitempty"` // comma-separated
+
 	Cron     string `json:"cron,omitempty"`
 	JQL      string `json:"jql,omitempty"`
 }
 
 type Action struct {
 	Type       string `json:"type"`
+	Target     string `json:"target,omitempty"`
 	Status     string `json:"status,omitempty"`
+	Category   string `json:"category,omitempty"`
 	Assignee   string `json:"assignee,omitempty"`
 	Field      string `json:"field,omitempty"`
 	Value      any    `json:"value,omitempty"`
@@ -96,6 +105,9 @@ func (s *Service) validate(ctx context.Context, actor *authz.Actor, in RuleInput
 	if !slices.Contains(TriggerTypes, in.Trigger.Type) {
 		return nil, apperr.Invalid("trigger.type", "unknown trigger %q", in.Trigger.Type)
 	}
+	if in.Trigger.ToCategory != "" && !slices.Contains(categories, in.Trigger.ToCategory) {
+		return nil, apperr.Invalid("trigger.toCategory", "must be todo, in_progress or done")
+	}
 	var next *time.Time
 	if in.Trigger.Type == "schedule" {
 		sched, err := cronParser.Parse(in.Trigger.Cron)
@@ -121,14 +133,24 @@ func (s *Service) validate(ctx context.Context, actor *authz.Actor, in RuleInput
 	}
 	for i, a := range in.Actions {
 		field := fmt.Sprintf("actions[%d]", i)
+		if !slices.Contains(ActionTargets, a.Target) {
+			return nil, apperr.Invalid(field, "target must be issue, parent or children")
+		}
 		switch a.Type {
 		case "transition":
-			if a.Status == "" {
-				return nil, apperr.Invalid(field, "transition needs a target status")
+			switch {
+			case a.Category != "":
+				if !slices.Contains(categories, a.Category) {
+					return nil, apperr.Invalid(field, "category must be todo, in_progress or done")
+				}
+			case a.Status == "":
+				return nil, apperr.Invalid(field, "transition needs a target status or category")
+			default:
+				if _, err := s.Q.GetStatusByName(ctx, a.Status); err != nil {
+					return nil, apperr.Invalid(field, "unknown status %q", a.Status)
+				}
 			}
-			if _, err := s.Q.GetStatusByName(ctx, a.Status); err != nil {
-				return nil, apperr.Invalid(field, "unknown status %q", a.Status)
-			}
+		case "rollup_dates":
 		case "assign":
 			if a.Assignee == "" {
 				return nil, apperr.Invalid(field, "assign needs actor, reporter, unassigned or an email")
@@ -284,11 +306,11 @@ func (s *Service) runRules(ctx context.Context, ev jobs.DomainEvent, data map[st
 		if t.ToStatus != "" && !strings.EqualFold(fmt.Sprint(data["to"]), t.ToStatus) {
 			continue
 		}
-		if t.Field != "" {
-			fields, _ := data["fields"].([]any)
-			if !slices.ContainsFunc(fields, func(f any) bool { return strings.EqualFold(fmt.Sprint(f), t.Field) }) {
-				continue
-			}
+		if t.ToCategory != "" && fmt.Sprint(data["toCategory"]) != t.ToCategory {
+			continue
+		}
+		if t.Field != "" && !changedAny(data, t.Field) {
+			continue
 		}
 		if ev.Depth >= s.Cfg.AutomationMaxDepth {
 			s.record(ctx, rule.ID, ev.IssueID, "skipped", fmt.Sprintf("stopped: automation chain depth %d reached", ev.Depth), ev.Depth)
@@ -339,29 +361,98 @@ func (s *Service) runRule(ctx context.Context, rule dbq.AutomationRule, issueID 
 	var actions []Action
 	_ = json.Unmarshal(rule.Actions, &actions)
 	actor := authz.AutomationActor(rule.ID, ev.Depth+1)
+	trigger := triggerRef{Key: tracker.IssueKey(p, issue), Summary: issue.Summary}
 	var done []string
 	for _, a := range actions {
-		msg, err := s.runAction(ctx, actor, p, issueID, a, ev, data)
+		targets, err := s.targets(ctx, issue, a.Target)
 		if err != nil {
 			s.record(ctx, rule.ID, &issueID, "failed", fmt.Sprintf("%s: %v", a.Type, err), ev.Depth)
 			return
 		}
-		if msg != "" {
-			done = append(done, msg)
+		if len(targets) == 0 {
+			done = append(done, fmt.Sprintf("%s: no %s", a.Type, a.Target))
+			continue
+		}
+		for _, target := range targets {
+			msg, err := s.runAction(ctx, actor, p, target, a, trigger, ev, data)
+			if err != nil {
+				s.record(ctx, rule.ID, &issueID, "failed", fmt.Sprintf("%s: %v", a.Type, err), ev.Depth)
+				return
+			}
+			if msg != "" {
+				if target != issueID {
+					msg = s.keyOf(ctx, p, target) + ": " + msg
+				}
+				done = append(done, msg)
+			}
 		}
 	}
 	s.record(ctx, rule.ID, &issueID, "success", strings.Join(done, "; "), ev.Depth)
 }
 
-func render(tmpl string, key, summary string, data map[string]any) string {
-	out := strings.NewReplacer("{{issue.key}}", key, "{{issue.summary}}", summary).Replace(tmpl)
+// changedAny reports whether an issue.updated event changed any of the comma-separated fields.
+func changedAny(data map[string]any, fields string) bool {
+	changed, _ := data["fields"].([]any)
+	for _, f := range strings.Split(fields, ",") {
+		f = strings.TrimSpace(f)
+		if f != "" && slices.ContainsFunc(changed, func(c any) bool { return strings.EqualFold(fmt.Sprint(c), f) }) {
+			return true
+		}
+	}
+	return false
+}
+
+// targets resolves an action's target relative to the triggering issue.
+func (s *Service) targets(ctx context.Context, issue dbq.Issue, target string) ([]uuid.UUID, error) {
+	switch target {
+	case "parent":
+		if issue.ParentID == nil {
+			return nil, nil
+		}
+		return []uuid.UUID{*issue.ParentID}, nil
+	case "children":
+		children, err := s.Q.ChildIssues(ctx, &issue.ID)
+		if err != nil {
+			return nil, err
+		}
+		ids := make([]uuid.UUID, len(children))
+		for i, c := range children {
+			ids[i] = c.ID
+		}
+		return ids, nil
+	}
+	return []uuid.UUID{issue.ID}, nil
+}
+
+func (s *Service) keyOf(ctx context.Context, p dbq.Project, id uuid.UUID) string {
+	i, err := s.Q.GetIssue(ctx, id)
+	if err != nil {
+		return id.String()
+	}
+	if i.ProjectID != p.ID {
+		if other, err := s.Q.GetProject(ctx, i.ProjectID); err == nil {
+			p = other
+		}
+	}
+	return tracker.IssueKey(p, i)
+}
+
+// triggerRef names the issue that triggered a rule; actions may run on its parent or children.
+type triggerRef struct{ Key, Summary string }
+
+// render fills a template: {{issue.*}} is the issue the action runs on, {{trigger.*}} the issue
+// that triggered the rule (the same unless the action targets a parent or children), and
+// {{event.*}} the trigger's data.
+func render(tmpl string, key, summary string, trigger triggerRef, data map[string]any) string {
+	out := strings.NewReplacer("{{issue.key}}", key, "{{issue.summary}}", summary,
+		"{{trigger.key}}", trigger.Key, "{{trigger.summary}}", trigger.Summary).Replace(tmpl)
 	for k, v := range data {
 		out = strings.ReplaceAll(out, "{{event."+k+"}}", fmt.Sprint(v))
 	}
 	return out
 }
 
-func (s *Service) runAction(ctx context.Context, actor *authz.Actor, p dbq.Project, issueID uuid.UUID, a Action, ev jobs.DomainEvent, data map[string]any) (string, error) {
+func (s *Service) runAction(ctx context.Context, actor *authz.Actor, p dbq.Project, issueID uuid.UUID, a Action, trigger triggerRef, ev jobs.DomainEvent, data map[string]any) (string, error) {
 	issue, err := s.Q.GetIssue(ctx, issueID)
 	if err != nil {
 		return "", err
@@ -370,6 +461,16 @@ func (s *Service) runAction(ctx context.Context, actor *authz.Actor, p dbq.Proje
 	ref := issueID.String()
 	switch a.Type {
 	case "transition":
+		if a.Category != "" {
+			to, err := s.Tracker.TransitionToCategory(ctx, actor, issueID, a.Category)
+			if err != nil {
+				return "", err
+			}
+			if to == "" {
+				return fmt.Sprintf("already %s or no transition to it", strings.ReplaceAll(a.Category, "_", " ")), nil
+			}
+			return "moved to " + to, nil
+		}
 		ran, err := s.Tracker.TransitionToStatus(ctx, actor, issueID, a.Status, "")
 		if err != nil {
 			return "", err
@@ -378,6 +479,8 @@ func (s *Service) runAction(ctx context.Context, actor *authz.Actor, p dbq.Proje
 			return fmt.Sprintf("no transition to %s from the current status", a.Status), nil
 		}
 		return "moved to " + a.Status, nil
+	case "rollup_dates":
+		return s.rollupDates(ctx, actor, issue, ref)
 	case "assign":
 		var target tracker.Opt[uuid.UUID]
 		switch a.Assignee {
@@ -415,7 +518,7 @@ func (s *Service) runAction(ctx context.Context, actor *authz.Actor, p dbq.Proje
 				patch.StoryPoints = tracker.Null[float64]()
 			}
 		case "summary":
-			v := render(fmt.Sprint(a.Value), key, issue.Summary, data)
+			v := render(fmt.Sprint(a.Value), key, issue.Summary, trigger, data)
 			patch.Summary = &v
 		default:
 			patch.Fields = map[string]any{a.Field: a.Value}
@@ -427,7 +530,7 @@ func (s *Service) runAction(ctx context.Context, actor *authz.Actor, p dbq.Proje
 		_, _, err := s.Tracker.UpdateIssue(ctx, actor, ref, tracker.IssuePatch{Labels: &labels})
 		return "labelled " + a.Label, err
 	case "comment":
-		_, err := s.Tracker.AddComment(ctx, actor, ref, render(a.Body, key, issue.Summary, data))
+		_, err := s.Tracker.AddComment(ctx, actor, ref, render(a.Body, key, issue.Summary, trigger, data))
 		return "commented", err
 	case "webhook":
 		payload, _ := json.Marshal(map[string]any{"event": "automation", "issue": key, "trigger": ev.Event, "data": data, "sentAt": time.Now().UTC()})
@@ -439,6 +542,47 @@ func (s *Service) runAction(ctx context.Context, actor *authz.Actor, p dbq.Proje
 		return "notified " + a.Recipients, nil
 	}
 	return "", fmt.Errorf("unknown action %s", a.Type)
+}
+
+// rollupDates sets an issue's start and due dates to span its children's (ignoring children
+// without dates), so an epic's bar on the timeline covers its stories.
+func (s *Service) rollupDates(ctx context.Context, actor *authz.Actor, issue dbq.Issue, ref string) (string, error) {
+	children, err := s.Q.ChildIssues(ctx, &issue.ID)
+	if err != nil {
+		return "", err
+	}
+	var start, due *time.Time
+	for _, c := range children {
+		for _, d := range []*time.Time{c.StartDate, c.DueDate} {
+			if d == nil {
+				continue
+			}
+			if start == nil || d.Before(*start) {
+				start = d
+			}
+			if due == nil || d.After(*due) {
+				due = d
+			}
+		}
+	}
+	if start == nil {
+		return "no dated children", nil
+	}
+	if sameDay(start, issue.StartDate) && sameDay(due, issue.DueDate) {
+		return "dates already span the children", nil
+	}
+	patch := tracker.IssuePatch{StartDate: tracker.Some(*start), DueDate: tracker.Some(*due)}
+	if _, _, err := s.Tracker.UpdateIssue(ctx, actor, ref, patch); err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("dates set to %s – %s", start.Format("2006-01-02"), due.Format("2006-01-02")), nil
+}
+
+func sameDay(a, b *time.Time) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return a.Format("2006-01-02") == b.Format("2006-01-02")
 }
 
 // RunScheduled runs scheduled rules that are due (periodic job, every minute).
