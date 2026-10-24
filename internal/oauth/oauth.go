@@ -81,6 +81,9 @@ type Server struct {
 func New(cfg *config.Config, pool *pgxpool.Pool, q *dbq.Queries, box *secure.Box, auth *identity.Auth, track *tracker.Service, log *slog.Logger) *Server {
 	fetch := netguard.Client(5*time.Second, cfg.WebhookAllowPrivate, cfg.OutboundAllowedHosts...)
 	fetch.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	if cfg.Production && cfg.OAuth.Enabled && !strings.HasPrefix(cfg.PublicURL, "https://") {
+		log.Warn("OAuth for AI assistants is served over plain http; set WFM_PUBLIC_URL to the https address assistants use", "public_url", cfg.PublicURL)
+	}
 	return &Server{
 		Cfg: cfg, Pool: pool, Q: q, Box: box, Auth: auth, Track: track, Log: log, HTTPClient: fetch,
 		resource:      canonicalResource(cfg.PublicURL + "/mcp"),
