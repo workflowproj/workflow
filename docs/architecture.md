@@ -19,7 +19,7 @@ Workflow is a modular monolith: one Go binary, one PostgreSQL database.
 | Mode | Serves | Scales on |
 |---|---|---|
 | `web` | `/api/v1`, `/auth/*`, the UI, `/api/v1/events` (SSE), health | HTTP load (HPA on CPU) |
-| `hooks` | `POST /hooks/{provider}/{connection}`, `/scim/v2` | inbound bursts; small and isolated so a webhook storm cannot starve users |
+| `hooks` | `POST /hooks/{provider}/{connection}`, `/scim/v2`, `/hooks/email/unsubscribe` | inbound bursts; small and isolated so a webhook storm cannot starve users |
 | `worker` | background jobs (River) and periodic schedules | queue depth (KEDA PostgreSQL scaler) |
 | `all` | everything (development and small installs) | — |
 
