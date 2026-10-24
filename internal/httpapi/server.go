@@ -35,6 +35,7 @@ import (
 	"github.com/geoffo-dev/workflow-management/internal/jobs"
 	"github.com/geoffo-dev/workflow-management/internal/mail"
 	"github.com/geoffo-dev/workflow-management/internal/mcpserver"
+	"github.com/geoffo-dev/workflow-management/internal/oauth"
 	"github.com/geoffo-dev/workflow-management/internal/scm"
 	"github.com/geoffo-dev/workflow-management/internal/secure"
 	"github.com/geoffo-dev/workflow-management/internal/telemetry"
@@ -55,6 +56,8 @@ type Server struct {
 	Hub        *events.Hub
 	Box        *secure.Box
 	Mailer     mail.Sender
+	// OAuth is the authorisation server for AI assistants connecting to /mcp.
+	OAuth *oauth.Server
 }
 
 var _ api.StrictServerInterface = (*Server)(nil)
@@ -198,7 +201,9 @@ func (s *Server) WebHandler(ui http.Handler) http.Handler {
 	mux.HandleFunc("GET /api/v1/openapi.yaml", s.openAPI)
 	mux.HandleFunc("GET /api/v1/dev/mailbox", s.devMailbox)
 	mux.HandleFunc("GET /api/v1/openapi.json", s.openAPI)
-	mux.Handle("/mcp", (&mcpserver.Server{API: s, Auth: s.Auth, PublicURL: s.Cfg.PublicURL, Version: telemetry.Version, Log: s.Log}).Handler())
+	mux.Handle("/mcp", (&mcpserver.Server{API: s, Auth: s.Auth, PublicURL: s.Cfg.PublicURL, Version: telemetry.Version, Log: s.Log, OAuth: s.OAuth}).Handler())
+	// OAuth discovery and endpoints for AI assistants; the consent page is part of the UI.
+	s.OAuth.Routes(mux)
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		WriteProblem(s.Log, w, r, apperr.NotFound("route"))
 	})
@@ -313,7 +318,8 @@ func route(path string) string {
 		}
 	}
 	r := strings.Join(parts, "/")
-	if !strings.HasPrefix(r, "/api/") && !strings.HasPrefix(r, "/hooks/") && !strings.HasPrefix(r, "/scim/") && !strings.HasPrefix(r, "/auth/") {
+	if !strings.HasPrefix(r, "/api/") && !strings.HasPrefix(r, "/hooks/") && !strings.HasPrefix(r, "/scim/") && !strings.HasPrefix(r, "/auth/") &&
+		!strings.HasPrefix(r, "/oauth/") && !strings.HasPrefix(r, "/.well-known/") && r != "/mcp" {
 		return "/ui"
 	}
 	return r

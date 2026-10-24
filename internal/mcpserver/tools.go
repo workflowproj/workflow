@@ -47,12 +47,19 @@ func (t *tools) register(s *mcp.Server) {
 	mcp.AddTool(s, &mcp.Tool{Name: "get_metrics", Description: "Delivery metrics over projects and/or JQL: summary (open, created, resolved, overdue, cycle time), breakdown (counts and points by a field), cycle_time, created_resolved, cumulative_flow, or velocity (one project's recent sprints).", Annotations: read("Get metrics")}, t.getMetrics)
 	mcp.AddTool(s, &mcp.Tool{Name: "find_users", Description: "Find people by name or email (to assign issues or write JQL).", Annotations: read("Find users")}, t.findUsers)
 
+	if t.readOnly {
+		return
+	}
 	mcp.AddTool(s, &mcp.Tool{Name: "create_issue", Description: "Create an issue. Use get_project for the project's issue type keys. Description is Markdown.", Annotations: write("Create issue", false)}, t.createIssue)
 	mcp.AddTool(s, &mcp.Tool{Name: "update_issue", Description: "Change an issue's fields; only the fields you pass change. Use `clear` to empty fields. Status changes use transition_issue instead.", Annotations: write("Update issue", true)}, t.updateIssue)
 	mcp.AddTool(s, &mcp.Tool{Name: "transition_issue", Description: "Move an issue through its workflow, by transition id, name or target status (get_issue lists the available ones). Some transitions ask for screen fields such as a resolution.", Annotations: write("Transition issue", false)}, t.transitionIssue)
 	mcp.AddTool(s, &mcp.Tool{Name: "add_comment", Description: "Comment on an issue (Markdown).", Annotations: write("Add comment", false)}, t.addComment)
 	mcp.AddTool(s, &mcp.Tool{Name: "link_issues", Description: "Link two issues: key <type> targetKey, e.g. PLAT-3 blocks PLAT-7.", Annotations: write("Link issues", true)}, t.linkIssues)
 }
+
+// writeTools are the tools registered after the read tools above: they change issues, need the
+// write scope, and are left out for connected apps allowed only to read.
+var writeTools = []string{"create_issue", "update_issue", "transition_issue", "add_comment", "link_issues"}
 
 type none struct{}
 
@@ -72,7 +79,11 @@ func (t *tools) whoami(ctx context.Context, _ *mcp.CallToolRequest, _ none) (*mc
 	if t.actor.TokenID != nil {
 		scopes = strings.Join(t.actor.Scopes, ", ")
 	}
-	return text(fmt.Sprintf("%s <%s>\nOrganisation role: %s\nToken scopes: %s", me.DisplayName, me.Email, me.OrgRole, scopes)), nil, nil
+	out := fmt.Sprintf("%s <%s>\nOrganisation role: %s\nToken scopes: %s", me.DisplayName, me.Email, me.OrgRole, scopes)
+	if t.connected {
+		out += "\nConnected app: " + t.actor.Via
+	}
+	return text(out), nil, nil
 }
 
 func (t *tools) listProjects(ctx context.Context, _ *mcp.CallToolRequest, _ none) (*mcp.CallToolResult, any, error) {

@@ -119,6 +119,21 @@ type Config struct {
 
 	// Email. Without a host, messages are kept in memory (and logged) instead of sent.
 	SMTP SMTP
+
+	// OAuth sign-in for AI assistants connecting to /mcp.
+	OAuth OAuth
+}
+
+// OAuth configures Workflow as the OAuth authorisation server for MCP clients.
+type OAuth struct {
+	// Enabled lets assistants sign in through the browser; without it /mcp takes tokens only.
+	Enabled bool
+	// DynamicRegistration allows RFC 7591 client registration at /oauth/register.
+	DynamicRegistration bool
+	// ClientMetadataDocuments accepts https client ids pointing at client ID metadata documents.
+	ClientMetadataDocuments bool
+	AccessTokenTTL          time.Duration
+	RefreshTokenTTL         time.Duration
 }
 
 type SMTP struct {
@@ -244,6 +259,19 @@ func LoadFrom(get func(string) string) (*Config, error) {
 		},
 	}
 	c.HooksPublicURL = strings.TrimRight(e.str("WFM_HOOKS_PUBLIC_URL", c.PublicURL), "/")
+	c.OAuth = OAuth{
+		Enabled:                 e.boolean("WFM_OAUTH_ENABLED", true),
+		DynamicRegistration:     e.boolean("WFM_OAUTH_DYNAMIC_REGISTRATION", true),
+		ClientMetadataDocuments: e.boolean("WFM_OAUTH_CLIENT_METADATA_DOCUMENTS", true),
+		AccessTokenTTL:          e.duration("WFM_OAUTH_ACCESS_TOKEN_TTL", time.Hour),
+		RefreshTokenTTL:         e.duration("WFM_OAUTH_REFRESH_TOKEN_TTL", 30*24*time.Hour),
+	}
+	if c.OAuth.AccessTokenTTL < time.Minute || c.OAuth.AccessTokenTTL > 24*time.Hour {
+		e.errs = append(e.errs, errors.New("WFM_OAUTH_ACCESS_TOKEN_TTL must be between 1m and 24h"))
+	}
+	if c.OAuth.RefreshTokenTTL < time.Hour || c.OAuth.RefreshTokenTTL > 366*24*time.Hour {
+		e.errs = append(e.errs, errors.New("WFM_OAUTH_REFRESH_TOKEN_TTL must be between 1h and 8784h"))
+	}
 	c.OIDCProviders = loadOIDC(e)
 
 	switch c.SMTP.TLS {

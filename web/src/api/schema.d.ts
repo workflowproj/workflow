@@ -1723,6 +1723,92 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/oauth/consent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What an AI assistant asks for, shown on the consent page (browser session only) */
+        get: operations["getOAuthConsent"];
+        put?: never;
+        /** Approve or deny an AI assistant (browser session only); returns where to send the browser */
+        post: operations["decideOAuthConsent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/connected-apps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** AI assistants and other apps you allowed to act for you over OAuth */
+        get: operations["listMyConnectedApps"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/connected-apps/{grantId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Disconnect an app; its tokens stop working and it must ask again */
+        delete: operations["revokeMyConnectedApp"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/connected-apps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every person's connected apps */
+        get: operations["adminListConnectedApps"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/connected-apps/{grantId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Disconnect anyone's app */
+        delete: operations["adminRevokeConnectedApp"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/events": {
         parameters: {
             query?: never;
@@ -3139,6 +3225,62 @@ export interface components {
             /** Format: date-time */
             deliveredAt?: string;
         };
+        /**
+         * @description mcp:read = the MCP read tools; mcp:write = also the tools that create, edit, comment on and move issues.
+         * @enum {string}
+         */
+        OAuthScope: "mcp:read" | "mcp:write";
+        OAuthClient: {
+            /** @description Generated for apps that registered themselves; the metadata document URL otherwise */
+            id: string;
+            /** @description The name the app gives itself */
+            name: string;
+            /**
+             * @description dynamic = registered itself (RFC 7591); metadata = identified by a client ID metadata document served from its own https URL
+             * @enum {string}
+             */
+            kind: "dynamic" | "metadata";
+            /** @description The host serving a metadata document (verified) */
+            host: string;
+            clientUri?: string;
+            logoUri?: string;
+        };
+        OAuthConsent: {
+            client: components["schemas"]["OAuthClient"];
+            redirectUri: string;
+            /** @description Host (or app scheme) the browser returns to */
+            redirectHost: string;
+            /** @description The browser returns to an app on this computer (a loopback address or an app link) */
+            nativeRedirect: boolean;
+            requestedScopes: components["schemas"]["OAuthScope"][];
+            /** @description What you allowed this app before */
+            grantedScopes?: components["schemas"]["OAuthScope"][];
+            /** @description An earlier approval covers this request */
+            alreadyGranted: boolean;
+        };
+        OAuthConsentDecision: {
+            request: string;
+            approve: boolean;
+            /** @description Required when approving; among those requested */
+            scopes?: components["schemas"]["OAuthScope"][];
+        };
+        OAuthRedirect: {
+            redirectUrl: string;
+        };
+        ConnectedApp: {
+            /** Format: uuid */
+            id: string;
+            client: components["schemas"]["OAuthClient"];
+            scopes: components["schemas"]["OAuthScope"][];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt?: string;
+            /** Format: date-time */
+            lastUsedAt?: string;
+            /** @description The person who connected it (administration listing) */
+            user?: components["schemas"]["User"];
+        };
     };
     responses: {
         /** @description Error */
@@ -3186,6 +3328,7 @@ export interface components {
         ChannelId: string;
         FieldId: string;
         EventId: string;
+        GrantId: string;
     };
     requestBodies: never;
     headers: never;
@@ -6989,6 +7132,139 @@ export interface operations {
         responses: {
             /** @description A ping delivery was queued */
             202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getOAuthConsent: {
+        parameters: {
+            query: {
+                /** @description The sealed authorisation request /oauth/authorize passed to the consent page */
+                request: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The app, where it returns to and the access it asks for */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OAuthConsent"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    decideOAuthConsent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OAuthConsentDecision"];
+            };
+        };
+        responses: {
+            /** @description The app's redirect URI with an authorisation code, or with error=access_denied */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OAuthRedirect"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listMyConnectedApps: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Connected apps, most recently used first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectedApp"][];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    revokeMyConnectedApp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                grantId: components["parameters"]["GrantId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Disconnected */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    adminListConnectedApps: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Connected apps, most recently used first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectedApp"][];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    adminRevokeConnectedApp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                grantId: components["parameters"]["GrantId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Disconnected */
+            204: {
                 headers: {
                     [name: string]: unknown;
                 };

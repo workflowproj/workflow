@@ -8,7 +8,8 @@ info:
 
     Authenticate with the browser session cookie or a personal access token
     (`Authorization: Bearer wfm_pat_...`). Cookie-authenticated mutations must send
-    `X-Requested-With: XMLHttpRequest`.
+    `X-Requested-With: XMLHttpRequest`. OAuth access tokens issued to AI assistants
+    (`wfm_oat_...`) are valid for `/mcp` only.
 
     Errors use RFC 9457 problem details (`application/problem+json`).
 servers:
@@ -2250,6 +2251,86 @@ paths:
         default: { $ref: '#/components/responses/Problem' }
 
   # ---------------------------------------------------------------------------
+  # AI assistants: OAuth consent and connected apps
+  # ---------------------------------------------------------------------------
+  /oauth/consent:
+    get:
+      operationId: getOAuthConsent
+      tags: [me]
+      summary: What an AI assistant asks for, shown on the consent page (browser session only)
+      parameters:
+        - { name: request, in: query, required: true, description: The sealed authorisation request /oauth/authorize passed to the consent page, schema: { type: string } }
+      responses:
+        "200":
+          description: The app, where it returns to and the access it asks for
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OAuthConsent' }
+        default: { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: decideOAuthConsent
+      tags: [me]
+      summary: Approve or deny an AI assistant (browser session only); returns where to send the browser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OAuthConsentDecision' }
+      responses:
+        "200":
+          description: The app's redirect URI with an authorisation code, or with error=access_denied
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OAuthRedirect' }
+        default: { $ref: '#/components/responses/Problem' }
+  /me/connected-apps:
+    get:
+      operationId: listMyConnectedApps
+      tags: [me]
+      summary: AI assistants and other apps you allowed to act for you over OAuth
+      responses:
+        "200":
+          description: Connected apps, most recently used first
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ConnectedApp' }
+        default: { $ref: '#/components/responses/Problem' }
+  /me/connected-apps/{grantId}:
+    delete:
+      operationId: revokeMyConnectedApp
+      tags: [me]
+      summary: Disconnect an app; its tokens stop working and it must ask again
+      parameters: [{ $ref: '#/components/parameters/GrantId' }]
+      responses:
+        "204": { description: Disconnected }
+        default: { $ref: '#/components/responses/Problem' }
+  /admin/connected-apps:
+    get:
+      operationId: adminListConnectedApps
+      tags: [admin]
+      summary: Every person's connected apps
+      responses:
+        "200":
+          description: Connected apps, most recently used first
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ConnectedApp' }
+        default: { $ref: '#/components/responses/Problem' }
+  /admin/connected-apps/{grantId}:
+    delete:
+      operationId: adminRevokeConnectedApp
+      tags: [admin]
+      summary: Disconnect anyone's app
+      parameters: [{ $ref: '#/components/parameters/GrantId' }]
+      responses:
+        "204": { description: Disconnected }
+        default: { $ref: '#/components/responses/Problem' }
+
+  # ---------------------------------------------------------------------------
   # Live updates
   # ---------------------------------------------------------------------------
   /events:
@@ -2312,6 +2393,7 @@ components:
     ChannelId: { name: channelId, in: path, required: true, schema: { type: string, format: uuid } }
     FieldId: { name: fieldId, in: path, required: true, schema: { type: string, format: uuid } }
     EventId: { name: eventId, in: path, required: true, schema: { type: string, format: uuid } }
+    GrantId: { name: grantId, in: path, required: true, schema: { type: string, format: uuid } }
 
   responses:
     Problem:
@@ -3743,3 +3825,56 @@ components:
         lastError: { type: string }
         createdAt: { type: string, format: date-time }
         deliveredAt: { type: string, format: date-time }
+
+    # AI assistants (OAuth)
+    OAuthScope:
+      type: string
+      enum: ['mcp:read', 'mcp:write']
+      description: mcp:read = the MCP read tools; mcp:write = also the tools that create, edit, comment on and move issues.
+    OAuthClient:
+      type: object
+      required: [id, name, kind, host]
+      properties:
+        id: { type: string, description: Generated for apps that registered themselves; the metadata document URL otherwise }
+        name: { type: string, description: The name the app gives itself }
+        kind:
+          type: string
+          enum: [dynamic, metadata]
+          description: dynamic = registered itself (RFC 7591); metadata = identified by a client ID metadata document served from its own https URL
+        host: { type: string, description: The host serving a metadata document (verified), or the host of a registered app's first redirect URI }
+        clientUri: { type: string }
+        logoUri: { type: string }
+    OAuthConsent:
+      type: object
+      required: [client, redirectUri, redirectHost, nativeRedirect, requestedScopes, alreadyGranted]
+      properties:
+        client: { $ref: '#/components/schemas/OAuthClient' }
+        redirectUri: { type: string }
+        redirectHost: { type: string, description: Host (or app scheme) the browser returns to }
+        nativeRedirect: { type: boolean, description: The browser returns to an app on this computer (a loopback address or an app link) }
+        requestedScopes: { type: array, items: { $ref: '#/components/schemas/OAuthScope' } }
+        grantedScopes: { type: array, items: { $ref: '#/components/schemas/OAuthScope' }, description: What you allowed this app before, if anything }
+        alreadyGranted: { type: boolean, description: An earlier approval covers this request }
+    OAuthConsentDecision:
+      type: object
+      required: [request, approve]
+      properties:
+        request: { type: string }
+        approve: { type: boolean }
+        scopes: { type: array, items: { $ref: '#/components/schemas/OAuthScope' }, description: Required when approving; among those requested }
+    OAuthRedirect:
+      type: object
+      required: [redirectUrl]
+      properties:
+        redirectUrl: { type: string }
+    ConnectedApp:
+      type: object
+      required: [id, client, scopes, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        client: { $ref: '#/components/schemas/OAuthClient' }
+        scopes: { type: array, items: { $ref: '#/components/schemas/OAuthScope' } }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        lastUsedAt: { type: string, format: date-time }
+        user: { $ref: '#/components/schemas/User', description: The person who connected it (administration listing) }
