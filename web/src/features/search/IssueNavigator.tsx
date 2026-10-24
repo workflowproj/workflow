@@ -68,7 +68,7 @@ export function IssueNavigator({
 
   const [draft, setDraft] = useState(jql);
   useEffect(() => setDraft(jql), [jql]);
-  const [mode, setMode] = useMode();
+  const [preferredMode, setMode] = useMode();
   const parsed = useMemo(() => parseBasic(jql, projectKey), [jql, projectKey]);
   const [saving, setSaving] = useState<"new" | "update" | null>(null);
 
@@ -85,6 +85,9 @@ export function IssueNavigator({
   const openIssue = (key?: string) => onSearch({ ...search, issue: key });
 
   const queryError = results.error instanceof ApiError && results.error.status === 400 ? results.error : null;
+  // A broken query (e.g. from a shared link) is shown in the JQL editor, where its error position
+  // can be highlighted, whichever mode the person prefers.
+  const mode: Mode = queryError ? "jql" : preferredMode;
   const jqlError: JqlError | null =
     queryError && sameJql(draft, jql)
       ? {
