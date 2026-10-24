@@ -9,7 +9,7 @@ import (
 
 func TestRequestLimits(t *testing.T) {
 	e := newEnv(t,
-		withEnv("WFM_RATE_LIMIT_PER_MINUTE", "20"),          // bursts of 10 per session or token
+		withEnv("WFM_RATE_LIMIT_PER_MINUTE", "20"),           // bursts of 10 per session or token
 		withEnv("WFM_RATE_LIMIT_ANONYMOUS_PER_MINUTE", "20"), // bursts of 10 per address
 		withEnv("WFM_RATE_LIMIT_ADDRESS_PER_MINUTE", "1000"),
 		// The test server is on loopback: don't trust it as a proxy, so X-Forwarded-For is ignored.

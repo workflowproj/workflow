@@ -42,7 +42,8 @@ search and live updates all run on Postgres.
   webhooks.
 - **API and AI assistants.** The REST API behind every screen (OpenAPI published by the server)
   and an MCP server, so Claude and other assistants can search, file, update and move issues and
-  read sprint metrics as you.
+  read sprint metrics as you. Assistants connect by URL and you approve them in the browser
+  (OAuth), or use a personal access token.
 - **Slack and Mattermost.** Channel notifications with event and JQL filters, a chat action for
   automation, and a read-only `/wfm` command for issue lookup and search.
 - **Live.** Boards and issue views update in real time over server-sent events; light and dark
@@ -110,6 +111,7 @@ internal/identity/       OIDC sign-in, sessions, tokens, SCIM server, Google dir
 internal/scm/            GitHub and GitLab providers, webhook processing, reconcile
 internal/automation/     rules, notifications, outbound webhooks, Slack and Mattermost
 internal/mcpserver/      the MCP server for AI assistants (tools over the API handlers)
+internal/oauth/          OAuth 2.1 authorisation server for assistants connecting to /mcp
 internal/db/             migrations (goose) and queries (sqlc)
 internal/integration/    end-to-end tests of the API against PostgreSQL
 web/                     React UI (Vite, TanStack Router and Query, dnd-kit, React Flow, Tiptap)

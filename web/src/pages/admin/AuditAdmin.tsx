@@ -14,7 +14,7 @@ import { formatDateTime } from "@/lib/format";
 type AuditEvent = Schemas["AuditEvent"];
 
 const PAGE = 50;
-const PRESETS = ["user.", "group.", "role.", "token.", "scim.", "project.", "workflow.", "automation.", "scm.", "field."];
+const PRESETS = ["user.", "group.", "role.", "token.", "oauth.", "scim.", "project.", "workflow.", "automation.", "scm.", "field."];
 
 export function AuditAdmin() {
   const [action, setAction] = useState("");

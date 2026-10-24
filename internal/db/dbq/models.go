@@ -296,6 +296,63 @@ type Notification struct {
 	CreatedAt time.Time
 }
 
+type OauthClient struct {
+	ID              string
+	Kind            string
+	Name            string
+	ClientUri       *string
+	LogoUri         *string
+	RedirectUris    []string
+	TokenAuthMethod string
+	SecretHash      *string
+	SoftwareID      *string
+	SoftwareVersion *string
+	FetchedAt       *time.Time
+	RefreshAfter    *time.Time
+	CreatedIp       *string
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+}
+
+type OauthCode struct {
+	CodeHash      string
+	GrantID       uuid.UUID
+	RedirectUri   string
+	CodeChallenge string
+	Resource      string
+	Scopes        []string
+	FamilyID      *uuid.UUID
+	ExpiresAt     time.Time
+	UsedAt        *time.Time
+	CreatedAt     time.Time
+}
+
+type OauthGrant struct {
+	ID         uuid.UUID
+	UserID     uuid.UUID
+	ClientID   string
+	Scopes     []string
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+	LastUsedAt *time.Time
+	RevokedAt  *time.Time
+}
+
+type OauthToken struct {
+	ID         uuid.UUID
+	GrantID    uuid.UUID
+	FamilyID   uuid.UUID
+	Kind       string
+	TokenHash  string
+	Scopes     []string
+	Resource   string
+	ExpiresAt  time.Time
+	CreatedAt  time.Time
+	LastUsedAt *time.Time
+	UsedAt     *time.Time
+	RevokedAt  *time.Time
+}
+
 type Project struct {
 	ID           uuid.UUID
 	Key          string

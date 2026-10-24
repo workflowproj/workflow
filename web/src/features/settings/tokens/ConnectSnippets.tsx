@@ -2,9 +2,50 @@ import { useState } from "react";
 import { Check, Copy } from "lucide-react";
 import { cn } from "@/lib/cn";
 
-/** The ways to use a token, as copyable snippets: AI assistants over MCP, the REST API and the CLI. */
-export function connectSnippets(server: string, token = "wfm_pat_…") {
+/**
+ * The ways to connect, as copyable snippets. Without a token: AI assistants add Workflow by its
+ * MCP address and sign in through the browser (OAuth); the REST API and CLI use a token. With a
+ * token (just created): every client sends it as a header.
+ */
+export function connectSnippets(server: string, token?: string) {
   const mcp = `${server}/mcp`;
+  const pat = token ?? "wfm_pat_…";
+  const rest = {
+    id: "rest",
+    label: "REST API",
+    hint: token ? "Every screen uses this API. The OpenAPI description generates clients for any language." : "Send a personal access token. The OpenAPI description generates clients for any language.",
+    code: `curl -H "Authorization: Bearer ${pat}" \\\n  "${server}/api/v1/search?jql=assignee%20%3D%20currentUser()"\n\n# API description\ncurl -O ${server}/api/v1/openapi.yaml`,
+  };
+  const cli = {
+    id: "cli",
+    label: "CLI",
+    hint: "Apply workflows kept in your repository (needs a token with the write scope).",
+    code: `export WFM_SERVER=${server}\nexport WFM_TOKEN=${pat}\nwfm workflow apply -f workflow.yaml --project KEY`,
+  };
+  if (!token) {
+    return [
+      {
+        id: "claude",
+        label: "Claude",
+        hint: "claude.ai, Claude Desktop and mobile: Settings → Connectors → Add custom connector. Paste this address, choose Connect and approve access in your browser.",
+        code: mcp,
+      },
+      {
+        id: "claude-code",
+        label: "Claude Code",
+        hint: "Run this, then /mcp in Claude Code and choose Authenticate; your browser asks you to approve access.",
+        code: `claude mcp add --transport http workflow ${mcp}`,
+      },
+      {
+        id: "http",
+        label: "Other MCP clients",
+        hint: "Cursor, VS Code, ChatGPT connectors and other clients that support OAuth: add the address and sign in through the browser when they connect.",
+        code: JSON.stringify({ mcpServers: { workflow: { type: "http", url: mcp } } }, null, 2),
+      },
+      rest,
+      cli,
+    ];
+  }
   return [
     {
       id: "claude-code",
@@ -21,21 +62,11 @@ export function connectSnippets(server: string, token = "wfm_pat_…") {
     {
       id: "desktop",
       label: "Claude Desktop",
-      hint: "Claude Desktop starts local servers: install the wfm binary, then add this to claude_desktop_config.json.",
+      hint: "Claude Desktop can also start a local relay: install the wfm binary, then add this to claude_desktop_config.json.",
       code: JSON.stringify({ mcpServers: { workflow: { command: "wfm", args: ["mcp"], env: { WFM_SERVER: server, WFM_TOKEN: token } } } }, null, 2),
     },
-    {
-      id: "rest",
-      label: "REST API",
-      hint: "Every screen uses this API. The OpenAPI description generates clients for any language.",
-      code: `curl -H "Authorization: Bearer ${token}" \\\n  "${server}/api/v1/search?jql=assignee%20%3D%20currentUser()"\n\n# API description\ncurl -O ${server}/api/v1/openapi.yaml`,
-    },
-    {
-      id: "cli",
-      label: "CLI",
-      hint: "Apply workflows kept in your repository (needs the write scope).",
-      code: `export WFM_SERVER=${server}\nexport WFM_TOKEN=${token}\nwfm workflow apply -f workflow.yaml --project KEY`,
-    },
+    rest,
+    cli,
   ];
 }
 

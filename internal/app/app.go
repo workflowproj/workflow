@@ -35,6 +35,7 @@ import (
 	"github.com/geoffo-dev/workflow-management/internal/identity/scim"
 	"github.com/geoffo-dev/workflow-management/internal/jobs"
 	"github.com/geoffo-dev/workflow-management/internal/mail"
+	"github.com/geoffo-dev/workflow-management/internal/oauth"
 	"github.com/geoffo-dev/workflow-management/internal/scm"
 	"github.com/geoffo-dev/workflow-management/internal/secure"
 	"github.com/geoffo-dev/workflow-management/internal/storage"
@@ -61,6 +62,8 @@ type App struct {
 	Mailer mail.Sender
 	Server *httpapi.Server
 	Scim   *scim.Handler
+	// OAuth signs AI assistants in to /mcp.
+	OAuth *oauth.Server
 }
 
 // Options let tests substitute collaborators.
@@ -167,9 +170,10 @@ func New(ctx context.Context, cfg *config.Config, log *slog.Logger, pool *pgxpoo
 	a.River = client
 	enq.Enqueuer = client
 
+	a.OAuth = oauth.New(cfg, pool, dbq.New(pool), box, a.Auth, a.Tracker, log.With("module", "oauth"))
 	a.Server = &httpapi.Server{
 		Cfg: cfg, Log: log.With("module", "http"), Pool: pool, Q: dbq.New(pool), Tracker: a.Tracker, Auth: a.Auth, Prov: a.Prov,
-		SCM: a.SCM, Automation: a.Automation, Jobs: enq, Hub: a.Hub, Box: box, Mailer: a.Mailer,
+		SCM: a.SCM, Automation: a.Automation, Jobs: enq, Hub: a.Hub, Box: box, Mailer: a.Mailer, OAuth: a.OAuth,
 	}
 	return a, nil
 }

@@ -126,6 +126,8 @@ type Config struct {
 	RateLimit RateLimit
 	// TrustedProxies may set X-Forwarded-For (client addresses for limits, sessions and audit).
 	TrustedProxies []netip.Prefix
+	// OAuth sign-in for AI assistants connecting to /mcp.
+	OAuth OAuth
 }
 
 // RateLimit is requests per minute (0 = no limit), each with a burst of half that.
@@ -134,6 +136,18 @@ type RateLimit struct {
 	Anonymous     int // per client address, requests without credentials
 	PerAddress    int // per client address, everything
 	Hooks         int // per webhook endpoint (/hooks/...)
+}
+
+// OAuth configures Workflow as the OAuth authorisation server for MCP clients.
+type OAuth struct {
+	// Enabled lets assistants sign in through the browser; without it /mcp takes tokens only.
+	Enabled bool
+	// DynamicRegistration allows RFC 7591 client registration at /oauth/register.
+	DynamicRegistration bool
+	// ClientMetadataDocuments accepts https client ids pointing at client ID metadata documents.
+	ClientMetadataDocuments bool
+	AccessTokenTTL          time.Duration
+	RefreshTokenTTL         time.Duration
 }
 
 type SMTP struct {
@@ -280,6 +294,19 @@ func LoadFrom(get func(string) string) (*Config, error) {
 		e.errs = append(e.errs, fmt.Errorf("WFM_TRUSTED_PROXIES: %v", err))
 	} else {
 		c.TrustedProxies = p
+	}
+	c.OAuth = OAuth{
+		Enabled:                 e.boolean("WFM_OAUTH_ENABLED", true),
+		DynamicRegistration:     e.boolean("WFM_OAUTH_DYNAMIC_REGISTRATION", true),
+		ClientMetadataDocuments: e.boolean("WFM_OAUTH_CLIENT_METADATA_DOCUMENTS", true),
+		AccessTokenTTL:          e.duration("WFM_OAUTH_ACCESS_TOKEN_TTL", time.Hour),
+		RefreshTokenTTL:         e.duration("WFM_OAUTH_REFRESH_TOKEN_TTL", 30*24*time.Hour),
+	}
+	if c.OAuth.AccessTokenTTL < time.Minute || c.OAuth.AccessTokenTTL > 24*time.Hour {
+		e.errs = append(e.errs, errors.New("WFM_OAUTH_ACCESS_TOKEN_TTL must be between 1m and 24h"))
+	}
+	if c.OAuth.RefreshTokenTTL < time.Hour || c.OAuth.RefreshTokenTTL > 366*24*time.Hour {
+		e.errs = append(e.errs, errors.New("WFM_OAUTH_REFRESH_TOKEN_TTL must be between 1h and 8784h"))
 	}
 	c.OIDCProviders = loadOIDC(e)
 

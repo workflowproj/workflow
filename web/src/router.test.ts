@@ -21,6 +21,9 @@ describe("router", () => {
       "/app/projects/$projectKey/timeline",
       "/app/browse/$issueKey",
       "/app/admin/users",
+      "/app/admin/connected-apps",
+      "/oauth/consent",
+      "/oauth/consent/$request",
     ]) {
       expect(ids).toContain(id);
     }

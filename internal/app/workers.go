@@ -143,14 +143,17 @@ func (a *App) periodicJobs() []*river.PeriodicJob {
 	return out
 }
 
-// maintenance purges expired sessions, anonymises users deleted upstream after the retention
-// period and prunes processed webhook payloads.
+// maintenance purges expired sessions and OAuth tokens, anonymises users deleted upstream after
+// the retention period and prunes processed webhook payloads.
 func (a *App) maintenance(ctx context.Context) error {
 	q := dbq.New(a.Pool)
 	if n, err := q.DeleteExpiredSessions(ctx); err != nil {
 		return err
 	} else if n > 0 {
 		a.Log.Info("expired sessions removed", "count", n)
+	}
+	if err := a.OAuth.Prune(ctx); err != nil {
+		return err
 	}
 	if a.Cfg.DeletedUserRetention > 0 {
 		ids, err := q.UsersToAnonymize(ctx, ptr(time.Now().Add(-a.Cfg.DeletedUserRetention)))
