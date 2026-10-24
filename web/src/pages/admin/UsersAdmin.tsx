@@ -110,7 +110,7 @@ export function UsersAdmin() {
                 const self = u.id === me?.id;
                 const managed = isDirectoryManaged(u.source);
                 return (
-                  <tr key={u.id} className={u.active ? undefined : "opacity-60"}>
+                  <tr key={u.id} className={u.active ? undefined : "bg-surface-2/60"}>
                     <td>
                       <span className="flex items-center gap-2.5">
                         <UserAvatar user={u} size={28} />

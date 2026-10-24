@@ -2,7 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { api, projectKey, signIn } from "./helpers";
 
-// Accessibility: every main page, in light and dark mode, has no serious or critical axe
+// Accessibility: every main page (the admin pages need the first user, an organisation admin), in light and dark mode, has no serious or critical axe
 // violations against WCAG 2.1 A/AA. Less severe findings are printed for follow-up.
 
 async function audit(page: Page, name: string) {
@@ -26,6 +26,8 @@ test("accessibility: main pages in light and dark mode", async ({ page, browser 
   const anon = await ctx.newPage();
   await anon.goto("/login");
   await audit(anon, "login");
+  await anon.goto("/forgot-password");
+  await audit(anon, "forgot password");
   await ctx.close();
 
   await signIn(page, "e2e-admin@example.com", "E2E Admin");
@@ -61,6 +63,11 @@ test("accessibility: main pages in light and dark mode", async ({ page, browser 
     ["dashboard", `/dashboards/${dashboard.id}`],
     ["big picture", "/timeline"],
     ["profile", "/profile"],
+    ["timesheet", "/timesheet"],
+    ["admin users", "/admin/users"],
+    ["admin email", "/admin/email"],
+    ["admin connected apps", "/admin/connected-apps"],
+    ["admin import", "/admin/import"],
   ];
   for (const theme of ["light", "dark"] as const) {
     await page.evaluate((t) => localStorage.setItem("wfm.theme", t), theme);

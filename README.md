@@ -51,12 +51,19 @@ search and live updates all run on Postgres.
   and an MCP server, so Claude and other assistants can search, file, update and move issues and
   read sprint metrics as you. Assistants connect by URL and you approve them in the browser
   (OAuth), or use a personal access token.
+- **Notifications.** In the app and by email: per kind immediately (several changes to one issue
+  arrive as one email), in a daily digest at your hour, or off; one-click unsubscribe.
+- **Import from Jira.** Cloud or Data Center projects with their history, sprints, comments,
+  attachments, links and rank order, so reports cover the past; re-runnable; people become
+  placeholders they claim when they first sign in.
 - **Slack and Mattermost.** Channel notifications with event and JQL filters, a chat action for
   automation, and a read-only `/wfm` command for issue lookup and search.
-- **Live.** Boards and issue views update in real time over server-sent events; light and dark
-  themes.
-- **Operable.** `--mode=web|hooks|worker` from one image, Prometheus metrics, OpenTelemetry
-  traces, JSON logs, a Helm chart with CloudNativePG, HPA/KEDA, NetworkPolicies and Argo CD hooks.
+- **Live.** Boards, dashboards and issue views update in real time over server-sent events;
+  light and dark themes, both checked against WCAG 2.1 AA in the end-to-end tests.
+- **Operable.** `--mode=web|hooks|worker` from one image, Prometheus metrics with a Grafana
+  dashboard and alert rules, OpenTelemetry traces, JSON logs, request limits per token, session
+  and address, a Helm chart with CloudNativePG, HPA/KEDA, NetworkPolicies and Argo CD hooks.
+  Searches, boards and reports are measured against 100,000 issues.
 
 ## Quick start (local)
 
