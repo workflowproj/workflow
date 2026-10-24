@@ -5,9 +5,11 @@ import { useQuery } from "@tanstack/react-query";
 import { ChevronRight, CircleCheck, Columns3 } from "lucide-react";
 import type { Status } from "@/api/types";
 import { IssueTypeIcon, PriorityIcon } from "@/components/issue-bits";
-import { EmptyState } from "@/components/ui";
+import { Button, EmptyState } from "@/components/ui";
 import { UserAvatar } from "@/components/UserAvatar";
 import { cn } from "@/lib/cn";
+import type { CardField } from "./card-fields";
+import { ColumnMenu, ColumnNameInput, type ColumnTools } from "./ColumnMenu";
 import { IssueCard, SortableIssueCard } from "./IssueCard";
 import { buildLanes, cellId, findContainer, parseCellId, type Containers, type Lane, type SwimlaneMode } from "./model";
 import { transitionsQuery, type BoardColumnData } from "./queries";
@@ -23,7 +25,9 @@ export function BoardView({
   mode,
   meId,
   statuses,
+  cardFields,
   canDrag,
+  columnTools,
   onOpen,
   onDrop,
 }: {
@@ -32,7 +36,11 @@ export function BoardView({
   mode: SwimlaneMode;
   meId?: string;
   statuses: Map<string, Status>;
+  /** What the cards show (the board's cardFields). */
+  cardFields?: CardField[];
   canDrag: boolean;
+  /** Column header menus, for people who may configure the board. */
+  columnTools?: ColumnTools;
   onOpen: (key: string) => void;
   onDrop: (issueId: string, toColumnId: string, list: string[]) => void;
 }) {
@@ -77,19 +85,28 @@ export function BoardView({
     onDragCancel: ({ active }) => `Moving ${keyOf(active.id)} was cancelled.`,
   };
 
-  if (columns.length === 0) return <EmptyState icon={<Columns3 className="size-8" />} title="This board has no columns" body="Map workflow statuses to columns in the board settings." />;
+  if (columns.length === 0)
+    return (
+      <EmptyState
+        icon={<Columns3 className="size-8" />}
+        title="This board has no columns"
+        body="Map workflow statuses to columns to see issues here."
+        action={columnTools && <Button onClick={columnTools.configure}>Configure columns</Button>}
+      />
+    );
   const grid = { gridTemplateColumns: `repeat(${columns.length}, minmax(14.5rem, 1fr))` };
   const lanesOn = mode !== "none";
 
+  const header = (c: (typeof columns)[number], i: number) => <ColumnHeader column={c} index={i} count={columns.length} statuses={statuses} tools={columnTools} />;
   const cells = (lane: Lane, fill?: boolean) =>
-    columns.map((c) => {
+    columns.map((c, i) => {
       const id = cellId(lane.id, c.id);
       const ids = dnd.items[id] ?? [];
       return (
-        <Cell key={id} id={id} items={ids} fill={fill} danger={fill && c.overLimit} over={target === id && !!active} dimmed={!!reachable && !reachable.has(c.id)} header={fill ? <ColumnHeader column={c} statuses={statuses} /> : undefined}>
+        <Cell key={id} id={id} label={lanesOn ? `${c.name} column, ${lane.label}` : `${c.name} column`} items={ids} fill={fill} danger={fill && c.overLimit} over={target === id && !!active} dimmed={!!reachable && !reachable.has(c.id)} header={fill ? header(c, i) : undefined}>
           {ids.map((iid) => {
             const issue = issues.get(iid);
-            return issue ? <SortableIssueCard key={iid} issue={issue} onOpen={onOpen} disabled={!canDrag} /> : null;
+            return issue ? <SortableIssueCard key={iid} issue={issue} fields={cardFields} onOpen={onOpen} disabled={!canDrag} /> : null;
           })}
         </Cell>
       );
@@ -113,9 +130,9 @@ export function BoardView({
         ) : (
           <>
             <div className="sticky top-0 z-10 grid gap-3 bg-canvas pb-1" style={grid}>
-              {columns.map((c) => (
+              {columns.map((c, i) => (
                 <div key={c.id} className={cn("rounded-lg px-1.5", c.overLimit ? "bg-danger-soft" : "bg-surface-2")}>
-                  <ColumnHeader column={c} statuses={statuses} />
+                  {header(c, i)}
                 </div>
               ))}
             </div>
@@ -148,15 +165,37 @@ export function BoardView({
           </>
         )}
       </div>
-      <DragOverlay dropAnimation={{ duration: 160, easing: "cubic-bezier(0.2, 0, 0, 1)" }}>{active ? <IssueCard issue={active} lifted /> : null}</DragOverlay>
+      <DragOverlay dropAnimation={{ duration: 160, easing: "cubic-bezier(0.2, 0, 0, 1)" }}>{active ? <IssueCard issue={active} fields={cardFields} lifted /> : null}</DragOverlay>
     </DndContext>
   );
 }
 
-function Cell({ id, items, children, header, fill, danger, over, dimmed }: { id: string; items: string[]; children: ReactNode; header?: ReactNode; fill?: boolean; danger?: boolean; over?: boolean; dimmed?: boolean }) {
+function Cell({
+  id,
+  label,
+  items,
+  children,
+  header,
+  fill,
+  danger,
+  over,
+  dimmed,
+}: {
+  id: string;
+  label: string;
+  items: string[];
+  children: ReactNode;
+  header?: ReactNode;
+  fill?: boolean;
+  danger?: boolean;
+  over?: boolean;
+  dimmed?: boolean;
+}) {
   const { setNodeRef } = useDroppable({ id });
   return (
     <div
+      role="group"
+      aria-label={label}
       className={cn(
         "flex flex-col rounded-lg transition-[opacity,box-shadow]",
         danger ? "bg-danger-soft" : "bg-surface-2",
@@ -175,27 +214,53 @@ function Cell({ id, items, children, header, fill, danger, over, dimmed }: { id:
   );
 }
 
-function ColumnHeader({ column, statuses }: { column: BoardColumnData & { total?: number }; statuses: Map<string, Status> }) {
-  const count = column.issues.length;
-  const total = column.total ?? count;
+function ColumnHeader({
+  column,
+  index,
+  count,
+  statuses,
+  tools,
+}: {
+  column: BoardColumnData & { total?: number };
+  index: number;
+  count: number;
+  statuses: Map<string, Status>;
+  tools?: ColumnTools;
+}) {
+  const [renaming, setRenaming] = useState(false);
+  const shown = column.issues.length;
+  const total = column.total ?? shown;
   const done = column.statusIds.length > 0 && column.statusIds.every((s) => statuses.get(s)?.category === "done");
   const names = column.statusIds.map((s) => statuses.get(s)?.name).filter(Boolean);
   return (
-    <div className="flex h-10 items-center gap-2 px-1" title={names.length > 1 ? `Statuses: ${names.join(", ")}` : undefined}>
-      <h3 className="truncate text-xs font-semibold tracking-wide text-muted uppercase">{column.name}</h3>
-      {done && <CircleCheck className="size-3.5 shrink-0 text-done" aria-label="Done column" />}
+    <div className="group/column flex h-10 items-center gap-2 px-1" title={names.length > 1 && !renaming ? `Statuses: ${names.join(", ")}` : undefined}>
+      {renaming && tools ? (
+        <ColumnNameInput
+          name={column.name}
+          onDone={(name) => {
+            setRenaming(false);
+            if (name) tools.rename(column.id, name);
+          }}
+        />
+      ) : (
+        <h3 className="truncate text-xs font-semibold tracking-wide text-muted uppercase" onDoubleClick={tools ? () => setRenaming(true) : undefined}>
+          {column.name}
+        </h3>
+      )}
+      {done && !renaming && <CircleCheck className="size-3.5 shrink-0 text-done" aria-label="Done column" />}
       {column.wipLimit != null ? (
         <span
           title={column.overLimit ? `Over the work-in-progress limit of ${column.wipLimit}` : `Work-in-progress limit: ${column.wipLimit}`}
-          className={cn("ml-auto rounded px-1.5 py-0.5 text-[11px] font-semibold tabular-nums", column.overLimit ? "bg-danger text-white" : "bg-surface-3 text-muted")}
+          className={cn("ml-auto shrink-0 rounded px-1.5 py-0.5 text-[11px] font-semibold tabular-nums", column.overLimit ? "bg-danger text-white" : "bg-surface-3 text-muted")}
         >
           {total} / {column.wipLimit}
         </span>
       ) : (
-        <span className="ml-auto text-xs text-faint tabular-nums" title={total !== count ? `${count} of ${total} shown` : undefined}>
-          {total !== count ? `${count} of ${total}` : count}
+        <span className="ml-auto shrink-0 text-xs text-faint tabular-nums" title={total !== shown ? `${shown} of ${total} shown` : undefined}>
+          {total !== shown ? `${shown} of ${total}` : shown}
         </span>
       )}
+      {tools && <ColumnMenu column={column} index={index} count={count} tools={tools} onRename={() => setRenaming(true)} />}
     </div>
   );
 }

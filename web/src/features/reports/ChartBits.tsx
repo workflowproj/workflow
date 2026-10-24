@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import type { StatusCategory } from "@/api/types";
 import { cn } from "@/lib/cn";
 
 /*
@@ -14,6 +15,19 @@ export const C = {
   axis: "var(--color-line-strong)",
   text: "var(--color-muted)",
   surface: "var(--color-surface)",
+  /** A second series beside the accent one, e.g. a sprint's scope on a burnup. */
+  second: "var(--color-chart-2)",
+  done: "var(--color-chart-done)",
+};
+
+/** Categorical slots in their fixed order (see index.css); a ninth series folds into "Other". */
+export const CATEGORICAL = [1, 2, 3, 4, 5, 6, 7, 8].map((i) => `var(--color-chart-${i})`);
+
+/** Status categories keep their meaning in charts: grey to do, blue in progress, green done. */
+export const categoryColor: Record<StatusCategory, string> = {
+  todo: "var(--color-chart-todo)",
+  in_progress: "var(--color-chart-progress)",
+  done: "var(--color-chart-done)",
 };
 
 /** Tooltip floats inside a `relative` chart container at (x, y), flipping left near the right edge. */
@@ -60,6 +74,29 @@ export function StatTile({ label, value, sub }: { label: string; value: ReactNod
       <p className="text-xs text-muted">{label}</p>
       <p className="mt-1 text-2xl font-semibold tracking-tight">{value}</p>
       {sub && <p className="mt-0.5 text-xs text-muted">{sub}</p>}
+    </div>
+  );
+}
+
+/** Segmented is a small single-choice switch (a radio group), e.g. points or issues. */
+export function Segmented<T extends string>({ label, value, options, onChange }: { label: string; value: T; options: { value: T; label: string }[]; onChange: (v: T) => void }) {
+  return (
+    <div role="radiogroup" aria-label={label} className="inline-flex rounded-md border border-line-strong bg-surface p-0.5">
+      {options.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          role="radio"
+          aria-checked={value === o.value}
+          onClick={() => onChange(o.value)}
+          className={cn(
+            "h-6 rounded px-2 text-xs font-medium focus-visible:outline-2 focus-visible:outline-accent",
+            value === o.value ? "bg-accent-soft text-accent" : "text-muted hover:text-ink",
+          )}
+        >
+          {o.label}
+        </button>
+      ))}
     </div>
   );
 }

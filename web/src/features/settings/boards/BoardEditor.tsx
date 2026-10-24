@@ -6,8 +6,11 @@ import { api, ApiError, unwrap, type Schemas } from "@/api/client";
 import { Button, Field, Input, Select, Textarea, useConfirm, useToast } from "@/components/ui";
 import { ErrorBox } from "@/components/ErrorBox";
 import { cn } from "@/lib/cn";
+import { columnErrors, columnInputs, draftColumns, type ColumnDraft } from "@/features/board/board-config";
+import { CardFieldsEditor } from "@/features/board/CardFieldsEditor";
+import { normalizeCardFields, type CardField } from "@/features/board/card-fields";
+import { ColumnsEditor, type StatusInfo } from "@/features/board/ColumnsEditor";
 import { SettingsSection } from "../common";
-import { ColumnsEditor, newColumnKey, type ColumnDraft, type StatusInfo } from "./ColumnsEditor";
 
 type Board = Schemas["Board"];
 
@@ -19,10 +22,6 @@ const swimlaneOptions: { value: Schemas["Swimlanes"]; label: string }[] = [
   { value: "type", label: "By issue type" },
 ];
 
-function draftColumns(b: Board): ColumnDraft[] {
-  return b.columns.map((c) => ({ key: newColumnKey(), name: c.name, statusIds: [...c.statusIds], wipLimit: c.wipLimit }));
-}
-
 export function BoardEditor({ board, projectKey, statuses, onDeleted }: { board: Board; projectKey: string; statuses: Map<string, StatusInfo>; onDeleted: () => void }) {
   const qc = useQueryClient();
   const toast = useToast();
@@ -32,7 +31,8 @@ export function BoardEditor({ board, projectKey, statuses, onDeleted }: { board:
   const [filterJql, setFilterJql] = useState(board.filterJql);
   const [swimlanes, setSwimlanes] = useState(board.swimlanes);
   const [retention, setRetention] = useState(board.doneRetentionDays);
-  const [columns, setColumns] = useState<ColumnDraft[]>(() => draftColumns(board));
+  const [columns, setColumns] = useState<ColumnDraft[]>(() => draftColumns(board.columns));
+  const [cardFields, setCardFields] = useState<CardField[]>(() => normalizeCardFields(board.cardFields));
 
   const body: Schemas["BoardInput"] = useMemo(
     () => ({
@@ -41,9 +41,10 @@ export function BoardEditor({ board, projectKey, statuses, onDeleted }: { board:
       filterJql: filterJql.trim(),
       swimlanes,
       doneRetentionDays: retention,
-      columns: columns.map((c) => ({ name: c.name.trim(), statusIds: c.statusIds, ...(c.wipLimit ? { wipLimit: c.wipLimit } : {}) })),
+      columns: columnInputs(columns),
+      cardFields,
     }),
-    [name, type, filterJql, swimlanes, retention, columns],
+    [name, type, filterJql, swimlanes, retention, columns, cardFields],
   );
   const original = JSON.stringify({
     name: board.name,
@@ -51,7 +52,8 @@ export function BoardEditor({ board, projectKey, statuses, onDeleted }: { board:
     filterJql: board.filterJql,
     swimlanes: board.swimlanes,
     doneRetentionDays: board.doneRetentionDays,
-    columns: board.columns.map((c) => ({ name: c.name, statusIds: c.statusIds, ...(c.wipLimit ? { wipLimit: c.wipLimit } : {}) })),
+    columns: columnInputs(draftColumns(board.columns)),
+    cardFields: normalizeCardFields(board.cardFields),
   });
   const dirty = JSON.stringify(body) !== original;
 
@@ -59,7 +61,7 @@ export function BoardEditor({ board, projectKey, statuses, onDeleted }: { board:
     mutationFn: () => unwrap(api.PUT("/boards/{boardId}", { params: { path: { boardId: board.id } }, body })),
     onSuccess: (b) => {
       qc.setQueryData(["boards", projectKey], (list: Board[] | undefined) => list?.map((x) => (x.id === b.id ? b : x)));
-      for (const key of [["boards", projectKey], ["board"], ["backlog"]]) qc.invalidateQueries({ queryKey: key });
+      for (const key of [["boards", projectKey], ["board", b.id], ["backlog", b.id]]) qc.invalidateQueries({ queryKey: key });
       toast.success(`Saved ${b.name}`);
     },
   });
@@ -73,13 +75,15 @@ export function BoardEditor({ board, projectKey, statuses, onDeleted }: { board:
     onError: toast.error,
   });
   const fe = save.error instanceof ApiError ? save.error.fieldErrors() : {};
+  const colErrors = columnErrors(fe);
   const reset = () => {
     setName(board.name);
     setType(board.type);
     setFilterJql(board.filterJql);
     setSwimlanes(board.swimlanes);
     setRetention(board.doneRetentionDays);
-    setColumns(draftColumns(board));
+    setColumns(draftColumns(board.columns));
+    setCardFields(normalizeCardFields(board.cardFields));
     save.reset();
   };
 
@@ -163,8 +167,14 @@ export function BoardEditor({ board, projectKey, statuses, onDeleted }: { board:
         description="Each status shows in at most one column. Drag statuses between columns, or use the menus. A WIP limit highlights a column when it holds too many issues."
       >
         <div className="p-4">
-          <ColumnsEditor columns={columns} onChange={setColumns} statuses={statuses} />
-          {fe.columns && <p className="mt-2 text-sm text-danger">{fe.columns}</p>}
+          <ColumnsEditor columns={columns} onChange={setColumns} statuses={statuses} errors={colErrors.byIndex} />
+          {colErrors.general && <p className="mt-2 text-sm text-danger">{colErrors.general}</p>}
+        </div>
+      </SettingsSection>
+
+      <SettingsSection title="Card layout" description="What the board's cards show besides the summary, issue type and key, in this order.">
+        <div className="p-4">
+          <CardFieldsEditor value={cardFields} onChange={setCardFields} projectKey={projectKey} error={fe.cardFields} />
         </div>
       </SettingsSection>
 

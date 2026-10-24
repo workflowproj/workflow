@@ -21,7 +21,7 @@ import { AdminLayout } from "@/pages/admin/AdminLayout";
  *   const route = getRouteApi("/app/projects/$projectKey/board");
  *   const { projectKey } = route.useParams(); const { issue } = route.useSearch();
  * Route ids are the full paths prefixed with "/app" for signed-in pages (see router.test.ts).
- * Settings, administration, reports and personal pages load on demand to keep the first load small.
+ * Settings, administration, reports, dashboards and personal pages load on demand to keep the first load small.
  */
 
 const str = (v: unknown) => (typeof v === "string" && v !== "" ? v : undefined);
@@ -119,6 +119,14 @@ const timelineRoute = createRoute({
   validateSearch: timelineSearch,
   component: lazyRouteComponent(() => import("@/pages/TimelinePage"), "TimelinePage"),
 });
+export type DashboardSearch = { edit?: boolean; issue?: string };
+const dashboardsRoute = createRoute({ getParentRoute: () => appRoute, path: "/dashboards", component: lazyRouteComponent(() => import("@/pages/DashboardsPage"), "DashboardsPage") });
+const dashboardRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/dashboards/$dashboardId",
+  validateSearch: (s: Record<string, unknown>): DashboardSearch => ({ edit: s.edit === true || s.edit === "true" || s.edit === "1" ? true : undefined, issue: str(s.issue) }),
+  component: lazyRouteComponent(() => import("@/pages/DashboardPage"), "DashboardPage"),
+});
 const browseRoute = createRoute({ getParentRoute: () => appRoute, path: "/browse/$issueKey", component: IssuePage });
 const notificationsRoute = createRoute({ getParentRoute: () => appRoute, path: "/notifications", component: lazyRouteComponent(() => import("@/pages/me/NotificationsPage"), "NotificationsPage") });
 const profileRoute = createRoute({ getParentRoute: () => appRoute, path: "/profile", component: lazyRouteComponent(() => import("@/pages/me/ProfilePage"), "ProfilePage") });
@@ -168,6 +176,8 @@ export const routeTree = rootRoute.addChildren([
     ]),
     searchRoute,
     timelineRoute,
+    dashboardsRoute,
+    dashboardRoute,
     browseRoute,
     notificationsRoute,
     profileRoute,

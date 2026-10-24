@@ -19,9 +19,9 @@ search and live updates all run on Postgres.
   CEL conditions and validators, screens and post-functions. Every change publishes a new
   version; issues stay on their version until a background job migrates them with your status
   mapping. Edit visually in the browser or apply from CI with `wfm workflow apply`.
-- **Boards and planning.** Scrum and Kanban boards with column mapping, swimlanes, WIP limits and
-  quick filters, including assignee avatars to show one or several people's work; ranked
-  backlog; sprints with burndown and velocity; releases; cycle time.
+- **Boards and planning.** Scrum and Kanban boards with columns you edit right on the board,
+  configurable cards, swimlanes, WIP limits and quick filters, including assignee avatars to show
+  one or several people's work; ranked backlog; sprints; releases.
 - **JQL search** compiled to SQL, with autocomplete, saved and shared filters.
 - **GitHub and GitLab.** A GitHub App or GitLab token per connection; verified, de-duplicated
   webhooks; branches, commits, pull/merge requests and pipelines linked to issues by key; smart
@@ -31,12 +31,18 @@ search and live updates all run on Postgres.
   Entra ID and others; Google Workspace directory sync; just-in-time provisioning when neither is
   used. Organisation roles, project roles, custom roles, groups mapped to roles, personal access
   tokens and service accounts with scopes and expiry, and an audit log.
+- **Metrics and dashboards.** Lead time, cycle time and time in status for every issue; scope-aware
+  sprint burndown and burnup, velocity, cumulative flow, created vs resolved, cycle time and
+  breakdowns; personal and shared dashboards built from gadgets.
 - **Timeline.** A roadmap per project and across all projects: epics and their issues on a time
   axis, dependency arrows (with conflicts highlighted), sprints and releases; drag to reschedule.
 - **Automation.** Rules triggered by issue events, development activity or a schedule, with CEL
   conditions and actions (transition, assign, set field, comment, label, webhook, notify, chat,
   roll up dates) on the issue, its parent or its children; ready-made templates; signed outbound
   webhooks.
+- **API and AI assistants.** The REST API behind every screen (OpenAPI published by the server)
+  and an MCP server, so Claude and other assistants can search, file, update and move issues and
+  read sprint metrics as you.
 - **Slack and Mattermost.** Channel notifications with event and JQL filters, a chat action for
   automation, and a read-only `/wfm` command for issue lookup and search.
 - **Live.** Boards and issue views update in real time over server-sent events; light and dark
@@ -73,6 +79,8 @@ To run the production build locally: `make web embed-web build` then
 | [JQL](docs/jql.md) | Query language reference |
 | [Automation and webhooks](docs/automation.md) | Rules, actions, outbound webhook signatures |
 | [Slack and Mattermost](docs/chat.md) | Channel notifications and the `/wfm` command |
+| [Metrics and dashboards](docs/metrics.md) | Issue timing, sprint reports, flow metrics, dashboards |
+| [AI assistants (MCP)](docs/mcp.md) | Connecting Claude and other assistants; the tools |
 | [API](docs/api.md) | REST API, authentication, errors, live events |
 
 The REST API is described by [`api/openapi.yaml`](api/openapi.yaml) (OpenAPI 3.1); the Go
@@ -91,7 +99,7 @@ cd web && npm test     # web unit tests
 Layout:
 
 ```
-cmd/wfm/                 the binary: serve, migrate, workflow apply|validate|export
+cmd/wfm/                 the binary: serve, migrate, workflow apply|validate|export, mcp
 api/openapi.yaml         API contract (source of truth)
 internal/app/            wiring, modes, background job registry
 internal/httpapi/        HTTP handlers (generated strict server + SSE + hooks)
@@ -100,7 +108,8 @@ internal/workflow/       workflow YAML, validation and the CEL evaluator (pure)
 internal/search/         JQL parser and SQL compiler (pure)
 internal/identity/       OIDC sign-in, sessions, tokens, SCIM server, Google directory sync
 internal/scm/            GitHub and GitLab providers, webhook processing, reconcile
-internal/automation/     rules, notifications, outbound webhooks
+internal/automation/     rules, notifications, outbound webhooks, Slack and Mattermost
+internal/mcpserver/      the MCP server for AI assistants (tools over the API handlers)
 internal/db/             migrations (goose) and queries (sqlc)
 internal/integration/    end-to-end tests of the API against PostgreSQL
 web/                     React UI (Vite, TanStack Router and Query, dnd-kit, React Flow, Tiptap)

@@ -6,7 +6,6 @@ import { durationUnit, formatDuration, linear, niceTicks, useElementWidth } from
 
 type CycleTimeReport = Schemas["CycleTimeReport"];
 
-const H = 280;
 const M = { top: 16, right: 76, bottom: 30, left: 44 };
 const DAY = 86_400_000;
 
@@ -14,7 +13,7 @@ const DAY = 86_400_000;
  * CycleTimeChart scatters resolved issues by resolution date and cycle time, with the median
  * and 85th percentile as reference lines. Dots are links to the issues.
  */
-export function CycleTimeChart({ report, onOpen }: { report: CycleTimeReport; onOpen: (key: string) => void }) {
+export function CycleTimeChart({ report, onOpen, height: H = 280 }: { report: CycleTimeReport; onOpen: (key: string) => void; height?: number }) {
   const [ref, width] = useElementWidth<HTMLDivElement>();
   const [hover, setHover] = useState<number | null>(null);
   const now = Date.now();
@@ -23,7 +22,7 @@ export function CycleTimeChart({ report, onOpen }: { report: CycleTimeReport; on
   const maxHours = Math.max(report.p85Hours, ...report.issues.map((i) => i.cycleHours), 1);
   const unit = durationUnit(maxHours);
   const per = unit === "d" ? 24 : 1;
-  const ticks = niceTicks(maxHours / per, 5);
+  const ticks = niceTicks(maxHours / per, H < 240 ? 4 : 5);
   const y = linear([0, ticks[ticks.length - 1] * per], [H - M.bottom, M.top]);
   const xTickCount = Math.max(2, Math.min(7, Math.floor((width - M.left - M.right) / 90)));
   const xTicks = Array.from({ length: xTickCount }, (_, k) => from + ((now - from) * k) / (xTickCount - 1));

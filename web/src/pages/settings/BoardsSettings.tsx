@@ -1,14 +1,13 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { getRouteApi } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { KanbanSquare, Plus } from "lucide-react";
 import { api, ApiError, unwrap } from "@/api/client";
-import { statusesQuery } from "@/api/queries";
 import { Badge, Button, EmptyState, Field, Input, Modal, PageHeader, PageSpinner, Select } from "@/components/ui";
 import { ErrorBox } from "@/components/ErrorBox";
 import { BoardEditor } from "@/features/settings/boards/BoardEditor";
-import type { StatusInfo } from "@/features/settings/boards/ColumnsEditor";
-import { boardsQuery, useProjectStatuses } from "@/features/settings/queries";
+import { useStatusInfo } from "@/features/board/ColumnsEditor";
+import { boardsQuery } from "@/features/settings/queries";
 import { cn } from "@/lib/cn";
 
 const route = getRouteApi("/app/projects/$projectKey/settings/boards");
@@ -16,19 +15,10 @@ const route = getRouteApi("/app/projects/$projectKey/settings/boards");
 export function BoardsSettings() {
   const { projectKey } = route.useParams();
   const { data: boards = [], isLoading, error } = useQuery(boardsQuery(projectKey));
-  const project = useProjectStatuses(projectKey);
-  const { data: all = [] } = useQuery(statusesQuery);
+  const project = useStatusInfo(projectKey);
   const [picked, setPicked] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const selected = boards.find((b) => b.id === picked) ?? boards[0];
-
-  // Every status a column might reference: the project's (in workflow order) plus stale ones.
-  const statuses = useMemo(() => {
-    const m = new Map<string, StatusInfo>();
-    for (const s of project.statuses) m.set(s.id, { id: s.id, name: s.name, category: s.category, inProject: true });
-    for (const s of all) if (!m.has(s.id)) m.set(s.id, { id: s.id, name: s.name, category: s.category, inProject: false });
-    return m;
-  }, [project.statuses, all]);
 
   return (
     <div className="flex flex-col gap-5">
@@ -75,7 +65,7 @@ export function BoardsSettings() {
               ))}
             </div>
           )}
-          {selected && <BoardEditor key={selected.id} board={selected} projectKey={projectKey} statuses={statuses} onDeleted={() => setPicked(null)} />}
+          {selected && <BoardEditor key={selected.id} board={selected} projectKey={projectKey} statuses={project.statuses} onDeleted={() => setPicked(null)} />}
         </div>
       )}
       {creating && (

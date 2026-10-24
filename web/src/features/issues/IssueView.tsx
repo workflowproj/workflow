@@ -17,10 +17,11 @@ import { LinksSection } from "./LinksSection";
 import { DevelopmentPanel } from "./DevelopmentPanel";
 import { ActivitySection } from "./ActivitySection";
 import { DetailsPanel } from "./DetailsPanel";
+import { MetricsPanel } from "./MetricsPanel";
 
 /**
  * IssueView is the full issue view: header, description, sub-tasks, links, comments,
- * attachments, history, development panel and the details sidebar. Used by the /browse page
+ * attachments, history, development panel and the sidebar (details and metrics). Used by the /browse page
  * and inside the board/backlog/search drawer (`variant="drawer"`, with `onClose`).
  * `onNavigate` lets a drawer switch to another issue (e.g. clicking a sub-task) in place.
  */
@@ -73,8 +74,9 @@ function IssueLayout({ gone }: { gone: boolean }) {
           </div>
           {!!problem && <TransitionProblem error={problem} onDismiss={() => setProblem(null)} />}
         </div>
-        <aside className="min-w-0 [grid-area:side]">
+        <aside className="flex min-w-0 flex-col gap-4 [grid-area:side]">
           <DetailsPanel />
+          <MetricsPanel />
         </aside>
         <div className="flex min-w-0 flex-col gap-8 [grid-area:body]">
           <DescriptionSection />

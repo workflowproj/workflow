@@ -1,16 +1,21 @@
 import type { KeyboardEvent } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { CircleCheck, CircleDot, CircleX, CornerDownRight, GitBranch, GitMerge, GitPullRequest } from "lucide-react";
+import { CalendarDays, CircleCheck, CircleDot, CircleX, CornerDownRight, GitBranch, GitMerge, GitPullRequest } from "lucide-react";
 import type { Issue } from "@/api/types";
 import { IssueTypeIcon, PriorityIcon } from "@/components/issue-bits";
 import { UserAvatar } from "@/components/UserAvatar";
 import { cn } from "@/lib/cn";
+import { ageDots, cardLayout, daysLabel, daysSince, daysTitle, DEFAULT_CARD_FIELDS, dueLabel, type CardField } from "./card-fields";
 import { formatPoints } from "./model";
 
-/** IssueCard is the visual card on a board; SortableIssueCard makes it draggable and openable. */
-export function IssueCard({ issue, lifted, className }: { issue: Issue; lifted?: boolean; className?: string }) {
+/**
+ * IssueCard is the visual card on a board; SortableIssueCard makes it draggable and openable.
+ * The summary, type and key always show; `fields` (the board's cardFields) add the rest, in order.
+ */
+export function IssueCard({ issue, fields = DEFAULT_CARD_FIELDS, lifted, className }: { issue: Issue; fields?: CardField[]; lifted?: boolean; className?: string }) {
   const done = issue.status.category === "done";
+  const { tags, left, right } = cardLayout(fields);
   return (
     <div
       className={cn(
@@ -20,17 +25,68 @@ export function IssueCard({ issue, lifted, className }: { issue: Issue; lifted?:
       )}
     >
       <p className={cn("line-clamp-3 text-[13px] leading-snug text-ink", done && "text-muted")}>{issue.summary}</p>
-      <CardChips issue={issue} />
+      <CardChips issue={issue} fields={tags} />
       <div className="mt-2.5 flex items-center gap-1.5">
-        <IssueTypeIcon type={issue.type} />
-        <span className={cn("font-mono text-[11px] font-medium text-muted", done && "line-through")}>{issue.key}</span>
-        <PriorityIcon priority={issue.priority} className="size-3.5" />
-        <DevIndicators dev={issue.dev} />
-        <span className="ml-auto" />
-        {issue.storyPoints != null && <PointsPill points={issue.storyPoints} />}
-        <UserAvatar user={issue.assignee} size={22} />
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-1">
+          <IssueTypeIcon type={issue.type} />
+          <span className={cn("font-mono text-[11px] font-medium text-muted", done && "line-through")}>{issue.key}</span>
+          {left.map((f) => (
+            <FieldValue key={f} field={f} issue={issue} />
+          ))}
+        </div>
+        {right.map((f) => (
+          <FieldValue key={f} field={f} issue={issue} />
+        ))}
       </div>
     </div>
+  );
+}
+
+/** FieldValue renders one optional card field, or nothing when the issue has no value for it. */
+function FieldValue({ field, issue }: { field: CardField; issue: Issue }) {
+  switch (field) {
+    case "priority":
+      return <PriorityIcon priority={issue.priority} className="size-3.5" />;
+    case "dev":
+      return <DevIndicators dev={issue.dev} />;
+    case "points":
+      return issue.storyPoints != null ? <PointsPill points={issue.storyPoints} /> : null;
+    case "assignee":
+      return <UserAvatar user={issue.assignee} size={22} />;
+    case "dueDate":
+      return issue.dueDate ? <DueDate due={issue.dueDate} done={issue.status.category === "done"} /> : null;
+    case "daysInColumn":
+      return <DaysInColumn issue={issue} />;
+    default:
+      return null;
+  }
+}
+
+function DueDate({ due, done }: { due: string; done: boolean }) {
+  const d = dueLabel(due, new Date(), done);
+  return (
+    <span title={d.title} aria-label={d.title} className={cn("inline-flex h-5 items-center gap-1 rounded px-1 text-[11px] font-medium whitespace-nowrap", d.overdue ? "bg-danger-soft text-danger" : "text-muted")}>
+      <CalendarDays className="size-3" aria-hidden />
+      {d.text}
+    </span>
+  );
+}
+
+/** DaysInColumn: days since the issue entered its status, with dots that fill over two weeks. Hidden once done. */
+function DaysInColumn({ issue }: { issue: Issue }) {
+  const days = daysSince(issue.statusChangedAt, Date.now());
+  if (days === undefined || issue.status.category === "done") return null;
+  const dots = ageDots(days);
+  const title = daysTitle(issue.status.name, days);
+  return (
+    <span title={title} aria-label={title} className={cn("inline-flex h-5 items-center gap-1 text-[11px] font-medium tabular-nums", dots >= 4 ? "text-warning" : dots > 0 ? "text-muted" : "text-faint")}>
+      <span aria-hidden className="inline-flex gap-px">
+        {[1, 2, 3, 4].map((n) => (
+          <span key={n} className={cn("size-1 rounded-full", n <= dots ? "bg-current" : "bg-line-strong")} />
+        ))}
+      </span>
+      {daysLabel(days)}
+    </span>
   );
 }
 
@@ -53,18 +109,35 @@ export function ParentChip({ parent, className }: { parent: NonNullable<Issue["p
   );
 }
 
-function CardChips({ issue }: { issue: Issue }) {
-  if (!issue.parent && issue.labels.length === 0) return null;
-  const labels = issue.labels.slice(0, 3);
-  return (
-    <div className="mt-2 flex flex-wrap items-center gap-1">
-      {issue.parent && <ParentChip parent={issue.parent} className="max-w-[12rem]" />}
+function CardChips({ issue, fields }: { issue: Issue; fields: CardField[] }) {
+  const parent = fields.includes("epic") ? issue.parent : undefined;
+  const all = fields.includes("labels") ? issue.labels : [];
+  if (!parent && all.length === 0) return null;
+  const labels = all.slice(0, 3);
+  const labelChips = (
+    <>
       {labels.map((l) => (
         <span key={l} className="inline-flex h-5 max-w-[8rem] items-center truncate rounded border border-line px-1.5 text-[11px] text-muted">
           {l}
         </span>
       ))}
-      {issue.labels.length > labels.length && <span className="text-[11px] text-faint">+{issue.labels.length - labels.length}</span>}
+      {all.length > labels.length && <span className="text-[11px] text-faint">+{all.length - labels.length}</span>}
+    </>
+  );
+  const epicChip = parent && <ParentChip parent={parent} className="max-w-[12rem]" />;
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-1">
+      {fields.indexOf("labels") < fields.indexOf("epic") ? (
+        <>
+          {labelChips}
+          {epicChip}
+        </>
+      ) : (
+        <>
+          {epicChip}
+          {labelChips}
+        </>
+      )}
     </div>
   );
 }
@@ -107,7 +180,19 @@ export function DevIndicators({ dev }: { dev?: Issue["dev"] }) {
  * SortableIssueCard: drag with the pointer, or focus it and press Space to pick it up (arrows
  * move, Space drops, Escape cancels). Click or Enter opens the issue.
  */
-export function SortableIssueCard({ issue, onOpen, disabled, dimmed }: { issue: Issue; onOpen: (key: string) => void; disabled?: boolean; dimmed?: boolean }) {
+export function SortableIssueCard({
+  issue,
+  fields,
+  onOpen,
+  disabled,
+  dimmed,
+}: {
+  issue: Issue;
+  fields?: CardField[];
+  onOpen: (key: string) => void;
+  disabled?: boolean;
+  dimmed?: boolean;
+}) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: issue.id, disabled });
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key === "Enter" && !isDragging) {
@@ -134,7 +219,7 @@ export function SortableIssueCard({ issue, onOpen, disabled, dimmed }: { issue: 
         dimmed && "opacity-60",
       )}
     >
-      <IssueCard issue={issue} />
+      <IssueCard issue={issue} fields={fields} />
     </div>
   );
 }

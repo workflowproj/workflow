@@ -1,20 +1,25 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { getRouteApi, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { CalendarClock, Columns3, ListTodo, TriangleAlert } from "lucide-react";
+import { CalendarClock, Columns3, ListTodo, Settings2, TriangleAlert } from "lucide-react";
 import { hasPermission, statusesQuery, useMe, useProject } from "@/api/queries";
-import type { Project, User } from "@/api/types";
-import { Button, EmptyState, PageSpinner, Select } from "@/components/ui";
+import type { Project, Status, User } from "@/api/types";
+import { Button, EmptyState, PageSpinner, Popover, Select } from "@/components/ui";
+import { StatusBadge } from "@/components/issue-bits";
 import { ErrorBox } from "@/components/ErrorBox";
 import { IssueDrawer } from "@/features/issues/IssueDrawer";
 import { BoardSwitcher } from "@/features/board/BoardSwitcher";
+import { joinNames } from "@/features/board/board-config";
 import { BoardView } from "@/features/board/BoardView";
+import { normalizeCardFields } from "@/features/board/card-fields";
+import { ConfigureBoard, type ConfigureTab } from "@/features/board/ConfigureBoard";
 import { hasFilters, NO_FILTERS, quickFilterJql, type QuickFilters } from "@/features/board/jql";
 import { SWIMLANE_LABELS, type SwimlaneMode } from "@/features/board/model";
 import { filterColumns, peopleOf } from "@/features/board/people";
 import { QuickFilterBar } from "@/features/board/QuickFilterBar";
 import { boardDataQuery, useBoardSelection, type Board, type BoardData } from "@/features/board/queries";
 import { primaryLink } from "@/features/board/styles";
+import { useColumnTools } from "@/features/board/useBoardConfig";
 import { useBoardMove } from "@/features/board/useBoardMove";
 import { formatRange, remainingLabel } from "@/features/backlog/dates";
 import { CompleteSprintDialog } from "@/features/backlog/SprintDialogs";
@@ -68,12 +73,21 @@ function BoardScreen({ project, boards, board, onSelect, onOpen }: { project: Pr
   const statusMap = useMemo(() => new Map(statuses.map((s) => [s.id, s])), [statuses]);
   const move = useBoardMove(board.id, jql);
   const [completing, setCompleting] = useState(false);
+  const [configuring, setConfiguring] = useState<ConfigureTab | null>(null);
 
   const config = data?.board ?? board;
   const mode = groupBy ?? config.swimlanes;
   const scrum = config.type === "scrum";
   const sprint = data?.sprint;
   const canDrag = ["issue.transition", "issue.edit", "sprint.manage"].some((p) => hasPermission(project, p));
+  const canManage = hasPermission(project, "board.manage");
+  const cardFields = useMemo(() => normalizeCardFields(config.cardFields), [config.cardFields]);
+  const { tools, mapStatus } = useColumnTools({ board: config, statuses: statusMap, onConfigure: () => setConfiguring("columns") });
+  const issueCounts = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const c of data?.columns ?? []) for (const i of c.issues) m.set(i.status.id, (m.get(i.status.id) ?? 0) + 1);
+    return m;
+  }, [data]);
   // The people filter applies here, so toggling an avatar is instant and the avatars come from
   // every issue the other filters leave on the board.
   const known = useRef(new Map<string, User>());
@@ -92,11 +106,18 @@ function BoardScreen({ project, boards, board, onSelect, onOpen }: { project: Pr
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <BoardSwitcher boards={boards} board={board} onSelect={onSelect} />
           {scrum && sprint && <SprintSummary sprint={sprint} />}
-          {scrum && sprint && hasPermission(project, "sprint.manage") && (
-            <Button size="sm" className="ml-auto" onClick={() => setCompleting(true)}>
-              Complete sprint
-            </Button>
-          )}
+          <div className="ml-auto flex items-center gap-2">
+            {canManage && (
+              <Button size="sm" variant="ghost" icon={<Settings2 className="size-3.5" />} onClick={() => setConfiguring("columns")}>
+                Configure board
+              </Button>
+            )}
+            {scrum && sprint && hasPermission(project, "sprint.manage") && (
+              <Button size="sm" onClick={() => setCompleting(true)}>
+                Complete sprint
+              </Button>
+            )}
+          </div>
         </div>
         <div className={cn("flex flex-wrap items-center justify-between gap-2", noSprint && "hidden")}>
           <QuickFilterBar value={filters} onChange={setFilters} people={people} meId={me?.id} />
@@ -113,7 +134,15 @@ function BoardScreen({ project, boards, board, onSelect, onOpen }: { project: Pr
             </span>
           </label>
         </div>
-        {data && data.unmappedStatusIds.length > 0 && <UnmappedNotice project={project} names={data.unmappedStatusIds.map((id) => statusMap.get(id)?.name ?? "Unknown")} />}
+        {data && data.unmappedStatusIds.length > 0 && (
+          <UnmappedNotice
+            statuses={data.unmappedStatusIds.map((id) => statusMap.get(id) ?? { id, name: "Unknown", category: "todo" })}
+            columns={config.columns}
+            canManage={canManage}
+            onMap={mapStatus}
+            onConfigure={() => setConfiguring("columns")}
+          />
+        )}
         {data && hasFilters(filters) && total === 0 && (!scrum || sprint) && (
           <p className="text-sm text-muted">
             No issues match these filters.{" "}
@@ -131,10 +160,21 @@ function BoardScreen({ project, boards, board, onSelect, onOpen }: { project: Pr
         ) : !data ? null : scrum && !sprint ? (
           <NoActiveSprint projectKey={project.key} />
         ) : (
-          <BoardView columns={columns} mode={mode} meId={me?.id} statuses={statusMap} canDrag={canDrag} onOpen={onOpen} onDrop={move.drop} />
+          <BoardView
+            columns={columns}
+            mode={mode}
+            meId={me?.id}
+            statuses={statusMap}
+            cardFields={cardFields}
+            canDrag={canDrag}
+            columnTools={canManage ? tools : undefined}
+            onOpen={onOpen}
+            onDrop={move.drop}
+          />
         )}
       </div>
       {move.dialogs}
+      {configuring && <ConfigureBoard key={config.id} board={config} issueCounts={issueCounts} initialTab={configuring} onClose={() => setConfiguring(null)} />}
       <CompleteSprintDialog open={completing} onClose={() => setCompleting(false)} sprint={sprint ?? null} projectKey={project.key} />
     </>
   );
@@ -175,18 +215,71 @@ function NoActiveSprint({ projectKey }: { projectKey: string }) {
   );
 }
 
-function UnmappedNotice({ names, project }: { names: string[]; project: Project }) {
-  const list = names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}` : names[0];
+/** UnmappedNotice warns that some issues are hidden and lets board managers map their statuses on the spot. */
+function UnmappedNotice({
+  statuses,
+  columns,
+  canManage,
+  onMap,
+  onConfigure,
+}: {
+  statuses: Status[];
+  columns: { id?: string; name: string }[];
+  canManage: boolean;
+  onMap: (statusId: string, columnId: string | "new") => void;
+  onConfigure: () => void;
+}) {
+  const several = statuses.length > 1;
   return (
-    <div className="flex items-center gap-2 rounded-md border border-warning/30 bg-warning-soft px-3 py-2 text-[13px] text-ink">
-      <TriangleAlert className="size-4 shrink-0 text-warning" />
-      <span className="flex-1">
-        Issues in <strong className="font-medium">{list}</strong> aren't shown: {names.length > 1 ? "those statuses aren't" : "that status isn't"} mapped to a column.
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border border-warning/30 bg-warning-soft px-3 py-2 text-[13px] text-ink">
+      <span className="flex min-w-0 flex-1 items-center gap-2">
+        <TriangleAlert className="size-4 shrink-0 text-warning" />
+        <span>
+          Issues in <strong className="font-medium">{joinNames(statuses.map((s) => s.name))}</strong> aren't shown: {several ? "those statuses aren't" : "that status isn't"} mapped to a column.
+        </span>
       </span>
-      {hasPermission(project, "board.manage") && (
-        <Link to="/projects/$projectKey/settings/boards" params={{ projectKey: project.key }} className="shrink-0 font-medium text-accent hover:underline">
-          Configure board
-        </Link>
+      {canManage && (
+        <span className="flex shrink-0 items-center gap-3">
+          <Popover
+            align="end"
+            trigger={({ toggle, open }) => (
+              <Button size="sm" onClick={toggle} aria-expanded={open} aria-haspopup="dialog">
+                Map {several ? "statuses" : "status"}
+              </Button>
+            )}
+            content={(close) => (
+              <div role="dialog" aria-label="Map statuses to columns" className="flex w-72 flex-col gap-3 p-2">
+                <p className="text-xs text-muted">Pick a column for each status; its issues show there straight away.</p>
+                {statuses.map((s) => (
+                  <div key={s.id} className="flex flex-col gap-1">
+                    <StatusBadge status={s} className="self-start" />
+                    <Select
+                      aria-label={`Column for ${s.name}`}
+                      value=""
+                      onChange={(e) => {
+                        if (!e.target.value) return;
+                        onMap(s.id, e.target.value);
+                        if (statuses.length === 1) close();
+                      }}
+                      className="h-8 text-[13px]"
+                    >
+                      <option value="">Choose a column…</option>
+                      {columns.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                      <option value="new">New column “{s.name}”</option>
+                    </Select>
+                  </div>
+                ))}
+              </div>
+            )}
+          />
+          <button type="button" className="font-medium text-accent hover:underline" onClick={onConfigure}>
+            Configure board
+          </button>
+        </span>
       )}
     </div>
   );

@@ -9,7 +9,8 @@ import { api, unwrap } from "./client";
  *   ["users", q, project], ["issue", key], ["issue-comments", key], ["issue-history", key],
  *   ["boards", projectKey], ["board", boardId, ...], ["backlog", boardId], ["search", jql, ...], ["sprints", projectKey],
  *   ["releases", projectKey], ["notifications"], ["fields"], ["labels", projectKey],
- *   ["timeline", projects, jql, doneDays]
+ *   ["timeline", projects, jql, doneDays], ["dashboards"], ["dashboards", id],
+ *   ["metrics", kind, projects, jql, ...] (dashboard gadgets; see features/dashboards/api.ts)
  */
 
 export const meQuery = queryOptions({

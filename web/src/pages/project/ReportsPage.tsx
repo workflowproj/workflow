@@ -1,18 +1,19 @@
 import { useMemo, useState } from "react";
 import { getRouteApi, useNavigate } from "@tanstack/react-router";
-import { useQueries, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { BarChart3, Timer, TrendingDown } from "lucide-react";
-import { api, unwrap } from "@/api/client";
+import { api, unwrap, type Schemas } from "@/api/client";
 import { Card, EmptyState, PageHeader, PageSpinner, Select } from "@/components/ui";
 import { ErrorBox } from "@/components/ErrorBox";
 import { sprintsQuery, type Sprint } from "@/features/board/queries";
 import { formatPoints } from "@/features/board/model";
 import { formatDay, formatRange, remainingLabel } from "@/features/backlog/dates";
-import { BurndownChart } from "@/features/reports/BurndownChart";
-import { StatTile } from "@/features/reports/ChartBits";
+import { velocityQuery } from "@/features/dashboards/api";
+import { BurndownChart, BurnupChart, measureOf, sprintMeasure, type Measure } from "@/features/reports/BurndownChart";
+import { Segmented, StatTile } from "@/features/reports/ChartBits";
 import { formatDuration } from "@/features/reports/chart-utils";
 import { CycleTimeChart } from "@/features/reports/CycleTimeChart";
-import { VelocityChart, type VelocityPoint } from "@/features/reports/VelocityChart";
+import { VelocityChart } from "@/features/reports/VelocityChart";
 
 const route = getRouteApi("/app/projects/$projectKey/reports");
 
@@ -33,7 +34,7 @@ export function ReportsPage() {
       ) : started.length > 0 ? (
         <>
           <SprintReport projectKey={projectKey} sprints={started} />
-          <Velocity sprints={started.filter((s) => s.state === "closed")} />
+          <Velocity projectKey={projectKey} hasClosed={started.some((s) => s.state === "closed")} />
         </>
       ) : (
         <Card title="Sprint report">
@@ -51,13 +52,14 @@ function SprintReport({ projectKey, sprints }: { projectKey: string; sprints: Sp
   const [picked, setPicked] = useState<string>();
   const sprint = ordered.find((s) => s.id === picked) ?? ordered[0];
   const { data, isLoading, error } = useQuery({ queryKey: ["sprints", projectKey, "report", sprint.id], ...reportQuery(sprint.id) });
-  const pct = data && data.committedPoints > 0 ? Math.round((data.completedPoints / data.committedPoints) * 100) : null;
+  const [view, setView] = useState<"burndown" | "burnup">("burndown");
+  const [pickedMeasure, setMeasure] = useState<Measure>();
   const left = sprint.state === "active" ? remainingLabel(sprint.endDate) : null;
   return (
     <Card
       title={
         <span className="inline-flex items-center gap-2">
-          <TrendingDown className="size-4 text-muted" /> Sprint burndown
+          <TrendingDown className="size-4 text-muted" /> Sprint report
         </span>
       }
       actions={
@@ -84,31 +86,86 @@ function SprintReport({ projectKey, sprints }: { projectKey: string; sprints: Sp
         {isLoading || !data ? (
           <PageSpinner label="Loading sprint report" />
         ) : (
-          <>
-            <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
-              <StatTile label="Committed" value={`${formatPoints(data.committedPoints)} pts`} sub={`${data.committedIssues} issue${data.committedIssues === 1 ? "" : "s"} at sprint start`} />
-              <StatTile label="Completed" value={`${formatPoints(data.completedPoints)} pts`} sub={`${data.completedIssues} issue${data.completedIssues === 1 ? "" : "s"} done`} />
-              <StatTile label="Completion" value={pct == null ? "–" : `${pct}%`} sub="of committed points" />
-              <StatTile label="Remaining" value={`${formatPoints(Math.max(0, data.committedPoints - data.completedPoints))} pts`} sub={left?.text ?? (sprint.state === "closed" ? "Sprint completed" : undefined)} />
-            </div>
-            {data.burndown.length > 0 ? <BurndownChart report={data} /> : <p className="text-sm text-muted">There's no burndown for this sprint yet.</p>}
-          </>
+          <SprintNumbers report={data} measure={sprintMeasure(data, pickedMeasure)} left={left?.text} view={view} onView={setView} onMeasure={setMeasure} />
         )}
       </div>
     </Card>
   );
 }
 
-function Velocity({ sprints }: { sprints: Sprint[] }) {
-  // The last eight completed sprints, oldest first.
-  const recent = useMemo(() => [...sprints].sort((a, b) => (a.completedAt ?? "").localeCompare(b.completedAt ?? "")).slice(-8), [sprints]);
-  const reports = useQueries({ queries: recent.map((s) => ({ queryKey: ["sprint-report", s.id], ...reportQuery(s.id), staleTime: 5 * 60_000 })) });
-  const loading = reports.some((r) => r.isLoading);
-  const failed = reports.find((r) => r.error)?.error;
-  const data: VelocityPoint[] = reports.flatMap((r, i) =>
-    r.data ? [{ id: recent[i].id, name: recent[i].name, committed: r.data.committedPoints, completed: r.data.completedPoints, committedIssues: r.data.committedIssues, completedIssues: r.data.completedIssues }] : [],
+/** SprintNumbers is the sprint's totals, its scope change and the burndown or burnup. */
+function SprintNumbers({
+  report,
+  measure,
+  left,
+  view,
+  onView,
+  onMeasure,
+}: {
+  report: Schemas["SprintReport"];
+  measure: Measure;
+  left?: string;
+  view: "burndown" | "burnup";
+  onView: (v: "burndown" | "burnup") => void;
+  onMeasure: (m: Measure) => void;
+}) {
+  const m = measureOf(report, measure);
+  const last = report.burndown[report.burndown.length - 1];
+  const scope = last ? m.scope(last) : m.committed + m.added - m.removed;
+  const remaining = last ? m.remaining(last) : Math.max(0, scope - m.completed);
+  const pct = scope > 0 ? Math.round((m.completed / scope) * 100) : null;
+  const n = (v: number, word: string) => `${v} ${word}${v === 1 ? "" : "s"}`;
+  const issuesOf = (pts: number, issues: number) => (measure === "points" ? ` (${n(issues, "issue")})` : pts > 0 ? ` (${formatPoints(pts)} pts)` : "");
+  const change =
+    m.added === 0 && m.removed === 0
+      ? "No scope change since the sprint started."
+      : [m.added > 0 && `+${m.format(m.added)} ${m.unit} added${issuesOf(report.addedPoints, report.addedIssues)}`, m.removed > 0 && `−${m.format(m.removed)} ${m.unit} removed${issuesOf(report.removedPoints, report.removedIssues)}`]
+          .filter(Boolean)
+          .join(", ") + " after the sprint started.";
+  return (
+    <>
+      <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+        <StatTile label="Committed" value={`${m.format(m.committed)} ${m.unit}`} sub={measure === "points" ? `${n(report.committedIssues, "issue")} at sprint start` : "at sprint start"} />
+        <StatTile label="Completed" value={`${m.format(m.completed)} ${m.unit}`} sub={pct == null ? undefined : `${pct}% of the current scope`} />
+        <StatTile label="Scope change" value={m.added === 0 && m.removed === 0 ? "None" : `${m.added - m.removed >= 0 ? "+" : "−"}${m.format(Math.abs(m.added - m.removed))} ${m.unit}`} sub={`now ${m.format(scope)} ${m.unit} in scope`} />
+        <StatTile label="Remaining" value={`${m.format(remaining)} ${m.unit}`} sub={left ?? (report.sprint.state === "closed" ? "Sprint completed" : undefined)} />
+      </div>
+      <p className="mb-4 text-[13px] text-muted">{change}</p>
+      {report.burndown.length > 0 ? (
+        <>
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <Segmented
+              label="Chart"
+              value={view}
+              onChange={onView}
+              options={[
+                { value: "burndown", label: "Burndown" },
+                { value: "burnup", label: "Burnup" },
+              ]}
+            />
+            <Segmented
+              label="Measure"
+              value={measure}
+              onChange={onMeasure}
+              options={[
+                { value: "points", label: "Story points" },
+                { value: "issues", label: "Issues" },
+              ]}
+            />
+          </div>
+          {view === "burndown" ? <BurndownChart report={report} measure={measure} /> : <BurnupChart report={report} measure={measure} />}
+        </>
+      ) : (
+        <p className="text-sm text-muted">There's no burndown for this sprint yet.</p>
+      )}
+    </>
   );
-  const average = data.length ? data.reduce((n, d) => n + d.completed, 0) / data.length : 0;
+}
+
+function Velocity({ projectKey, hasClosed }: { projectKey: string; hasClosed: boolean }) {
+  const { data, isLoading, error } = useQuery({ ...velocityQuery(projectKey, 8), enabled: hasClosed });
+  const points = !data || data.sprints.some((s) => s.committedPoints > 0 || s.completedPoints > 0);
+  const average = points ? data?.averagePoints : data?.averageIssues;
   return (
     <Card
       title={
@@ -116,17 +173,21 @@ function Velocity({ sprints }: { sprints: Sprint[] }) {
           <BarChart3 className="size-4 text-muted" /> Velocity
         </span>
       }
-      actions={data.length > 0 && <span className="text-xs text-muted">Average {formatPoints(Math.round(average * 10) / 10)} points per sprint</span>}
+      actions={!!data?.sprints.length && <span className="text-xs text-muted">Average {formatPoints(Math.round((average ?? 0) * 10) / 10)} {points ? "points" : "issues"} per sprint</span>}
     >
       <div className="p-4">
-        {failed ? (
-          <ErrorBox error={failed} />
-        ) : recent.length === 0 ? (
+        {error ? (
+          <ErrorBox error={error} />
+        ) : !hasClosed || data?.sprints.length === 0 ? (
           <EmptyState title="No completed sprints yet" body="Velocity compares committed and completed story points once sprints are completed." />
-        ) : loading ? (
+        ) : isLoading || !data ? (
           <PageSpinner label="Loading velocity" />
         ) : (
-          <VelocityChart data={data} />
+          <VelocityChart
+            unit={points ? "points" : "issues"}
+            average={average}
+            data={data.sprints.map((s) => ({ id: s.sprint.id, name: s.sprint.name, committed: s.committedPoints, completed: s.completedPoints, committedIssues: s.committedIssues, completedIssues: s.completedIssues }))}
+          />
         )}
       </div>
     </Card>

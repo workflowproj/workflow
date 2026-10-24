@@ -16,6 +16,8 @@ describe("router", () => {
       "/app/projects/$projectKey/settings/chat",
       "/app/issues",
       "/app/timeline",
+      "/app/dashboards",
+      "/app/dashboards/$dashboardId",
       "/app/projects/$projectKey/timeline",
       "/app/browse/$issueKey",
       "/app/admin/users",

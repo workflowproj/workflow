@@ -1,4 +1,4 @@
-import { queryOptions, useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { keepPreviousData, queryOptions, useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { api, ApiError, unwrap, type Schemas } from "@/api/client";
 import type { IssueDetail } from "@/api/types";
 import { useToast } from "@/components/ui";
@@ -19,6 +19,18 @@ export const transitionsQuery = (key: string) =>
   queryOptions({
     queryKey: ["issue", key, "transitions"],
     queryFn: () => unwrap(api.GET("/issues/{issueKey}/transitions", path(key))),
+    staleTime: 30_000,
+  });
+
+/**
+ * Lead/cycle time and time in status. Under ["issue", key] so live events and transitions
+ * refresh it; keyed by version too, so edits that touch it (a sprint change) do as well.
+ */
+export const metricsQuery = (key: string, version: number) =>
+  queryOptions({
+    queryKey: ["issue", key, "metrics", version],
+    queryFn: () => unwrap(api.GET("/issues/{issueKey}/metrics", path(key))),
+    placeholderData: keepPreviousData,
     staleTime: 30_000,
   });
 

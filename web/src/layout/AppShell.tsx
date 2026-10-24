@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, Outlet, useNavigate, useParams, useRouterState } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bell, FolderKanban, GanttChart, LogOut, Menu, Plus, Search, Settings, Shield, UserRound } from "lucide-react";
+import { Bell, FolderKanban, GanttChart, LayoutDashboard, LogOut, Menu, Plus, Search, Settings, Shield, UserRound } from "lucide-react";
 import { api, unwrap } from "@/api/client";
 import { projectsQuery, useMe } from "@/api/queries";
 import { Button, IconButton, MenuItem, Popover } from "@/components/ui";
@@ -94,6 +94,9 @@ function Sidebar({ className }: { className?: string }) {
         </Link>
         <Link to="/timeline" className={navItem} activeProps={active}>
           <GanttChart className="size-4" /> Timeline
+        </Link>
+        <Link to="/dashboards" className={navItem} activeProps={active}>
+          <LayoutDashboard className="size-4" /> Dashboards
         </Link>
         <Link to="/notifications" className={navItem} activeProps={active}>
           <Bell className="size-4" /> Notifications

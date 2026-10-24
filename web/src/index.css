@@ -33,6 +33,23 @@
   --color-progress-soft: #e3ecfe;
   --color-done: #15803d;
   --color-done-soft: #e1f4e7;
+
+  /* Chart colours, validated as sets with the dataviz palette checks: adjacent slots stay
+     apart under colour-blindness in both themes and sit in the lightness band. Categorical
+     slots are assigned in this fixed order, never cycled; past eight, fold into "Other".
+     The category trio is the status categories stepped for chart fills. Light slots 3-5 are
+     under 3:1 on the surface, so charts using them ship a legend and a table view. */
+  --color-chart-1: #2a78d6;
+  --color-chart-2: #eb6834;
+  --color-chart-3: #1baf7a;
+  --color-chart-4: #eda100;
+  --color-chart-5: #e87ba4;
+  --color-chart-6: #008300;
+  --color-chart-7: #6250d6;
+  --color-chart-8: #e34948;
+  --color-chart-todo: #5d6573;
+  --color-chart-progress: #2563eb;
+  --color-chart-done: #15803d;
 }
 
 :root {
@@ -68,6 +85,17 @@
   --color-progress-soft: #1b2a47;
   --color-done: #4ccb7a;
   --color-done-soft: #173323;
+  --color-chart-1: #3987e5;
+  --color-chart-2: #d95926;
+  --color-chart-3: #199e70;
+  --color-chart-4: #c98500;
+  --color-chart-5: #d55181;
+  --color-chart-6: #008300;
+  --color-chart-7: #9085e9;
+  --color-chart-8: #e66767;
+  --color-chart-todo: #6b7280;
+  --color-chart-progress: #4c8dff;
+  --color-chart-done: #2f9e5c;
 }
 
 html,
