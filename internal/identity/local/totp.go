@@ -10,12 +10,13 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
 	"time"
 
-	"rsc.io/qr"
+	"rsc.io/qr/coding"
 )
 
 // TOTP (RFC 6238) with the parameters every authenticator app supports: HMAC-SHA1, 30-second
@@ -99,28 +100,28 @@ func LooksLikeTOTP(code string) bool {
 }
 
 // OTPAuthURI is what the QR code holds (the Key Uri Format understood by authenticator apps).
+// SHA-1, 6 digits and 30 seconds are the format's defaults, so they are left out: a shorter URI
+// makes a coarser QR code that cameras read more easily.
 func OTPAuthURI(issuer, account, secret string) string {
 	label := url.PathEscape(issuer) + ":" + url.PathEscape(account)
 	q := url.Values{}
 	q.Set("secret", secret)
 	q.Set("issuer", issuer)
-	q.Set("algorithm", "SHA1")
-	q.Set("digits", fmt.Sprint(totpDigits))
-	q.Set("period", fmt.Sprint(totpPeriod))
 	return "otpauth://totp/" + label + "?" + q.Encode()
 }
 
 // QRCodeDataURI renders text as a QR code: an SVG image as a data: URI, so the page can show it
 // with an <img> and nothing about the secret leaves the server except to this browser.
 func QRCodeDataURI(text string) (string, error) {
-	c, err := qr.Encode(text, qr.M)
+	c, err := qrEncode(text)
 	if err != nil {
 		return "", err
 	}
-	const quiet = 4
+	// Four pixels per module at the image's natural size: whole pixels keep every module crisp.
+	const quiet, scale = 4, 4
 	n := c.Size + 2*quiet
 	var b strings.Builder
-	fmt.Fprintf(&b, `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %d %d" shape-rendering="crispEdges">`, n, n)
+	fmt.Fprintf(&b, `<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d" viewBox="0 0 %d %d" shape-rendering="crispEdges">`, n*scale, n*scale, n, n)
 	fmt.Fprintf(&b, `<rect width="%d" height="%d" fill="#fff"/><path fill="#000" d="`, n, n)
 	for y := 0; y < c.Size; y++ {
 		for x := 0; x < c.Size; x++ {
@@ -131,6 +132,104 @@ func QRCodeDataURI(text string) (string, error) {
 	}
 	b.WriteString(`"/></svg>`)
 	return "data:image/svg+xml;base64," + base64.StdEncoding.EncodeToString([]byte(b.String())), nil
+}
+
+// qrEncode encodes text in byte mode with medium error correction (15%), in the smallest
+// version that fits, choosing the mask with the lowest penalty score as ISO/IEC 18004 §7.8.3
+// asks (rsc.io/qr's own Encode always uses mask 0, which can leave finder-like patterns that
+// put readers off).
+func qrEncode(text string) (*coding.Code, error) {
+	enc := coding.String(text)
+	v := coding.Version(coding.MinVersion)
+	for ; enc.Bits(v) > v.DataBytes(coding.M)*8; v++ {
+		if v == coding.MaxVersion {
+			return nil, errors.New("text too long for a QR code")
+		}
+	}
+	var best *coding.Code
+	bestScore := 0
+	for m := coding.Mask(0); m < 8; m++ {
+		p, err := coding.NewPlan(v, coding.M, m)
+		if err != nil {
+			return nil, err
+		}
+		c, err := p.Encode(enc)
+		if err != nil {
+			return nil, err
+		}
+		if s := qrPenalty(c); best == nil || s < bestScore {
+			best, bestScore = c, s
+		}
+	}
+	return best, nil
+}
+
+// qrPenalty scores a symbol by the four rules of ISO/IEC 18004 §7.8.3: runs of five or more
+// same-coloured modules, 2x2 blocks, finder-like 1:1:3:1:1 patterns and an uneven dark/light
+// balance. Lower is easier to read.
+func qrPenalty(c *coding.Code) int {
+	n := c.Size
+	score := 0
+	line := func(i int, horizontal bool) []bool {
+		out := make([]bool, n)
+		for j := range out {
+			if horizontal {
+				out[j] = c.Black(j, i)
+			} else {
+				out[j] = c.Black(i, j)
+			}
+		}
+		return out
+	}
+	finder := []bool{true, false, true, true, true, false, true}
+	matches := func(l []bool, at int, pattern []bool) bool {
+		for k, want := range pattern {
+			if l[at+k] != want {
+				return false
+			}
+		}
+		return true
+	}
+	light4 := []bool{false, false, false, false}
+	dark := 0
+	for i := 0; i < n; i++ {
+		for _, horizontal := range []bool{true, false} {
+			l := line(i, horizontal)
+			run := 1
+			for j := 1; j <= n; j++ {
+				if j < n && l[j] == l[j-1] {
+					run++
+					continue
+				}
+				if run >= 5 {
+					score += 3 + run - 5
+				}
+				run = 1
+			}
+			for j := 0; j+7 <= n; j++ {
+				if matches(l, j, finder) && ((j >= 4 && matches(l, j-4, light4)) || (j+11 <= n && matches(l, j+7, light4))) {
+					score += 40
+				}
+			}
+			if horizontal {
+				for _, b := range l {
+					if b {
+						dark++
+					}
+				}
+			}
+		}
+	}
+	for y := 0; y+1 < n; y++ {
+		for x := 0; x+1 < n; x++ {
+			b := c.Black(x, y)
+			if c.Black(x+1, y) == b && c.Black(x, y+1) == b && c.Black(x+1, y+1) == b {
+				score += 3
+			}
+		}
+	}
+	pct := dark * 100 / (n * n)
+	return score + 10*(max(pct-50, 50-pct)/5)
 }
 
 // ---------------------------------------------------------------------------

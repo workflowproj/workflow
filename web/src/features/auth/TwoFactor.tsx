@@ -69,17 +69,18 @@ export function TotpSetupPanel({
         onConfirm(code);
       }}
     >
-      <ol className="flex flex-col gap-4 text-sm">
-        <li className="flex flex-col gap-3 sm:flex-row sm:items-start">
-          {/* The QR code keeps a white background in dark mode so cameras can read it. */}
-          <img src={setup.qrCode} alt="QR code for your authenticator app" width={152} height={152} className="size-38 shrink-0 self-center rounded-md border border-line bg-white p-1 sm:self-start" />
+      <ol className="@container flex flex-col gap-4 text-sm">
+        <li className="flex flex-col gap-3 @md:flex-row @md:items-start">
+          {/* Natural size (whole pixels per module) keeps every module crisp; the white
+              background stays in dark mode so cameras can read it. */}
+          <img src={setup.qrCode} alt="QR code for your authenticator app" className="max-w-full shrink-0 self-center rounded-md border border-line bg-white p-1 @md:self-start" />
           <div className="flex min-w-0 flex-col gap-2">
             <p>
               <span className="font-medium">1. Scan the QR code</span> with an authenticator app such as 1Password, Google Authenticator, Microsoft Authenticator or Authy.
             </p>
             <p className="text-[13px] text-muted">Can't scan it? Enter this key in the app instead (time-based, 6 digits):</p>
             <div className="flex items-center gap-2 rounded-md border border-line bg-surface-2 py-1 pr-1 pl-2.5">
-              <code data-testid="totp-secret" data-secret={setup.secret} className="min-w-0 flex-1 font-mono text-[13px] break-all select-all">
+              <code data-testid="totp-secret" data-secret={setup.secret} className="min-w-0 flex-1 font-mono text-[13px] select-all">
                 {groupKey(setup.secret)}
               </code>
               <CopyButton value={setup.secret} label="Copy key" variant="ghost" />

@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"rsc.io/qr/coding"
 )
 
 var fast = Params{Memory: 1024, Time: 1, Threads: 1, SaltLen: 16, KeyLen: 32}
@@ -168,7 +170,7 @@ func TestTOTPVerify(t *testing.T) {
 
 func TestOTPAuthURIAndQRCode(t *testing.T) {
 	uri := OTPAuthURI("Workflow (wfm.example.com)", "ada@example.com", "JBSWY3DPEHPK3PXP")
-	want := "otpauth://totp/Workflow%20%28wfm.example.com%29:ada@example.com?algorithm=SHA1&digits=6&issuer=Workflow+%28wfm.example.com%29&period=30&secret=JBSWY3DPEHPK3PXP"
+	want := "otpauth://totp/Workflow%20%28wfm.example.com%29:ada@example.com?issuer=Workflow+%28wfm.example.com%29&secret=JBSWY3DPEHPK3PXP"
 	if uri != want {
 		t.Fatalf("uri = %s", uri)
 	}
@@ -183,6 +185,34 @@ func TestOTPAuthURIAndQRCode(t *testing.T) {
 	svg := string(raw)
 	if !strings.HasPrefix(svg, "<svg xmlns=") || !strings.HasSuffix(svg, "</svg>") || strings.Count(svg, "h1v1h-1z") < 200 {
 		t.Fatalf("svg looks wrong: %.200s", svg)
+	}
+}
+
+func TestQRMaskChoice(t *testing.T) {
+	// An all-light 21x21 grid: every row and column is one 21-module run (42 lines x 19), every
+	// 2x2 block counts (400 x 3) and it is 0% dark (10 x 10).
+	blank := &coding.Code{Bitmap: make([]byte, 21*3), Size: 21, Stride: 3}
+	if got := qrPenalty(blank); got != 42*19+400*3+100 {
+		t.Fatalf("penalty of a blank grid = %d", got)
+	}
+	text := OTPAuthURI("Workflow (workflow.example-company.com)", "firstname.lastname@example-company.com", NewTOTPSecret())
+	best, err := qrEncode(text)
+	if err != nil {
+		t.Fatal(err)
+	}
+	v := coding.Version((best.Size - 17) / 4)
+	if coding.String(text).Bits(v-1) <= (v-1).DataBytes(coding.M)*8 {
+		t.Fatalf("version %d is not the smallest that fits", v)
+	}
+	for m := coding.Mask(0); m < 8; m++ {
+		p, _ := coding.NewPlan(v, coding.M, m)
+		c, err := p.Encode(coding.String(text))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if qrPenalty(c) < qrPenalty(best) {
+			t.Fatalf("mask %d scores %d, below the chosen %d", m, qrPenalty(c), qrPenalty(best))
+		}
 	}
 }
 
