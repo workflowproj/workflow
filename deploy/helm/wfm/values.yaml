@@ -608,6 +608,28 @@ serviceMonitor:
   interval: 30s
   scrapeTimeout: 10s
 
+# A Grafana dashboard (HTTP, request limits, background jobs, webhooks, live streams, processes)
+# as a ConfigMap for the Grafana sidecar of kube-prometheus-stack, which loads ConfigMaps
+# labelled grafana_dashboard="1". Needs serviceMonitor (its `component` label drives the filter).
+grafanaDashboard:
+  enabled: false
+  labels:
+    grafana_dashboard: "1"
+  # e.g. {grafana_folder: Workflow} when the sidecar sorts dashboards into folders
+  annotations: {}
+  # Where Grafana's sidecar looks; empty = the release namespace.
+  namespace: ""
+
+# Alerts (a PrometheusRule for the Prometheus Operator): many server errors, slow requests,
+# failing background jobs, failing Git webhooks, or a component with no healthy target.
+prometheusRule:
+  enabled: false
+  # e.g. {release: kube-prometheus-stack}
+  labels: {}
+  errorRatio: 0.05          # share of responses that are 5xx, over 10 minutes
+  latencyP95Seconds: 2      # p95 request latency, over 15 minutes
+  jobErrorsPerMinute: 5     # failed background job attempts, over 15 minutes
+
 # Extra manifests rendered with the release (strings or objects; templated with tpl), e.g. a Traefik
 # Middleware restricting the internal host, a SecretStore, or a Barman Cloud ObjectStore.
 extraObjects: []

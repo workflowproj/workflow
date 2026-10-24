@@ -119,6 +119,7 @@ jobs:
             [k3d-dev]="-f deploy/k3d/values-dev.yaml"
             [k3d-cnpg]="-f deploy/k3d/values-dev.yaml -f deploy/k3d/values-cnpg.yaml"
             [gateway-api]="--set ingress.web.enabled=false --set ingress.hooks.enabled=false --set gatewayAPI.web.enabled=true --set gatewayAPI.web.parentRefs[0].name=internal --set gatewayAPI.hooks.enabled=true --set gatewayAPI.hooks.parentRefs[0].name=public"
+            [monitoring]="--set serviceMonitor.enabled=true --set grafanaDashboard.enabled=true --set prometheusRule.enabled=true"
             [cnpg-plugin-backup]="--set database.cnpg.backup.enabled=true --set database.cnpg.backup.method=plugin --set database.cnpg.backup.destinationPath=s3://bucket/wfm --set database.cnpg.backup.s3Credentials.inheritFromIAMRole=true"
           )
           for name in "${!overlays[@]}"; do

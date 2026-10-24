@@ -79,9 +79,9 @@ version stamped through `-ldflags`), and copies only the binary into distroless.
 | Worker autoscaling | optional (fixed replicas, or a CPU HPA) | KEDA 2.x |
 | NetworkPolicy enforcement | built in | VPC CNI with `enableNetworkPolicy: "true"` (or Cilium/Calico) |
 | Storage | `local-path` | EBS CSI driver with a `gp3` StorageClass |
-| Metrics | optional | Prometheus Operator (`serviceMonitor.enabled`) |
+| Metrics | optional | Prometheus Operator (`serviceMonitor.enabled`), with a Grafana dashboard (`grafanaDashboard.enabled`) and alerts (`prometheusRule.enabled`) |
 
-Every CRD-backed template (CNPG `Cluster`, KEDA, `ExternalSecret`, `ServiceMonitor`, `HTTPRoute`)
+Every CRD-backed template (CNPG `Cluster`, KEDA, `ExternalSecret`, `ServiceMonitor`, `PrometheusRule`, `HTTPRoute`)
 is off unless enabled by values, except the CNPG cluster, which is on by default. Disable it with
 `database.cnpg.enabled=false` and point at another PostgreSQL (below).
 
@@ -102,6 +102,8 @@ rejects typos):
 | `gatewayAPI.web`, `gatewayAPI.hooks` | the same as Gateway API `HTTPRoute`s |
 | `networkPolicy.*` | default-deny ingress, per-component ingress/egress, database ingress |
 | `serviceMonitor.*` | Prometheus Operator scraping |
+| `grafanaDashboard.*` | the "Workflow" Grafana dashboard as a ConfigMap for the kube-prometheus-stack sidecar (label `grafana_dashboard: "1"`): traffic, 5xx ratio, latency and slowest routes, request limits, background jobs, Git webhooks, live streams, CPU/memory/goroutines. The JSON is also in `deploy/helm/wfm/dashboards/wfm.json` to import by hand |
+| `prometheusRule.*` | alerts: high server-error ratio, slow requests (p95), failing jobs, failing Git webhooks, a component with no healthy target; thresholds in values |
 | `extraObjects` | extra manifests (Traefik middlewares, SecretStores, ...) |
 
 Example overlays: `values-k3s.yaml` (one node, one CNPG instance, Traefik, SOPS) and
