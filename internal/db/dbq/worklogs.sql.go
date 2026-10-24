@@ -286,19 +286,20 @@ func (q *Queries) UpdateWorklog(ctx context.Context, arg UpdateWorklogParams) (W
 }
 
 const worklogsOfIssues = `-- name: WorklogsOfIssues :many
-SELECT issue_id, started_at, duration_seconds
+SELECT issue_id, started_at, created_at, duration_seconds
 FROM worklogs
 WHERE issue_id = ANY($1::uuid[])
-ORDER BY started_at
+ORDER BY created_at
 `
 
 type WorklogsOfIssuesRow struct {
 	IssueID         uuid.UUID
 	StartedAt       time.Time
+	CreatedAt       time.Time
 	DurationSeconds int64
 }
 
-// Worklogs of many issues, oldest first (sprint reports in hours).
+// Worklogs of many issues in the order they were logged (sprint reports in hours).
 func (q *Queries) WorklogsOfIssues(ctx context.Context, ids []uuid.UUID) ([]WorklogsOfIssuesRow, error) {
 	rows, err := q.db.Query(ctx, worklogsOfIssues, ids)
 	if err != nil {
@@ -308,7 +309,12 @@ func (q *Queries) WorklogsOfIssues(ctx context.Context, ids []uuid.UUID) ([]Work
 	items := []WorklogsOfIssuesRow{}
 	for rows.Next() {
 		var i WorklogsOfIssuesRow
-		if err := rows.Scan(&i.IssueID, &i.StartedAt, &i.DurationSeconds); err != nil {
+		if err := rows.Scan(
+			&i.IssueID,
+			&i.StartedAt,
+			&i.CreatedAt,
+			&i.DurationSeconds,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

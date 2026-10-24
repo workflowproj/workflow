@@ -3198,7 +3198,7 @@ components:
         addedIssues: { type: integer }
         removedIssues: { type: integer }
         committedSeconds: { type: integer, format: int64, description: Remaining estimate of the open issues in the sprint when it started }
-        completedSeconds: { type: integer, format: int64, description: Time logged on the sprint's issues during the sprint }
+        completedSeconds: { type: integer, format: int64, description: Time logged on the sprint's issues during the sprint (counted when it was logged) }
         addedSeconds: { type: integer, format: int64, description: 'Remaining estimate of issues added after the start, when they were added' }
         removedSeconds: { type: integer, format: int64, description: 'Remaining estimate of issues taken out after the start, when they left' }
         burndown:

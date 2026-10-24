@@ -32,11 +32,11 @@ WHERE id = @id
 RETURNING *;
 
 -- name: WorklogsOfIssues :many
--- Worklogs of many issues, oldest first (sprint reports in hours).
-SELECT issue_id, started_at, duration_seconds
+-- Worklogs of many issues in the order they were logged (sprint reports in hours).
+SELECT issue_id, started_at, created_at, duration_seconds
 FROM worklogs
 WHERE issue_id = ANY(@ids::uuid[])
-ORDER BY started_at;
+ORDER BY created_at;
 
 -- name: TimesheetRows :many
 -- Time logged per person, issue and day (in the given time zone) on issues of the projects,

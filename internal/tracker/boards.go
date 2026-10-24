@@ -692,7 +692,9 @@ func (s *Service) sprintReport(ctx context.Context, sp dbq.Sprint) (SprintReport
 		totalDays = max(int(sp.EndDate.Sub(start).Hours()/24)+1, 1)
 	}
 	// Hours: the remaining estimate of the open committed issues when the sprint started, and
-	// the time logged on the sprint's issues while they were in it.
+	// the time logged on the sprint's issues while they were in it. Work counts when it was
+	// logged, the moment the remaining estimate moves with it, so logging work with the
+	// estimate adjusted leaves the scope (logged + remaining) where it was.
 	for _, m := range members {
 		if committed[m.issue.ID] && !doneAt(m, start) {
 			rep.CommittedSeconds += remainingAt(m.issue.RemainingEstimateSeconds, hist[m.issue.ID], start)
@@ -702,7 +704,7 @@ func (s *Service) sprintReport(ctx context.Context, sp dbq.Sprint) (SprintReport
 		var n int64
 		for _, m := range members {
 			for _, w := range m.worklogs {
-				if !w.StartedAt.Before(start) && w.StartedAt.Before(t) && inAt(m, w.StartedAt) {
+				if !w.CreatedAt.Before(start) && w.CreatedAt.Before(t) && inAt(m, w.CreatedAt) {
 					n += w.DurationSeconds
 				}
 			}

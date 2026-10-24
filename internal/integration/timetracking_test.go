@@ -239,6 +239,9 @@ func TestSprintReportInHours(t *testing.T) {
 	// Day 1: 4h logged on A. Day 2: C joins and B is done.
 	c.must("POST", "/api/v1/issues/"+a+"/worklogs", obj{"timeSpentSeconds": 4 * hour, "startedAt": day(1).Format(time.RFC3339)}, 201, nil)
 	e.backdate(t, a, "remainingEstimate", day(1))
+	e.exec("UPDATE worklogs SET created_at = $1", day(1)) // logged that day too
+	// Work logged today for yesterday counts today, when the estimate moved with it.
+	c.must("POST", "/api/v1/issues/"+a+"/worklogs", obj{"timeSpentSeconds": hour, "startedAt": day(2).Format(time.RFC3339)}, 201, nil)
 	c.must("PATCH", "/api/v1/issues/"+cc, obj{"sprintId": sprint}, 200, nil)
 	e.backdate(t, cc, "sprint", day(2))
 	c.transition(b, "start-work", 200)
@@ -249,7 +252,7 @@ func TestSprintReportInHours(t *testing.T) {
 	c.get("/api/v1/sprints/"+sprint+"/report", &rep)
 	h := func(v any) string { return fmt.Sprint(v.(float64) / hour) }
 	eq(t, h(rep["committedSeconds"]), "16", "remaining estimate at the start")
-	eq(t, h(rep["completedSeconds"]), "4", "time logged in the sprint")
+	eq(t, h(rep["completedSeconds"]), "5", "time logged in the sprint")
 	eq(t, h(rep["addedSeconds"]), "4", "added scope in hours")
 	eq(t, h(rep["removedSeconds"]), "0", "nothing removed")
 	burn := rep["burndown"].([]any)
@@ -260,7 +263,7 @@ func TestSprintReportInHours(t *testing.T) {
 	eq(t, point(0), "16 0 16", "day 0: the commitment")
 	eq(t, point(1), "12 4 16", "day 1: 4h logged on A")
 	eq(t, point(2), "10 4 14", "day 2: C added, B done")
-	eq(t, point(3), "10 4 14", "today")
+	eq(t, point(3), "9 5 14", "today: an hour logged (for yesterday), the estimate down with it")
 	eq(t, h(burn[0].(obj)["idealSeconds"]), "16", "the guideline starts at the commitment")
 }
 

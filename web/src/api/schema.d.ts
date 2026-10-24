@@ -2558,7 +2558,7 @@ export interface components {
             committedSeconds: number;
             /**
              * Format: int64
-             * @description Time logged on the sprint's issues during the sprint
+             * @description Time logged on the sprint's issues during the sprint (counted when it was logged)
              */
             completedSeconds: number;
             /**
