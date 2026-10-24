@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/geoffo-dev/workflow-management/internal/timetrack"
 )
 
 func mustCompile(t *testing.T, src string, env Env) *Compiled {
@@ -180,5 +182,50 @@ func TestOrderBy(t *testing.T) {
 	c = mustCompile(t, `project = X`, Env{})
 	if c.OrderBy != "i.rank ASC NULLS LAST, i.id" {
 		t.Errorf("default order = %s", c.OrderBy)
+	}
+}
+
+func TestTimeTrackingFields(t *testing.T) {
+	me := uuid.New()
+	env := Env{UserID: &me, Now: time.Date(2026, 10, 21, 15, 0, 0, 0, time.UTC)}
+	cases := map[string][]string{
+		`originalEstimate > 2h`:              {"i.original_estimate_seconds > $2::bigint"},
+		`remainingEstimate is EMPTY`:         {"i.remaining_estimate_seconds IS NULL"},
+		`timeestimate = "1d 4h"`:             {"i.remaining_estimate_seconds = $2::bigint"},
+		`timeSpent >= 30`:                    {"coalesce((SELECT sum(w.duration_seconds) FROM worklogs w WHERE w.issue_id = i.id), 0) >= $2::bigint"},
+		`timeSpent is not EMPTY`:             {"NOT coalesce(((SELECT sum(w.duration_seconds)", "IS NULL)"},
+		`worklogAuthor = currentUser()`:      {"EXISTS (SELECT 1 FROM worklogs w WHERE w.issue_id = i.id AND w.author_id IN ($2::uuid))"},
+		`worklogAuthor is EMPTY`:             {"NOT EXISTS (SELECT 1 FROM worklogs w WHERE w.issue_id = i.id)"},
+		`worklogAuthor != "ada@example.com"`: {"NOT coalesce", "w.author_id IN (SELECT id FROM users"},
+		`worklogDate >= -7d`:                 {"EXISTS (SELECT 1 FROM worklogs w WHERE w.issue_id = i.id AND w.started_at >= $2::timestamptz)"},
+		`worklogDate = 2026-10-20`:           {"w.started_at >= $2::timestamptz AND w.started_at < $3::timestamptz"},
+		`worklogDate != 2026-10-20`:          {"(NOT EXISTS (SELECT 1 FROM worklogs w WHERE w.issue_id = i.id AND"},
+		`worklogDate is EMPTY`:               {"NOT EXISTS (SELECT 1 FROM worklogs w WHERE w.issue_id = i.id)"},
+	}
+	for src, wants := range cases {
+		c := mustCompile(t, src, env)
+		for _, w := range wants {
+			if !strings.Contains(c.Where, w) {
+				t.Errorf("%q compiled to\n  %s\nmissing %q", src, c.Where, w)
+			}
+		}
+	}
+	// Durations use the working day: 1d is 8 hours unless configured otherwise.
+	c := mustCompile(t, `originalEstimate >= 1d AND remainingEstimate < "1w 2d" AND timeSpent > 90`, env)
+	if c.Args[0] != int64(8*3600) || c.Args[1] != int64(56*3600) || c.Args[2] != int64(90*60) {
+		t.Errorf("duration args = %v", c.Args)
+	}
+	c = mustCompile(t, `originalEstimate = 1d`, Env{Units: timetrack.Units{HoursPerDay: 6, DaysPerWeek: 4}})
+	if c.Args[0] != int64(6*3600) {
+		t.Errorf("6-hour day: %v", c.Args)
+	}
+	c = mustCompile(t, `ORDER BY timeSpent DESC, remainingEstimate`, env)
+	if !strings.HasPrefix(c.OrderBy, "(SELECT sum(w.duration_seconds)") || !strings.Contains(c.OrderBy, "i.remaining_estimate_seconds ASC") {
+		t.Errorf("order by = %s", c.OrderBy)
+	}
+	for _, src := range []string{`timeSpent > lots`, `originalEstimate = currentUser()`, `worklogDate > soon`} {
+		if _, err := CompileString(src, env, 0, nil); err == nil {
+			t.Errorf("%q should fail to compile", src)
+		}
 	}
 }

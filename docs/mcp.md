@@ -94,7 +94,7 @@ internal ingress, like the UI and API; assistants must be able to reach that add
 | `list_projects` | projects you can browse |
 | `get_project` | issue types (keys for creating issues), boards and columns, open sprints, unreleased releases, labels |
 | `search_issues` | JQL search, one line per issue, paged (`limit` up to 100) |
-| `get_issue` | fields, description, parent, children, links, pull requests, recent comments, lead/cycle time and time in each status, and the transitions available now |
+| `get_issue` | fields, description, parent, children, links, pull requests, recent comments, time tracking (estimated, logged, remaining), lead/cycle time and time in each status, and the transitions available now |
 | `get_board` | a board's columns and issues (the active sprint on a Scrum board) |
 | `get_sprint_report` | a sprint's commitment, completion, scope change and day-by-day burndown |
 | `get_metrics` | `summary`, `breakdown`, `cycle_time`, `created_resolved`, `cumulative_flow` or `velocity` over projects and JQL |
@@ -103,6 +103,7 @@ internal ingress, like the UI and API; assistants must be able to reach that add
 | `update_issue` | change fields; `clear` empties them |
 | `transition_issue` | run a workflow transition by id, name or target status, with screen fields and a comment |
 | `add_comment` | comment (Markdown) |
+| `log_work` | log time spent (`2h`, `1d 4h`), when it was done, a description; the remaining estimate goes down by the time logged unless `remainingEstimate` sets it or `leaveEstimate` keeps it |
 | `link_issues` | `blocks`, `relates`, `duplicates` or `clones` |
 
 Read tools are annotated read-only; nothing deletes. An app you allowed only to read is offered

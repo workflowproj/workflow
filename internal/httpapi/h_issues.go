@@ -45,6 +45,7 @@ func (s *Server) CreateIssue(ctx context.Context, req api.CreateIssueRequestObje
 		ProjectKey: b.ProjectKey, TypeKey: b.TypeKey, Summary: b.Summary, Description: deref(b.Description),
 		AssigneeID: b.AssigneeId, ParentKey: deref(b.ParentKey), SprintID: b.SprintId, StoryPoints: b.StoryPoints,
 		Labels: deref(b.Labels), ReleaseIDs: deref(b.ReleaseIds), Fields: deref(b.Fields),
+		OriginalEstimate: b.OriginalEstimate, RemainingEstimate: b.RemainingEstimate,
 	}
 	if b.Priority != nil {
 		in.Priority = string(*b.Priority)
@@ -87,6 +88,7 @@ func (s *Server) UpdateIssue(ctx context.Context, req api.UpdateIssueRequestObje
 		AssigneeID: opt(b.AssigneeId), ReporterID: opt(b.ReporterId), ParentKey: opt(b.ParentKey), SprintID: opt(b.SprintId),
 		StoryPoints: opt(b.StoryPoints), Labels: b.Labels, ReleaseIDs: b.ReleaseIds, Fields: deref(b.Fields),
 		StartDate: dateOpt(b.StartDate, b.StartDate.MustGet), DueDate: dateOpt(b.DueDate, b.DueDate.MustGet),
+		OriginalEstimate: opt(b.OriginalEstimate), RemainingEstimate: opt(b.RemainingEstimate),
 	}
 	if b.Priority != nil {
 		p := string(*b.Priority)

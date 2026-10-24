@@ -46,6 +46,9 @@ type IssueInput struct {
 	Labels      []string
 	ReleaseIDs  []uuid.UUID
 	Fields      map[string]any
+	// Estimates in seconds; the remaining estimate defaults to the original one.
+	OriginalEstimate  *int64
+	RemainingEstimate *int64
 }
 
 type IssuePatch struct {
@@ -64,6 +67,10 @@ type IssuePatch struct {
 	Labels      *[]string
 	ReleaseIDs  *[]uuid.UUID
 	Fields      map[string]any
+	// Estimates in seconds. Setting the original estimate on an issue without a remaining
+	// estimate sets that too.
+	OriginalEstimate  Opt[int64]
+	RemainingEstimate Opt[int64]
 }
 
 func normalizeLabels(in []string) ([]string, error) {
@@ -173,6 +180,15 @@ func (s *Service) CreateIssue(ctx context.Context, actor *authz.Actor, in IssueI
 			return dbq.Issue{}, p, err
 		}
 	}
+	if err := checkEstimate("originalEstimate", in.OriginalEstimate); err != nil {
+		return dbq.Issue{}, p, err
+	}
+	if err := checkEstimate("remainingEstimate", in.RemainingEstimate); err != nil {
+		return dbq.Issue{}, p, err
+	}
+	if in.RemainingEstimate == nil && in.OriginalEstimate != nil {
+		in.RemainingEstimate = ptr(*in.OriginalEstimate)
+	}
 	var issue dbq.Issue
 	err = s.tx(ctx, func(tx pgx.Tx, q *dbq.Queries) error {
 		it, err := q.GetIssueTypeByKey(ctx, dbq.GetIssueTypeByKeyParams{ProjectID: p.ID, Key: in.TypeKey})
@@ -243,7 +259,7 @@ func (s *Service) CreateIssue(ctx context.Context, actor *authz.Actor, in IssueI
 			Description: in.Description, StatusID: initial.ID, WorkflowVersionID: wv.ID, Priority: in.Priority,
 			AssigneeID: in.AssigneeID, ReporterID: actor.UserID(), SprintID: sprintID, StoryPoints: in.StoryPoints,
 			StartDate: in.StartDate, DueDate: in.DueDate, Labels: labels, Resolution: resolution, ResolvedAt: resolvedAt,
-			Fields: fields, Rank: r,
+			Fields: fields, Rank: r, OriginalEstimateSeconds: in.OriginalEstimate, RemainingEstimateSeconds: in.RemainingEstimate,
 		})
 		if err != nil {
 			return err
@@ -301,7 +317,7 @@ func (s *Service) UpdateIssue(ctx context.Context, actor *authz.Actor, ref strin
 	}
 	onlyAssignee := in.TypeKey == nil && in.Summary == nil && in.Description == nil && in.Priority == nil && !in.ReporterID.Set &&
 		!in.ParentKey.Set && !in.SprintID.Set && !in.StoryPoints.Set && !in.StartDate.Set && !in.DueDate.Set &&
-		in.Labels == nil && in.ReleaseIDs == nil && len(in.Fields) == 0
+		in.Labels == nil && in.ReleaseIDs == nil && len(in.Fields) == 0 && !in.OriginalEstimate.Set && !in.RemainingEstimate.Set
 	if !onlyAssignee && !canEdit(access, actor, cur) {
 		return cur, p, apperr.Forbidden("you cannot edit %s", issueKey(p, cur))
 	}
@@ -514,6 +530,25 @@ func (s *Service) UpdateIssue(ctx context.Context, actor *authz.Actor, ref strin
 			}
 			upd.Fields = fields
 		}
+		if in.OriginalEstimate.Set && !int64PtrEqual(in.OriginalEstimate.Value, i.OriginalEstimateSeconds) {
+			if err := checkEstimate("originalEstimate", in.OriginalEstimate.Value); err != nil {
+				return err
+			}
+			c := s.estimateChange("originalEstimate", i.OriginalEstimateSeconds, in.OriginalEstimate.Value)
+			record(c.field, c.from, c.to, c.fromRef, c.toRef)
+			upd.OriginalEstimateSeconds = in.OriginalEstimate.Value
+			if !in.RemainingEstimate.Set && i.RemainingEstimateSeconds == nil && in.OriginalEstimate.Value != nil {
+				in.RemainingEstimate = Some(*in.OriginalEstimate.Value)
+			}
+		}
+		if in.RemainingEstimate.Set && !int64PtrEqual(in.RemainingEstimate.Value, i.RemainingEstimateSeconds) {
+			if err := checkEstimate("remainingEstimate", in.RemainingEstimate.Value); err != nil {
+				return err
+			}
+			c := s.estimateChange("remainingEstimate", i.RemainingEstimateSeconds, in.RemainingEstimate.Value)
+			record(c.field, c.from, c.to, c.fromRef, c.toRef)
+			upd.RemainingEstimateSeconds = in.RemainingEstimate.Value
+		}
 		if in.ReleaseIDs != nil {
 			before, err := q.IssueReleases(ctx, i.ID)
 			if err != nil {
@@ -576,6 +611,7 @@ func updateFromIssue(i dbq.Issue) dbq.UpdateIssueParams {
 		StatusID: i.StatusID, WorkflowVersionID: i.WorkflowVersionID, Priority: i.Priority, AssigneeID: i.AssigneeID,
 		ReporterID: i.ReporterID, SprintID: i.SprintID, StoryPoints: i.StoryPoints, StartDate: i.StartDate, DueDate: i.DueDate,
 		Labels: i.Labels, Resolution: i.Resolution, ResolvedAt: i.ResolvedAt, Fields: i.Fields, Rank: i.Rank,
+		OriginalEstimateSeconds: i.OriginalEstimateSeconds, RemainingEstimateSeconds: i.RemainingEstimateSeconds,
 	}
 }
 

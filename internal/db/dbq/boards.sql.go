@@ -491,7 +491,7 @@ func (q *Queries) GetSprintsByIDs(ctx context.Context, ids []uuid.UUID) ([]Sprin
 const issueHistoryFor = `-- name: IssueHistoryFor :many
 SELECT issue_id, field, from_ref, to_ref, from_value, to_value, created_at
 FROM issue_history
-WHERE issue_id = ANY($1::uuid[]) AND field IN ('status', 'sprint', 'storyPoints')
+WHERE issue_id = ANY($1::uuid[]) AND field IN ('status', 'sprint', 'storyPoints', 'remainingEstimate')
 ORDER BY issue_id, created_at, id
 `
 
@@ -505,7 +505,7 @@ type IssueHistoryForRow struct {
 	CreatedAt time.Time
 }
 
-// Status, sprint and story point changes of many issues, oldest first (for metrics).
+// Status, sprint, story point and remaining estimate changes of many issues, oldest first (for metrics).
 func (q *Queries) IssueHistoryFor(ctx context.Context, ids []uuid.UUID) ([]IssueHistoryForRow, error) {
 	rows, err := q.db.Query(ctx, issueHistoryFor, ids)
 	if err != nil {

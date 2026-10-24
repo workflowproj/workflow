@@ -135,10 +135,10 @@ ON CONFLICT DO NOTHING;
 UPDATE boards SET card_fields = @card_fields, updated_at = now() WHERE id = @id;
 
 -- name: IssueHistoryFor :many
--- Status, sprint and story point changes of many issues, oldest first (for metrics).
+-- Status, sprint, story point and remaining estimate changes of many issues, oldest first (for metrics).
 SELECT issue_id, field, from_ref, to_ref, from_value, to_value, created_at
 FROM issue_history
-WHERE issue_id = ANY(@ids::uuid[]) AND field IN ('status', 'sprint', 'storyPoints')
+WHERE issue_id = ANY(@ids::uuid[]) AND field IN ('status', 'sprint', 'storyPoints', 'remainingEstimate')
 ORDER BY issue_id, created_at, id;
 
 -- name: ClosedSprints :many

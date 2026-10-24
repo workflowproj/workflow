@@ -215,31 +215,33 @@ type GroupMember struct {
 }
 
 type Issue struct {
-	ID                uuid.UUID
-	ProjectID         uuid.UUID
-	Number            int32
-	TypeID            uuid.UUID
-	ParentID          *uuid.UUID
-	Summary           string
-	Description       string
-	StatusID          uuid.UUID
-	WorkflowVersionID uuid.UUID
-	Priority          string
-	AssigneeID        *uuid.UUID
-	ReporterID        *uuid.UUID
-	SprintID          *uuid.UUID
-	StoryPoints       *float64
-	StartDate         *time.Time
-	DueDate           *time.Time
-	Labels            []string
-	Resolution        *string
-	ResolvedAt        *time.Time
-	Fields            json.RawMessage
-	Rank              string
-	Version           int32
-	CreatedAt         time.Time
-	UpdatedAt         time.Time
-	StatusChangedAt   time.Time
+	ID                       uuid.UUID
+	ProjectID                uuid.UUID
+	Number                   int32
+	TypeID                   uuid.UUID
+	ParentID                 *uuid.UUID
+	Summary                  string
+	Description              string
+	StatusID                 uuid.UUID
+	WorkflowVersionID        uuid.UUID
+	Priority                 string
+	AssigneeID               *uuid.UUID
+	ReporterID               *uuid.UUID
+	SprintID                 *uuid.UUID
+	StoryPoints              *float64
+	StartDate                *time.Time
+	DueDate                  *time.Time
+	Labels                   []string
+	Resolution               *string
+	ResolvedAt               *time.Time
+	Fields                   json.RawMessage
+	Rank                     string
+	Version                  int32
+	CreatedAt                time.Time
+	UpdatedAt                time.Time
+	StatusChangedAt          time.Time
+	OriginalEstimateSeconds  *int64
+	RemainingEstimateSeconds *int64
 }
 
 type IssueHistory struct {
@@ -594,4 +596,15 @@ type WorkflowVersion struct {
 	SourceYaml  string
 	PublishedBy *uuid.UUID
 	PublishedAt time.Time
+}
+
+type Worklog struct {
+	ID              uuid.UUID
+	IssueID         uuid.UUID
+	AuthorID        *uuid.UUID
+	StartedAt       time.Time
+	DurationSeconds int64
+	Comment         string
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 }

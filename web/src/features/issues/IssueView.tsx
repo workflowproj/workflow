@@ -18,6 +18,7 @@ import { DevelopmentPanel } from "./DevelopmentPanel";
 import { ActivitySection } from "./ActivitySection";
 import { DetailsPanel } from "./DetailsPanel";
 import { MetricsPanel } from "./MetricsPanel";
+import { TimeTrackingPanel } from "@/features/time/TimeTrackingPanel";
 
 /**
  * IssueView is the full issue view: header, description, sub-tasks, links, comments,
@@ -76,6 +77,7 @@ function IssueLayout({ gone }: { gone: boolean }) {
         </div>
         <aside className="flex min-w-0 flex-col gap-4 [grid-area:side]">
           <DetailsPanel />
+          <TimeTrackingPanel />
           <MetricsPanel />
         </aside>
         <div className="flex min-w-0 flex-col gap-8 [grid-area:body]">

@@ -128,6 +128,8 @@ type Config struct {
 	TrustedProxies []netip.Prefix
 	// OAuth sign-in for AI assistants connecting to /mcp.
 	OAuth OAuth
+	// TimeTracking sets the working day and week that durations such as "1w 2d" use.
+	TimeTracking TimeTracking
 }
 
 // RateLimit is requests per minute (0 = no limit), each with a burst of half that.
@@ -148,6 +150,11 @@ type OAuth struct {
 	ClientMetadataDocuments bool
 	AccessTokenTTL          time.Duration
 	RefreshTokenTTL         time.Duration
+}
+
+type TimeTracking struct {
+	HoursPerDay float64
+	DaysPerWeek float64
 }
 
 type SMTP struct {
@@ -192,6 +199,19 @@ func (e *env) integer(key string, def int) int {
 		return def
 	}
 	return n
+}
+
+func (e *env) float(key string, def float64) float64 {
+	v := strings.TrimSpace(e.get(key))
+	if v == "" {
+		return def
+	}
+	f, err := strconv.ParseFloat(v, 64)
+	if err != nil {
+		e.errs = append(e.errs, fmt.Errorf("%s: expected a number, got %q", key, v))
+		return def
+	}
+	return f
 }
 
 func (e *env) duration(key string, def time.Duration) time.Duration {
@@ -307,6 +327,13 @@ func LoadFrom(get func(string) string) (*Config, error) {
 	}
 	if c.OAuth.RefreshTokenTTL < time.Hour || c.OAuth.RefreshTokenTTL > 366*24*time.Hour {
 		e.errs = append(e.errs, errors.New("WFM_OAUTH_REFRESH_TOKEN_TTL must be between 1h and 8784h"))
+	}
+	c.TimeTracking = TimeTracking{HoursPerDay: e.float("WFM_TIME_HOURS_PER_DAY", 8), DaysPerWeek: e.float("WFM_TIME_DAYS_PER_WEEK", 5)}
+	if h := c.TimeTracking.HoursPerDay; !(h > 0 && h <= 24) {
+		e.errs = append(e.errs, fmt.Errorf("WFM_TIME_HOURS_PER_DAY: must be more than 0 and at most 24, got %v", h))
+	}
+	if d := c.TimeTracking.DaysPerWeek; !(d > 0 && d <= 7) {
+		e.errs = append(e.errs, fmt.Errorf("WFM_TIME_DAYS_PER_WEEK: must be more than 0 and at most 7, got %v", d))
 	}
 	c.OIDCProviders = loadOIDC(e)
 

@@ -13,10 +13,10 @@ SELECT * FROM issues WHERE id = ANY(@ids::uuid[]);
 -- name: CreateIssue :one
 INSERT INTO issues (project_id, number, type_id, parent_id, summary, description, status_id, workflow_version_id,
                     priority, assignee_id, reporter_id, sprint_id, story_points, start_date, due_date, labels,
-                    resolution, resolved_at, fields, rank)
+                    resolution, resolved_at, fields, rank, original_estimate_seconds, remaining_estimate_seconds)
 VALUES (@project_id, @number, @type_id, @parent_id, @summary, @description, @status_id, @workflow_version_id,
         @priority, @assignee_id, @reporter_id, @sprint_id, @story_points, @start_date, @due_date, @labels,
-        @resolution, @resolved_at, @fields, @rank)
+        @resolution, @resolved_at, @fields, @rank, @original_estimate_seconds, @remaining_estimate_seconds)
 RETURNING *;
 
 -- name: UpdateIssue :one
@@ -27,6 +27,7 @@ UPDATE issues SET
     assignee_id = @assignee_id, reporter_id = @reporter_id, sprint_id = @sprint_id, story_points = @story_points,
     start_date = @start_date, due_date = @due_date, labels = @labels, resolution = @resolution,
     resolved_at = @resolved_at, fields = @fields, rank = @rank,
+    original_estimate_seconds = @original_estimate_seconds, remaining_estimate_seconds = @remaining_estimate_seconds,
     version = version + 1, updated_at = now()
 WHERE id = @id AND version = @version
 RETURNING *;

@@ -21,6 +21,7 @@ import (
 //
 //	issue      key, type, typeLevel, summary, description, priority, status, statusCategory,
 //	           assignee, reporter (emails, "" when unset), labels, storyPoints, resolution, fields,
+//	           originalEstimate, remainingEstimate, timeSpent (seconds, 0 when unset),
 //	           subtasks / children [{key, summary, type, status, category}],
 //	           devLinks [{kind: branch|commit|pr|pipeline, state, title, merged}],
 //	           links [{type, direction, key, category}], parent {key, type, status, category} or {}

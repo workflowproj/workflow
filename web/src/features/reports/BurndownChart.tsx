@@ -8,8 +8,11 @@ import { linear, niceTicks, useElementWidth } from "./chart-utils";
 type SprintReport = Schemas["SprintReport"];
 type BurndownPoint = Schemas["BurndownPoint"];
 
-/** Sprint charts count story points, or issues when a sprint isn't estimated. */
-export type Measure = "points" | "issues";
+/**
+ * Sprint charts count story points, or issues when a sprint isn't estimated, or hours: the
+ * remaining estimate burning down and the time logged (time tracking).
+ */
+export type Measure = "points" | "issues" | "hours";
 
 const M = { top: 20, right: 20, bottom: 30, left: 40 };
 
@@ -22,6 +25,21 @@ export function sprintMeasure(report: SprintReport, preferred?: Measure): Measur
 
 /** measureOf reads a sprint report's totals and daily values in one measure. */
 export function measureOf(report: SprintReport, measure: Measure) {
+  if (measure === "hours") {
+    const h = (seconds: number) => seconds / 3600;
+    return {
+      committed: h(report.committedSeconds),
+      completed: h(report.completedSeconds),
+      added: h(report.addedSeconds),
+      removed: h(report.removedSeconds),
+      remaining: (p: BurndownPoint) => h(p.remainingSeconds),
+      scope: (p: BurndownPoint) => h(p.scopeSeconds),
+      done: (p: BurndownPoint) => h(p.completedSeconds),
+      unit: "hours",
+      format: (n: number) => formatPoints(Math.round(n * 10) / 10),
+      doneLabel: "Logged",
+    };
+  }
   const pts = measure === "points";
   return {
     committed: pts ? report.committedPoints : report.committedIssues,
@@ -33,6 +51,7 @@ export function measureOf(report: SprintReport, measure: Measure) {
     done: (p: BurndownPoint) => (pts ? p.completedPoints : p.completedIssues),
     unit: pts ? "pts" : "issues",
     format: (n: number) => (pts ? formatPoints(n) : String(Math.round(n))),
+    doneLabel: "Completed",
   };
 }
 
@@ -71,7 +90,7 @@ function SprintDayChart({ report, kind, measure, height: H = 280 }: { report: Sp
     kind === "burndown"
       ? [{ key: "remaining", label: "Remaining", color: C.series, value: m.remaining }]
       : [
-          { key: "completed", label: "Completed", color: C.series, value: m.done },
+          { key: "completed", label: m.doneLabel, color: C.series, value: m.done },
           { key: "scope", label: "Scope", color: C.second, value: m.scope },
         ];
   const ideal = (i: number) => {
@@ -105,7 +124,7 @@ function SprintDayChart({ report, kind, measure, height: H = 280 }: { report: Sp
   const hoveredPoint = hover != null && hover <= last.i ? at(hover) : undefined;
   const round = (n: number) => m.format(Math.round(n * 10) / 10);
 
-  const endText = (key: string, v: number) => `${m.format(v)} ${key === "remaining" ? "left" : key === "completed" ? "done" : "scope"}`;
+  const endText = (key: string, v: number) => `${m.format(v)}${measure === "hours" ? "h" : ""} ${key === "remaining" ? "left" : key === "completed" ? (measure === "hours" ? "logged" : "done") : "scope"}`;
   // End labels: the primary line always; the scope too when it is clear of the first.
   const endLabels = lines
     .map((l, k) => ({ l, k, v: l.value(last.p) }))
@@ -116,7 +135,7 @@ function SprintDayChart({ report, kind, measure, height: H = 280 }: { report: Sp
   const summary =
     kind === "burndown"
       ? `Burndown: ${m.format(m.remaining(last.p))} of ${m.format(m.scope(last.p))} ${m.unit} remaining, ${m.format(m.committed)} committed`
-      : `Burnup: ${m.format(m.done(last.p))} of ${m.format(m.scope(last.p))} ${m.unit} completed, ${m.format(m.committed)} committed`;
+      : `Burnup: ${m.format(m.done(last.p))} of ${m.format(m.scope(last.p))} ${m.unit} ${measure === "hours" ? "logged" : "completed"}, ${m.format(m.committed)} committed`;
 
   return (
     <div>

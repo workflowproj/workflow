@@ -30,7 +30,7 @@ func (s *Service) searchEnv(ctx context.Context, actor *authz.Actor) (search.Env
 	if err != nil {
 		return search.Env{}, err
 	}
-	env := search.Env{UserID: actor.UserID(), Now: s.Now()}
+	env := search.Env{UserID: actor.UserID(), Now: s.Now(), Units: s.Units()}
 	for _, d := range defs {
 		env.CustomFields = append(env.CustomFields, search.CustomField{Key: d.Key, Name: d.Name, Type: d.Type})
 	}

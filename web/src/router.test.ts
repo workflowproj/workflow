@@ -18,6 +18,7 @@ describe("router", () => {
       "/app/timeline",
       "/app/dashboards",
       "/app/dashboards/$dashboardId",
+      "/app/timesheet",
       "/app/projects/$projectKey/timeline",
       "/app/browse/$issueKey",
       "/app/admin/users",
