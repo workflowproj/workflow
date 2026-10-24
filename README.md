@@ -34,6 +34,9 @@ search and live updates all run on Postgres.
 - **Metrics and dashboards.** Lead time, cycle time and time in status for every issue; scope-aware
   sprint burndown and burnup, velocity, cumulative flow, created vs resolved, cycle time and
   breakdowns; personal and shared dashboards built from gadgets.
+- **Time tracking.** Original and remaining estimates, work logged as `1w 2d 3h` against a
+  configurable working day, overruns at a glance, JQL on estimates and worklogs, a sprint burndown
+  in hours and a timesheet with CSV export.
 - **Timeline.** A roadmap per project and across all projects: epics and their issues on a time
   axis, dependency arrows (with conflicts highlighted), sprints and releases; drag to reschedule.
 - **Automation.** Rules triggered by issue events, development activity or a schedule, with CEL
@@ -80,6 +83,7 @@ To run the production build locally: `make web embed-web build` then
 | [Automation and webhooks](docs/automation.md) | Rules, actions, outbound webhook signatures |
 | [Slack and Mattermost](docs/chat.md) | Channel notifications and the `/wfm` command |
 | [Metrics and dashboards](docs/metrics.md) | Issue timing, sprint reports, flow metrics, dashboards |
+| [Time tracking](docs/time-tracking.md) | Estimates, logging work, the hours burndown and the timesheet |
 | [AI assistants (MCP)](docs/mcp.md) | Connecting Claude and other assistants; the tools |
 | [API](docs/api.md) | REST API, authentication, errors, live events |
 

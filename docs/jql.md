@@ -43,11 +43,29 @@ fixVersion = "2026.11" AND statusCategory != Done
 | `comment` | `~` `!~` | text in comments |
 | `created`, `updated`, `resolved`, `due`, `start` | `=` `!=` `<` `<=` `>` `>=` `is [not] EMPTY` | dates (below) |
 | `storyPoints` (`points`, `estimate`) | `=` `!=` `<` `<=` `>` `>=` `is [not] EMPTY` | number |
+| `originalEstimate` (`timeOriginalEstimate`), `remainingEstimate` (`timeEstimate`) | `=` `!=` `<` `<=` `>` `>=` `is [not] EMPTY` | durations (below); `EMPTY` when never estimated |
+| `timeSpent` | `=` `!=` `<` `<=` `>` `>=` `is [not] EMPTY` | durations; the sum of the worklogs, `0` in comparisons and `EMPTY` when none were logged |
+| `worklogAuthor` | `=` `!=` `in` `not in` `is [not] EMPTY` | people who logged work (as for `assignee`); `EMPTY` means no work logged |
+| `worklogDate` | `=` `!=` `<` `<=` `>` `>=` `is [not] EMPTY` | dates: issues with work done then (`!=` with none done then) |
 | custom fields | depends on type | by key or name (`severity = High`), or `cf[key]` |
 
 Custom fields by type: `text`/`url` support `~`, `=`, `is EMPTY`; `number` and `date` support
 comparisons; `select` and `multiselect` support `=`, `in`; `user` accepts the user values above;
 `checkbox` accepts `true`/`false`; `version` accepts release names.
+
+## Durations
+
+Time tracking fields take durations as in the issue view: `30m`, `2h`, `1d`, `1w`, or several
+units in quotes (`"1d 4h"`). A day and a week are the working day and week
+(`WFM_TIME_HOURS_PER_DAY`, `WFM_TIME_DAYS_PER_WEEK`; 8 hours and 5 days by default), and a bare
+number is minutes. See [time-tracking.md](time-tracking.md).
+
+```
+remainingEstimate > 4h AND sprint in openSprints()
+timeSpent >= "1d 2h" ORDER BY timeSpent DESC
+worklogAuthor = currentUser() AND worklogDate >= startOfWeek()
+originalEstimate is EMPTY AND statusCategory != Done
+```
 
 ## Dates
 
@@ -60,7 +78,8 @@ comparisons; `select` and `multiselect` support `=`, `in`; `user` accepts the us
 ## Ordering
 
 `ORDER BY` accepts `rank`, `key`, `created`, `updated`, `resolved`, `due`, `start`, `priority`,
-`summary`, `status`, `assignee`, `storyPoints` and `type`.
+`summary`, `status`, `assignee`, `storyPoints`, `type`, `originalEstimate`, `remainingEstimate` and
+`timeSpent`.
 
 ## Saved filters
 

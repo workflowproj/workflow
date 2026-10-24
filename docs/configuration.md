@@ -57,6 +57,15 @@ Without S3, attachments are stored in PostgreSQL.
 | `WFM_S3_USE_SSL` | `true` | |
 | `WFM_ATTACHMENT_MAX_MB` | `25` | |
 
+## Time tracking
+
+Durations such as `1w 2d 3h` count working days and weeks; see [time-tracking.md](time-tracking.md).
+
+| Variable | Default | |
+|---|---|---|
+| `WFM_TIME_HOURS_PER_DAY` | `8` | hours in a working day (`1d`); more than 0, at most 24 |
+| `WFM_TIME_DAYS_PER_WEEK` | `5` | working days in a week (`1w`); more than 0, at most 7 |
+
 ## Background work and integrations
 
 | Variable | Default | |

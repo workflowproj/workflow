@@ -21,8 +21,12 @@ The burndown replays the sprint day by day: the issues committed when it started
 issue added or taken out, each re-estimate and each completion. So the line steps up when scope
 is added, and the report lists committed, completed, added and removed work. The burnup draws
 the same data as two lines, scope and completed. Projects that don't estimate can use issue counts
-instead of story points. Velocity compares committed and completed points over the last
-completed sprints.
+instead of story points, and teams that track time can switch to hours: the remaining estimate
+burning down and the time logged ([time-tracking.md](time-tracking.md)). Velocity compares
+committed and completed points over the last completed sprints.
+
+The **Timesheet** (sidebar) totals the time people logged per day, for a week or a month, by
+project and person, and exports CSV.
 
 ## Flow metrics
 
@@ -58,6 +62,7 @@ dashboard; others can make a copy.
 | `GET /projects/{key}/velocity?count=7` | committed and completed per sprint |
 | `GET /metrics/summary`, `/metrics/flow`, `/metrics/created-resolved`, `/metrics/breakdown?by=…`, `/metrics/cycle-time` | flow metrics; all take `projects=A,B`, `jql=` and (except breakdown) `days=` |
 | `GET/POST /dashboards`, `GET/PUT/DELETE /dashboards/{id}` | dashboards |
+| `GET /worklogs?from=&to=&projects=&user=&tz=` | timesheet: time logged per person, issue and day |
 
 The same metrics are available to AI assistants through the `get_metrics` and
 `get_sprint_report` tools ([mcp.md](mcp.md)).
