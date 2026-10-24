@@ -109,6 +109,12 @@ type Config struct {
 	AutomationMaxDepth int
 	// Allow outbound webhooks to private / loopback addresses (air-gapped installs).
 	WebhookAllowPrivate bool
+	// OutboundAllowedHosts may resolve to private addresses (e.g. a self-hosted Mattermost).
+	OutboundAllowedHosts []string
+	// Chat slash commands (/wfm): enabled per provider by its secret.
+	SlackSigningSecret      string
+	MattermostCommandTokens []string
+	ChatCommandProjects     []string // project keys commands may read; empty = every open project
 }
 
 type env struct {
@@ -212,11 +218,15 @@ func LoadFrom(get func(string) string) (*Config, error) {
 			SecretKey: e.str("WFM_S3_SECRET_KEY", ""),
 			UseSSL:    e.boolean("WFM_S3_USE_SSL", true),
 		},
-		AttachmentMaxBytes:   int64(e.integer("WFM_ATTACHMENT_MAX_MB", 25)) * 1024 * 1024,
-		WorkerConcurrency:    e.integer("WFM_WORKER_CONCURRENCY", 10),
-		SCMReconcileInterval: e.duration("WFM_SCM_RECONCILE_INTERVAL", 30*time.Minute),
-		AutomationMaxDepth:   e.integer("WFM_AUTOMATION_MAX_DEPTH", 5),
-		WebhookAllowPrivate:  e.boolean("WFM_WEBHOOK_ALLOW_PRIVATE", false),
+		AttachmentMaxBytes:      int64(e.integer("WFM_ATTACHMENT_MAX_MB", 25)) * 1024 * 1024,
+		WorkerConcurrency:       e.integer("WFM_WORKER_CONCURRENCY", 10),
+		SCMReconcileInterval:    e.duration("WFM_SCM_RECONCILE_INTERVAL", 30*time.Minute),
+		AutomationMaxDepth:      e.integer("WFM_AUTOMATION_MAX_DEPTH", 5),
+		OutboundAllowedHosts:    e.list("WFM_OUTBOUND_ALLOWED_HOSTS"),
+		SlackSigningSecret:      e.str("WFM_SLACK_SIGNING_SECRET", ""),
+		MattermostCommandTokens: e.list("WFM_MATTERMOST_COMMAND_TOKENS"),
+		ChatCommandProjects:     e.list("WFM_CHAT_COMMAND_PROJECTS"),
+		WebhookAllowPrivate:     e.boolean("WFM_WEBHOOK_ALLOW_PRIVATE", false),
 	}
 	c.HooksPublicURL = strings.TrimRight(e.str("WFM_HOOKS_PUBLIC_URL", c.PublicURL), "/")
 	c.OIDCProviders = loadOIDC(e)

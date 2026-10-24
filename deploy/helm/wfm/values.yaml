@@ -70,6 +70,11 @@ config:
   # WFM_S3_BUCKET: wfm-attachments
   # WFM_S3_REGION: eu-west-1
   # OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector.observability:4318
+  # Hosts that may resolve to private addresses for outbound calls, e.g. a self-hosted Mattermost
+  # (everything else private stays blocked). If it listens on 8065, also add an egress extraRule.
+  # WFM_OUTBOUND_ALLOWED_HOSTS: mattermost.corp.example
+  # Projects the /wfm chat command may read (default: every open project).
+  # WFM_CHAT_COMMAND_PROJECTS: PLAT,OPS
 
 # Extra env (list of EnvVar) and envFrom sources for every app pod and the migration job.
 extraEnv: []
@@ -90,6 +95,9 @@ secrets:
   create: false
   values: {}
     # WFM_SECRET_KEY: "change-me-to-32-or-more-random-characters"
+    # Enable the /wfm slash command (see docs/chat.md):
+    # WFM_SLACK_SIGNING_SECRET: "from the Slack app's Basic Information page"
+    # WFM_MATTERMOST_COMMAND_TOKENS: "token of the Mattermost slash command"
   # 3. An External Secrets Operator ExternalSecret (production). The generated Secret is named
   #    <fullname> unless externalSecret.targetName is set.
   externalSecret:

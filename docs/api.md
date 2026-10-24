@@ -73,6 +73,20 @@ curl -G $WFM/api/v1/search -H "Authorization: Bearer $T" \
   --data-urlencode 'jql=project = PLAT AND sprint in openSprints() ORDER BY rank'
 ```
 
+## Timeline
+
+`GET /api/v1/timeline?projects=PLAT,OPS&jql=…&doneDays=90` returns what the timeline draws:
+epics and standard issues (not sub-tasks) with their dates and parents, the `blocks` dependencies
+between them (`sourceKey` blocks `targetKey`), and each project's sprints and releases. Omit
+`projects` for every project you can browse. Change dates with `PATCH /issues/{key}`
+(`startDate`, `dueDate`) and add dependencies with `POST /issues/{key}/links` (`type: blocks`).
+
+## Slack and Mattermost
+
+Project admins manage chat channels with `GET/POST /projects/{key}/chat-channels`,
+`PATCH/DELETE /chat-channels/{id}`, `POST /chat-channels/{id}/test` and
+`GET /chat-channels/{id}/deliveries`. The webhook URL is write-only. See [chat.md](chat.md).
+
 ## Live events
 
 `GET /api/v1/events?project=PLAT` is a [server-sent events](https://html.spec.whatwg.org/multipage/server-sent-events.html)

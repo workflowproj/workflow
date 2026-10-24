@@ -30,10 +30,16 @@ search and live updates all run on Postgres.
   Entra ID and others; Google Workspace directory sync; just-in-time provisioning when neither is
   used. Organisation roles, project roles, custom roles, groups mapped to roles, personal access
   tokens and service accounts with scopes and expiry, and an audit log.
+- **Timeline.** A roadmap per project and across all projects: epics and their issues on a time
+  axis, dependency arrows (with conflicts highlighted), sprints and releases; drag to reschedule.
 - **Automation.** Rules triggered by issue events, development activity or a schedule, with CEL
-  conditions and actions (transition, assign, set field, comment, label, webhook, notify);
-  signed outbound webhooks.
-- **Live.** Boards and issue views update in real time over server-sent events.
+  conditions and actions (transition, assign, set field, comment, label, webhook, notify, chat,
+  roll up dates) on the issue, its parent or its children; ready-made templates; signed outbound
+  webhooks.
+- **Slack and Mattermost.** Channel notifications with event and JQL filters, a chat action for
+  automation, and a read-only `/wfm` command for issue lookup and search.
+- **Live.** Boards and issue views update in real time over server-sent events; light and dark
+  themes.
 - **Operable.** `--mode=web|hooks|worker` from one image, Prometheus metrics, OpenTelemetry
   traces, JSON logs, a Helm chart with CloudNativePG, HPA/KEDA, NetworkPolicies and Argo CD hooks.
 
@@ -65,6 +71,7 @@ To run the production build locally: `make web embed-web build` then
 | [Workflows as code](docs/workflows.md) | The YAML format, CEL reference, versioning and migration |
 | [JQL](docs/jql.md) | Query language reference |
 | [Automation and webhooks](docs/automation.md) | Rules, actions, outbound webhook signatures |
+| [Slack and Mattermost](docs/chat.md) | Channel notifications and the `/wfm` command |
 | [API](docs/api.md) | REST API, authentication, errors, live events |
 
 The REST API is described by [`api/openapi.yaml`](api/openapi.yaml) (OpenAPI 3.1); the Go

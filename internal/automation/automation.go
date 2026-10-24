@@ -48,7 +48,7 @@ type Service struct {
 func New(pool *pgxpool.Pool, tr *tracker.Service, eval *workflow.Evaluator, enq jobs.Enqueuer, box *secure.Box, cfg *config.Config, log *slog.Logger) *Service {
 	return &Service{
 		Pool: pool, Q: dbq.New(pool), Tracker: tr, Eval: eval, Jobs: enq, Box: box, Cfg: cfg, Log: log,
-		HTTP: netguard.Client(10*time.Second, cfg.WebhookAllowPrivate),
+		HTTP: netguard.Client(10*time.Second, cfg.WebhookAllowPrivate, cfg.OutboundAllowedHosts...),
 	}
 }
 
@@ -56,7 +56,7 @@ func New(pool *pgxpool.Pool, tr *tracker.Service, eval *workflow.Evaluator, enq 
 // Rules
 
 var TriggerTypes = []string{"issue.created", "issue.transitioned", "issue.field_changed", "pr.opened", "pr.merged", "commit.pushed", "branch.created", "pipeline.completed", "schedule"}
-var ActionTypes = []string{"transition", "assign", "set_field", "comment", "add_label", "webhook", "notify", "rollup_dates"}
+var ActionTypes = []string{"transition", "assign", "set_field", "comment", "add_label", "webhook", "notify", "rollup_dates", "chat"}
 
 // ActionTargets are the issues an action can apply to, relative to the one that triggered the rule.
 var ActionTargets = []string{"", "issue", "parent", "children"}
@@ -85,6 +85,7 @@ type Action struct {
 	Label      string `json:"label,omitempty"`
 	URL        string `json:"url,omitempty"`
 	Recipients string `json:"recipients,omitempty"`
+	ChannelID  string `json:"channelId,omitempty"` // chat: a chat channel of the project
 }
 
 type RuleInput struct {
@@ -98,7 +99,7 @@ type RuleInput struct {
 
 var cronParser = cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor)
 
-func (s *Service) validate(ctx context.Context, actor *authz.Actor, in RuleInput) (*time.Time, error) {
+func (s *Service) validate(ctx context.Context, actor *authz.Actor, projectID uuid.UUID, in RuleInput) (*time.Time, error) {
 	if strings.TrimSpace(in.Name) == "" {
 		return nil, apperr.Invalid("name", "name is required")
 	}
@@ -150,6 +151,17 @@ func (s *Service) validate(ctx context.Context, actor *authz.Actor, in RuleInput
 					return nil, apperr.Invalid(field, "unknown status %q", a.Status)
 				}
 			}
+		case "chat":
+			id, err := uuid.Parse(a.ChannelID)
+			if err != nil {
+				return nil, apperr.Invalid(field, "chat needs a channel")
+			}
+			if ch, err := s.Q.GetChatChannel(ctx, id); err != nil || ch.ProjectID != projectID {
+				return nil, apperr.Invalid(field, "unknown chat channel")
+			}
+			if strings.TrimSpace(a.Body) == "" {
+				return nil, apperr.Invalid(field, "chat needs a message")
+			}
 		case "rollup_dates":
 		case "assign":
 			if a.Assignee == "" {
@@ -196,7 +208,7 @@ func (s *Service) CreateRule(ctx context.Context, actor *authz.Actor, projectRef
 	if err != nil {
 		return dbq.AutomationRule{}, err
 	}
-	next, err := s.validate(ctx, actor, in)
+	next, err := s.validate(ctx, actor, p.ID, in)
 	if err != nil {
 		return dbq.AutomationRule{}, err
 	}
@@ -229,7 +241,7 @@ func (s *Service) UpdateRule(ctx context.Context, actor *authz.Actor, id uuid.UU
 	if err != nil {
 		return dbq.AutomationRule{}, err
 	}
-	next, err := s.validate(ctx, actor, in)
+	next, err := s.validate(ctx, actor, p.ID, in)
 	if err != nil {
 		return dbq.AutomationRule{}, err
 	}
@@ -283,6 +295,9 @@ func (s *Service) HandleDomainEvent(ctx context.Context, ev jobs.DomainEvent) er
 		s.Log.Warn("notifications failed", "event", ev.Event, "error", err)
 	}
 	if err := s.dispatchWebhooks(ctx, ev, data); err != nil {
+		return err
+	}
+	if err := s.dispatchChat(ctx, ev, data); err != nil {
 		return err
 	}
 	return s.runRules(ctx, ev, data)
@@ -481,6 +496,8 @@ func (s *Service) runAction(ctx context.Context, actor *authz.Actor, p dbq.Proje
 		return "moved to " + a.Status, nil
 	case "rollup_dates":
 		return s.rollupDates(ctx, actor, issue, ref)
+	case "chat":
+		return s.chatAction(ctx, p, issue, a, render(a.Body, key, issue.Summary, trigger, data))
 	case "assign":
 		var target tracker.Opt[uuid.UUID]
 		switch a.Assignee {

@@ -104,6 +104,35 @@ type BoardColumn struct {
 	WipLimit  *int32
 }
 
+type ChatChannel struct {
+	ID            uuid.UUID
+	ProjectID     uuid.UUID
+	Provider      string
+	Name          string
+	WebhookUrlEnc string
+	UrlHint       string
+	Events        []string
+	Jql           string
+	Active        bool
+	CreatedBy     *uuid.UUID
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+}
+
+type ChatDelivery struct {
+	ID             uuid.UUID
+	ChannelID      uuid.UUID
+	Event          string
+	IssueKey       *string
+	Payload        json.RawMessage
+	Status         string
+	Attempts       int32
+	ResponseStatus *int32
+	LastError      *string
+	CreatedAt      time.Time
+	DeliveredAt    *time.Time
+}
+
 type Comment struct {
 	ID        uuid.UUID
 	IssueID   uuid.UUID

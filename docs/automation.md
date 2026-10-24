@@ -11,8 +11,8 @@ outcome (success, skipped, failed) and message.
 | Trigger | Fires when | Options |
 |---|---|---|
 | `issue.created` | an issue is created | |
-| `issue.transitioned` | an issue changes status | `toStatus`: only when entering this status |
-| `issue.field_changed` | an issue is edited | `field`: only when this field changed (`priority`, `assignee`, `labels`, a custom field key, …) |
+| `issue.transitioned` | an issue changes status | `toStatus`: only when entering this status; or `toCategory`: entering any `todo`, `in_progress` or `done` status |
+| `issue.field_changed` | an issue is edited | `field`: only when one of these fields changed, comma-separated (`startDate, dueDate`, `priority`, `assignee`, `labels`, `parent`, a custom field key, …) |
 | `pr.opened`, `pr.merged` | a linked pull/merge request opens (or leaves draft) / merges | |
 | `commit.pushed`, `branch.created` | a commit or branch mentioning the issue is first seen | |
 | `pipeline.completed` | a linked pipeline/workflow run succeeds or fails | |
@@ -31,18 +31,35 @@ event.status == "failed" && issue.statusCategory != "done"
 
 ### Actions
 
+Every action takes a **target**: `issue` (the issue that triggered the rule, the default),
+`parent` (a story's epic, a sub-task's story) or `children` (each child). This is how rules keep
+related work in step — start an epic when its first story starts, finish a story when its last
+sub-task is done, stretch an epic's dates over its stories.
+
 | Action | Options |
 |---|---|
-| `transition` | `status`: target status name; runs the transition that leads there (conditions and validators apply; screens with required fields are skipped) |
+| `transition` | `status`: target status name, or `category`: `todo` / `in_progress` / `done` (the first status of that category the workflow allows; nothing happens when the issue is already in it). Conditions and validators apply; screens with required fields are skipped |
 | `assign` | `assignee`: `actor`, `reporter`, `unassigned` or an email |
 | `set_field` | `field`, `value` (system fields like `priority`, `labels`, `storyPoints`, `dueDate`, or a custom field) |
-| `comment` | `body` (Markdown); `{{issue.key}}`, `{{issue.summary}}` and `{{event.<name>}}` are replaced |
+| `comment` | `body` (Markdown); `{{issue.key}}` / `{{issue.summary}}` (the issue the action runs on), `{{trigger.key}}` / `{{trigger.summary}}` (the issue that fired the rule) and `{{event.<name>}}` are replaced |
 | `add_label` | `label` |
 | `notify` | `recipients`: `assignee`, `reporter` or `watchers` |
 | `webhook` | `url`: POSTs `{event: "automation", issue, trigger, data, sentAt}` (unsigned) |
+| `chat` | `channelId` (one of the project's [Slack/Mattermost channels](chat.md)), `body`: message with the same templates as comments |
+| `rollup_dates` | sets the target's start and due dates to span its children's dates — typically with target `parent`, so epics on the timeline cover their stories |
+
+Project settings → Automation offers these as **templates** to start from.
 
 Examples:
 
+- *Start the epic with its first story*: trigger `issue.transitioned` with `toCategory`
+  `in_progress`, condition `issue.typeLevel == 0 && issue.parent.category == "todo"`, action
+  transition target `parent` category `in_progress`.
+- *Finish the story with its last sub-task*: trigger `issue.transitioned` `toCategory` `done`,
+  condition `issue.typeLevel == -1 && issue.parent.openChildren == 0`, actions transition target
+  `parent` category `done`, comment target `parent` "All sub-tasks done ({{trigger.key}} was last)".
+- *Keep epic dates covering their stories*: trigger `issue.field_changed` with field
+  `startDate, dueDate, parent`, action `rollup_dates` target `parent`.
 - *Move to In Review when a PR opens*: trigger `pr.opened`, action transition → `In Review`.
 - *Close when merged*: trigger `pr.merged`, actions transition → `Done`, comment `Merged in #{{event.number}}`.
 - *Triage new bugs*: trigger `issue.created`, condition `issue.type == "bug"`, actions set

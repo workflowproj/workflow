@@ -58,6 +58,20 @@ func (s *Service) Search(ctx context.Context, actor *authz.Actor, jql string, li
 	})
 }
 
+// SearchIn runs JQL over the given projects (callers decide which projects are visible).
+func (s *Service) SearchIn(ctx context.Context, actor *authz.Actor, projectIDs []uuid.UUID, jql string, limit int) ([]dbq.Issue, int, error) {
+	return s.runSearch(ctx, actor, projectIDs, SearchQuery{JQL: jql, DefaultOrder: []search.Order{{Field: "updated", Desc: true}}, Limit: limit})
+}
+
+// IssueMatches reports whether an issue satisfies a JQL query (chat channel filters). It runs
+// without a user, so currentUser() matches nobody.
+func (s *Service) IssueMatches(ctx context.Context, projectID, issueID uuid.UUID, jql string) (bool, error) {
+	issues, _, err := s.runSearch(ctx, authz.SystemActor(), []uuid.UUID{projectID}, SearchQuery{
+		JQL: jql, Extra: []string{"i.id = $2::uuid"}, ExtraArgs: []any{issueID}, Limit: 1,
+	})
+	return len(issues) == 1, err
+}
+
 // ValidateJQL checks a query compiles (used when saving filters and boards).
 func (s *Service) ValidateJQL(ctx context.Context, actor *authz.Actor, jql string) error {
 	env, err := s.searchEnv(ctx, actor)

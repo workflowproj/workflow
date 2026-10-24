@@ -64,7 +64,18 @@ Without S3, attachments are stored in PostgreSQL.
 | `WFM_WORKER_CONCURRENCY` | `10` | jobs per queue per worker process |
 | `WFM_SCM_RECONCILE_INTERVAL` | `30m` | `0` disables |
 | `WFM_AUTOMATION_MAX_DEPTH` | `5` | maximum chain of rules triggering rules |
-| `WFM_WEBHOOK_ALLOW_PRIVATE` | `false` | allow outbound webhooks to private addresses |
+| `WFM_WEBHOOK_ALLOW_PRIVATE` | `false` | allow outbound calls to any private address (prefer the allowlist below) |
+| `WFM_OUTBOUND_ALLOWED_HOSTS` | — | host names (or `.domain` suffixes) that may resolve to private addresses, e.g. a self-hosted Mattermost |
+
+## Slack and Mattermost
+
+See [chat.md](chat.md). Channel notifications need no configuration; these enable the `/wfm` command.
+
+| Variable | Default | |
+|---|---|---|
+| `WFM_SLACK_SIGNING_SECRET` | — | Slack app signing secret; enables `/hooks/chat/slack` |
+| `WFM_MATTERMOST_COMMAND_TOKENS` | — | slash command token(s); enables `/hooks/chat/mattermost` |
+| `WFM_CHAT_COMMAND_PROJECTS` | every open project | project keys the command may read |
 
 ## Telemetry
 

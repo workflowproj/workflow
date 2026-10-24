@@ -128,6 +128,17 @@ func (DeliverWebhook) InsertOpts() river.InsertOpts {
 	return river.InsertOpts{Queue: QueueOutbound, MaxAttempts: 8}
 }
 
+// DeliverChat posts one Slack or Mattermost message, retried with backoff.
+type DeliverChat struct {
+	DeliveryID uuid.UUID `json:"deliveryId"`
+}
+
+func (DeliverChat) Kind() string { return "chat_deliver" }
+
+func (DeliverChat) InsertOpts() river.InsertOpts {
+	return river.InsertOpts{Queue: QueueOutbound, MaxAttempts: 6}
+}
+
 // DirectorySync reads the Google Workspace directory and reconciles users and groups.
 type DirectorySync struct {
 	Trigger string `json:"trigger"`

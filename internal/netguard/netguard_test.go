@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
+	"net/url"
 	"testing"
 	"time"
 )
@@ -33,4 +34,35 @@ func TestClientRefusesLoopback(t *testing.T) {
 	if err != nil || res.StatusCode != 204 {
 		t.Fatalf("allowPrivate client: %v %v", res, err)
 	}
+}
+
+func TestHostAllowed(t *testing.T) {
+	allowed := []string{"mattermost.corp.example", ".internal.example"}
+	for host, want := range map[string]bool{
+		"mattermost.corp.example":  true,
+		"MATTERMOST.corp.example.": true,
+		"chat.internal.example":    true,
+		"internal.example":         true,
+		"evil-internal.example":    false,
+		"corp.example":             false,
+		"metadata.google.internal": false,
+	} {
+		if got := HostAllowed(host, allowed); got != want {
+			t.Errorf("HostAllowed(%q) = %v, want %v", host, got, want)
+		}
+	}
+}
+
+func TestAllowedHostMayBePrivate(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(204) }))
+	defer srv.Close()
+	u, _ := url.Parse(srv.URL)
+	if _, err := Client(time.Second, false).Get(srv.URL); !errors.Is(err, ErrBlocked) {
+		t.Fatalf("loopback should be blocked, got %v", err)
+	}
+	res, err := Client(time.Second, false, u.Hostname()).Get(srv.URL)
+	if err != nil {
+		t.Fatalf("allowlisted host: %v", err)
+	}
+	res.Body.Close()
 }

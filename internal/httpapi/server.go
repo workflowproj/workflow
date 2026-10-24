@@ -206,6 +206,7 @@ func (s *Server) HooksHandler(scimHandler interface {
 }) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /hooks/{provider}/{connection}", s.SCM.HandleWebhook)
+	mux.HandleFunc("POST /hooks/chat/{provider}", s.Automation.HandleChatCommand) // Slack / Mattermost /wfm
 	if scimHandler != nil {
 		scimHandler.Routes(mux, "/scim/v2")
 	}

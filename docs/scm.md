@@ -4,7 +4,9 @@ Connect GitHub (as a GitHub App) and GitLab (with an access token) under Adminis
 GitHub & GitLab. Then link repositories to projects (Project settings → Repositories). Issue keys
 in branch names, commit messages and pull/merge request titles, branches or descriptions link
 that activity to the issue — but only for projects linked to the repository, so `ABC-1` in an
-unrelated repository is ignored.
+unrelated repository is ignored. Keys match in any case and with any separator, so a pull request
+from `feature/plat-12-checkout`, `PLAT-12_fix-totals` or `users/ada/Plat-12/try` links to PLAT-12
+even when its title never mentions the issue.
 
 What you get on each issue:
 

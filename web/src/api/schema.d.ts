@@ -1442,6 +1442,72 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{projectKey}/chat-channels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Slack and Mattermost channels that receive this project's notifications */
+        get: operations["listChatChannels"];
+        put?: never;
+        post: operations["createChatChannel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/chat-channels/{channelId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["deleteChatChannel"];
+        options?: never;
+        head?: never;
+        patch: operations["updateChatChannel"];
+        trace?: never;
+    };
+    "/chat-channels/{channelId}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Post a test message to the channel */
+        post: operations["testChatChannel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/chat-channels/{channelId}/deliveries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listChatDeliveries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/webhooks": {
         parameters: {
             query?: never;
@@ -2326,7 +2392,7 @@ export interface components {
         };
         Timeline: {
             projects: components["schemas"]["ProjectRef"][];
-            /** @description Epics and standard issues, ranked; parents come before their children */
+            /** @description Epics and standard issues in rank order (children name their parent) */
             issues: components["schemas"]["Issue"][];
             links: components["schemas"]["TimelineLink"][];
             sprints: components["schemas"]["TimelineSprint"][];
@@ -2524,7 +2590,7 @@ export interface components {
              * @description rollup_dates sets the target issue's start and due dates to span its children
              * @enum {string}
              */
-            type: "transition" | "assign" | "set_field" | "comment" | "add_label" | "webhook" | "notify" | "rollup_dates";
+            type: "transition" | "assign" | "set_field" | "comment" | "add_label" | "webhook" | "notify" | "rollup_dates" | "chat";
             /**
              * @description Which issue(s) the action applies to: the triggering issue (default), its parent (e.g. the epic of a story) or its children
              * @enum {string}
@@ -2544,6 +2610,11 @@ export interface components {
             url?: string;
             /** @description notify: assignee | reporter | watchers */
             recipients?: string;
+            /**
+             * Format: uuid
+             * @description chat: one of the project's chat channels (body is the message, Markdown with {{issue.*}} / {{trigger.*}} / {{event.*}})
+             */
+            channelId?: string;
         };
         AutomationRule: {
             /** Format: uuid */
@@ -2605,6 +2676,58 @@ export interface components {
         WebhookSubscriptionCreated: components["schemas"]["WebhookSubscription"] & {
             secret: string;
         };
+        /** @enum {string} */
+        ChatProvider: "slack" | "mattermost";
+        /** @enum {string} */
+        ChatEvent: "*" | "issue.created" | "issue.transitioned" | "issue.assigned" | "comment.created" | "sprint.started" | "sprint.completed" | "release.released" | "pr.opened" | "pr.merged" | "pipeline.failed";
+        ChatChannel: {
+            /** Format: uuid */
+            id: string;
+            provider: components["schemas"]["ChatProvider"];
+            /** @description Label for people, e.g. #team-payments */
+            name: string;
+            events: components["schemas"]["ChatEvent"][];
+            /** @description Only issues matching this query notify (issue events) */
+            jql: string;
+            active: boolean;
+            /** @description Host and last characters of the webhook URL (the URL itself is never returned) */
+            urlHint: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        ChatChannelInput: {
+            provider: components["schemas"]["ChatProvider"];
+            name: string;
+            /** @description The channel's incoming webhook URL */
+            webhookUrl: string;
+            events: components["schemas"]["ChatEvent"][];
+            jql?: string;
+            /** @default true */
+            active?: boolean;
+        };
+        ChatChannelPatch: {
+            name?: string;
+            /** @description Omit to keep the current URL */
+            webhookUrl?: string;
+            events?: components["schemas"]["ChatEvent"][];
+            jql?: string;
+            active?: boolean;
+        };
+        ChatDelivery: {
+            /** Format: uuid */
+            id: string;
+            event: string;
+            issueKey?: string;
+            /** @enum {string} */
+            status: "pending" | "delivered" | "failed";
+            attempts: number;
+            responseStatus?: number;
+            lastError?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            deliveredAt?: string;
+        };
         WebhookDelivery: {
             /** Format: uuid */
             id: string;
@@ -2656,6 +2779,7 @@ export interface components {
         RepositoryId: string;
         RuleId: string;
         WebhookId: string;
+        ChannelId: string;
         FieldId: string;
         EventId: string;
     };
@@ -5866,6 +5990,152 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AutomationRun"][];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listChatChannels: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project key (or id) */
+                projectKey: components["parameters"]["ProjectKey"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Channels */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatChannel"][];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    createChatChannel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project key (or id) */
+                projectKey: components["parameters"]["ProjectKey"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatChannelInput"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatChannel"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    deleteChatChannel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                channelId: components["parameters"]["ChannelId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    updateChatChannel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                channelId: components["parameters"]["ChannelId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatChannelPatch"];
+            };
+        };
+        responses: {
+            /** @description Updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatChannel"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    testChatChannel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                channelId: components["parameters"]["ChannelId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Queued */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listChatDeliveries: {
+        parameters: {
+            query?: {
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path: {
+                channelId: components["parameters"]["ChannelId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Recent messages, newest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatDelivery"][];
                 };
             };
             default: components["responses"]["Problem"];

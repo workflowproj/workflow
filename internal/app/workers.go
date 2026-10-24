@@ -90,6 +90,9 @@ func (a *App) handlers() []handler {
 		}),
 		reg(time.Minute, a.Automation.HandlePostFunction),
 		reg(time.Minute, func(ctx context.Context, j jobs.DeliverWebhook) error { return a.Automation.Deliver(ctx, j.DeliveryID) }),
+		reg(time.Minute, func(ctx context.Context, j jobs.DeliverChat) error {
+			return a.Automation.DeliverChat(ctx, j.DeliveryID)
+		}),
 		reg(30*time.Minute, func(ctx context.Context, j jobs.DirectorySync) error {
 			if a.Syncer == nil {
 				return nil
@@ -161,7 +164,10 @@ func (a *App) maintenance(ctx context.Context) error {
 			a.Log.Info("users anonymised after retention", "count", len(ids))
 		}
 	}
-	_, err := q.PruneWebhookEvents(ctx, time.Now().AddDate(0, 0, -30))
+	if _, err := q.PruneWebhookEvents(ctx, time.Now().AddDate(0, 0, -30)); err != nil {
+		return err
+	}
+	_, err := a.Automation.PruneChatDeliveries(ctx, time.Now().AddDate(0, 0, -30))
 	return err
 }
 
