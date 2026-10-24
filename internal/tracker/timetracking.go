@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -14,7 +15,6 @@ import (
 	"github.com/geoffo-dev/workflow-management/internal/api"
 	"github.com/geoffo-dev/workflow-management/internal/apperr"
 	"github.com/geoffo-dev/workflow-management/internal/authz"
-	"github.com/geoffo-dev/workflow-management/internal/db"
 	"github.com/geoffo-dev/workflow-management/internal/db/dbq"
 	"github.com/geoffo-dev/workflow-management/internal/timetrack"
 )
@@ -57,7 +57,7 @@ func secondsRef(v *int64) *string {
 	return strp(strconv.FormatInt(*v, 10))
 }
 
-// recordEstimate adds an estimate change to an issue update's history.
+// estimateChange is the history entry of an estimate change: durations to read, seconds as refs.
 func (s *Service) estimateChange(field string, from, to *int64) change {
 	u := s.Units()
 	return change{field: field, from: timetrack.FormatPtr(from, u), to: timetrack.FormatPtr(to, u), fromRef: secondsRef(from), toRef: secondsRef(to)}
@@ -502,19 +502,23 @@ func (s *Service) Timesheet(ctx context.Context, actor *authz.Actor, in Timeshee
 	return out, nil
 }
 
+// knownZones remembers the time zones PostgreSQL accepted (reading pg_timezone_names scans
+// the zone files).
+var knownZones sync.Map
+
 // checkTimeZone asks PostgreSQL, whose zone database computes the days, whether it knows tz.
 func (s *Service) checkTimeZone(ctx context.Context, tz string) error {
+	if _, ok := knownZones.Load(tz); ok {
+		return nil
+	}
 	var ok bool
 	if err := s.Pool.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM pg_timezone_names WHERE name = $1) OR upper($1) = 'UTC'", tz).Scan(&ok); err != nil {
-		if db.IsNoRows(err) {
-			ok = false
-		} else {
-			return err
-		}
+		return err
 	}
 	if !ok {
 		return apperr.Invalid("tz", "unknown time zone %q (use an IANA name such as Europe/London)", tz)
 	}
+	knownZones.Store(tz, true)
 	return nil
 }
 
