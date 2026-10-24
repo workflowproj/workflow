@@ -20,6 +20,8 @@ export default defineConfig({
       // Shown in the UI as the SCIM base URL and SCM webhook URLs.
       "/scim": { target: api },
       "/hooks": { target: api },
+      // MCP for AI assistants (streamable HTTP).
+      "/mcp": { target: api, changeOrigin: false },
     },
   },
   build: { sourcemap: true, chunkSizeWarningLimit: 1500 },

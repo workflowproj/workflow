@@ -11,6 +11,7 @@ import (
 	"runtime/debug"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -18,6 +19,9 @@ import (
 	"github.com/oapi-codegen/nullable"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+	"go.yaml.in/yaml/v3"
+
+	apispec "github.com/geoffo-dev/workflow-management/api"
 
 	"github.com/geoffo-dev/workflow-management/internal/api"
 	"github.com/geoffo-dev/workflow-management/internal/apperr"
@@ -29,8 +33,10 @@ import (
 	"github.com/geoffo-dev/workflow-management/internal/events"
 	"github.com/geoffo-dev/workflow-management/internal/identity"
 	"github.com/geoffo-dev/workflow-management/internal/jobs"
+	"github.com/geoffo-dev/workflow-management/internal/mcpserver"
 	"github.com/geoffo-dev/workflow-management/internal/scm"
 	"github.com/geoffo-dev/workflow-management/internal/secure"
+	"github.com/geoffo-dev/workflow-management/internal/telemetry"
 	"github.com/geoffo-dev/workflow-management/internal/tracker"
 )
 
@@ -187,6 +193,9 @@ func (s *Server) WebHandler(ui http.Handler) http.Handler {
 	})
 	api.HandlerWithOptions(strict, api.StdHTTPServerOptions{BaseURL: "/api/v1", BaseRouter: mux, ErrorHandlerFunc: badRequest(s.Log)})
 	mux.HandleFunc("GET /api/v1/events", s.streamEvents)
+	mux.HandleFunc("GET /api/v1/openapi.yaml", s.openAPI)
+	mux.HandleFunc("GET /api/v1/openapi.json", s.openAPI)
+	mux.Handle("/mcp", (&mcpserver.Server{API: s, Auth: s.Auth, PublicURL: s.Cfg.PublicURL, Version: telemetry.Version, Log: s.Log}).Handler())
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		WriteProblem(s.Log, w, r, apperr.NotFound("route"))
 	})
@@ -213,6 +222,34 @@ func (s *Server) HooksHandler(scimHandler interface {
 	mux.HandleFunc("GET /healthz", s.health)
 	mux.HandleFunc("GET /readyz", s.ready)
 	return s.common(mux)
+}
+
+// openAPI publishes the API description (YAML, or JSON for tools that want it).
+func (s *Server) openAPI(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "public, max-age=300")
+	if !strings.HasSuffix(r.URL.Path, ".json") {
+		w.Header().Set("Content-Type", "application/yaml")
+		_, _ = w.Write(apispec.OpenAPI)
+		return
+	}
+	specJSON.once.Do(func() {
+		var doc any
+		if specJSON.err = yaml.Unmarshal(apispec.OpenAPI, &doc); specJSON.err == nil {
+			specJSON.body, specJSON.err = json.Marshal(doc)
+		}
+	})
+	if specJSON.err != nil {
+		WriteProblem(s.Log, w, r, specJSON.err)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write(specJSON.body)
+}
+
+var specJSON struct {
+	once sync.Once
+	body []byte
+	err  error
 }
 
 func (s *Server) health(w http.ResponseWriter, _ *http.Request) {

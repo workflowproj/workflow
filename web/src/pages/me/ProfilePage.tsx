@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Lock, Plus } from "lucide-react";
+import { Bot, FileCode2, Lock, Plus } from "lucide-react";
 import { api, unwrap } from "@/api/client";
 import { useMe } from "@/api/queries";
 import { Badge, Button, PageHeader, PageSpinner, useToast } from "@/components/ui";
 import { ErrorBox } from "@/components/ErrorBox";
 import { UserAvatar } from "@/components/UserAvatar";
-import { CodeBlock, SettingsSection } from "@/features/settings/common";
+import { SettingsSection } from "@/features/settings/common";
+import { ConnectSnippets } from "@/features/settings/tokens/ConnectSnippets";
 import { CreateTokenDialog, TokenTable } from "@/features/settings/tokens/Tokens";
 import { SourceBadge, sourceLabel } from "@/features/admin/badges";
 
@@ -32,7 +33,7 @@ export function ProfilePage() {
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-6 p-6">
-      <PageHeader title="Profile" subtitle="Your account and the tokens that act as you." />
+      <PageHeader title="Profile" subtitle="Your account, the tokens that act as you, and how to connect AI assistants and scripts." />
       <SettingsSection title="Account">
         <div className="flex flex-wrap items-start gap-5 p-5">
           <UserAvatar user={me} size={64} />
@@ -65,7 +66,7 @@ export function ProfilePage() {
 
       <SettingsSection
         title="Personal access tokens"
-        description="For scripts, CI and the wfm CLI. A token can do what you can do, limited by its scopes."
+        description="For AI assistants, scripts, CI and the wfm CLI. A token can do what you can do, limited by its scopes: read tokens only look."
         actions={
           <Button size="sm" variant="primary" icon={<Plus className="size-3.5" />} onClick={() => setCreating(true)}>
             New token
@@ -76,10 +77,35 @@ export function ProfilePage() {
         {tokens.isLoading ? <PageSpinner /> : <TokenTable tokens={tokens.data ?? []} onRevoke={(t) => revoke.mutate(t.id)} revoking={revoke.isPending ? revoke.variables : undefined} />}
       </SettingsSection>
 
-      <SettingsSection title="Command line">
-        <div className="flex flex-col gap-2 p-4 text-[13px] text-muted">
-          <p>Point the wfm CLI at this server with a token that has the write scope, then apply workflows kept in your repository:</p>
-          <CodeBlock>{`export WFM_SERVER=${server}\nexport WFM_TOKEN=wfm_pat_…\nwfm workflow apply -f workflow.yaml --project KEY`}</CodeBlock>
+      <SettingsSection
+        title="Connect AI assistants and tools"
+        description="Claude and other AI assistants can search, read, create and update issues, move them through workflows and read sprint and flow metrics over MCP, as you."
+      >
+        <div className="flex flex-col gap-4 p-4">
+          <ConnectSnippets server={server} />
+          <div className="grid gap-3 text-[13px] text-muted sm:grid-cols-2">
+            <p className="flex gap-2">
+              <Bot className="mt-0.5 size-4 shrink-0 text-faint" />
+              <span>
+                MCP endpoint <code className="font-mono text-ink">{server}/mcp</code>. Tools: search issues (JQL), get an issue, project, board or sprint report, metrics, create, update, transition, comment and link
+                issues. Changes appear in the issue history under your name.
+              </span>
+            </p>
+            <p className="flex gap-2">
+              <FileCode2 className="mt-0.5 size-4 shrink-0 text-faint" />
+              <span>
+                REST API at <code className="font-mono text-ink">{server}/api/v1</code>, described by{" "}
+                <a className="font-medium text-accent hover:underline" href="/api/v1/openapi.yaml" target="_blank" rel="noreferrer">
+                  openapi.yaml
+                </a>{" "}
+                (or{" "}
+                <a className="font-medium text-accent hover:underline" href="/api/v1/openapi.json" target="_blank" rel="noreferrer">
+                  JSON
+                </a>
+                ).
+              </span>
+            </p>
+          </div>
         </div>
       </SettingsSection>
 
@@ -92,12 +118,7 @@ export function ProfilePage() {
           qc.invalidateQueries({ queryKey: ["my-tokens"] });
           return t;
         }}
-        after={(token) => (
-          <div className="flex flex-col gap-1.5 text-[13px] text-muted">
-            <p>Use it with the CLI:</p>
-            <CodeBlock>{`export WFM_SERVER=${server}\nexport WFM_TOKEN=${token}\nwfm workflow apply -f workflow.yaml`}</CodeBlock>
-          </div>
-        )}
+        after={(token) => <ConnectSnippets server={server} token={token} />}
       />
     </div>
   );

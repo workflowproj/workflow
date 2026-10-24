@@ -1,8 +1,9 @@
 # REST API
 
 Everything the UI does goes through the REST API at `/api/v1`, described by
-[`api/openapi.yaml`](../api/openapi.yaml) (OpenAPI 3.1). Generate a client for your language
-from it, or use `curl`.
+[`api/openapi.yaml`](../api/openapi.yaml) (OpenAPI 3.1), which every server also publishes at
+`/api/v1/openapi.yaml` and `/api/v1/openapi.json`. Generate a client for your language from it,
+or use `curl`. AI assistants can use the [MCP server](mcp.md) instead.
 
 ## Authentication
 
@@ -80,6 +81,13 @@ epics and standard issues (not sub-tasks) with their dates and parents, the `blo
 between them (`sourceKey` blocks `targetKey`), and each project's sprints and releases. Omit
 `projects` for every project you can browse. Change dates with `PATCH /issues/{key}`
 (`startDate`, `dueDate`) and add dependencies with `POST /issues/{key}/links` (`type: blocks`).
+
+## Metrics and dashboards
+
+Issue timing (`/issues/{key}/metrics`), sprint burndown and burnup (`/sprints/{id}/report`),
+velocity (`/projects/{key}/velocity`), flow metrics (`/metrics/summary`, `/metrics/flow`,
+`/metrics/created-resolved`, `/metrics/breakdown`, `/metrics/cycle-time`) and dashboards
+(`/dashboards`). See [metrics.md](metrics.md).
 
 ## Slack and Mattermost
 

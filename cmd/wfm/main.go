@@ -6,6 +6,7 @@
 //	wfm workflow apply -f workflow.yaml [--project KEY] [--map "Old=New"] [--dry-run]
 //	wfm workflow validate -f workflow.yaml
 //	wfm workflow export --id <uuid>
+//	wfm mcp
 //	wfm version
 package main
 
@@ -48,6 +49,8 @@ func run(args []string) error {
 		return migrate()
 	case "workflow":
 		return workflowCmd(args)
+	case "mcp":
+		return mcpBridge()
 	case "version":
 		fmt.Println(telemetry.Version)
 		return nil
@@ -64,10 +67,13 @@ const usage = `Usage:
   wfm workflow apply -f FILE [--project KEY] [--map "Old status=New status"] [--dry-run]
   wfm workflow validate -f FILE
   wfm workflow export --id WORKFLOW_ID
+  wfm mcp
   wfm version
 
 The workflow commands talk to the API: set WFM_SERVER (e.g. https://wfm.example.com) and
-WFM_TOKEN (a personal access token or service-account token with the write scope).`
+WFM_TOKEN (a personal access token or service-account token with the write scope).
+wfm mcp relays the Model Context Protocol between stdio and WFM_SERVER/mcp, for AI assistants
+that launch local MCP servers; it uses the same two variables.`
 
 func signalContext() (context.Context, context.CancelFunc) {
 	return signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
