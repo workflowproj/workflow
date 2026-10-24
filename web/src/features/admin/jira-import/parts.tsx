@@ -7,7 +7,7 @@ export function Stepper({ imp, step, onStep }: { imp: JiraImport; step: StepKey;
   const at = STEPS.findIndex((s) => s.key === step);
   return (
     <nav aria-label="Import steps" className="overflow-x-auto">
-      <ol className="flex min-w-max items-center gap-1">
+      <ol className="flex flex-wrap items-center gap-1">
         {STEPS.map((s, i) => {
           const open = reachable(imp, s.key);
           const current = s.key === step;
@@ -89,7 +89,10 @@ export function Stat({ label, value, hint }: { label: string; value: string | nu
 export function ProgressBar({ value, label, tone = "accent" }: { value: number; label: string; tone?: "accent" | "success" | "danger" }) {
   return (
     <div role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={value} className="h-1.5 w-full overflow-hidden rounded-full bg-surface-3">
-      <div className={cn("h-full rounded-full transition-[width] duration-500", { accent: "bg-accent", success: "bg-success", danger: "bg-danger" }[tone])} style={{ width: `${value}%` }} />
+      <div
+        className={cn("h-full rounded-full transition-[width] duration-500", { accent: "bg-accent", success: "bg-success", danger: "bg-danger" }[tone])}
+        style={{ width: `${value}%` }}
+      />
     </div>
   );
 }

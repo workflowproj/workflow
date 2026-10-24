@@ -51,7 +51,10 @@ export function ConnectForm({ onConnected, onCancel }: { onConnected: (imp: Sche
               key={f.id}
               aria-pressed={flavor === f.id}
               onClick={() => (setFlavor(f.id), reset())}
-              className={cn("flex items-start gap-3 rounded-md border p-3 text-left transition-colors", flavor === f.id ? "border-accent bg-accent-soft" : "border-line hover:border-line-strong")}
+              className={cn(
+                "flex items-start gap-3 rounded-md border p-3 text-left transition-colors",
+                flavor === f.id ? "border-accent bg-accent-soft" : "border-line hover:border-line-strong",
+              )}
             >
               <f.icon className={cn("mt-0.5 size-5 shrink-0", flavor === f.id ? "text-accent" : "text-faint")} aria-hidden />
               <span>
@@ -62,7 +65,12 @@ export function ConnectForm({ onConnected, onCancel }: { onConnected: (imp: Sche
           ))}
         </div>
       </fieldset>
-      <Field label="Site URL" required error={fe.baseUrl} hint={flavor === "cloud" ? "For example https://acme.atlassian.net" : "The base URL people open Jira at, e.g. https://jira.example.com"}>
+      <Field
+        label="Site URL"
+        required
+        error={fe.baseUrl}
+        hint={flavor === "cloud" ? "For example https://acme.atlassian.net" : "The base URL people open Jira at, e.g. https://jira.example.com"}
+      >
         {(id) => (
           <Input
             id={id}

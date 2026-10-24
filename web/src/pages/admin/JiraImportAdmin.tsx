@@ -49,11 +49,7 @@ export function JiraImportAdmin() {
             <ul className="divide-y divide-line">
               {list.map((imp) => (
                 <li key={imp.id}>
-                  <Link
-                    to="/admin/import/$importId"
-                    params={{ importId: imp.id }}
-                    className="flex items-center gap-3 px-4 py-3 hover:bg-surface-2/60"
-                  >
+                  <Link to="/admin/import/$importId" params={{ importId: imp.id }} className="flex items-center gap-3 px-4 py-3 hover:bg-surface-2/60">
                     {imp.flavor === "cloud" ? <Cloud className="size-5 shrink-0 text-faint" aria-hidden /> : <Server className="size-5 shrink-0 text-faint" aria-hidden />}
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">{siteName(imp.baseUrl)}</p>

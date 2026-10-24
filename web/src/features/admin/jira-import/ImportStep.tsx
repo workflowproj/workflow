@@ -51,7 +51,11 @@ export function ImportStep({ imp }: { imp: JiraImport }) {
           {running && <ProgressBar value={overallPercent(progress)} label="Overall progress" />}
           {progress && <Phases progress={progress} failed={imp.status === "failed" || imp.stalled} />}
           {imp.error && <ErrorBox error={new Error(imp.error)} />}
-          {imp.stalled && <Callout tone="warning" title="The import stopped checkpointing">The worker running it may have restarted. Resume it: it continues from the last checkpoint.</Callout>}
+          {imp.stalled && (
+            <Callout tone="warning" title="The import stopped checkpointing">
+              The worker running it may have restarted. Resume it: it continues from the last checkpoint.
+            </Callout>
+          )}
           {resumable && (
             <div className="flex flex-wrap items-center gap-2">
               <Button variant="primary" icon={<RotateCcw className="size-4" />} loading={actions.run.isPending} disabled={!imp.hasCredentials} onClick={() => actions.run.mutate()}>
@@ -65,7 +69,7 @@ export function ImportStep({ imp }: { imp: JiraImport }) {
       </Card>
 
       {rows.length > 0 && (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-2">
           {rows.map((r) => (
             <Stat key={r.key} label={r.label} value={r.value} />
           ))}
@@ -93,14 +97,19 @@ export function ImportStep({ imp }: { imp: JiraImport }) {
             <p className="flex flex-wrap items-center gap-2">
               Open the imported projects:
               {projects.map((k) => (
-                <Link key={k} to="/projects/$projectKey/board" params={{ projectKey: k }} className="rounded bg-surface-2 px-2 py-0.5 font-mono text-[13px] text-accent hover:underline">
+                <Link
+                  key={k}
+                  to="/projects/$projectKey/board"
+                  params={{ projectKey: k }}
+                  className="rounded bg-surface-2 px-2 py-0.5 font-mono text-[13px] text-accent hover:underline"
+                >
                   {k}
                 </Link>
               ))}
             </p>
             <p className="text-muted">
-              Running the import again later brings over what changed in Jira (unchanged issues are skipped). Placeholders become real accounts when their people sign in with
-              their email.
+              Running the import again later brings over what changed in Jira (unchanged issues are skipped). Placeholders become real accounts when their people sign in with their
+              email.
             </p>
             <div className="flex flex-wrap gap-2">
               <Button icon={<Play className="size-4" />} loading={actions.run.isPending} disabled={!imp.hasCredentials} onClick={() => actions.run.mutate()}>

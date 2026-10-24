@@ -51,8 +51,7 @@ export function DryRunStep({ imp, onStarted }: { imp: JiraImport; onStarted: () 
                     <tr key={p.jiraKey}>
                       <td>
                         <span className="font-mono text-xs text-muted">{p.jiraKey}</span> → <span className="font-mono text-sm font-medium">{p.key}</span>{" "}
-                        <span className="text-[13px]">{p.name}</span>{" "}
-                        {p.existing ? <Badge tone="accent">Update</Badge> : <Badge>{templateName[p.template] ?? p.template}</Badge>}
+                        <span className="text-[13px]">{p.name}</span> {p.existing ? <Badge tone="accent">Update</Badge> : <Badge>{templateName[p.template] ?? p.template}</Badge>}
                       </td>
                       <td className="text-right tabular-nums">{p.issues}</td>
                       <td className="text-right tabular-nums">{p.comments}</td>
@@ -71,7 +70,7 @@ export function DryRunStep({ imp, onStarted }: { imp: JiraImport; onStarted: () 
               </table>
             </div>
           </Card>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-2">
             <Stat label="People matched" value={dry.people.matched} hint="existing accounts" />
             <Stat label="Claimable placeholders" value={dry.people.placeholders} hint="claimed by signing in" />
             <Stat label="Unclaimable placeholders" value={dry.people.unclaimable} hint="no email" />

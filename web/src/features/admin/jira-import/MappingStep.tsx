@@ -30,11 +30,18 @@ export function MappingStep({ imp, onNext }: { imp: JiraImport; onNext: () => vo
       <Card title="Analyse the projects">
         <div className="flex flex-col items-start gap-3 p-4">
           <p className="text-sm text-muted">
-            The analysis reads every issue of the selected projects once (without changing anything) to count them and to find the statuses, issue types, priorities and people the mapping needs.
+            The analysis reads every issue of the selected projects once (without changing anything) to count them and to find the statuses, issue types, priorities and people the
+            mapping needs.
           </p>
           {imp.stalled && <Callout tone="warning">The last analysis stopped unexpectedly. Start it again.</Callout>}
           {actions.scan.error && <ErrorBox error={actions.scan.error} />}
-          <Button variant="primary" icon={<RefreshCw className="size-4" />} loading={actions.scan.isPending} disabled={busy(imp) || !imp.hasCredentials} onClick={() => actions.scan.mutate()}>
+          <Button
+            variant="primary"
+            icon={<RefreshCw className="size-4" />}
+            loading={actions.scan.isPending}
+            disabled={busy(imp) || !imp.hasCredentials}
+            onClick={() => actions.scan.mutate()}
+          >
             Analyse {imp.config.projects.length} project{imp.config.projects.length === 1 ? "" : "s"}
           </Button>
         </div>
@@ -70,7 +77,8 @@ function MappingEditor({ imp, scan, onNext }: { imp: JiraImport; scan: NonNullab
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted">
         <p>
-          Analysed {scan.projects.reduce((n, p) => n + p.issues, 0)} issues in {scan.projects.length} project{scan.projects.length === 1 ? "" : "s"}. Values are pre-filled; change what does not fit.
+          Analysed {scan.projects.reduce((n, p) => n + p.issues, 0)} issues in {scan.projects.length} project{scan.projects.length === 1 ? "" : "s"}. Values are pre-filled; change
+          what does not fit.
         </p>
         <Button size="sm" variant="ghost" icon={<RefreshCw className="size-3.5" />} loading={actions.scan.isPending} onClick={() => actions.scan.mutate()}>
           Analyse again
@@ -86,7 +94,10 @@ function MappingEditor({ imp, scan, onNext }: { imp: JiraImport; scan: NonNullab
               role="tab"
               aria-selected={p.jiraId === target?.jiraId}
               onClick={() => setTab(p.jiraId)}
-              className={cn("rounded-md px-3 py-1.5 text-sm", p.jiraId === target?.jiraId ? "bg-accent-soft font-medium text-accent" : "text-muted hover:bg-surface-2 hover:text-ink")}
+              className={cn(
+                "rounded-md px-3 py-1.5 text-sm",
+                p.jiraId === target?.jiraId ? "bg-accent-soft font-medium text-accent" : "text-muted hover:bg-surface-2 hover:text-ink",
+              )}
             >
               {p.jiraKey} → {options && p.jiraId === target?.jiraId && options.existingKey ? options.existingKey : p.key}
             </button>
@@ -96,7 +107,7 @@ function MappingEditor({ imp, scan, onNext }: { imp: JiraImport; scan: NonNullab
 
       {target && sp && options && (
         <>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-2">
             <Stat label="Issues" value={sp.issues} hint={`highest number ${sp.maxNumber}`} />
             <Stat label="Comments" value={sp.comments} />
             <Stat label="Attachments" value={sp.attachments} hint={formatBytes(sp.attachmentBytes)} />
@@ -105,80 +116,94 @@ function MappingEditor({ imp, scan, onNext }: { imp: JiraImport; scan: NonNullab
           </div>
           <div className="grid gap-4 lg:grid-cols-2">
             <Card title={`Statuses · ${target.jiraKey}`}>
-              <table className={table}>
-                <thead>
-                  <tr>
-                    <th>In Jira</th>
-                    <th className="w-14 text-right">Issues</th>
-                    <th className="w-48">Here</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sp.statuses.map((st) => (
-                    <tr key={st.id}>
-                      <td>
-                        <span className="mr-2">{st.name}</span>
-                        <Badge tone={categoryTone[st.category]}>{CATEGORY_LABEL[st.category]}</Badge>
-                      </td>
-                      <td className="text-right text-muted tabular-nums">{st.count}</td>
-                      <td>
-                        <Select aria-label={`Status for ${st.name}`} value={target.statuses[st.id] ?? ""} onChange={(e) => change(setStatus(cfg, target.jiraId, st.id, e.target.value))}>
-                          {(["todo", "in_progress", "done"] as const).map((cat) => (
-                            <optgroup key={cat} label={CATEGORY_LABEL[cat]}>
-                              {options.statuses
-                                .filter((o) => o.category === cat)
-                                .map((o) => (
-                                  <option key={o.name} value={o.name}>
-                                    {o.name}
-                                  </option>
-                                ))}
-                            </optgroup>
-                          ))}
-                        </Select>
-                      </td>
+              <div className="overflow-x-auto">
+                <table className={table}>
+                  <thead>
+                    <tr>
+                      <th>In Jira</th>
+                      <th className="w-14 text-right">Issues</th>
+                      <th className="w-48">Here</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {sp.statuses.map((st) => (
+                      <tr key={st.id}>
+                        <td>
+                          <span className="mr-2">{st.name}</span>
+                          <Badge tone={categoryTone[st.category]}>{CATEGORY_LABEL[st.category]}</Badge>
+                        </td>
+                        <td className="text-right text-muted tabular-nums">{st.count}</td>
+                        <td>
+                          <Select
+                            className="min-w-36"
+                            aria-label={`Status for ${st.name}`}
+                            value={target.statuses[st.id] ?? ""}
+                            onChange={(e) => change(setStatus(cfg, target.jiraId, st.id, e.target.value))}
+                          >
+                            {(["todo", "in_progress", "done"] as const).map((cat) => (
+                              <optgroup key={cat} label={CATEGORY_LABEL[cat]}>
+                                {options.statuses
+                                  .filter((o) => o.category === cat)
+                                  .map((o) => (
+                                    <option key={o.name} value={o.name}>
+                                      {o.name}
+                                    </option>
+                                  ))}
+                              </optgroup>
+                            ))}
+                          </Select>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
               <p className="border-t border-line px-4 py-2.5 text-xs text-muted">
                 Where an issue type's workflow lacks the chosen status, the first status of the same category is used. History keeps the mapped statuses, so cycle time and flow
                 charts cover the Jira past.
               </p>
             </Card>
             <Card title={`Issue types · ${target.jiraKey}`}>
-              <table className={table}>
-                <thead>
-                  <tr>
-                    <th>In Jira</th>
-                    <th className="w-14 text-right">Issues</th>
-                    <th className="w-48">Here</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sp.types.map((ty) => {
-                    const chosen = options.types.find((o) => o.key === target.types[ty.id]);
-                    return (
-                      <tr key={ty.id}>
-                        <td>
-                          <span className="mr-2">{ty.name}</span>
-                          <span className="text-xs text-faint">{LEVEL_LABEL[ty.level]}</span>
-                          {chosen && chosen.level !== ty.level && <p className="text-xs text-warning">Different level: parent links that break the hierarchy are dropped.</p>}
-                        </td>
-                        <td className="text-right text-muted tabular-nums">{ty.count}</td>
-                        <td>
-                          <Select aria-label={`Type for ${ty.name}`} value={target.types[ty.id] ?? ""} onChange={(e) => change(setType(cfg, target.jiraId, ty.id, e.target.value))}>
-                            {options.types.map((o) => (
-                              <option key={o.key} value={o.key}>
-                                {o.name}
-                              </option>
-                            ))}
-                          </Select>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              <div className="overflow-x-auto">
+                <table className={table}>
+                  <thead>
+                    <tr>
+                      <th>In Jira</th>
+                      <th className="w-14 text-right">Issues</th>
+                      <th className="w-48">Here</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sp.types.map((ty) => {
+                      const chosen = options.types.find((o) => o.key === target.types[ty.id]);
+                      return (
+                        <tr key={ty.id}>
+                          <td>
+                            <span className="mr-2">{ty.name}</span>
+                            <span className="text-xs text-faint">{LEVEL_LABEL[ty.level]}</span>
+                            {chosen && chosen.level !== ty.level && <p className="text-xs text-warning">Different level: parent links that break the hierarchy are dropped.</p>}
+                          </td>
+                          <td className="text-right text-muted tabular-nums">{ty.count}</td>
+                          <td>
+                            <Select
+                              className="min-w-36"
+                              aria-label={`Type for ${ty.name}`}
+                              value={target.types[ty.id] ?? ""}
+                              onChange={(e) => change(setType(cfg, target.jiraId, ty.id, e.target.value))}
+                            >
+                              {options.types.map((o) => (
+                                <option key={o.key} value={o.key}>
+                                  {o.name}
+                                </option>
+                              ))}
+                            </Select>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </Card>
           </div>
         </>
@@ -200,7 +225,12 @@ function MappingEditor({ imp, scan, onNext }: { imp: JiraImport; scan: NonNullab
                   <td>{p.name}</td>
                   <td className="text-right text-muted tabular-nums">{p.count}</td>
                   <td>
-                    <Select aria-label={`Priority for ${p.name}`} value={cfg.priorities[p.id] ?? "medium"} onChange={(e) => change({ ...cfg, priorities: { ...cfg.priorities, [p.id]: e.target.value as (typeof PRIORITIES)[number] } })}>
+                    <Select
+                      className="min-w-28"
+                      aria-label={`Priority for ${p.name}`}
+                      value={cfg.priorities[p.id] ?? "medium"}
+                      onChange={(e) => change({ ...cfg, priorities: { ...cfg.priorities, [p.id]: e.target.value as (typeof PRIORITIES)[number] } })}
+                    >
                       {PRIORITIES.map((v) => (
                         <option key={v} value={v}>
                           {v[0].toUpperCase() + v.slice(1)}
@@ -274,12 +304,12 @@ function PeopleCard({ imp, cfg, onChange }: { imp: JiraImport; cfg: JiraConfig; 
       }
     >
       <Callout className="m-3" icon={<UserRoundCheck className="mt-0.5 size-4 shrink-0 text-accent" />} title="How people are brought over">
-        People with an account here (same email) are matched. Everyone else becomes a <strong className="text-ink">placeholder</strong>: an inactive account with their name and email
-        that owns their issues, comments and history. Nobody can sign in to a placeholder. When the person later signs in with that email through single sign-on (or is provisioned
-        by SCIM or directory sync), the placeholder becomes their account with everything attached. People whose email Jira hides get a placeholder nobody can claim — enter their
-        email or map them to an account.
+        People with an account here (same email) are matched. Everyone else becomes a <strong className="text-ink">placeholder</strong>: an inactive account with their name and
+        email that owns their issues, comments and history. Nobody can sign in to a placeholder. When the person later signs in with that email through single sign-on (or is
+        provisioned by SCIM or directory sync), the placeholder becomes their account with everything attached. People whose email Jira hides get a placeholder nobody can claim —
+        enter their email or map them to an account.
       </Callout>
-      <div className="max-h-[28rem] overflow-y-auto">
+      <div className="max-h-[28rem] overflow-auto">
         <table className={table}>
           <thead className="sticky top-0 bg-surface">
             <tr>
@@ -296,7 +326,13 @@ function PeopleCard({ imp, cfg, onChange }: { imp: JiraImport; cfg: JiraConfig; 
               const m = cfg.people[p.id];
               const action = m?.action ?? "auto";
               const outcome = personOutcome(p, m);
-              const pickedUser = picked[p.id] ?? (m?.userId && p.match?.id === m.userId ? { ...p.match, kind: "human" as const } : m?.userId ? { id: m.userId, displayName: "Chosen account", email: "", kind: "human" as const } : null);
+              const pickedUser =
+                picked[p.id] ??
+                (m?.userId && p.match?.id === m.userId
+                  ? { ...p.match, kind: "human" as const }
+                  : m?.userId
+                    ? { id: m.userId, displayName: "Chosen account", email: "", kind: "human" as const }
+                    : null);
               return (
                 <tr key={p.id}>
                   <td>
@@ -345,7 +381,9 @@ function PeopleCard({ imp, cfg, onChange }: { imp: JiraImport; cfg: JiraConfig; 
                         onChange={(e) => set(p.id, { action: "placeholder", email: e.target.value })}
                       />
                     ) : (
-                      <span className={cn("text-[13px]", { success: "text-success", accent: "text-ink", warning: "text-warning", neutral: "text-muted" }[outcome.tone])}>{outcome.text}</span>
+                      <span className={cn("text-[13px]", { success: "text-success", accent: "text-ink", warning: "text-warning", neutral: "text-muted" }[outcome.tone])}>
+                        {outcome.text}
+                      </span>
                     )}
                   </td>
                 </tr>

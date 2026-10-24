@@ -52,7 +52,14 @@ export function ConnectionPanel({ imp }: { imp: JiraImport }) {
               disabled={busy(imp)}
               loading={actions.deleteCredentials.isPending}
               onClick={async () => {
-                if (await confirm({ title: "Delete the Jira credentials?", body: "The stored token is erased. Imported data and the mapping stay.", confirmLabel: "Delete credentials", danger: true }))
+                if (
+                  await confirm({
+                    title: "Delete the Jira credentials?",
+                    body: "The stored token is erased. Imported data and the mapping stay.",
+                    confirmLabel: "Delete credentials",
+                    danger: true,
+                  })
+                )
                   actions.deleteCredentials.mutate(undefined, { onSuccess: () => toast.success("Credentials deleted") });
               }}
             >

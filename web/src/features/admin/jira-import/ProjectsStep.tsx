@@ -94,7 +94,7 @@ export function ProjectsStep({ imp, onNext }: { imp: JiraImport; onNext: () => v
               <tbody>
                 {cfg.projects.map((t, i) => {
                   const fixed = existing.get(t.jiraId);
-                  const err = fixed ? undefined : keyError(t.key) ?? fieldErrors[`projects[${i}].key`];
+                  const err = fixed ? undefined : (keyError(t.key) ?? fieldErrors[`projects[${i}].key`]);
                   return (
                     <tr key={t.jiraId}>
                       <td>
@@ -120,10 +120,20 @@ export function ProjectsStep({ imp, onNext }: { imp: JiraImport; onNext: () => v
                         )}
                       </td>
                       <td>
-                        <Input aria-label={`Name for ${t.jiraKey}`} value={t.name} disabled={!!fixed} onChange={(e) => setCfg(updateTarget(cfg, t.jiraId, { name: e.target.value }))} />
+                        <Input
+                          aria-label={`Name for ${t.jiraKey}`}
+                          value={t.name}
+                          disabled={!!fixed}
+                          onChange={(e) => setCfg(updateTarget(cfg, t.jiraId, { name: e.target.value }))}
+                        />
                       </td>
                       <td>
-                        <Select aria-label={`Template for ${t.jiraKey}`} value={t.template} disabled={!!fixed} onChange={(e) => setCfg(updateTarget(cfg, t.jiraId, { template: e.target.value }))}>
+                        <Select
+                          aria-label={`Template for ${t.jiraKey}`}
+                          value={t.template}
+                          disabled={!!fixed}
+                          onChange={(e) => setCfg(updateTarget(cfg, t.jiraId, { template: e.target.value }))}
+                        >
                           {TEMPLATES.map((tp) => (
                             <option key={tp.id} value={tp.id}>
                               {tp.label}
@@ -132,7 +142,12 @@ export function ProjectsStep({ imp, onNext }: { imp: JiraImport; onNext: () => v
                         </Select>
                       </td>
                       <td>
-                        <Select aria-label={`Access for ${t.jiraKey}`} value={t.open ? "open" : "private"} disabled={!!fixed} onChange={(e) => setCfg(updateTarget(cfg, t.jiraId, { open: e.target.value === "open" }))}>
+                        <Select
+                          aria-label={`Access for ${t.jiraKey}`}
+                          value={t.open ? "open" : "private"}
+                          disabled={!!fixed}
+                          onChange={(e) => setCfg(updateTarget(cfg, t.jiraId, { open: e.target.value === "open" }))}
+                        >
                           <option value="open">Open</option>
                           <option value="private">Private</option>
                         </Select>
@@ -144,14 +159,20 @@ export function ProjectsStep({ imp, onNext }: { imp: JiraImport; onNext: () => v
             </table>
           </div>
           <p className="border-t border-line px-4 py-2.5 text-xs text-muted">
-            Issues keep their numbers: with the same key, PLAT-123 stays PLAT-123. With another key the old one keeps resolving. Jira permissions are not imported; add members to private projects
-            afterwards.
+            Issues keep their numbers: with the same key, PLAT-123 stays PLAT-123. With another key the old one keeps resolving. Jira permissions are not imported; add members to
+            private projects afterwards.
           </p>
         </Card>
       )}
       {error && <ErrorBox error={error} />}
       <div className="flex justify-end">
-        <Button variant="primary" icon={<ArrowRight className="size-4" />} disabled={cfg.projects.length === 0 || invalid} loading={actions.saveConfig.isPending || actions.scan.isPending} onClick={() => save().catch(() => undefined)}>
+        <Button
+          variant="primary"
+          icon={<ArrowRight className="size-4" />}
+          disabled={cfg.projects.length === 0 || invalid}
+          loading={actions.saveConfig.isPending || actions.scan.isPending}
+          onClick={() => save().catch(() => undefined)}
+        >
           Save and analyse
         </Button>
       </div>

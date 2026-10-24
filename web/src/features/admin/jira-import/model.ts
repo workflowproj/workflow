@@ -108,9 +108,7 @@ export function personOutcome(p: JiraPerson, m: PersonMapping | undefined): { to
   if (action === "user") return { tone: "success", text: "Mapped to the chosen account" };
   const email = (action === "placeholder" && m?.email) || (action === "auto" && p.match ? "" : p.email);
   if (action === "auto" && p.match) {
-    return p.placeholder
-      ? { tone: "accent", text: `Placeholder from an earlier import (${p.match.email})` }
-      : { tone: "success", text: `Matched: ${p.match.displayName}` };
+    return p.placeholder ? { tone: "accent", text: `Placeholder from an earlier import (${p.match.email})` } : { tone: "success", text: `Matched: ${p.match.displayName}` };
   }
   if (email) return { tone: "accent", text: `Placeholder; claimed when ${email} signs in` };
   return { tone: "warning", text: "Placeholder nobody can claim (no email)" };
