@@ -44,6 +44,20 @@ See [identity.md](identity.md).
 | `WFM_GOOGLE_SYNC_GROUPS` | `true` | mirror groups |
 | `WFM_GOOGLE_GROUP_PREFIX` | — | only mirror groups whose email starts with this |
 
+## AI assistants (OAuth)
+
+Assistants connect to `/mcp` by URL and sign in through the browser; see [mcp.md](mcp.md).
+`WFM_PUBLIC_URL` is the OAuth issuer and `<WFM_PUBLIC_URL>/mcp` the token audience, so it must be
+the address assistants use (https in production).
+
+| Variable | Default | |
+|---|---|---|
+| `WFM_OAUTH_ENABLED` | `true` | `false`: no OAuth; `/mcp` accepts personal access tokens only |
+| `WFM_OAUTH_DYNAMIC_REGISTRATION` | `true` | allow apps to register themselves at `/oauth/register` (RFC 7591); `false` leaves client ID metadata documents |
+| `WFM_OAUTH_CLIENT_METADATA_DOCUMENTS` | `true` | accept https client ids that point at a client ID metadata document (fetched under the outbound guard below) |
+| `WFM_OAUTH_ACCESS_TOKEN_TTL` | `1h` | access token lifetime (1m–24h) |
+| `WFM_OAUTH_REFRESH_TOKEN_TTL` | `720h` (30 days) | refresh token lifetime, renewed on every refresh (1h–8784h) |
+
 ## Attachments
 
 Without S3, attachments are stored in PostgreSQL.
