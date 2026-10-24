@@ -4,6 +4,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	netmail "net/mail"
 	"os"
 	"sort"
 	"strconv"
@@ -115,6 +116,15 @@ type Config struct {
 	SlackSigningSecret      string
 	MattermostCommandTokens []string
 	ChatCommandProjects     []string // project keys commands may read; empty = every open project
+
+	// Email. Without a host, messages are kept in memory (and logged) instead of sent.
+	SMTP SMTP
+}
+
+type SMTP struct {
+	Host, Username, Password, From string
+	Port                           int
+	TLS                            string // starttls, tls or none
 }
 
 type env struct {
@@ -227,10 +237,23 @@ func LoadFrom(get func(string) string) (*Config, error) {
 		MattermostCommandTokens: e.list("WFM_MATTERMOST_COMMAND_TOKENS"),
 		ChatCommandProjects:     e.list("WFM_CHAT_COMMAND_PROJECTS"),
 		WebhookAllowPrivate:     e.boolean("WFM_WEBHOOK_ALLOW_PRIVATE", false),
+		SMTP: SMTP{
+			Host: e.str("WFM_SMTP_HOST", ""), Port: e.integer("WFM_SMTP_PORT", 587),
+			Username: e.str("WFM_SMTP_USERNAME", ""), Password: e.str("WFM_SMTP_PASSWORD", ""),
+			From: e.str("WFM_SMTP_FROM", "Workflow <workflow@localhost>"), TLS: e.str("WFM_SMTP_TLS", "starttls"),
+		},
 	}
 	c.HooksPublicURL = strings.TrimRight(e.str("WFM_HOOKS_PUBLIC_URL", c.PublicURL), "/")
 	c.OIDCProviders = loadOIDC(e)
 
+	switch c.SMTP.TLS {
+	case "starttls", "tls", "none":
+	default:
+		e.errs = append(e.errs, fmt.Errorf("WFM_SMTP_TLS: must be starttls, tls or none, got %q", c.SMTP.TLS))
+	}
+	if _, err := netmail.ParseAddress(c.SMTP.From); err != nil {
+		e.errs = append(e.errs, fmt.Errorf("WFM_SMTP_FROM: %v", err))
+	}
 	switch c.Mode {
 	case ModeWeb, ModeHooks, ModeWorker, ModeAll:
 	default:

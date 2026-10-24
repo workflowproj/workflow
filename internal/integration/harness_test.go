@@ -34,13 +34,21 @@ import (
 
 var (
 	baseURL    string // admin connection URL
-	templateDB = "wfm_it_template"
+	// One template per test process, so parallel runs (other checkouts, other branches with
+	// other migrations) never drop each other's template.
+	templateDB = fmt.Sprintf("wfm_it_template_%d", os.Getpid())
 	setupOnce  sync.Once
 	setupErr   error
 )
 
 func TestMain(m *testing.M) {
 	code := m.Run()
+	if baseURL != "" {
+		if c, err := pgx.Connect(context.Background(), baseURL); err == nil {
+			_, _ = c.Exec(context.Background(), "DROP DATABASE IF EXISTS "+templateDB+" WITH (FORCE)")
+			c.Close(context.Background())
+		}
+	}
 	os.Exit(code)
 }
 

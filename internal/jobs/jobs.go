@@ -41,6 +41,21 @@ type DomainEvent struct {
 
 func (DomainEvent) Kind() string { return "domain_event" }
 
+// SendEmail delivers one email (see the mail package, which queues these).
+type SendEmail struct {
+	To      []string          `json:"to"`
+	Subject string            `json:"subject"`
+	Text    string            `json:"text"`
+	HTML    string            `json:"html,omitempty"`
+	Headers map[string]string `json:"headers,omitempty"`
+}
+
+func (SendEmail) Kind() string { return "email_send" }
+
+func (SendEmail) InsertOpts() river.InsertOpts {
+	return river.InsertOpts{Queue: QueueOutbound, MaxAttempts: 8}
+}
+
 // ProcessWebhook processes a stored inbound SCM webhook event.
 type ProcessWebhook struct {
 	EventID uuid.UUID `json:"eventId"`

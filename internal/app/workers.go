@@ -12,6 +12,7 @@ import (
 
 	"github.com/geoffo-dev/workflow-management/internal/db/dbq"
 	"github.com/geoffo-dev/workflow-management/internal/jobs"
+	"github.com/geoffo-dev/workflow-management/internal/mail"
 )
 
 var (
@@ -90,6 +91,7 @@ func (a *App) handlers() []handler {
 		}),
 		reg(time.Minute, a.Automation.HandlePostFunction),
 		reg(time.Minute, func(ctx context.Context, j jobs.DeliverWebhook) error { return a.Automation.Deliver(ctx, j.DeliveryID) }),
+		reg(time.Minute, func(ctx context.Context, j jobs.SendEmail) error { return a.Mailer.Send(ctx, mail.FromJob(j)) }),
 		reg(time.Minute, func(ctx context.Context, j jobs.DeliverChat) error {
 			return a.Automation.DeliverChat(ctx, j.DeliveryID)
 		}),

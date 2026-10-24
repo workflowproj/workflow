@@ -33,6 +33,7 @@ import (
 	"github.com/geoffo-dev/workflow-management/internal/events"
 	"github.com/geoffo-dev/workflow-management/internal/identity"
 	"github.com/geoffo-dev/workflow-management/internal/jobs"
+	"github.com/geoffo-dev/workflow-management/internal/mail"
 	"github.com/geoffo-dev/workflow-management/internal/mcpserver"
 	"github.com/geoffo-dev/workflow-management/internal/scm"
 	"github.com/geoffo-dev/workflow-management/internal/secure"
@@ -53,6 +54,7 @@ type Server struct {
 	Jobs       jobs.Enqueuer
 	Hub        *events.Hub
 	Box        *secure.Box
+	Mailer     mail.Sender
 }
 
 var _ api.StrictServerInterface = (*Server)(nil)
@@ -194,6 +196,7 @@ func (s *Server) WebHandler(ui http.Handler) http.Handler {
 	api.HandlerWithOptions(strict, api.StdHTTPServerOptions{BaseURL: "/api/v1", BaseRouter: mux, ErrorHandlerFunc: badRequest(s.Log)})
 	mux.HandleFunc("GET /api/v1/events", s.streamEvents)
 	mux.HandleFunc("GET /api/v1/openapi.yaml", s.openAPI)
+	mux.HandleFunc("GET /api/v1/dev/mailbox", s.devMailbox)
 	mux.HandleFunc("GET /api/v1/openapi.json", s.openAPI)
 	mux.Handle("/mcp", (&mcpserver.Server{API: s, Auth: s.Auth, PublicURL: s.Cfg.PublicURL, Version: telemetry.Version, Log: s.Log}).Handler())
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
@@ -250,6 +253,19 @@ var specJSON struct {
 	once sync.Once
 	body []byte
 	err  error
+}
+
+// devMailbox lists the emails held in memory when no SMTP server is configured, in
+// development only (?to=address filters), so tests and developers can follow invite and reset
+// links.
+func (s *Server) devMailbox(w http.ResponseWriter, r *http.Request) {
+	box, ok := s.Mailer.(*mail.Memory)
+	if !ok || s.Cfg.Production {
+		WriteProblem(s.Log, w, r, apperr.NotFound("route"))
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(box.Messages(r.URL.Query().Get("to")))
 }
 
 func (s *Server) health(w http.ResponseWriter, _ *http.Request) {

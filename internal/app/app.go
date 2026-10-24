@@ -34,6 +34,7 @@ import (
 	"github.com/geoffo-dev/workflow-management/internal/identity/directory"
 	"github.com/geoffo-dev/workflow-management/internal/identity/scim"
 	"github.com/geoffo-dev/workflow-management/internal/jobs"
+	"github.com/geoffo-dev/workflow-management/internal/mail"
 	"github.com/geoffo-dev/workflow-management/internal/scm"
 	"github.com/geoffo-dev/workflow-management/internal/secure"
 	"github.com/geoffo-dev/workflow-management/internal/storage"
@@ -56,8 +57,10 @@ type App struct {
 	Automation *automation.Service
 	Syncer     *directory.Syncer
 	Hub        *events.Hub
-	Server     *httpapi.Server
-	Scim       *scim.Handler
+	// Mailer sends email (an in-memory *mail.Memory without WFM_SMTP_HOST).
+	Mailer mail.Sender
+	Server *httpapi.Server
+	Scim   *scim.Handler
 }
 
 // Options let tests substitute collaborators.
@@ -123,7 +126,7 @@ func New(ctx context.Context, cfg *config.Config, log *slog.Logger, pool *pgxpoo
 	if err != nil {
 		return nil, err
 	}
-	a := &App{Cfg: cfg, Log: log, Pool: pool, Box: box}
+	a := &App{Cfg: cfg, Log: log, Pool: pool, Box: box, Mailer: mail.New(cfg.SMTP, log.With("module", "mail"))}
 
 	runWorkers := cfg.RunsWorker()
 	if opts.Workers != nil {
@@ -166,7 +169,7 @@ func New(ctx context.Context, cfg *config.Config, log *slog.Logger, pool *pgxpoo
 
 	a.Server = &httpapi.Server{
 		Cfg: cfg, Log: log.With("module", "http"), Pool: pool, Q: dbq.New(pool), Tracker: a.Tracker, Auth: a.Auth, Prov: a.Prov,
-		SCM: a.SCM, Automation: a.Automation, Jobs: enq, Hub: a.Hub, Box: box,
+		SCM: a.SCM, Automation: a.Automation, Jobs: enq, Hub: a.Hub, Box: box, Mailer: a.Mailer,
 	}
 	return a, nil
 }

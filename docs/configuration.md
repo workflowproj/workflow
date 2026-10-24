@@ -67,6 +67,20 @@ Without S3, attachments are stored in PostgreSQL.
 | `WFM_WEBHOOK_ALLOW_PRIVATE` | `false` | allow outbound calls to any private address (prefer the allowlist below) |
 | `WFM_OUTBOUND_ALLOWED_HOSTS` | — | host names (or `.domain` suffixes) that may resolve to private addresses, e.g. a self-hosted Mattermost |
 
+## Email
+
+Without `WFM_SMTP_HOST`, email is not sent: messages are logged and kept in memory (in
+development they can be read at `/api/v1/dev/mailbox`). Email is queued after the change that
+causes it and retried on failure.
+
+| Variable | Default | |
+|---|---|---|
+| `WFM_SMTP_HOST` | — | SMTP server, e.g. `smtp.sendgrid.net`, `email-smtp.eu-west-1.amazonaws.com` |
+| `WFM_SMTP_PORT` | `587` | |
+| `WFM_SMTP_TLS` | `starttls` | `starttls`, `tls` (implicit, usually port 465) or `none` |
+| `WFM_SMTP_USERNAME`, `WFM_SMTP_PASSWORD` | — | omit for an unauthenticated relay |
+| `WFM_SMTP_FROM` | `Workflow <workflow@localhost>` | sender address |
+
 ## Slack and Mattermost
 
 See [chat.md](chat.md). Channel notifications need no configuration; these enable the `/wfm` command.
