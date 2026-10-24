@@ -2196,6 +2196,8 @@ export interface components {
             /** Format: double */
             p85Hours: number;
             issues: components["schemas"]["CycleTimeIssue"][];
+            /** @description More issues were resolved than a report reads (100,000); the most recent count */
+            truncated?: boolean;
         };
         CycleTimeIssue: {
             key: string;
@@ -2346,6 +2348,8 @@ export interface components {
             days: number;
             dates: string[];
             series: components["schemas"]["FlowSeries"][];
+            /** @description More issues match than a report reads (100,000); the most recently created count */
+            truncated?: boolean;
         };
         FlowSeries: {
             /** @description A status category */

@@ -180,6 +180,9 @@ func TestMetrics(t *testing.T) {
 	eq(t, fmt.Sprint(group("statusCategory")), "map[Done:1 In progress:1 To do:2]", "by status category")
 	eq(t, fmt.Sprint(group("label")), "map[No label:2 api:1 web:2]", "by label")
 	eq(t, fmt.Sprint(group("epic")), "map[Checkout:2 No epic:2]", "by epic")
+	eq(t, fmt.Sprint(group("type")), "map[Epic:1 Task:3]", "by type")
+	eq(t, fmt.Sprint(group("priority")), "map[Medium:4]", "by priority")
+	eq(t, fmt.Sprint(group("release"), group("sprint")), "map[No release:4] map[No sprint:4]", "by release and sprint")
 	var b breakdown
 	ada.get("/api/v1/metrics/breakdown?projects=FLO&by=statusCategory", &b)
 	eq(t, str(b.Groups[0], "key"), "todo", "categories in their natural order")

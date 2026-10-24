@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/geoffo-dev/workflow-management/internal/apperr"
 	"github.com/geoffo-dev/workflow-management/internal/authz"
@@ -817,14 +818,23 @@ func (s *Service) Velocity(ctx context.Context, actor *authz.Actor, ref string, 
 	if err != nil {
 		return nil, err
 	}
-	out := make([]VelocitySprint, 0, len(sprints))
-	for k := len(sprints) - 1; k >= 0; k-- {
-		rep, err := s.sprintReport(ctx, sprints[k])
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, VelocitySprint{Sprint: rep.Sprint, CommittedPoints: rep.CommittedPoints, CompletedPoints: rep.CompletedPoints,
-			CommittedIssues: rep.CommittedIssues, CompletedIssues: rep.CompletedIssues})
+	// Each sprint is replayed from its history; a few at a time.
+	out := make([]VelocitySprint, len(sprints))
+	g, gctx := errgroup.WithContext(ctx)
+	g.SetLimit(4)
+	for k, sp := range sprints {
+		g.Go(func() error {
+			rep, err := s.sprintReport(gctx, sp)
+			if err != nil {
+				return err
+			}
+			out[len(sprints)-1-k] = VelocitySprint{Sprint: rep.Sprint, CommittedPoints: rep.CommittedPoints, CompletedPoints: rep.CompletedPoints,
+				CommittedIssues: rep.CommittedIssues, CompletedIssues: rep.CompletedIssues}
+			return nil
+		})
+	}
+	if err := g.Wait(); err != nil {
+		return nil, err
 	}
 	return out, nil
 }

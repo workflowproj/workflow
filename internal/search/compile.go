@@ -262,8 +262,8 @@ func (b *builder) clause(c Clause) (string, error) {
 			if err != nil {
 				return "", err
 			}
-			return epicAncestor + " IN (" + sub + ")", nil
-		}, epicAncestor+" IS NULL")
+			return inEpics("SELECT e.id FROM issues e JOIN issue_types et ON et.id = e.type_id WHERE et.level >= 1 AND e.id IN (" + sub + ")"), nil
+		}, "NOT coalesce("+inEpics(allEpics)+", false)")
 	case "issuelinktype", "linktype":
 		return b.setField(c, func(v Value) (string, error) {
 			s, err := b.str(v)
@@ -466,11 +466,14 @@ func (b *builder) keyField(c Clause) (string, error) {
 	}, "")
 }
 
-// epicAncestor is the id of an issue's epic (NULL when it has none).
-const epicAncestor = `(SELECT CASE WHEN pt.level >= 1 THEN p.id WHEN gpt.level >= 1 THEN gp.id END
-	FROM issues p JOIN issue_types pt ON pt.id = p.type_id
-	LEFT JOIN issues gp ON gp.id = p.parent_id LEFT JOIN issue_types gpt ON gpt.id = gp.type_id
-	WHERE p.id = i.parent_id)`
+// inEpics is "the issue's epic is one of these": its parent is one of the epics, or its parent
+// is a standard issue whose parent is (sub-tasks). Both sides are sets of parent ids, so the
+// database looks them up once rather than walking every issue's parents.
+func inEpics(epics string) string {
+	return "(i.parent_id IN (" + epics + ") OR i.parent_id IN (SELECT c.id FROM issues c JOIN issue_types ct ON ct.id = c.type_id WHERE ct.level < 1 AND c.parent_id IN (" + epics + ")))"
+}
+
+const allEpics = "SELECT e.id FROM issues e JOIN issue_types et ON et.id = e.type_id WHERE et.level >= 1"
 
 // linkDescription is one side of a link type, as Jira words it: "blocks" is the source's side
 // of a blocks link, "is blocked by" the target's.

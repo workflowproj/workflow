@@ -2827,6 +2827,7 @@ components:
         issues:
           type: array
           items: { $ref: '#/components/schemas/CycleTimeIssue' }
+        truncated: { type: boolean, description: 'More issues were resolved than a report reads (100,000); the most recent count' }
     CycleTimeIssue:
       type: object
       required: [key, summary, cycleHours, resolvedAt]
@@ -2944,6 +2945,7 @@ components:
         series:
           type: array
           items: { $ref: '#/components/schemas/FlowSeries' }
+        truncated: { type: boolean, description: 'More issues match than a report reads (100,000); the most recently created count' }
     FlowSeries:
       type: object
       required: [key, label, category, counts]

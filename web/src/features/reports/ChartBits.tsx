@@ -90,6 +90,11 @@ export function StatTile({ label, value, sub }: { label: string; value: ReactNod
   );
 }
 
+/** TruncatedNote says a report counted only the newest issues (the server reads at most 100,000). */
+export function TruncatedNote({ what }: { what: "created" | "resolved" }) {
+  return <p className="mt-2 text-xs text-muted">Based on the 100,000 most recently {what} issues. Narrow the projects or query to count them all.</p>;
+}
+
 /** Segmented is a small single-choice switch (a radio group), e.g. points or issues. */
 export function Segmented<T extends string>({ label, value, options, onChange }: { label: string; value: T; options: { value: T; label: string }[]; onChange: (v: T) => void }) {
   return (

@@ -24,8 +24,9 @@ import (
  * browsable one when none are named) narrowed by optional JQL.
  */
 
-// metricIssueLimit caps the issues a history-based metric (cycle time, flow) reads.
-const metricIssueLimit = 20000
+// metricIssueLimit caps the issues a history-based metric (cycle time, flow) reads; beyond it
+// the newest count and the report says it was truncated.
+const metricIssueLimit = 100000
 
 // MetricScope is the issues a metric looks at.
 type MetricScope struct {
@@ -323,6 +324,8 @@ type CycleTimeReport struct {
 	Days                 int
 	Average, Median, P85 float64
 	Issues               []CycleTimeEntry
+	// Truncated: more issues were resolved than metricIssueLimit; the most recent count.
+	Truncated bool
 }
 
 // CycleTime is the cycle time report of one project.
@@ -342,51 +345,39 @@ func (s *Service) CycleTimeFor(ctx context.Context, actor *authz.Actor, sc Metri
 	if err != nil {
 		return rep, err
 	}
-	rows, err := s.Pool.Query(ctx, `SELECT i.id, i.project_id, i.number, i.summary, i.created_at, i.resolved_at FROM issues i
-		WHERE i.resolved_at >= $2 AND `+where+` ORDER BY i.resolved_at LIMIT `+strconv.Itoa(metricIssueLimit), args...)
+	// Work starts when the issue first entered an in-progress status (else when it was created).
+	rows, err := s.Pool.Query(ctx, `SELECT i.id, i.project_id, i.number, i.summary, i.resolved_at,
+			coalesce((SELECT min(h.created_at) FROM issue_history h JOIN statuses st ON st.id::text = h.to_ref
+				WHERE h.issue_id = i.id AND h.field = 'status' AND st.category = 'in_progress'), i.created_at)
+		FROM issues i WHERE i.resolved_at >= $2 AND `+where+` ORDER BY i.resolved_at DESC, i.id LIMIT `+strconv.Itoa(metricIssueLimit+1), args...)
 	if err != nil {
 		return rep, err
 	}
 	type resolved struct {
-		ID, ProjectID       uuid.UUID
-		Number              int32
-		Summary             string
-		CreatedAt, Resolved time.Time
+		ID, ProjectID   uuid.UUID
+		Number          int32
+		Summary         string
+		Resolved, Start time.Time
 	}
 	list, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (resolved, error) {
 		var v resolved
-		err := r.Scan(&v.ID, &v.ProjectID, &v.Number, &v.Summary, &v.CreatedAt, &v.Resolved)
+		err := r.Scan(&v.ID, &v.ProjectID, &v.Number, &v.Summary, &v.Resolved, &v.Start)
 		return v, err
 	})
 	if err != nil {
 		return rep, err
 	}
-	ids := make([]uuid.UUID, len(list))
-	for k, v := range list {
-		ids[k] = v.ID
+	if len(list) > metricIssueLimit {
+		list, rep.Truncated = list[:metricIssueLimit], true
 	}
-	hist, err := s.historyByIssue(ctx, ids)
-	if err != nil {
-		return rep, err
-	}
-	statuses, err := s.statusMap(ctx)
-	if err != nil {
-		return rep, err
-	}
+	slices.Reverse(list)
 	keys := map[uuid.UUID]string{}
 	for _, p := range projects {
 		keys[p.ID] = p.Key
 	}
 	var all []float64
 	for _, v := range list {
-		start := v.CreatedAt
-		for _, h := range hist[v.ID] {
-			if id, ok := refID(h.ToRef); ok && h.Field == "status" && statuses[id].Category == "in_progress" {
-				start = h.CreatedAt
-				break
-			}
-		}
-		hrs := hours(v.Resolved.Sub(start))
+		hrs := hours(v.Resolved.Sub(v.Start))
 		all = append(all, hrs)
 		pk := keys[v.ProjectID]
 		rep.Issues = append(rep.Issues, CycleTimeEntry{Key: pk + "-" + strconv.Itoa(int(v.Number)), ProjectKey: pk, Summary: v.Summary, Hours: hrs, ResolvedAt: v.Resolved})
@@ -486,27 +477,27 @@ var categoryLabel = map[string]string{"todo": "To do", "in_progress": "In progre
 
 // CumulativeFlow counts the issues in each status category (or status) at the end of each day.
 // Issues resolved before the window are left out, so the done band is work finished in it.
-func (s *Service) CumulativeFlow(ctx context.Context, actor *authz.Actor, sc MetricScope, days int, by string) ([]time.Time, []FlowSeries, error) {
+func (s *Service) CumulativeFlow(ctx context.Context, actor *authz.Actor, sc MetricScope, days int, by string) (dates []time.Time, out []FlowSeries, truncated bool, err error) {
 	if err := checkDays(days); err != nil {
-		return nil, nil, err
+		return nil, nil, false, err
 	}
 	if by == "" {
 		by = "category"
 	}
 	if by != "category" && by != "status" {
-		return nil, nil, apperr.Invalid("by", "by must be category or status")
+		return nil, nil, false, apperr.Invalid("by", "by must be category or status")
 	}
 	now := s.Now()
 	today := dayStart(now)
 	start := today.AddDate(0, 0, -(days - 1))
 	where, args, _, err := s.scopeWhere(ctx, actor, sc, start)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, false, err
 	}
 	rows, err := s.Pool.Query(ctx, `SELECT i.id, i.status_id, i.created_at FROM issues i
-		WHERE (i.resolved_at IS NULL OR i.resolved_at >= $2) AND `+where+` LIMIT `+strconv.Itoa(metricIssueLimit), args...)
+		WHERE (i.resolved_at IS NULL OR i.resolved_at >= $2) AND `+where+` ORDER BY i.created_at DESC, i.id LIMIT `+strconv.Itoa(metricIssueLimit+1), args...)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, false, err
 	}
 	type flowIssue struct {
 		ID, Status uuid.UUID
@@ -518,7 +509,10 @@ func (s *Service) CumulativeFlow(ctx context.Context, actor *authz.Actor, sc Met
 		return v, err
 	})
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, false, err
+	}
+	if len(list) > metricIssueLimit {
+		list, truncated = list[:metricIssueLimit], true
 	}
 	ids := make([]uuid.UUID, len(list))
 	for k, v := range list {
@@ -526,13 +520,12 @@ func (s *Service) CumulativeFlow(ctx context.Context, actor *authz.Actor, sc Met
 	}
 	hist, err := s.historyByIssue(ctx, ids)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, false, err
 	}
 	statuses, err := s.statusMap(ctx)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, false, err
 	}
-	var dates []time.Time
 	for d := start; !d.After(today); d = d.AddDate(0, 0, 1) {
 		dates = append(dates, d)
 	}
@@ -548,28 +541,50 @@ func (s *Service) CumulativeFlow(ctx context.Context, actor *authz.Actor, sc Met
 			series[cat] = &FlowSeries{Key: cat, Label: categoryLabel[cat], Category: cat, Counts: make([]int, len(dates))}
 		}
 	}
-	for _, v := range list {
-		tl := statusTimeline(v.Created, v.Status, hist[v.ID])
-		for d, day := range dates {
-			at := day.AddDate(0, 0, 1)
-			if at.After(now) {
-				at = now
-			}
-			id, ok := statusAt(tl, at)
-			if !ok {
-				continue
-			}
-			st := statuses[id]
-			k := keyOf(st)
-			fs := series[k]
-			if fs == nil {
-				fs = &FlowSeries{Key: k, Label: st.Name, Category: st.Category, Counts: make([]int, len(dates))}
-				series[k] = fs
-			}
-			fs.Counts[d]++
+	// Each day counts the issue's status at its end (or now, today). A status holds from one
+	// change to the next, which covers a run of days: add +1 at the run's first day and -1 after
+	// its last, then sum, so the work is per status change rather than per issue per day.
+	ends := make([]time.Time, len(dates))
+	for d, day := range dates {
+		ends[d] = day.AddDate(0, 0, 1)
+		if ends[d].After(now) {
+			ends[d] = now
 		}
 	}
-	out := make([]FlowSeries, 0, len(series))
+	firstDayEndingFrom := func(t time.Time) int {
+		return sort.Search(len(ends), func(d int) bool { return !ends[d].Before(t) })
+	}
+	diffs := map[string][]int{}
+	for _, v := range list {
+		tl := statusTimeline(v.Created, v.Status, hist[v.ID])
+		for k, c := range tl {
+			from, to := firstDayEndingFrom(c.at), len(dates)
+			if k+1 < len(tl) {
+				to = firstDayEndingFrom(tl[k+1].at)
+			}
+			if from >= to {
+				continue
+			}
+			st := statuses[c.to]
+			key := keyOf(st)
+			if series[key] == nil {
+				series[key] = &FlowSeries{Key: key, Label: st.Name, Category: st.Category, Counts: make([]int, len(dates))}
+			}
+			if diffs[key] == nil {
+				diffs[key] = make([]int, len(dates)+1)
+			}
+			diffs[key][from]++
+			diffs[key][to]--
+		}
+	}
+	for key, diff := range diffs {
+		run := 0
+		for d := range dates {
+			run += diff[d]
+			series[key].Counts[d] = run
+		}
+	}
+	out = make([]FlowSeries, 0, len(series))
 	for _, fs := range series {
 		out = append(out, *fs)
 	}
@@ -579,7 +594,7 @@ func (s *Service) CumulativeFlow(ctx context.Context, actor *authz.Actor, sc Met
 		}
 		return strings.Compare(strings.ToLower(a.Label), strings.ToLower(b.Label))
 	})
-	return dates, out, nil
+	return dates, out, truncated, nil
 }
 
 // ---------------------------------------------------------------------------
@@ -598,40 +613,64 @@ var breakdownNone = map[string]string{
 
 var priorityOrder = []string{"highest", "high", "medium", "low", "lowest"}
 
+// breakdownKeys is, per field, the group an issue counts in (NULL is the "None" group) and any
+// join it needs. An issue with several labels or releases joins to several rows. Epics are the
+// parent when it is epic-level, else the grandparent (sub-tasks).
+var breakdownKeys = map[string]struct{ join, key string }{
+	"status":         {"", "i.status_id::text"},
+	"statusCategory": {"JOIN statuses bst ON bst.id = i.status_id", "bst.category"},
+	"priority":       {"", "i.priority"},
+	"type":           {"", "i.type_id::text"},
+	"assignee":       {"", "i.assignee_id::text"},
+	"sprint":         {"", "i.sprint_id::text"},
+	"project":        {"", "i.project_id::text"},
+	"label":          {"LEFT JOIN LATERAL unnest(i.labels) bl(label) ON true", "bl.label"},
+	"release":        {"LEFT JOIN issue_releases bir ON bir.issue_id = i.id", "bir.release_id::text"},
+	"epic": {`LEFT JOIN issues bp ON bp.id = i.parent_id LEFT JOIN issue_types bpt ON bpt.id = bp.type_id
+		LEFT JOIN issues bgp ON bgp.id = bp.parent_id LEFT JOIN issue_types bgpt ON bgpt.id = bgp.type_id`,
+		"(CASE WHEN bpt.level >= 1 THEN bp.id WHEN bgpt.level >= 1 THEN bgp.id END)::text"},
+}
+
 // Breakdown groups the matching issues by a field. Groups are largest first, except priority and
 // status category, which keep their natural order; "None" comes last. An issue with several
-// labels or releases counts in each.
+// labels or releases counts in each. The database does the counting, so every matching issue
+// counts however many there are.
 func (s *Service) Breakdown(ctx context.Context, actor *authz.Actor, sc MetricScope, by string) ([]BreakdownGroup, int, float64, error) {
-	if !slices.Contains([]string{"status", "statusCategory", "priority", "type", "assignee", "label", "epic", "sprint", "release", "project"}, by) {
+	k, ok := breakdownKeys[by]
+	if !ok {
 		return nil, 0, 0, apperr.Invalid("by", "unknown breakdown field %q", by)
 	}
 	where, args, projects, err := s.scopeWhere(ctx, actor, sc)
 	if err != nil {
 		return nil, 0, 0, err
 	}
-	rows, err := s.Pool.Query(ctx, `SELECT i.id, i.project_id, i.status_id, i.priority, i.type_id, i.assignee_id, i.labels, i.parent_id,
-		i.sprint_id, i.story_points::float8 FROM issues i WHERE `+where+` LIMIT 100000`, args...)
+	var total int
+	var totalPoints float64
+	if err := s.Pool.QueryRow(ctx, `SELECT count(*), coalesce(sum(i.story_points), 0)::float8 FROM issues i WHERE `+where, args...).Scan(&total, &totalPoints); err != nil {
+		return nil, 0, 0, err
+	}
+	rows, err := s.Pool.Query(ctx, `SELECT `+k.key+`, count(*), coalesce(sum(i.story_points), 0)::float8
+		FROM issues i `+k.join+` WHERE `+where+` GROUP BY 1 ORDER BY 1`, args...)
 	if err != nil {
 		return nil, 0, 0, err
 	}
 	type row struct {
-		ID, ProjectID, StatusID, TypeID uuid.UUID
-		Priority                        string
-		AssigneeID, ParentID, SprintID  *uuid.UUID
-		Labels                          []string
-		Points                          *float64
+		Key    *string
+		Count  int
+		Points float64
 	}
 	list, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (row, error) {
 		var v row
-		err := r.Scan(&v.ID, &v.ProjectID, &v.StatusID, &v.Priority, &v.TypeID, &v.AssigneeID, &v.Labels, &v.ParentID, &v.SprintID, &v.Points)
+		err := r.Scan(&v.Key, &v.Count, &v.Points)
 		return v, err
 	})
 	if err != nil {
 		return nil, 0, 0, err
 	}
+
 	groups := map[string]*BreakdownGroup{}
 	var order []string
-	add := func(key, label string, pts float64, fill func(*BreakdownGroup)) {
+	add := func(v row, key, label string, fill func(*BreakdownGroup)) {
 		g := groups[key]
 		if g == nil {
 			g = &BreakdownGroup{Key: key, Label: label}
@@ -641,47 +680,59 @@ func (s *Service) Breakdown(ctx context.Context, actor *authz.Actor, sc MetricSc
 			groups[key] = g
 			order = append(order, key)
 		}
-		g.Count++
-		g.Points += pts
+		g.Count += v.Count
+		g.Points += v.Points
 	}
-	none := func(pts float64) { add("", cmpOr(breakdownNone[by], "None"), pts, nil) }
-
-	// Lookups for the chosen field.
-	ids := func(get func(row) *uuid.UUID) []uuid.UUID {
-		seen := map[uuid.UUID]bool{}
+	none := func(v row) { add(v, "", cmpOr(breakdownNone[by], "None"), nil) }
+	// ids are the groups' keys as ids, for looking up names.
+	ids := func() []uuid.UUID {
 		var out []uuid.UUID
 		for _, v := range list {
-			if id := get(v); id != nil && !seen[*id] {
-				seen[*id] = true
-				out = append(out, *id)
+			if v.Key != nil {
+				if id, err := uuid.Parse(*v.Key); err == nil {
+					out = append(out, id)
+				}
 			}
 		}
 		return out
 	}
-	total, totalPoints := len(list), 0.0
-	for _, v := range list {
-		totalPoints += deref0(v.Points)
+	// each calls f with every group's id, or counts it as None when it has no id or f says so.
+	each := func(f func(v row, id uuid.UUID) bool) {
+		for _, v := range list {
+			id, err := uuid.Nil, error(nil)
+			if v.Key != nil {
+				id, err = uuid.Parse(*v.Key)
+			}
+			if v.Key == nil || err != nil || !f(v, id) {
+				none(v)
+			}
+		}
 	}
+
 	switch by {
-	case "status", "statusCategory":
+	case "status":
 		statuses, err := s.statusMap(ctx)
 		if err != nil {
 			return nil, 0, 0, err
 		}
+		each(func(v row, id uuid.UUID) bool {
+			st := statuses[id]
+			add(v, st.ID.String(), st.Name, func(g *BreakdownGroup) { g.Category = st.Category })
+			return true
+		})
+	case "statusCategory":
 		for _, v := range list {
-			st := statuses[v.StatusID]
-			if by == "status" {
-				add(st.ID.String(), st.Name, deref0(v.Points), func(g *BreakdownGroup) { g.Category = st.Category })
-			} else {
-				add(st.Category, categoryLabel[st.Category], deref0(v.Points), func(g *BreakdownGroup) { g.Category = st.Category })
-			}
+			cat := deref(v.Key)
+			add(v, cat, categoryLabel[cat], func(g *BreakdownGroup) { g.Category = cat })
 		}
 	case "priority":
 		for _, v := range list {
-			add(v.Priority, strings.ToUpper(v.Priority[:1])+v.Priority[1:], deref0(v.Points), nil)
+			p := deref(v.Key)
+			add(v, p, strings.ToUpper(p[:1])+p[1:], nil)
 		}
 	case "type":
-		types, err := s.Q.GetIssueTypesByIDs(ctx, ids(func(v row) *uuid.UUID { return &v.TypeID }))
+		// Types are per project; the same key in several projects is one group.
+		types, err := s.Q.GetIssueTypesByIDs(ctx, ids())
 		if err != nil {
 			return nil, 0, 0, err
 		}
@@ -689,12 +740,13 @@ func (s *Service) Breakdown(ctx context.Context, actor *authz.Actor, sc MetricSc
 		for _, t := range types {
 			byID[t.ID] = t
 		}
-		for _, v := range list {
-			t := byID[v.TypeID]
-			add(t.Key, t.Name, deref0(v.Points), func(g *BreakdownGroup) { g.Color = t.Color })
-		}
+		each(func(v row, id uuid.UUID) bool {
+			t := byID[id]
+			add(v, t.Key, t.Name, func(g *BreakdownGroup) { g.Color = t.Color })
+			return true
+		})
 	case "assignee":
-		users, err := s.Q.GetUsersByIDs(ctx, ids(func(v row) *uuid.UUID { return v.AssigneeID }))
+		users, err := s.Q.GetUsersByIDs(ctx, ids())
 		if err != nil {
 			return nil, 0, 0, err
 		}
@@ -702,25 +754,23 @@ func (s *Service) Breakdown(ctx context.Context, actor *authz.Actor, sc MetricSc
 		for _, u := range users {
 			byID[u.ID] = u
 		}
-		for _, v := range list {
-			u, ok := dbqUser(byID, v.AssigneeID)
-			if !ok {
-				none(deref0(v.Points))
-				continue
+		each(func(v row, id uuid.UUID) bool {
+			u, ok := byID[id]
+			if ok {
+				add(v, u.ID.String(), u.DisplayName, func(g *BreakdownGroup) { g.User = &u })
 			}
-			add(u.ID.String(), u.DisplayName, deref0(v.Points), func(g *BreakdownGroup) { g.User = &u })
-		}
+			return ok
+		})
 	case "label":
 		for _, v := range list {
-			if len(v.Labels) == 0 {
-				none(deref0(v.Points))
+			if v.Key == nil {
+				none(v)
+				continue
 			}
-			for _, l := range v.Labels {
-				add(l, l, deref0(v.Points), nil)
-			}
+			add(v, *v.Key, *v.Key, nil)
 		}
 	case "sprint":
-		sprints, err := s.Q.GetSprintsByIDs(ctx, ids(func(v row) *uuid.UUID { return v.SprintID }))
+		sprints, err := s.Q.GetSprintsByIDs(ctx, ids())
 		if err != nil {
 			return nil, 0, 0, err
 		}
@@ -728,34 +778,15 @@ func (s *Service) Breakdown(ctx context.Context, actor *authz.Actor, sc MetricSc
 		for _, sp := range sprints {
 			byID[sp.ID] = sp
 		}
-		for _, v := range list {
-			var sp dbq.Sprint
-			ok := v.SprintID != nil
+		each(func(v row, id uuid.UUID) bool {
+			sp, ok := byID[id]
 			if ok {
-				sp, ok = byID[*v.SprintID]
+				add(v, sp.ID.String(), sp.Name, nil)
 			}
-			if !ok {
-				none(deref0(v.Points))
-				continue
-			}
-			add(sp.ID.String(), sp.Name, deref0(v.Points), nil)
-		}
+			return ok
+		})
 	case "release":
-		issueIDs := make([]uuid.UUID, len(list))
-		for k, v := range list {
-			issueIDs[k] = v.ID
-		}
-		links, err := s.Q.ReleaseIDsOfIssues(ctx, issueIDs)
-		if err != nil {
-			return nil, 0, 0, err
-		}
-		of := map[uuid.UUID][]uuid.UUID{}
-		var rids []uuid.UUID
-		for _, l := range links {
-			of[l.IssueID] = append(of[l.IssueID], l.ReleaseID)
-			rids = append(rids, l.ReleaseID)
-		}
-		releases, err := s.Q.GetReleasesByIDs(ctx, rids)
+		releases, err := s.Q.GetReleasesByIDs(ctx, ids())
 		if err != nil {
 			return nil, 0, 0, err
 		}
@@ -763,46 +794,40 @@ func (s *Service) Breakdown(ctx context.Context, actor *authz.Actor, sc MetricSc
 		for _, r := range releases {
 			names[r.ID] = r.Name
 		}
-		for _, v := range list {
-			if len(of[v.ID]) == 0 {
-				none(deref0(v.Points))
-			}
-			for _, rid := range of[v.ID] {
-				add(rid.String(), names[rid], deref0(v.Points), nil)
-			}
-		}
+		each(func(v row, id uuid.UUID) bool {
+			add(v, id.String(), names[id], nil)
+			return true
+		})
 	case "epic":
-		parents := map[uuid.UUID]uuid.UUID{}
-		for _, v := range list {
-			if v.ParentID != nil {
-				parents[v.ID] = *v.ParentID
-			}
-		}
-		epics, err := s.epicsOf(ctx, parents)
+		list, err := s.Q.GetIssuesByIDs(ctx, ids())
 		if err != nil {
 			return nil, 0, 0, err
+		}
+		epics := make(map[uuid.UUID]dbq.Issue, len(list))
+		for _, e := range list {
+			epics[e.ID] = e
 		}
 		keys, err := s.projectKeysOf(ctx, epics, projects)
 		if err != nil {
 			return nil, 0, 0, err
 		}
-		for _, v := range list {
-			e, ok := epics[v.ID]
-			if !ok {
-				none(deref0(v.Points))
-				continue
+		each(func(v row, id uuid.UUID) bool {
+			e, ok := epics[id]
+			if ok {
+				add(v, keys[e.ProjectID]+"-"+strconv.Itoa(int(e.Number)), e.Summary, nil)
 			}
-			add(keys[e.ProjectID]+"-"+strconv.Itoa(int(e.Number)), e.Summary, deref0(v.Points), nil)
-		}
+			return ok
+		})
 	case "project":
 		byID := map[uuid.UUID]dbq.Project{}
 		for _, p := range projects {
 			byID[p.ID] = p
 		}
-		for _, v := range list {
-			p := byID[v.ProjectID]
-			add(p.Key, p.Name, deref0(v.Points), nil)
-		}
+		each(func(v row, id uuid.UUID) bool {
+			p := byID[id]
+			add(v, p.Key, p.Name, nil)
+			return true
+		})
 	}
 	out := make([]BreakdownGroup, 0, len(order))
 	for _, k := range order {
@@ -832,7 +857,10 @@ func (s *Service) Breakdown(ctx context.Context, actor *authz.Actor, sc MetricSc
 		if a.Count != b.Count {
 			return b.Count - a.Count
 		}
-		return strings.Compare(strings.ToLower(a.Label), strings.ToLower(b.Label))
+		if c := strings.Compare(strings.ToLower(a.Label), strings.ToLower(b.Label)); c != 0 {
+			return c
+		}
+		return strings.Compare(a.Key, b.Key)
 	})
 	return out, total, math.Round(totalPoints*100) / 100, nil
 }
@@ -874,64 +902,4 @@ func (s *Service) projectKeysOf(ctx context.Context, issues map[uuid.UUID]dbq.Is
 		}
 	}
 	return keys, nil
-}
-
-// epicsOf finds each issue's epic from its parent (issue id → parent id): the parent when it has
-// an epic-level type, else the parent's parent (for sub-tasks).
-func (s *Service) epicsOf(ctx context.Context, parents map[uuid.UUID]uuid.UUID) (map[uuid.UUID]dbq.Issue, error) {
-	load := func(ids []uuid.UUID) (map[uuid.UUID]dbq.Issue, error) {
-		list, err := s.Q.GetIssuesByIDs(ctx, ids)
-		m := make(map[uuid.UUID]dbq.Issue, len(list))
-		for _, i := range list {
-			m[i.ID] = i
-		}
-		return m, err
-	}
-	var pids []uuid.UUID
-	for _, pid := range parents {
-		if !slices.Contains(pids, pid) {
-			pids = append(pids, pid)
-		}
-	}
-	ps, err := load(pids)
-	if err != nil {
-		return nil, err
-	}
-	var gids, tids []uuid.UUID
-	for _, p := range ps {
-		tids = append(tids, p.TypeID)
-		if p.ParentID != nil {
-			gids = append(gids, *p.ParentID)
-		}
-	}
-	gps, err := load(gids)
-	if err != nil {
-		return nil, err
-	}
-	for _, g := range gps {
-		tids = append(tids, g.TypeID)
-	}
-	types, err := s.Q.GetIssueTypesByIDs(ctx, tids)
-	if err != nil {
-		return nil, err
-	}
-	level := map[uuid.UUID]int32{}
-	for _, t := range types {
-		level[t.ID] = t.Level
-	}
-	out := map[uuid.UUID]dbq.Issue{}
-	for id, pid := range parents {
-		p, ok := ps[pid]
-		if !ok {
-			continue
-		}
-		if level[p.TypeID] >= 1 {
-			out[id] = p
-		} else if p.ParentID != nil {
-			if g, ok := gps[*p.ParentID]; ok && level[g.TypeID] >= 1 {
-				out[id] = g
-			}
-		}
-	}
-	return out, nil
 }

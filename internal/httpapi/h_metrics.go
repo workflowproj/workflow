@@ -28,6 +28,9 @@ func metricDays(days *int) int {
 
 func cycleTimeView(rep tracker.CycleTimeReport) api.CycleTimeReport {
 	out := api.CycleTimeReport{Days: rep.Days, AverageHours: rep.Average, MedianHours: rep.Median, P85Hours: rep.P85, Issues: []api.CycleTimeIssue{}}
+	if rep.Truncated {
+		out.Truncated = &rep.Truncated
+	}
 	for _, i := range rep.Issues {
 		pk := i.ProjectKey
 		out.Issues = append(out.Issues, api.CycleTimeIssue{Key: i.Key, ProjectKey: &pk, Summary: i.Summary, CycleHours: i.Hours, ResolvedAt: i.ResolvedAt})
@@ -56,11 +59,14 @@ func (s *Server) GetCumulativeFlow(ctx context.Context, req api.GetCumulativeFlo
 		return nil, err
 	}
 	days := metricDays(req.Params.Days)
-	dates, series, err := s.Tracker.CumulativeFlow(ctx, a, metricScope(req.Params.Projects, req.Params.Jql), days, string(deref(req.Params.By)))
+	dates, series, truncated, err := s.Tracker.CumulativeFlow(ctx, a, metricScope(req.Params.Projects, req.Params.Jql), days, string(deref(req.Params.By)))
 	if err != nil {
 		return nil, err
 	}
 	out := api.GetCumulativeFlow200JSONResponse{Days: days, Dates: []openapi_types.Date{}, Series: []api.FlowSeries{}}
+	if truncated {
+		out.Truncated = &truncated
+	}
 	for _, d := range dates {
 		out.Dates = append(out.Dates, openapiDate(d))
 	}

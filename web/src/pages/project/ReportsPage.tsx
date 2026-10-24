@@ -10,7 +10,7 @@ import { formatPoints } from "@/features/board/model";
 import { formatDay, formatRange, remainingLabel } from "@/features/backlog/dates";
 import { velocityQuery } from "@/features/dashboards/api";
 import { BurndownChart, BurnupChart, measureOf, sprintMeasure, type Measure } from "@/features/reports/BurndownChart";
-import { Segmented, StatTile } from "@/features/reports/ChartBits";
+import { Segmented, StatTile, TruncatedNote } from "@/features/reports/ChartBits";
 import { formatDuration } from "@/features/reports/chart-utils";
 import { CycleTimeChart } from "@/features/reports/CycleTimeChart";
 import { VelocityChart } from "@/features/reports/VelocityChart";
@@ -266,6 +266,7 @@ function CycleTime({ projectKey }: { projectKey: string }) {
               <StatTile label="Resolved" value={data.issues.length} sub={`in the last ${days} days`} />
             </div>
             <CycleTimeChart report={data} onOpen={(key) => navigate({ to: "/browse/$issueKey", params: { issueKey: key } })} />
+            {data.truncated && <TruncatedNote what="resolved" />}
           </>
         )}
       </div>

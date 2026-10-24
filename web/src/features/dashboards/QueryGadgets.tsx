@@ -6,6 +6,7 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { formatDay, todayISO } from "@/features/backlog/dates";
 import { formatPoints } from "@/features/board/model";
 import { BreakdownBars, BreakdownDonut, type BreakdownRow } from "@/features/reports/BreakdownChart";
+import { TruncatedNote } from "@/features/reports/ChartBits";
 import { CreatedResolvedChart } from "@/features/reports/CreatedResolvedChart";
 import { CumulativeFlowChart } from "@/features/reports/CumulativeFlowChart";
 import { CycleTimeChart } from "@/features/reports/CycleTimeChart";
@@ -34,7 +35,12 @@ export function FlowGadget() {
   return (
     <GadgetFrame {...frame} dimmed={q.isPlaceholderData}>
       <GadgetBody query={q} empty={(d) => d.series.every((s) => s.counts.every((c) => c === 0)) && nothing()}>
-        {(d) => <CumulativeFlowChart data={d} height={CHART_H} />}
+        {(d) => (
+          <>
+            <CumulativeFlowChart data={d} height={CHART_H} />
+            {d.truncated && <TruncatedNote what="created" />}
+          </>
+        )}
       </GadgetBody>
     </GadgetFrame>
   );
@@ -73,6 +79,7 @@ export function CycleTimeGadget() {
               ))}
             </dl>
             <CycleTimeChart report={d} onOpen={openIssue} height={CHART_H} />
+            {d.truncated && <TruncatedNote what="resolved" />}
           </>
         )}
       </GadgetBody>
