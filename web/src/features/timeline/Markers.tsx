@@ -52,10 +52,17 @@ export function ReleaseLines({ releases, x, ppd, top, height }: { releases: Rele
 }
 
 /**
- * MarkerLane labels a project's sprints (named chips over their span) and releases (a diamond
- * and name on the release date). It sits in the project's row, or in the header for one project.
+ * MarkerLane labels a project's sprints (named chips over their span, upper half) and releases
+ * (a diamond and name on the release date, lower half). It sits in the project's row, or in
+ * the header for one project. A release name that would run into the next one is left to the
+ * tooltip.
  */
 export function MarkerLane({ sprints, releases, x, ppd, today, height }: { sprints: Sprint[]; releases: Release[]; x: (day: number) => number; ppd: number; today: number; height: number }) {
+  const upper = height / 2 - 15;
+  const lower = height / 2 + 1;
+  const marks = shown(releases)
+    .map((r) => ({ r, day: toDay(r.releaseDate!) }))
+    .sort((a, b) => a.day - b.day);
   return (
     <>
       {dated(sprints).map((s) => {
@@ -66,29 +73,27 @@ export function MarkerLane({ sprints, releases, x, ppd, today, height }: { sprin
           <span
             key={s.id}
             title={`${s.name} (${s.state === "closed" ? "completed" : s.state}) · ${formatSpan(a, b)}${s.goal ? `\n${s.goal}` : ""}`}
-            className={cn(
-              "absolute truncate rounded px-1.5 text-[10px] leading-4 font-semibold",
-              active ? "bg-accent-soft text-accent" : "bg-surface-3 text-muted",
-            )}
-            style={{ left: x(a) + 1, maxWidth: Math.max(0, (b - a + 1) * ppd - 2), top: height / 2 - 8 }}
+            className={cn("absolute truncate rounded px-1.5 text-[10px] leading-[14px] font-semibold", active ? "bg-accent-soft text-accent" : "bg-surface-3 text-muted")}
+            style={{ left: x(a) + 1, maxWidth: Math.max(0, (b - a + 1) * ppd - 2), top: upper }}
           >
             {s.name}
           </span>
         );
       })}
-      {shown(releases).map((r) => {
-        const d = toDay(r.releaseDate!);
+      {marks.map(({ r, day }, i) => {
         const tone = releaseTone(r, today);
+        const left = x(day) + ppd / 2 - 5;
+        const next = marks[i + 1] ? x(marks[i + 1].day) + ppd / 2 - 5 : Infinity;
+        const fits = left + 18 + r.name.length * 6 < next;
         return (
           <span
             key={r.id}
-            title={`Release ${r.name} · ${formatDay(d)} · ${tone.label} · ${r.doneCount}/${r.issueCount} issues done`}
-            className="absolute z-[1] flex items-center gap-1 rounded bg-surface/85 pr-1 text-[10px] leading-4 font-semibold text-ink"
-            style={{ left: x(d) + ppd / 2 - 5, top: height / 2 - 8 }}
+            title={`Release ${r.name} · ${formatDay(day)} · ${tone.label} · ${r.doneCount}/${r.issueCount} issues done`}
+            className="absolute z-[1] flex items-center gap-1 rounded pr-1 text-[10px] leading-[14px] font-semibold whitespace-nowrap text-ink"
+            style={{ left, top: lower }}
           >
             <span aria-hidden className={cn("size-2.5 rotate-45 rounded-[2px] border-2", tone.fill)} />
-            <span className="sr-only">Release </span>
-            {r.name}
+            <span className={fits ? undefined : "sr-only"}>{r.name}</span>
           </span>
         );
       })}

@@ -132,11 +132,12 @@ export type Row =
 /**
  * buildRows flattens projects → epics → issues into the visible rows. Issues without an epic
  * go under "No epic"; children whose epic was filtered out are grouped under its name.
- * `include` filters issues (an epic stays when any child matches); `collapsed` holds row ids.
+ * `include` filters issues (an epic stays when any child matches); `collapsed` holds row ids;
+ * `hideEmpty` drops projects left without issues (when filtering).
  */
 export function buildRows(
   data: Pick<TimelineData, "projects" | "issues">,
-  opts: { multi: boolean; collapsed: Set<string>; include?: (i: Issue) => boolean },
+  opts: { multi: boolean; collapsed: Set<string>; include?: (i: Issue) => boolean; hideEmpty?: boolean },
 ): Row[] {
   const include = opts.include ?? (() => true);
   const rows: Row[] = [];
@@ -183,6 +184,7 @@ export function buildRows(
     for (const [key, g] of orphans) group(`${project.key}:parent:${key}`, g.parent.summary, g.issues, g.parent);
     group(`${project.key}:none`, "No epic", loose);
     if (opts.multi) {
+      if (count === 0 && opts.hideEmpty) continue;
       rows.push({ kind: "project", id: `project:${project.key}`, project, count });
       if (!opts.collapsed.has(`project:${project.key}`)) rows.push(...own);
     } else rows.push(...own);

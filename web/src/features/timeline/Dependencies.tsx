@@ -1,4 +1,4 @@
-import type { KeyboardEvent, MouseEvent } from "react";
+import { memo, type KeyboardEvent, type MouseEvent } from "react";
 import { ROW_H } from "./Bar";
 import type { Dependency, TimelineLink } from "./model";
 
@@ -16,7 +16,7 @@ export function route(x1: number, r1: number, x2: number, r2: number): string {
  * Dependencies is the SVG layer of "blocks" arrows. Conflicting ones (the blocker ends after
  * the blocked issue starts) are red. Arrows are clickable (and focusable) to inspect or remove.
  */
-export function Dependencies({
+export const Dependencies = memo(function Dependencies({
   deps,
   rowOf,
   x,
@@ -89,4 +89,4 @@ export function Dependencies({
       })}
     </svg>
   );
-}
+});

@@ -64,9 +64,11 @@ export function Timeline({
 
   const jql = [baseJql, filters.mine ? "assignee = currentUser()" : ""].filter(Boolean).map((j) => `(${j})`).join(" AND ");
   const query = timelineQuery(projects, jql, showDone ? 90 : 0);
-  const keys = projects ? projects.split(",") : [];
-  const polling = live && keys.length !== 1 && (keys.length === 0 || keys.length > MAX_STREAMS);
-  const { data, isLoading, error, isPlaceholderData } = useQuery({ ...query, refetchInterval: polling ? 30_000 : false });
+  const { data, isLoading, error, isPlaceholderData } = useQuery({
+    ...query,
+    refetchInterval: (q) => (live && (q.state.data?.projects.length ?? 0) > MAX_STREAMS ? 30_000 : false),
+  });
+  const streams = live && !!data && data.projects.length <= MAX_STREAMS;
   const { data: allProjects = [] } = useQuery(projectsQuery);
   const editable = useMemo(() => new Set(allProjects.filter((p) => p.myPermissions.includes("issue.edit")).map((p) => p.key)), [allProjects]);
   const canEdit = useCallback((key: string) => editable.has(key), [editable]);
@@ -79,14 +81,15 @@ export function Timeline({
     () => (filters.overdue || filters.conflicts ? (i: Issue) => (!filters.overdue || isOverdue(i, today)) && (!filters.conflicts || warnings.has(i.key)) : undefined),
     [filters.overdue, filters.conflicts, warnings, today],
   );
-  const rows = useMemo(() => (data ? buildRows(data, { multi, collapsed, include }) : []), [data, multi, collapsed, include]);
+  const filtering = !!include || !!jql;
+  const rows = useMemo(() => (data ? buildRows(data, { multi, collapsed, include, hideEmpty: filtering }) : []), [data, multi, collapsed, include, filtering]);
   const epicKeys = useMemo(() => (data?.issues ?? []).filter((i) => i.type.level >= 1).map((i) => i.key), [data]);
   const { data: progress } = useEpicProgress(epicKeys);
 
   const toggle = (id: string) => setCollapsed((s) => (s.has(id) ? new Set([...s].filter((x) => x !== id)) : new Set(s).add(id)));
   const toggleAll = (collapse: boolean) => {
     if (!collapse) return setCollapsed(new Set());
-    const all = buildRows(data ?? { projects: [], issues: [] }, { multi, collapsed: new Set(), include });
+    const all = buildRows(data ?? { projects: [], issues: [] }, { multi, collapsed: new Set(), include, hideEmpty: filtering });
     setCollapsed(new Set(all.filter((r) => r.kind !== "issue" || r.childCount > 0).map((r) => r.id)));
   };
   const flip = (k: keyof QuickFilters) => setFilters((f) => ({ ...f, [k]: !f[k] }));
@@ -94,7 +97,7 @@ export function Timeline({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {live && data?.projects.length && data.projects.length <= MAX_STREAMS ? data.projects.map((p) => <ProjectEvents key={p.key} projectKey={p.key} />) : null}
+      {streams && data?.projects.map((p) => <ProjectEvents key={p.key} projectKey={p.key} />)}
       <div className="flex shrink-0 flex-col gap-2.5 px-4 pt-4 pb-3 md:px-6">
         <div className="flex flex-wrap items-center gap-2">
           {picker}

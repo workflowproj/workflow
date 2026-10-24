@@ -1,16 +1,16 @@
-import { useMemo, type ReactNode } from "react";
+import { memo, useMemo, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { header, type Zoom } from "./scale";
 import { TREE_W } from "./TreeCell";
 
 export const BAND_H = 26;
-export const LANE_H = 24;
+export const LANE_H = 36;
 
 /**
  * TimeHeader is the sticky date header: months (or years, quarters) above days (or months),
  * an optional lane for sprint and release markers, and today's position.
  */
-export function TimeHeader({
+export const TimeHeader = memo(function TimeHeader({
   range,
   zoom,
   x,
@@ -72,4 +72,4 @@ export function TimeHeader({
       )}
     </div>
   );
-}
+});

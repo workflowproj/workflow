@@ -3,29 +3,19 @@ import { ChevronsDownUp, ChevronsUpDown } from "lucide-react";
 import type { Issue } from "@/api/types";
 import { IconButton } from "@/components/ui";
 import { cn } from "@/lib/cn";
-import { Bar, BAR_H, BAR_TOP, LinkHandle, ROW_H, type DragMode } from "./Bar";
+import { Background } from "./Background";
+import { ROW_H, type DragMode } from "./Bar";
 import { Dependencies } from "./Dependencies";
-import { MarkerLane, ReleaseLines, SprintBands } from "./Markers";
-import { formatSpan, fromDay, isOverdue, toDay, weekday, type Dependency, type Row, type Schedule, type TimelineData, type TimelineLink } from "./model";
-import { DatePopover, LinkMenu } from "./Popovers";
-import { gridLines, ppdFor, snapDays, timeRange, type Zoom } from "./scale";
+import { preview, type Drag } from "./drag";
+import { GridRow, type Markers, type RowActions } from "./GridRow";
+import { MarkerLane } from "./Markers";
+import { formatSpan, fromDay, isOverdue, toDay, type Dependency, type Row, type Schedule, type TimelineData, type TimelineLink } from "./model";
+import { LinkMenu } from "./Popovers";
+import { ppdFor, snapDays, timeRange, type Zoom } from "./scale";
 import { BAND_H, LANE_H, TimeHeader } from "./TimeHeader";
-import { TREE_W, TreeCell } from "./TreeCell";
+import { TREE_W } from "./TreeCell";
 
 const OVERSCAN = 8;
-
-type Drag =
-  | { kind: "bar"; mode: DragMode; issue: Issue; base: Schedule; clientX0: number; scroll0: number; delta: number; moved: boolean; editable: boolean }
-  | { kind: "create"; issue: Issue; anchor: number; current: number }
-  | { kind: "link"; from: string; x0: number; y0: number; x: number; y: number; target?: string };
-
-/** preview applies a bar drag to its schedule: move shifts both ends, resizing keeps start ≤ end. */
-function preview(d: Extract<Drag, { kind: "bar" }>): { start: number; end: number } {
-  const { start, end } = d.base;
-  if (d.mode === "move") return { start: start + d.delta, end: end + d.delta };
-  if (d.mode === "start") return { start: Math.min(start + d.delta, end), end };
-  return { start, end: Math.max(end + d.delta, start) };
-}
 
 export type TimelineEdits = {
   schedule: (issue: Issue, start: string | null, due: string | null) => void;
@@ -34,9 +24,10 @@ export type TimelineEdits = {
 };
 
 /**
- * TimelineGrid is the scrolling tree + time grid. Rows are windowed, so a few hundred issues
- * stay smooth. Bars can be dragged (move, resize, draw on an empty row), dependencies drawn
- * from a bar's end handle onto another bar, and every bar has a date popover when focused.
+ * TimelineGrid is the scrolling tree + time grid. Rows are windowed and memoised, so a few
+ * hundred issues stay smooth. Bars can be dragged (move, resize, draw on an empty row),
+ * dependencies drawn from a bar's end handle onto another bar, and a focused bar shows a
+ * date popover.
  */
 export function TimelineGrid({
   data,
@@ -74,13 +65,16 @@ export function TimelineGrid({
   today: number;
 }) {
   const ppd = ppdFor(zoom);
-  const range = useMemo(() => {
+  const span = useMemo(() => {
     const days: number[] = [];
     for (const s of sched.values()) days.push(s.start, s.end);
     for (const { sprint } of data.sprints) for (const d of [sprint.startDate, sprint.endDate]) if (d) days.push(toDay(d));
     for (const { release } of data.releases) if (release.releaseDate) days.push(toDay(release.releaseDate));
     return timeRange(days, today);
   }, [sched, data.sprints, data.releases, today]);
+  // The grid always fills the viewport, however short the plan.
+  const [viewW, setViewW] = useState(1200);
+  const range = useMemo(() => ({ start: span.start, end: Math.max(span.end, span.start + Math.ceil(viewW / ppd)) }), [span, viewW, ppd]);
   const gridW = (range.end - range.start + 1) * ppd;
   const x = useCallback((day: number) => (day - range.start) * ppd, [range.start, ppd]);
   const headerH = BAND_H * 2 + (multi ? 0 : LANE_H);
@@ -100,7 +94,13 @@ export function TimelineGrid({
     });
     return m;
   }, [rows]);
-  const conflictKeys = useMemo(() => new Set(warnings.keys()), [warnings]);
+  const markers = useMemo(() => {
+    const m = new Map<string, Markers>(data.projects.map((p) => [p.key, { sprints: [], releases: [] }]));
+    for (const s of data.sprints) m.get(s.projectKey)?.sprints.push(s.sprint);
+    for (const r of data.releases) m.get(r.projectKey)?.releases.push(r.release);
+    return m;
+  }, [data.projects, data.sprints, data.releases]);
+  const summaries = useMemo(() => new Map(data.issues.map((i) => [i.key, i.summary])), [data.issues]);
 
   // Scrolling and windowing.
   const scroller = useRef<HTMLDivElement>(null);
@@ -108,6 +108,7 @@ export function TimelineGrid({
   const measure = useCallback(() => {
     const el = scroller.current;
     if (!el) return;
+    setViewW(el.clientWidth - TREE_W);
     const first = Math.max(0, Math.floor(el.scrollTop / ROW_H) - OVERSCAN);
     const last = Math.ceil((el.scrollTop + el.clientHeight - headerH) / ROW_H) + OVERSCAN;
     setWin((w) => (w.first === first && w.last === last ? w : { first, last }));
@@ -126,7 +127,7 @@ export function TimelineGrid({
     frame.current = requestAnimationFrame(measure);
   };
 
-  // Keep the date at the centre in place when the zoom or the range start changes.
+  // Keep the date in the middle in place when the zoom or the range start changes.
   const prev = useRef({ ppd, start: range.start, ready: false });
   useLayoutEffect(() => {
     const el = scroller.current;
@@ -138,10 +139,10 @@ export function TimelineGrid({
     }
     prev.current = { ppd, start: range.start, ready: true };
   }, [ppd, range.start]);
+  // On mount and when asked ("Today"), bring today into view.
   useLayoutEffect(() => {
     const el = scroller.current;
     if (el) el.scrollLeft = x(today) - (el.clientWidth - TREE_W) * 0.3;
-    // Only on mount and when asked ("Today").
   }, [todaySignal]);
 
   // Interaction state.
@@ -156,21 +157,22 @@ export function TimelineGrid({
   const [hint, setHint] = useState<{ key: string; day: number } | null>(null);
   const [linkMenu, setLinkMenu] = useState<{ link: TimelineLink; left: number; top: number } | null>(null);
 
-  /** Converts a pointer position to grid coordinates (x from the grid's start, y from the first row). */
+  /** point converts a pointer position to grid coordinates (x from the first day, y from the first row). */
   const point = (clientX: number, clientY: number) => {
     const el = scroller.current!;
     const box = el.getBoundingClientRect();
     return { x: clientX - box.left + el.scrollLeft - TREE_W, y: clientY - box.top + el.scrollTop - headerH };
   };
-  const dayAt = (gx: number) => range.start + Math.floor(gx / ppd);
+  const dayAt = (clientX: number) => range.start + Math.floor(point(clientX, 0).x / ppd);
+  // Dragging towards an edge of the grid scrolls it.
   const autoScroll = (e: PointerEvent, vertical: boolean) => {
     const el = scroller.current!;
     const box = el.getBoundingClientRect();
-    if (e.clientX > box.right - 40) el.scrollLeft += 14;
-    else if (e.clientX < box.left + TREE_W + 40) el.scrollLeft -= 14;
+    if (e.movementX > 0 && e.clientX > box.right - 28) el.scrollLeft += 12;
+    else if (e.movementX < 0 && e.clientX < box.left + TREE_W + 28) el.scrollLeft -= 12;
     if (vertical) {
-      if (e.clientY > box.bottom - 32) el.scrollTop += 14;
-      else if (e.clientY < box.top + headerH + 32) el.scrollTop -= 14;
+      if (e.movementY > 0 && e.clientY > box.bottom - 28) el.scrollTop += 12;
+      else if (e.movementY < 0 && e.clientY < box.top + headerH + 28) el.scrollTop -= 12;
     }
   };
 
@@ -188,7 +190,7 @@ export function TimelineGrid({
         setDrag({ ...d, moved, delta: snapDays(e.clientX - d.clientX0 + el.scrollLeft - d.scroll0, ppd) });
       } else if (d.kind === "create") {
         autoScroll(e, false);
-        setDrag({ ...d, current: dayAt(point(e.clientX, e.clientY).x) });
+        setDrag({ ...d, current: dayAt(e.clientX) });
       } else {
         autoScroll(e, true);
         const p = point(e.clientX, e.clientY);
@@ -207,41 +209,25 @@ export function TimelineGrid({
         const s = preview(d);
         edits.schedule(d.issue, fromDay(s.start), fromDay(s.end));
       } else if (d.kind === "create") {
-        if (d.current === d.anchor) return;
-        edits.schedule(d.issue, fromDay(Math.min(d.anchor, d.current)), fromDay(Math.max(d.anchor, d.current)));
+        if (d.current !== d.anchor) edits.schedule(d.issue, fromDay(Math.min(d.anchor, d.current)), fromDay(Math.max(d.anchor, d.current)));
       } else if (d.target) edits.link(d.from, d.target);
     };
+    const onCancel = () => setDrag(null);
     const onKey = (e: globalThis.KeyboardEvent) => e.key === "Escape" && setDrag(null);
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
-    window.addEventListener("pointercancel", () => setDrag(null));
+    window.addEventListener("pointercancel", onCancel);
     window.addEventListener("keydown", onKey);
     return () => {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onCancel);
       window.removeEventListener("keydown", onKey);
     };
     // The handlers read the live drag from the ref; they only need binding once per drag.
   }, [dragging]);
 
-  const startBar = (e: ReactPointerEvent, issue: Issue, mode: DragMode) => {
-    const base = sched.get(issue.key);
-    if (e.button !== 0 || !base) return;
-    e.preventDefault(); // no text selection, and no focus (focus is the keyboard path)
-    setLinkMenu(null);
-    setDrag({ kind: "bar", mode, issue, base, clientX0: e.clientX, scroll0: scroller.current!.scrollLeft, delta: 0, moved: false, editable: canEdit(issue.projectKey) });
-  };
-  const startLink = (e: ReactPointerEvent, issue: Issue, rowIndex: number) => {
-    const s = sched.get(issue.key);
-    if (e.button !== 0 || !s) return;
-    e.preventDefault();
-    e.stopPropagation();
-    const x0 = x(s.end + 1);
-    const y0 = rowIndex * ROW_H + ROW_H / 2;
-    setDrag({ kind: "link", from: issue.key, x0, y0, x: x0, y: y0 });
-  };
-
-  // Up and down move between bars; Enter opens; Escape lets go.
+  // Up and down move between bars (scrolling as needed).
   const focusBar = (key: string) => {
     const i = rowOf.get(key);
     const el = scroller.current;
@@ -249,28 +235,84 @@ export function TimelineGrid({
     if (i * ROW_H < el.scrollTop || (i + 1) * ROW_H > el.scrollTop + el.clientHeight - headerH) el.scrollTop = i * ROW_H - (el.clientHeight - headerH) / 2;
     requestAnimationFrame(() => requestAnimationFrame(() => el.querySelector<HTMLElement>(`[data-bar-key="${key}"]`)?.focus()));
   };
-  const onBarKey = (e: KeyboardEvent, issue: Issue) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      onOpen(issue.key);
-    } else if (e.key === "Escape") (e.currentTarget as HTMLElement).blur();
-    else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-      e.preventDefault();
-      const start = rowOf.get(issue.key) ?? 0;
-      const step = e.key === "ArrowDown" ? 1 : -1;
-      for (let i = start + step; i >= 0 && i < rows.length; i += step) {
-        const r = rows[i];
-        if (r.kind === "issue" && sched.has(r.id)) return focusBar(r.id);
-      }
-    }
-  };
 
-  const lines = useMemo(() => gridLines(range, zoom), [range, zoom]);
-  const weekendOffset = ((6 - weekday(range.start) + 7) % 7) * ppd;
-  const sprintsOf = (key: string) => data.sprints.filter((s) => s.projectKey === key).map((s) => s.sprint);
-  const releasesOf = (key: string) => data.releases.filter((r) => r.projectKey === key).map((r) => r.release);
-  const summaries = useMemo(() => new Map(data.issues.map((i) => [i.key, i.summary])), [data.issues]);
-  const visible = rows.slice(win.first, win.last + 1);
+  // Rows get one stable set of callbacks that read the latest state through a ref.
+  const live = {
+    toggle: onToggle,
+    open: onOpen,
+    startBar: (e: ReactPointerEvent, issue: Issue, mode: DragMode) => {
+      const base = sched.get(issue.key);
+      if (e.button !== 0 || !base) return;
+      e.preventDefault(); // no text selection, and no focus: focus is the keyboard path
+      setLinkMenu(null);
+      setDrag({ kind: "bar", mode, issue, base, clientX0: e.clientX, scroll0: scroller.current!.scrollLeft, delta: 0, moved: false, editable: canEdit(issue.projectKey) });
+    },
+    startLink: (e: ReactPointerEvent, issue: Issue, rowIndex: number) => {
+      const s = sched.get(issue.key);
+      if (e.button !== 0 || !s) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const x0 = x(s.end + 1);
+      const y0 = rowIndex * ROW_H + ROW_H / 2;
+      setDrag({ kind: "link", from: issue.key, x0, y0, x: x0, y: y0 });
+    },
+    startCreate: (e: ReactPointerEvent, issue: Issue) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      const day = dayAt(e.clientX);
+      setDrag({ kind: "create", issue, anchor: day, current: day });
+    },
+    hint: (key: string, clientX: number | null) => setHint(clientX == null ? null : { key, day: dayAt(clientX) }),
+    barKey: (e: KeyboardEvent, issue: Issue) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        onOpen(issue.key);
+      } else if (e.key === "Escape") (e.currentTarget as HTMLElement).blur();
+      else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        const step = e.key === "ArrowDown" ? 1 : -1;
+        for (let i = (rowOf.get(issue.key) ?? 0) + step; i >= 0 && i < rows.length; i += step) {
+          const r = rows[i];
+          if (r.kind === "issue" && sched.has(r.id)) return focusBar(r.id);
+        }
+      }
+    },
+    select: (key: string, on: boolean) => setSelected((s) => (on ? key : s === key ? null : s)),
+    hover: (key: string, on: boolean) => setHover((h) => (on ? key : h === key ? null : h)),
+    save: (issue: Issue, start: string | null, due: string | null) => edits.schedule(issue, start, due),
+  };
+  const liveRef = useRef(live);
+  liveRef.current = live;
+  const actions = useMemo<RowActions>(
+    () => ({
+      toggle: (id) => liveRef.current.toggle(id),
+      open: (key) => liveRef.current.open(key),
+      startBar: (e, issue, mode) => liveRef.current.startBar(e, issue, mode),
+      startLink: (e, issue, i) => liveRef.current.startLink(e, issue, i),
+      startCreate: (e, issue) => liveRef.current.startCreate(e, issue),
+      hint: (key, cx) => liveRef.current.hint(key, cx),
+      barKey: (e, issue) => liveRef.current.barKey(e, issue),
+      select: (key, on) => liveRef.current.select(key, on),
+      hover: (key, on) => liveRef.current.hover(key, on),
+      save: (issue, s, d) => liveRef.current.save(issue, s, d),
+    }),
+    [],
+  );
+  const onSelectLink = useCallback(
+    (link: TimelineLink, at: { clientX: number; clientY: number }) => {
+      const el = scroller.current!;
+      const box = el.getBoundingClientRect();
+      const px = at.clientX - box.left + el.scrollLeft - TREE_W;
+      const py = at.clientY - box.top + el.scrollTop - headerH;
+      setLinkMenu({ link, left: TREE_W + Math.min(px + 8, gridW - 290), top: py + 8 });
+    },
+    [headerH, gridW],
+  );
+
+  const lane = useMemo(() => {
+    const m = !multi && data.projects[0] ? markers.get(data.projects[0].key) : undefined;
+    return m ? <MarkerLane sprints={m.sprints} releases={m.releases} x={x} ppd={ppd} today={today} height={LANE_H} /> : undefined;
+  }, [multi, data.projects, markers, x, ppd, today]);
   const hovered = hover && !drag && hover !== selected ? data.issues.find((i) => i.key === hover) : undefined;
 
   return (
@@ -288,104 +330,43 @@ export function TimelineGrid({
               </IconButton>
             </span>
           </div>
-          <TimeHeader
-            range={range}
-            zoom={zoom}
-            x={x}
-            ppd={ppd}
-            width={gridW}
-            today={today}
-            lane={!multi && data.projects[0] ? <MarkerLane sprints={sprintsOf(data.projects[0].key)} releases={releasesOf(data.projects[0].key)} x={x} ppd={ppd} today={today} height={LANE_H} /> : undefined}
-          />
+          <TimeHeader range={range} zoom={zoom} x={x} ppd={ppd} width={gridW} today={today} lane={lane} />
         </div>
 
         <div className="absolute left-0" style={{ top: headerH, width: TREE_W + gridW, height: bodyH }}>
-          {/* Background: weekends, grid lines, sprints, releases, today; then the arrows. */}
           <div className="absolute top-0" style={{ left: TREE_W, width: gridW, height: bodyH }}>
-            {zoom === "weeks" && (
-              <div
-                aria-hidden
-                className="absolute inset-0"
-                style={{
-                  backgroundImage: `repeating-linear-gradient(to right, color-mix(in srgb, var(--color-surface-3) 45%, transparent) 0 ${2 * ppd}px, transparent ${2 * ppd}px ${7 * ppd}px)`,
-                  backgroundPosition: `${weekendOffset}px 0`,
-                }}
-              />
-            )}
-            {lines.map((l) => (
-              <div key={l.day} aria-hidden className={cn("absolute top-0 w-px", l.strong ? "bg-line-strong/70" : "bg-line/70")} style={{ left: x(l.day), height: bodyH }} />
-            ))}
-            {[...spans].map(([key, [a, b]]) => (
-              <div key={key}>
-                <SprintBands sprints={sprintsOf(key)} x={x} ppd={ppd} top={a * ROW_H} height={(b - a + 1) * ROW_H} />
-                <ReleaseLines releases={releasesOf(key)} x={x} ppd={ppd} top={a * ROW_H} height={(b - a + 1) * ROW_H} />
-              </div>
-            ))}
-            {today >= range.start && today <= range.end && <div aria-hidden className="absolute top-0 z-[1] w-0.5 bg-accent" style={{ left: x(today) + ppd / 2 - 1, height: bodyH }} />}
-            <Dependencies deps={deps} rowOf={rowOf} x={x} width={gridW} height={bodyH} selected={linkMenu?.link.id} onSelect={(link, at) => {
-              const p = point(at.clientX, at.clientY);
-              setLinkMenu({ link, left: TREE_W + Math.min(p.x + 8, gridW - 290), top: p.y + 8 });
-            }} />
+            <Background range={range} zoom={zoom} x={x} ppd={ppd} width={gridW} height={bodyH} spans={spans} markers={markers} today={today} />
+            <Dependencies deps={deps} rowOf={rowOf} x={x} width={gridW} height={bodyH} selected={linkMenu?.link.id} onSelect={onSelectLink} />
           </div>
           <div aria-hidden className="sticky left-0 z-10 h-full border-r border-line bg-surface" style={{ width: TREE_W }} />
 
-          {visible.map((row, k) => {
+          {rows.slice(win.first, win.last + 1).map((row, k) => {
             const i = win.first + k;
+            const key = row.id;
             return (
-              <div key={row.id} data-row-key={row.id} className="group/row absolute left-0 flex" style={{ top: i * ROW_H, height: ROW_H, width: TREE_W + gridW }}>
-                <div
-                  className={cn(
-                    "sticky left-0 z-10 shrink-0 border-r border-b border-line bg-surface group-hover/row:bg-surface-2",
-                    row.kind === "project" && "bg-surface-2",
-                    row.kind === "issue" && selected === row.id && "bg-accent-soft/60",
-                  )}
-                  style={{ width: TREE_W }}
-                >
-                  <TreeCell
-                    row={row}
-                    collapsed={collapsed.has(row.id)}
-                    onToggle={() => onToggle(row.id)}
-                    onOpen={onOpen}
-                    warnings={row.kind === "issue" ? warnings.get(row.id) : undefined}
-                    overdue={row.kind === "issue" && isOverdue(row.issue, today)}
-                  />
-                </div>
-                <div className={cn("relative border-b border-line/50 group-hover/row:bg-surface-2/40", row.kind === "project" && "bg-surface-2/70")} style={{ width: gridW }}>
-                  {row.kind === "project" && (
-                    <MarkerLane sprints={sprintsOf(row.project.key)} releases={releasesOf(row.project.key)} x={x} ppd={ppd} today={today} height={ROW_H} />
-                  )}
-                  {row.kind === "issue" && (
-                    <IssueLane
-                      issue={row.issue}
-                      dayAtClient={(clientX) => dayAt(point(clientX, 0).x)}
-                      schedule={sched.get(row.id)}
-                      x={x}
-                      ppd={ppd}
-                      editable={canEdit(row.projectKey)}
-                      progress={progress?.get(row.id)}
-                      conflict={conflictKeys.has(row.id)}
-                      drag={drag}
-                      selected={selected === row.id}
-                      hint={hint?.key === row.id ? hint.day : undefined}
-                      linkTarget={drag?.kind === "link" && drag.target === row.id}
-                      onBarPointerDown={(e, mode) => startBar(e, row.issue, mode)}
-                      onLinkPointerDown={(e) => startLink(e, row.issue, i)}
-                      onCreatePointerDown={(e) => {
-                        if (e.button !== 0) return;
-                        e.preventDefault();
-                        const day = dayAt(point(e.clientX, e.clientY).x);
-                        setDrag({ kind: "create", issue: row.issue, anchor: day, current: day });
-                      }}
-                      onHint={(day) => setHint(day == null ? null : { key: row.id, day })}
-                      onBarKey={(e) => onBarKey(e, row.issue)}
-                      onSelect={(on) => setSelected((s) => (on ? row.id : s === row.id ? null : s))}
-                      onHover={(on) => setHover((h) => (on ? row.id : h === row.id ? null : h))}
-                      onSave={(start, due) => edits.schedule(row.issue, start, due)}
-                      onOpen={() => onOpen(row.id)}
-                    />
-                  )}
-                </div>
-              </div>
+              <GridRow
+                key={key}
+                row={row}
+                index={i}
+                gridW={gridW}
+                x={x}
+                ppd={ppd}
+                today={today}
+                collapsed={collapsed.has(key)}
+                warnings={row.kind === "issue" ? warnings.get(key) : undefined}
+                overdue={row.kind === "issue" && isOverdue(row.issue, today)}
+                schedule={row.kind === "issue" ? sched.get(key) : undefined}
+                editable={row.kind !== "project" && canEdit(row.projectKey)}
+                progress={row.kind === "issue" ? progress?.get(key) : undefined}
+                selected={selected === key}
+                hint={hint?.key === key ? hint.day : undefined}
+                barDrag={drag?.kind === "bar" && drag.issue.key === key ? drag : null}
+                createDrag={drag?.kind === "create" && drag.issue.key === key ? drag : null}
+                linkTarget={drag?.kind === "link" && drag.target === key}
+                dragging={dragging}
+                markers={row.kind === "project" ? markers.get(row.project.key) : undefined}
+                actions={actions}
+              />
             );
           })}
 
@@ -395,7 +376,16 @@ export function TimelineGrid({
               <circle cx={drag.x} cy={drag.y} r={4} fill="var(--color-accent)" />
             </svg>
           )}
-          {hovered && <HoverCard issue={hovered} schedule={sched.get(hovered.key)} warnings={warnings.get(hovered.key)} progress={progress?.get(hovered.key)} left={TREE_W + Math.max(8, x(sched.get(hovered.key)?.start ?? range.start))} top={((rowOf.get(hovered.key) ?? 0) + 1) * ROW_H - 4} />}
+          {hovered && (
+            <HoverCard
+              issue={hovered}
+              schedule={sched.get(hovered.key)}
+              warnings={warnings.get(hovered.key)}
+              progress={progress?.get(hovered.key)}
+              left={TREE_W + Math.max(8, x(sched.get(hovered.key)?.start ?? range.start))}
+              top={((rowOf.get(hovered.key) ?? 0) + 1) * ROW_H - 4}
+            />
+          )}
           {linkMenu && (
             <LinkMenu
               link={linkMenu.link}
@@ -421,122 +411,7 @@ export function TimelineGrid({
   );
 }
 
-/** IssueLane is the grid part of an issue row: its bar (with drag preview), handles, hint and popover. */
-function IssueLane({
-  issue,
-  dayAtClient,
-  schedule,
-  x,
-  ppd,
-  editable,
-  progress,
-  conflict,
-  drag,
-  selected,
-  hint,
-  linkTarget,
-  onBarPointerDown,
-  onLinkPointerDown,
-  onCreatePointerDown,
-  onHint,
-  onBarKey,
-  onSelect,
-  onHover,
-  onSave,
-  onOpen,
-}: {
-  issue: Issue;
-  dayAtClient: (clientX: number) => number;
-  schedule?: Schedule;
-  x: (day: number) => number;
-  ppd: number;
-  editable: boolean;
-  progress?: { done: number; total: number };
-  conflict: boolean;
-  drag: Drag | null;
-  selected: boolean;
-  hint?: number;
-  linkTarget: boolean;
-  onBarPointerDown: (e: ReactPointerEvent, mode: DragMode) => void;
-  onLinkPointerDown: (e: ReactPointerEvent) => void;
-  onCreatePointerDown: (e: ReactPointerEvent) => void;
-  onHint: (day: number | null) => void;
-  onBarKey: (e: KeyboardEvent) => void;
-  onSelect: (on: boolean) => void;
-  onHover: (on: boolean) => void;
-  onSave: (start: string | null, due: string | null) => void;
-  onOpen: () => void;
-}) {
-  const barDrag = drag?.kind === "bar" && drag.issue.key === issue.key && drag.editable && drag.moved ? drag : null;
-  const createDrag = drag?.kind === "create" && drag.issue.key === issue.key ? drag : null;
-  const shown = schedule && barDrag ? { ...schedule, ...preview(barDrag) } : schedule;
-  const chip = (start: number, end: number) => (
-    <span className="pointer-events-none absolute z-30 rounded bg-ink px-1.5 py-0.5 text-[10px] leading-none font-semibold whitespace-nowrap text-surface shadow" style={{ left: x(start), top: -6 }}>
-      {formatSpan(start, end)} · {end - start + 1}d
-    </span>
-  );
-
-  if (!shown) {
-    // Unscheduled: draw a range to set its dates.
-    const a = createDrag ? Math.min(createDrag.anchor, createDrag.current) : undefined;
-    const b = createDrag ? Math.max(createDrag.anchor, createDrag.current) : undefined;
-    return (
-      <div
-        className={cn("absolute inset-0", editable && "cursor-cell")}
-        onPointerDown={editable ? onCreatePointerDown : undefined}
-        onPointerMove={(e) => editable && !drag && onHint(dayAtClient(e.clientX))}
-        onPointerLeave={() => onHint(null)}
-      >
-        {createDrag && a != null && b != null ? (
-          <>
-            <span className="absolute rounded-[5px] border-[1.5px] border-dashed border-accent bg-accent-soft/60" style={{ left: x(a), width: (b - a + 1) * ppd, top: BAR_TOP, height: BAR_H }} />
-            {chip(a, b)}
-          </>
-        ) : (
-          hint != null && (
-            <>
-              <span className="pointer-events-none absolute rounded-[5px] border border-dashed border-line-strong" style={{ left: x(hint), width: Math.max(ppd, 6), top: BAR_TOP, height: BAR_H }} />
-              <span className="pointer-events-none absolute text-[11px] whitespace-nowrap text-muted" style={{ left: x(hint) + Math.max(ppd, 6) + 6, top: BAR_TOP + 4 }}>
-                Drag to schedule
-              </span>
-            </>
-          )
-        )}
-      </div>
-    );
-  }
-  const left = x(shown.start);
-  const width = (shown.end - shown.start + 1) * ppd;
-  return (
-    <span
-      className="contents"
-      onBlur={(e) => {
-        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) onSelect(false);
-      }}
-    >
-      <Bar
-        issue={issue}
-        schedule={shown}
-        left={left}
-        width={width}
-        progress={issue.type.level >= 1 ? progress : undefined}
-        editable={editable}
-        selected={selected}
-        conflict={conflict}
-        dragging={!!barDrag}
-        linkTarget={linkTarget}
-        onPointerDown={onBarPointerDown}
-        onKeyDown={onBarKey}
-        onFocus={() => onSelect(true)}
-        onHover={onHover}
-      />
-      {barDrag && chip(shown.start, shown.end)}
-      {editable && !drag && <LinkHandle left={left + Math.max(width, 4)} visible={selected} issueKey={issue.key} onPointerDown={onLinkPointerDown} />}
-      {selected && !drag && <DatePopover issue={issue} schedule={schedule} left={left} editable={editable} onSave={onSave} onOpen={onOpen} />}
-    </span>
-  );
-}
-
+/** HoverCard explains a bar: dates, length, status, progress, why its dates are derived and any conflicts. */
 function HoverCard({
   issue,
   schedule,

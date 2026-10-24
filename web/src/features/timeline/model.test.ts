@@ -81,6 +81,8 @@ describe("buildRows", () => {
     expect(rows.map((r) => r.id)).toEqual(["A-1", "A:parent:A-9", "A-4", "B:none", "B-1"]);
     const onlyChild = buildRows(data, { multi: false, collapsed: new Set(), include: (i) => i.key === "A-2" });
     expect(onlyChild.map((r) => r.id)).toEqual(["A-1", "A-2"]);
+    const filtered = buildRows(data, { multi: true, collapsed: new Set(), include: (i) => i.key === "A-2", hideEmpty: true });
+    expect(filtered.map((r) => r.id)).toEqual(["project:A", "A-1", "A-2"]);
   });
 });
 
