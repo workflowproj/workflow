@@ -134,3 +134,12 @@ internal/integration/    end-to-end tests of the API against PostgreSQL
 web/                     React UI (Vite, TanStack Router and Query, dnd-kit, React Flow, Tiptap)
 deploy/                  Helm chart and local k3d setup
 ```
+
+## Licence
+
+Workflow is open source under the [Apache License 2.0](LICENSE); see [NOTICE](NOTICE) for
+attributions.
+
+Jira is a trademark of Atlassian. GitHub, GitLab, Slack, Mattermost, Google and other names are
+trademarks of their respective owners. Workflow is not affiliated with, endorsed or sponsored by
+any of them; their names are used only to describe compatibility.

@@ -68,8 +68,10 @@ LABEL org.opencontainers.image.title="workflow-management" \
       org.opencontainers.image.description="Workflow platform: web, hooks and worker modes in one binary" \
       org.opencontainers.image.source="https://github.com/geoffo-dev/workflow-management" \
       org.opencontainers.image.version="${VERSION}" \
-      org.opencontainers.image.licenses="NOASSERTION"
+      org.opencontainers.image.licenses="Apache-2.0"
 COPY --from=build /out/wfm /wfm
+# The Apache License requires the licence and NOTICE with every copy.
+COPY LICENSE NOTICE /licenses/
 # distroless "nonroot" (65532). Numeric so runAsNonRoot can verify it.
 USER 65532:65532
 # 8080: UI/API (web) or webhooks/SCIM (hooks). 9090: /metrics, /healthz, /readyz (every mode).

@@ -122,3 +122,8 @@ used by the tests (`-flavor datacenter` for Data Center) and prints its credenti
 server with `WFM_OUTBOUND_ALLOWED_HOSTS=127.0.0.1` (or `WFM_WEBHOOK_ALLOW_PRIVATE=true`) and run the
 wizard against `http://127.0.0.1:8599`. `E2E_FAKE_JIRA=http://127.0.0.1:8599 npx playwright test
 jira-import` runs the wizard's end-to-end test against it.
+
+---
+
+Jira is a trademark of Atlassian. Workflow is not affiliated with, endorsed or sponsored by
+Atlassian; Jira's REST API is used with your own site and credentials to move your data.
