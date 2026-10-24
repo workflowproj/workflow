@@ -31,7 +31,7 @@ describe("templates", () => {
     expect(d.gadgets.map((g) => g.type)).toEqual(["sprint_health", "sprint_burndown", "sprint_burnup", "velocity", "breakdown", "issue_list"]);
     const list = d.gadgets.find((g) => g.type === "issue_list")!;
     expect(list.config.projectKeys).toEqual(["PLAT"]);
-    expect(list.config.jql).toMatch(/^sprint in openSprints\(\) AND statusCategory != Done AND \(due < startOfDay\(\) OR labels = blocked\) ORDER BY/);
+    expect(list.config.jql).toMatch(/^sprint in openSprints\(\) AND statusCategory != Done AND \(due < startOfDay\(\) OR issue in blockedIssues\(\)\) ORDER BY/);
   });
 
   it("covers every project when team flow gets none", () => {

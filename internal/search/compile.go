@@ -240,7 +240,7 @@ func (b *builder) clause(c Clause) (string, error) {
 			}
 			return "EXISTS (SELECT 1 FROM issue_releases ir JOIN releases r ON r.id = ir.release_id WHERE ir.issue_id = i.id AND " + cond + ")", nil
 		}, "NOT EXISTS (SELECT 1 FROM issue_releases ir WHERE ir.issue_id = i.id)")
-	case "parent", "epic", "epiclink":
+	case "parent":
 		return b.setField(c, func(v Value) (string, error) {
 			sub, err := b.issueByKey(v)
 			if err != nil {
@@ -248,6 +248,27 @@ func (b *builder) clause(c Clause) (string, error) {
 			}
 			return "i.parent_id IN (" + sub + ")", nil
 		}, "i.parent_id IS NULL")
+	case "epic", "epiclink":
+		// The epic ancestor: the parent when it is epic-level, else the grandparent (sub-tasks).
+		return b.setField(c, func(v Value) (string, error) {
+			sub, err := b.issueByKey(v)
+			if err != nil {
+				return "", err
+			}
+			return epicAncestor + " IN (" + sub + ")", nil
+		}, epicAncestor+" IS NULL")
+	case "issuelinktype", "linktype":
+		return b.setField(c, func(v Value) (string, error) {
+			s, err := b.str(v)
+			if err != nil {
+				return "", err
+			}
+			l, ok := linkDescriptions[normalize(s)]
+			if !ok {
+				return "", errAt(v.Pos, "unknown link type %q (use blocks, \"is blocked by\", relates, duplicates, \"is duplicated by\", clones or \"is cloned by\")", s)
+			}
+			return l.exists(b.arg(l.typ), "i.id"), nil
+		}, "NOT EXISTS (SELECT 1 FROM issue_links l WHERE l.source_id = i.id OR l.target_id = i.id)")
 	case "summary", "title":
 		return b.textField(c, "i.summary")
 	case "description":
@@ -411,12 +432,88 @@ func (b *builder) keyField(c Clause) (string, error) {
 		return fmt.Sprintf("(i.project_id IN %s AND i.number %s %s::int)", projectByKey(b.arg(key)), c.Op, b.arg(n)), nil
 	}
 	return b.setField(c, func(v Value) (string, error) {
+		if v.Kind == VFunc {
+			return b.issueFunction(v)
+		}
 		sub, err := b.issueByKey(v)
 		if err != nil {
 			return "", err
 		}
 		return "i.id IN (" + sub + ")", nil
 	}, "")
+}
+
+// epicAncestor is the id of an issue's epic (NULL when it has none).
+const epicAncestor = `(SELECT CASE WHEN pt.level >= 1 THEN p.id WHEN gpt.level >= 1 THEN gp.id END
+	FROM issues p JOIN issue_types pt ON pt.id = p.type_id
+	LEFT JOIN issues gp ON gp.id = p.parent_id LEFT JOIN issue_types gpt ON gpt.id = gp.type_id
+	WHERE p.id = i.parent_id)`
+
+// linkDescription is one side of a link type, as Jira words it: "blocks" is the source's side
+// of a blocks link, "is blocked by" the target's.
+type linkDescription struct {
+	typ  string
+	side string // source, target or either
+}
+
+var linkDescriptions = map[string]linkDescription{
+	"blocks": {"blocks", "source"}, "isblockedby": {"blocks", "target"}, "blockedby": {"blocks", "target"},
+	"relates": {"relates", "either"}, "relatesto": {"relates", "either"},
+	"duplicates": {"duplicates", "source"}, "isduplicatedby": {"duplicates", "target"},
+	"clones": {"clones", "source"}, "isclonedby": {"clones", "target"},
+}
+
+// exists is "issue col has a link of this description".
+func (l linkDescription) exists(typ, col string) string {
+	switch l.side {
+	case "source":
+		return fmt.Sprintf("EXISTS (SELECT 1 FROM issue_links l WHERE l.source_id = %s AND l.link_type = %s::text)", col, typ)
+	case "target":
+		return fmt.Sprintf("EXISTS (SELECT 1 FROM issue_links l WHERE l.target_id = %s AND l.link_type = %s::text)", col, typ)
+	}
+	return fmt.Sprintf("EXISTS (SELECT 1 FROM issue_links l WHERE (l.source_id = %[1]s OR l.target_id = %[1]s) AND l.link_type = %[2]s::text)", col, typ)
+}
+
+// issueFunction compiles issue functions used with key/issue (issue in linkedIssues("PLAT-1")).
+func (b *builder) issueFunction(v Value) (string, error) {
+	const openIssue = "EXISTS (SELECT 1 FROM issues o JOIN statuses os ON os.id = o.status_id WHERE o.id = %s AND os.category <> 'done')"
+	switch strings.ToLower(v.Text) {
+	case "linkedissues":
+		if len(v.Args) < 1 || len(v.Args) > 2 {
+			return "", errAt(v.Pos, `linkedIssues() takes an issue key and optionally a link type, e.g. linkedIssues("PLAT-1", "is blocked by")`)
+		}
+		sub, err := b.issueByKey(v.Args[0])
+		if err != nil {
+			return "", err
+		}
+		if len(v.Args) == 1 {
+			return "i.id IN (SELECT l.target_id FROM issue_links l WHERE l.source_id IN (" + sub + ") UNION SELECT l.source_id FROM issue_links l WHERE l.target_id IN (" + sub + "))", nil
+		}
+		s, err := b.str(v.Args[1])
+		if err != nil {
+			return "", err
+		}
+		l, ok := linkDescriptions[normalize(s)]
+		if !ok {
+			return "", errAt(v.Args[1].Pos, "unknown link type %q", s)
+		}
+		// "PLAT-1 blocks X": X is the target of PLAT-1's blocks links, and so on.
+		t := b.arg(l.typ)
+		switch l.side {
+		case "source":
+			return fmt.Sprintf("i.id IN (SELECT l.target_id FROM issue_links l WHERE l.link_type = %s::text AND l.source_id IN (%s))", t, sub), nil
+		case "target":
+			return fmt.Sprintf("i.id IN (SELECT l.source_id FROM issue_links l WHERE l.link_type = %s::text AND l.target_id IN (%s))", t, sub), nil
+		}
+		return fmt.Sprintf("i.id IN (SELECT l.target_id FROM issue_links l WHERE l.link_type = %[1]s::text AND l.source_id IN (%[2]s) UNION SELECT l.source_id FROM issue_links l WHERE l.link_type = %[1]s::text AND l.target_id IN (%[2]s))", t, sub), nil
+	case "blockedissues":
+		// Blocked by at least one issue that is not done.
+		return "EXISTS (SELECT 1 FROM issue_links l WHERE l.target_id = i.id AND l.link_type = 'blocks' AND " + fmt.Sprintf(openIssue, "l.source_id") + ")", nil
+	case "blockingissues":
+		// Blocking at least one issue that is not done.
+		return "EXISTS (SELECT 1 FROM issue_links l WHERE l.source_id = i.id AND l.link_type = 'blocks' AND " + fmt.Sprintf(openIssue, "l.target_id") + ")", nil
+	}
+	return "", errAt(v.Pos, "unknown function %s() for issue (use linkedIssues, blockedIssues or blockingIssues)", v.Text)
 }
 
 var priorityOrder = []string{"lowest", "low", "medium", "high", "highest"}
@@ -784,6 +881,8 @@ var Fields = []struct {
 	{"sprint", "sprint", []string{"=", "!=", "in", "not in", "is", "is not"}},
 	{"fixVersion", "release", []string{"=", "!=", "in", "not in", "is", "is not"}},
 	{"parent", "issue", []string{"=", "!=", "in", "not in", "is", "is not"}},
+	{"epic", "issue", []string{"=", "!=", "in", "not in", "is", "is not"}},
+	{"issueLinkType", "linkType", []string{"=", "!=", "in", "not in", "is", "is not"}},
 	{"level", "number", []string{"=", "!=", ">", ">=", "<", "<="}},
 	{"summary", "text", []string{"~", "!~", "=", "!=", "is", "is not"}},
 	{"description", "text", []string{"~", "!~", "is", "is not"}},
@@ -801,4 +900,5 @@ var Functions = []string{
 	"currentUser()", "membersOf(\"group\")", "openSprints()", "futureSprints()", "closedSprints()",
 	"releasedVersions()", "unreleasedVersions()", "now()", "startOfDay()", "endOfDay()",
 	"startOfWeek()", "endOfWeek()", "startOfMonth()", "endOfMonth()", "startOfYear()", "endOfYear()",
+	"linkedIssues(\"KEY\")", "blockedIssues()", "blockingIssues()",
 }

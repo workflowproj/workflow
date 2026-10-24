@@ -116,7 +116,7 @@ const BY_FIELD: Record<BreakdownBy, string> = {
   type: "type",
   assignee: "assignee",
   label: "labels",
-  epic: "parent",
+  epic: "epic",
   sprint: "sprint",
   release: "fixVersion",
   project: "project",

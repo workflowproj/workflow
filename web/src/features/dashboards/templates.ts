@@ -40,7 +40,7 @@ export const TEMPLATES: DashboardTemplate[] = [
           g("burnup", "sprint_burnup", 2, { projectKey: key }),
           g("velocity", "velocity", 1, { projectKey: key, count: 6 }),
           g("assignees", "breakdown", 1, { projectKeys: [key], jql: sprint, by: "assignee", measure: "issues", chart: "bar" }, "Open sprint work by assignee"),
-          g("at-risk", "issue_list", 2, { projectKeys: [key], jql: `${sprint} AND (due < startOfDay() OR labels = blocked) ORDER BY priority DESC, due ASC`, limit: 10 }, "Overdue or blocked"),
+          g("at-risk", "issue_list", 2, { projectKeys: [key], jql: `${sprint} AND (due < startOfDay() OR issue in blockedIssues()) ORDER BY priority DESC, due ASC`, limit: 10 }, "Overdue or blocked"),
         ],
       };
     },

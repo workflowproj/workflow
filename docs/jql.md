@@ -37,7 +37,9 @@ fixVersion = "2026.11" AND statusCategory != Done
 | `labels` (`label`) | `=` `!=` `in` `not in` `is [not] EMPTY` | label |
 | `sprint` | `=` `!=` `in` `not in` `is [not] EMPTY` | sprint name or id, `openSprints()`, `futureSprints()`, `closedSprints()` |
 | `fixVersion` (`release`, `version`) | `=` `!=` `in` `not in` `is [not] EMPTY` | release name, `releasedVersions()`, `unreleasedVersions()` |
-| `parent` (`epic`, `epicLink`) | `=` `!=` `in` `is [not] EMPTY` | issue key |
+| `parent` | `=` `!=` `in` `is [not] EMPTY` | issue key: the direct parent |
+| `epic` (`epicLink`) | `=` `!=` `in` `is [not] EMPTY` | epic key: everything under the epic, sub-tasks included |
+| `issueLinkType` | `=` `!=` `in` `not in` `is [not] EMPTY` | `blocks`, `"is blocked by"`, `relates`, `duplicates`, `"is duplicated by"`, `clones`, `"is cloned by"` — issues with such a link |
 | `summary` (`title`), `description` | `~` `!~` `=` `!=` `is [not] EMPTY` | `~` is a case-insensitive substring match |
 | `text` | `~` `!~` | full-text search over summary and description (web-search syntax: `"exact phrase"`, `-exclude`, `or`) |
 | `comment` | `~` `!~` | text in comments |
@@ -48,6 +50,22 @@ fixVersion = "2026.11" AND statusCategory != Done
 Custom fields by type: `text`/`url` support `~`, `=`, `is EMPTY`; `number` and `date` support
 comparisons; `select` and `multiselect` support `=`, `in`; `user` accepts the user values above;
 `checkbox` accepts `true`/`false`; `version` accepts release names.
+
+## Links
+
+Issue functions go with `issue in` (or `key in`):
+
+- `issue in linkedIssues("PLAT-1")` — issues linked to PLAT-1 either way; with a link type,
+  `linkedIssues("PLAT-1", "is blocked by")` is what blocks PLAT-1 and
+  `linkedIssues("PLAT-1", "blocks")` what PLAT-1 blocks.
+- `issue in blockedIssues()` — issues blocked by at least one issue that is not done.
+- `issue in blockingIssues()` — issues blocking at least one issue that is not done.
+
+```
+sprint in openSprints() AND issue in blockedIssues()          blocked sprint work
+epic = PLAT-1 AND statusCategory != Done                       what's left in an epic
+issue in linkedIssues("PLAT-42", "is blocked by") AND statusCategory != Done
+```
 
 ## Dates
 

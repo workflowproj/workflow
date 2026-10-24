@@ -45,7 +45,7 @@ describe("breakdownClause", () => {
     expect(breakdownClause("label", "")).toBe("labels is EMPTY");
     expect(breakdownClause("statusCategory", "in_progress")).toBe('statusCategory = "In Progress"');
     expect(breakdownClause("statusCategory", "done")).toBe("statusCategory = Done");
-    expect(breakdownClause("epic", "PLAT-4")).toBe('parent = "PLAT-4"');
+    expect(breakdownClause("epic", "PLAT-4")).toBe('epic = "PLAT-4"');
     expect(breakdownClause("release", "r1")).toBe('fixVersion = "r1"');
     expect(breakdownClause("project", "PLAT")).toBe("project = PLAT");
   });
