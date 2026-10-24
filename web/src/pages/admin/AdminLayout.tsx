@@ -1,5 +1,5 @@
 import { Link, Outlet } from "@tanstack/react-router";
-import { FolderGit2, KeyRound, ScrollText, ShieldCheck, TextCursorInput, UserRound, UsersRound, Webhook } from "lucide-react";
+import { FolderGit2, Import, KeyRound, ScrollText, ShieldCheck, TextCursorInput, UserRound, UsersRound, Webhook } from "lucide-react";
 import { useMe } from "@/api/queries";
 import { EmptyState } from "@/components/ui";
 
@@ -12,6 +12,7 @@ const sections = [
   { label: "GitHub & GitLab", to: "/admin/scm" as const, icon: FolderGit2 },
   { label: "Webhooks", to: "/admin/webhooks" as const, icon: Webhook },
   { label: "Audit log", to: "/admin/audit" as const, icon: ScrollText },
+  { label: "Import from Jira", to: "/admin/import" as const, icon: Import },
 ];
 
 export function AdminLayout() {
