@@ -484,6 +484,37 @@ func TestLocalAccountsAndIdentityProviders(t *testing.T) {
 	eq(t, str(admin.adminUser("jit@example.com"), "localAccount", "status"), "invited", "dev/JIT person invited")
 }
 
+// An install without single sign-on starts with `wfm create-admin`.
+func TestLocalBootstrapAdmin(t *testing.T) {
+	e := newEnv(t, withEnv("WFM_DEV_LOGIN", "false"))
+	ctx := context.Background()
+	if _, _, err := e.App.Local.BootstrapAdmin(ctx, "not-an-email", ""); err == nil {
+		t.Fatal("invalid email accepted")
+	}
+	u, pw, err := e.App.Local.BootstrapAdmin(ctx, "Owner@Example.com", "Olive Owner")
+	if err != nil {
+		t.Fatal(err)
+	}
+	eq(t, u.OrgRole, "admin", "admin")
+	c := e.anon()
+	wantStatus(t, c.passwordLogin("owner@example.com", pw), 200, "password_change_required")
+	body := wantStatus(t, c.do("POST", "/api/v1/auth/local/login/new-password", obj{"newPassword": "Granite-Willow-Beacon-44"}), 200, "signed_in")
+	eq(t, str(body, "me", "orgRole"), "admin", "signed in as admin")
+	c.must("GET", "/api/v1/admin/users", nil, 200, nil)
+
+	// Running it again for an existing member promotes them and issues a new temporary password.
+	var m obj
+	c.must("POST", "/api/v1/admin/users", obj{"displayName": "Max Member", "email": "max@example.com"}, 201, &m)
+	u2, pw2, err := e.App.Local.BootstrapAdmin(ctx, "max@example.com", "")
+	if err != nil || u2.OrgRole != "admin" || u2.DisplayName != "Max Member" || pw2 == "" {
+		t.Fatalf("existing person: %+v %v", u2, err)
+	}
+	if _, _, err := e.App.Local.BootstrapAdmin(ctx, "owner@example.com", ""); err != nil {
+		t.Fatal(err)
+	}
+	wantCode(t, e.anon().passwordLogin("owner@example.com", "Granite-Willow-Beacon-44"), 401, "invalid_credentials") // replaced
+}
+
 func TestLocalLoginDisabled(t *testing.T) {
 	e := newEnv(t, withEnv("WFM_LOCAL_LOGIN", "false"))
 	admin := e.login("admin@example.com", "Admin") // development sign-in is unaffected

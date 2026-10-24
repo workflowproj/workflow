@@ -3,6 +3,7 @@
 //
 //	wfm serve --mode=web|hooks|worker|all
 //	wfm migrate
+//	wfm create-admin --email you@example.com [--name "Your Name"]
 //	wfm workflow apply -f workflow.yaml [--project KEY] [--map "Old=New"] [--dry-run]
 //	wfm workflow validate -f workflow.yaml
 //	wfm workflow export --id <uuid>
@@ -47,6 +48,8 @@ func run(args []string) error {
 		return serve(args)
 	case "migrate":
 		return migrate()
+	case "create-admin":
+		return createAdmin(args)
 	case "workflow":
 		return workflowCmd(args)
 	case "mcp":
@@ -64,6 +67,7 @@ func run(args []string) error {
 const usage = `Usage:
   wfm serve [--mode=web|hooks|worker|all] [--migrate]
   wfm migrate
+  wfm create-admin --email EMAIL [--name NAME]
   wfm workflow apply -f FILE [--project KEY] [--map "Old status=New status"] [--dry-run]
   wfm workflow validate -f FILE
   wfm workflow export --id WORKFLOW_ID
@@ -73,7 +77,9 @@ const usage = `Usage:
 The workflow commands talk to the API: set WFM_SERVER (e.g. https://wfm.example.com) and
 WFM_TOKEN (a personal access token or service-account token with the write scope).
 wfm mcp relays the Model Context Protocol between stdio and WFM_SERVER/mcp, for AI assistants
-that launch local MCP servers; it uses the same two variables.`
+that launch local MCP servers; it uses the same two variables.
+wfm create-admin makes EMAIL an organisation admin who signs in with a password, and prints a
+temporary password (for installs without single sign-on); it uses the server's configuration.`
 
 func signalContext() (context.Context, context.CancelFunc) {
 	return signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)

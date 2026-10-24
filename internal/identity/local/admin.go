@@ -284,6 +284,58 @@ func (s *Service) RemovePassword(ctx context.Context, admin *authz.Actor, id uui
 	})
 }
 
+// BootstrapAdmin makes someone an organisation admin with a local account and returns a
+// temporary password, creating the person if needed. It is the way into an install without
+// single sign-on (`wfm create-admin`); running it again issues a new temporary password.
+func (s *Service) BootstrapAdmin(ctx context.Context, email, name string) (dbq.User, string, error) {
+	if err := s.enabled(); err != nil {
+		return dbq.User{}, "", err
+	}
+	email = normEmail(email)
+	at := strings.IndexByte(email, '@')
+	if at <= 0 || at == len(email)-1 {
+		return dbq.User{}, "", apperr.Invalid("email", "a valid email address is required")
+	}
+	var u dbq.User
+	err := db.Tx(ctx, s.Pool, func(_ pgx.Tx, q *dbq.Queries) error {
+		var err error
+		u, err = q.GetUserByEmail(ctx, email)
+		switch {
+		case db.IsNoRows(err):
+			if name = strings.TrimSpace(name); name == "" {
+				name = email[:at]
+			}
+			if u, err = q.CreateUser(ctx, dbq.CreateUserParams{Kind: "human", Email: email, Username: email, DisplayName: name, OrgRole: "admin", Source: "admin", Active: true}); err != nil {
+				return err
+			}
+			s.audit(ctx, q, nil, "user.create", &u, "", map[string]any{"email": email, "orgRole": "admin", "via": "wfm create-admin"})
+			return nil
+		case err != nil:
+			return err
+		}
+		if _, err := s.person(ctx, q, u.ID); err != nil {
+			return err
+		}
+		if !u.Active {
+			if u, err = q.SetUserActive(ctx, dbq.SetUserActiveParams{ID: u.ID, Active: true}); err != nil {
+				return err
+			}
+		}
+		if u.OrgRole != "admin" {
+			if u, err = q.SetUserOrgRole(ctx, dbq.SetUserOrgRoleParams{ID: u.ID, OrgRole: "admin"}); err != nil {
+				return err
+			}
+			s.audit(ctx, q, nil, "user.role", &u, "", map[string]any{"orgRole": "admin", "via": "wfm create-admin"})
+		}
+		return nil
+	})
+	if err != nil {
+		return u, "", err
+	}
+	pw, err := s.SetTemporaryPassword(ctx, authz.SystemActor(), u.ID, "")
+	return u, pw, err
+}
+
 // Prune removes expired challenges and links older than a month (maintenance job).
 func (s *Service) Prune(ctx context.Context) error {
 	if _, err := s.Q.DeleteExpiredLoginChallenges(ctx); err != nil {
