@@ -41,6 +41,28 @@ const loginRoute = createRoute({
   component: LoginPage,
 });
 
+// OAuth consent for AI assistants, outside the app shell: /oauth/consent/<request> asks the
+// signed-in person (signing in first if needed); /oauth/consent?error=… explains a refused request.
+const consentErrorRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/oauth/consent",
+  validateSearch: (s: Record<string, unknown>): { error?: string } => ({ error: str(s.error) }),
+  component: lazyRouteComponent(() => import("@/pages/oauth/ConsentPage"), "ConsentErrorPage"),
+});
+const consentRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/oauth/consent/$request",
+  beforeLoad: async ({ context, location }) => {
+    try {
+      await context.queryClient.ensureQueryData(meQuery);
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) throw redirect({ to: "/login", search: { returnTo: location.href } });
+      throw e;
+    }
+  },
+  component: lazyRouteComponent(() => import("@/pages/oauth/ConsentPage"), "ConsentPage"),
+});
+
 // Everything else requires a session; a 401 sends people to the login page and back.
 const appRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -147,9 +169,12 @@ const adminProvisioningRoute = createRoute({ getParentRoute: () => adminRoute, p
 const adminScmRoute = createRoute({ getParentRoute: () => adminRoute, path: "/scm", component: lazyRouteComponent(() => import("@/pages/admin/ScmAdmin"), "ScmAdmin") });
 const adminWebhooksRoute = createRoute({ getParentRoute: () => adminRoute, path: "/webhooks", component: lazyRouteComponent(() => import("@/pages/admin/WebhooksAdmin"), "WebhooksAdmin") });
 const adminAuditRoute = createRoute({ getParentRoute: () => adminRoute, path: "/audit", component: lazyRouteComponent(() => import("@/pages/admin/AuditAdmin"), "AuditAdmin") });
+const adminConnectedAppsRoute = createRoute({ getParentRoute: () => adminRoute, path: "/connected-apps", component: lazyRouteComponent(() => import("@/pages/admin/ConnectedAppsAdmin"), "ConnectedAppsAdmin") });
 
 export const routeTree = rootRoute.addChildren([
   loginRoute,
+  consentErrorRoute,
+  consentRoute,
   appRoute.addChildren([
     indexRoute,
     projectsRoute,
@@ -191,6 +216,7 @@ export const routeTree = rootRoute.addChildren([
       adminScmRoute,
       adminWebhooksRoute,
       adminAuditRoute,
+      adminConnectedAppsRoute,
     ]),
   ]),
 ]);

@@ -9,6 +9,7 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { SettingsSection } from "@/features/settings/common";
 import { ConnectSnippets } from "@/features/settings/tokens/ConnectSnippets";
 import { CreateTokenDialog, TokenTable } from "@/features/settings/tokens/Tokens";
+import { ConnectedAppsSection } from "@/features/settings/connected-apps/ConnectedAppsSection";
 import { SourceBadge, sourceLabel } from "@/features/admin/badges";
 
 const managed = new Set(["scim", "google"]);
@@ -77,9 +78,11 @@ export function ProfilePage() {
         {tokens.isLoading ? <PageSpinner /> : <TokenTable tokens={tokens.data ?? []} onRevoke={(t) => revoke.mutate(t.id)} revoking={revoke.isPending ? revoke.variables : undefined} />}
       </SettingsSection>
 
+      <ConnectedAppsSection />
+
       <SettingsSection
         title="Connect AI assistants and tools"
-        description="Claude and other AI assistants can search, read, create and update issues, move them through workflows and read sprint and flow metrics over MCP, as you."
+        description="Claude and other AI assistants can search, read, create and update issues, move them through workflows and read sprint and flow metrics over MCP, as you. Add Workflow by its address and approve access in your browser."
       >
         <div className="flex flex-col gap-4 p-4">
           <ConnectSnippets server={server} />

@@ -20,8 +20,13 @@ export default defineConfig({
       // Shown in the UI as the SCIM base URL and SCM webhook URLs.
       "/scim": { target: api },
       "/hooks": { target: api },
-      // MCP for AI assistants (streamable HTTP).
+      // MCP for AI assistants (streamable HTTP) and their OAuth sign-in; /oauth/consent is a UI page.
       "/mcp": { target: api, changeOrigin: false },
+      "/.well-known": { target: api, changeOrigin: false },
+      "/oauth/authorize": { target: api, changeOrigin: false },
+      "/oauth/token": { target: api, changeOrigin: false },
+      "/oauth/register": { target: api, changeOrigin: false },
+      "/oauth/revoke": { target: api, changeOrigin: false },
     },
   },
   build: { sourcemap: true, chunkSizeWarningLimit: 1500 },
