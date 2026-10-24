@@ -180,7 +180,7 @@ func (s *Server) MoveIssue(ctx context.Context, req api.MoveIssueRequestObject) 
 
 func (s *Server) commentView(ctx context.Context, a *authz.Actor, access authz.Access, c dbq.Comment, users map[uuid.UUID]dbq.User) api.Comment {
 	own := c.AuthorID != nil && a.UserID() != nil && *c.AuthorID == *a.UserID()
-	v := api.Comment{Id: c.ID, Body: c.Body, Source: c.Source, CreatedAt: c.CreatedAt, EditedAt: c.EditedAt, CanEdit: own || access.Has(authz.CommentModerate)}
+	v := api.Comment{Id: c.ID, Body: c.Body, Source: c.Source, Via: c.Via, CreatedAt: c.CreatedAt, EditedAt: c.EditedAt, CanEdit: own || access.Has(authz.CommentModerate)}
 	if c.AuthorID != nil {
 		u, ok := users[*c.AuthorID]
 		if !ok {
@@ -261,7 +261,7 @@ func (s *Server) ListIssueHistory(ctx context.Context, req api.ListIssueHistoryR
 	users := map[uuid.UUID]*api.User{}
 	out := api.ListIssueHistory200JSONResponse{}
 	for _, h := range rows {
-		v := api.HistoryEntry{Id: h.ID, ActorType: h.ActorType, Field: h.Field, From: h.FromValue, To: h.ToValue, CreatedAt: h.CreatedAt}
+		v := api.HistoryEntry{Id: h.ID, ActorType: h.ActorType, Via: h.Via, Field: h.Field, From: h.FromValue, To: h.ToValue, CreatedAt: h.CreatedAt}
 		if h.ActorID != nil {
 			if _, ok := users[*h.ActorID]; !ok {
 				if u, err := s.Q.GetUser(ctx, *h.ActorID); err == nil {

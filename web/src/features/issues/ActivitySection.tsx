@@ -108,7 +108,7 @@ function CommentItem({ comment: c }: { comment: Comment }) {
   // While editing, Escape cancels the edit rather than closing a surrounding drawer.
   useEscapeLayer(draft !== null, () => draft?.trim() === c.body.trim() && setDraft(null));
   const author = c.author ?? (c.source === "automation" ? automationUser : { displayName: "Unknown", kind: "human" });
-  const via = c.source !== "user" ? (sourceLabel[c.source] ?? `via ${c.source}`) : null;
+  const via = c.via ? `via ${c.via}` : c.source !== "user" ? (sourceLabel[c.source] ?? `via ${c.source}`) : null;
   const submit = () => draft?.trim() && save.mutate(draft.trim());
   return (
     <li className="flex gap-3">
@@ -258,7 +258,8 @@ function History() {
         <li key={h.id} className="relative flex gap-3">
           <UserAvatar user={h.actor ?? { displayName: actorNames[h.actorType] ?? "System", kind: "automation" }} size={24} className="ring-4 ring-surface" />
           <div className="min-w-0 flex-1 pt-0.5 text-sm">
-            <span className="font-medium">{h.actor?.displayName ?? actorNames[h.actorType] ?? "System"}</span> <Change entry={h} />
+            <span className="font-medium">{h.actor?.displayName ?? actorNames[h.actorType] ?? "System"}</span>
+            {h.via && <span className="text-muted"> via {h.via}</span>} <Change entry={h} />
             <time dateTime={h.createdAt} title={formatDateTime(h.createdAt)} className="ml-2 text-xs text-muted">
               {relativeTime(h.createdAt)}
             </time>

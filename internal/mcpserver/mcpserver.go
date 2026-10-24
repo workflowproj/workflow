@@ -58,6 +58,13 @@ func (s *Server) Handler() http.Handler {
 			unauthorized(w, "invalid or expired access token")
 			return
 		}
+		// Changes are recorded as "<person> via <token name>", e.g. "Ada via Claude".
+		if a.Via == "" {
+			a.Via = a.TokenName
+			if a.Via == "" {
+				a.Via = "AI assistant"
+			}
+		}
 		h.ServeHTTP(w, r.WithContext(identity.WithActor(r.Context(), a)))
 	})
 }

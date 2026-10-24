@@ -238,8 +238,16 @@ func actorType(a *authz.Actor) string { return string(a.Type) }
 func (s *Service) history(ctx context.Context, q *dbq.Queries, issueID uuid.UUID, actor *authz.Actor, field string, from, to *string, fromRef, toRef *string) error {
 	return q.InsertHistory(ctx, dbq.InsertHistoryParams{
 		IssueID: issueID, ActorID: actor.UserID(), ActorType: actorType(actor), Field: field,
-		FromValue: from, ToValue: to, FromRef: fromRef, ToRef: toRef,
+		FromValue: from, ToValue: to, FromRef: fromRef, ToRef: toRef, Via: via(actor),
 	})
+}
+
+// via is what the actor used to act, for history and comments (nil when nothing special).
+func via(a *authz.Actor) *string {
+	if a == nil || a.Via == "" {
+		return nil
+	}
+	return &a.Via
 }
 
 func strp(s string) *string {

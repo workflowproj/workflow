@@ -142,6 +142,7 @@ type Comment struct {
 	Source    string
 	EditedAt  *time.Time
 	CreatedAt time.Time
+	Via       *string
 }
 
 type Dashboard struct {
@@ -252,6 +253,7 @@ type IssueHistory struct {
 	FromRef   *string
 	ToRef     *string
 	CreatedAt time.Time
+	Via       *string
 }
 
 type IssueLink struct {

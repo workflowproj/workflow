@@ -7,7 +7,7 @@ sprints and flow.
 
 The assistant acts **as you**, through a personal access token: it sees only what you can
 browse, workflow conditions and validators apply, and every change appears in the issue history
-under your name. Use a token with only the `read` scope for an assistant that should look but
+under your name, marked with the token's name ("Ada via Claude"), as do its comments. Use a token with only the `read` scope for an assistant that should look but
 not touch.
 
 ## Connect

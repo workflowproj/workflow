@@ -70,8 +70,8 @@ GROUP BY i.parent_id, s.category;
 -- History
 
 -- name: InsertHistory :exec
-INSERT INTO issue_history (issue_id, actor_id, actor_type, field, from_value, to_value, from_ref, to_ref)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8);
+INSERT INTO issue_history (issue_id, actor_id, actor_type, field, from_value, to_value, from_ref, to_ref, via)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, sqlc.narg(via));
 
 -- name: ListHistory :many
 SELECT * FROM issue_history WHERE issue_id = $1 ORDER BY id;
@@ -95,7 +95,7 @@ SELECT * FROM issue_links WHERE source_id = $1 OR target_id = $1 ORDER BY create
 -- Comments
 
 -- name: CreateComment :one
-INSERT INTO comments (issue_id, author_id, body, source) VALUES ($1, $2, $3, $4) RETURNING *;
+INSERT INTO comments (issue_id, author_id, body, source, via) VALUES ($1, $2, $3, $4, sqlc.narg(via)) RETURNING *;
 
 -- name: GetComment :one
 SELECT * FROM comments WHERE id = $1;

@@ -143,6 +143,13 @@ func TestMCPServer(t *testing.T) {
 	var hist []obj
 	ada.get("/api/v1/issues/AI-1/history", &hist)
 	eq(t, str(hist[len(hist)-1], "actor", "displayName"), "Ada", "changes are made as the token owner")
+	eq(t, str(hist[len(hist)-1], "via"), "assistant", "and marked with what made them (the token's name)")
+	var comments []obj
+	ada.get("/api/v1/issues/AI-1/comments", &comments)
+	eq(t, str(comments[len(comments)-1], "via"), "assistant", "comments too")
+	ada.must("POST", "/api/v1/issues/AI-1/comments", obj{"body": "From the web"}, 201, nil)
+	ada.get("/api/v1/issues/AI-1/comments", &comments)
+	eq(t, str(comments[len(comments)-1], "via"), "", "not for the web app")
 
 	// Permissions are the owner's: Bob cannot see a private project.
 	ada.must("POST", "/api/v1/projects", obj{"key": "SEC", "name": "Secret", "template": "kanban", "access": "private"}, 201, nil)

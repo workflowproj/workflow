@@ -204,7 +204,7 @@ func (q *Queries) CreateAttachment(ctx context.Context, arg CreateAttachmentPara
 
 const createComment = `-- name: CreateComment :one
 
-INSERT INTO comments (issue_id, author_id, body, source) VALUES ($1, $2, $3, $4) RETURNING id, issue_id, author_id, body, source, edited_at, created_at
+INSERT INTO comments (issue_id, author_id, body, source, via) VALUES ($1, $2, $3, $4, $5) RETURNING id, issue_id, author_id, body, source, edited_at, created_at, via
 `
 
 type CreateCommentParams struct {
@@ -212,6 +212,7 @@ type CreateCommentParams struct {
 	AuthorID *uuid.UUID
 	Body     string
 	Source   string
+	Via      *string
 }
 
 // ---------------------------------------------------------------------------
@@ -222,6 +223,7 @@ func (q *Queries) CreateComment(ctx context.Context, arg CreateCommentParams) (C
 		arg.AuthorID,
 		arg.Body,
 		arg.Source,
+		arg.Via,
 	)
 	var i Comment
 	err := row.Scan(
@@ -232,6 +234,7 @@ func (q *Queries) CreateComment(ctx context.Context, arg CreateCommentParams) (C
 		&i.Source,
 		&i.EditedAt,
 		&i.CreatedAt,
+		&i.Via,
 	)
 	return i, err
 }
@@ -552,7 +555,7 @@ func (q *Queries) GetBlob(ctx context.Context, key string) ([]byte, error) {
 }
 
 const getComment = `-- name: GetComment :one
-SELECT id, issue_id, author_id, body, source, edited_at, created_at FROM comments WHERE id = $1
+SELECT id, issue_id, author_id, body, source, edited_at, created_at, via FROM comments WHERE id = $1
 `
 
 func (q *Queries) GetComment(ctx context.Context, id uuid.UUID) (Comment, error) {
@@ -566,6 +569,7 @@ func (q *Queries) GetComment(ctx context.Context, id uuid.UUID) (Comment, error)
 		&i.Source,
 		&i.EditedAt,
 		&i.CreatedAt,
+		&i.Via,
 	)
 	return i, err
 }
@@ -776,8 +780,8 @@ func (q *Queries) GetIssuesByIDs(ctx context.Context, ids []uuid.UUID) ([]Issue,
 
 const insertHistory = `-- name: InsertHistory :exec
 
-INSERT INTO issue_history (issue_id, actor_id, actor_type, field, from_value, to_value, from_ref, to_ref)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+INSERT INTO issue_history (issue_id, actor_id, actor_type, field, from_value, to_value, from_ref, to_ref, via)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 `
 
 type InsertHistoryParams struct {
@@ -789,6 +793,7 @@ type InsertHistoryParams struct {
 	ToValue   *string
 	FromRef   *string
 	ToRef     *string
+	Via       *string
 }
 
 // ---------------------------------------------------------------------------
@@ -803,6 +808,7 @@ func (q *Queries) InsertHistory(ctx context.Context, arg InsertHistoryParams) er
 		arg.ToValue,
 		arg.FromRef,
 		arg.ToRef,
+		arg.Via,
 	)
 	return err
 }
@@ -926,7 +932,7 @@ func (q *Queries) ListAttachments(ctx context.Context, issueID uuid.UUID) ([]Att
 }
 
 const listComments = `-- name: ListComments :many
-SELECT id, issue_id, author_id, body, source, edited_at, created_at FROM comments WHERE issue_id = $1 ORDER BY created_at
+SELECT id, issue_id, author_id, body, source, edited_at, created_at, via FROM comments WHERE issue_id = $1 ORDER BY created_at
 `
 
 func (q *Queries) ListComments(ctx context.Context, issueID uuid.UUID) ([]Comment, error) {
@@ -946,6 +952,7 @@ func (q *Queries) ListComments(ctx context.Context, issueID uuid.UUID) ([]Commen
 			&i.Source,
 			&i.EditedAt,
 			&i.CreatedAt,
+			&i.Via,
 		); err != nil {
 			return nil, err
 		}
@@ -991,7 +998,7 @@ func (q *Queries) ListFilters(ctx context.Context, ownerID uuid.UUID) ([]SavedFi
 }
 
 const listHistory = `-- name: ListHistory :many
-SELECT id, issue_id, actor_id, actor_type, field, from_value, to_value, from_ref, to_ref, created_at FROM issue_history WHERE issue_id = $1 ORDER BY id
+SELECT id, issue_id, actor_id, actor_type, field, from_value, to_value, from_ref, to_ref, created_at, via FROM issue_history WHERE issue_id = $1 ORDER BY id
 `
 
 func (q *Queries) ListHistory(ctx context.Context, issueID uuid.UUID) ([]IssueHistory, error) {
@@ -1014,6 +1021,7 @@ func (q *Queries) ListHistory(ctx context.Context, issueID uuid.UUID) ([]IssueHi
 			&i.FromRef,
 			&i.ToRef,
 			&i.CreatedAt,
+			&i.Via,
 		); err != nil {
 			return nil, err
 		}
@@ -1311,7 +1319,7 @@ func (q *Queries) SetIssueRank(ctx context.Context, arg SetIssueRankParams) (Iss
 }
 
 const updateComment = `-- name: UpdateComment :one
-UPDATE comments SET body = $2, edited_at = now() WHERE id = $1 RETURNING id, issue_id, author_id, body, source, edited_at, created_at
+UPDATE comments SET body = $2, edited_at = now() WHERE id = $1 RETURNING id, issue_id, author_id, body, source, edited_at, created_at, via
 `
 
 type UpdateCommentParams struct {
@@ -1330,6 +1338,7 @@ func (q *Queries) UpdateComment(ctx context.Context, arg UpdateCommentParams) (C
 		&i.Source,
 		&i.EditedAt,
 		&i.CreatedAt,
+		&i.Via,
 	)
 	return i, err
 }

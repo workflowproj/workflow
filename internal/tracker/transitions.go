@@ -436,7 +436,7 @@ func (s *Service) transitionTx(ctx context.Context, tx pgx.Tx, q *dbq.Queries, a
 		}
 	}
 	if comment != "" {
-		if _, err := q.CreateComment(ctx, dbq.CreateCommentParams{IssueID: i.ID, AuthorID: actor.UserID(), Body: comment, Source: commentSource(actor)}); err != nil {
+		if _, err := q.CreateComment(ctx, dbq.CreateCommentParams{IssueID: i.ID, AuthorID: actor.UserID(), Body: comment, Source: commentSource(actor), Via: via(actor)}); err != nil {
 			return i, err
 		}
 	}

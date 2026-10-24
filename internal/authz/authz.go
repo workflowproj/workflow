@@ -90,9 +90,13 @@ type Actor struct {
 	Type ActorType
 	// OrgRole is the effective organisation role (own role combined with group mappings).
 	OrgRole string
-	// TokenID and Scopes are set when authenticated with a personal access token.
-	TokenID *uuid.UUID
-	Scopes  []string
+	// TokenID, TokenName and Scopes are set when authenticated with a personal access token.
+	TokenID   *uuid.UUID
+	TokenName string
+	Scopes    []string
+	// Via names what the person used to act, recorded with their changes (e.g. the AI
+	// assistant connected over MCP). Empty for the web app and plain API calls.
+	Via string
 	// Depth counts automation rules triggering further rules; RuleID is the rule acting.
 	Depth  int
 	RuleID *uuid.UUID

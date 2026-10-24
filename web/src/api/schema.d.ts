@@ -2720,6 +2720,8 @@ export interface components {
             author?: components["schemas"]["User"];
             body: string;
             source: string;
+            /** @description What the author used, e.g. an AI assistant */
+            via?: string;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -2734,6 +2736,8 @@ export interface components {
             id: number;
             actor?: components["schemas"]["User"];
             actorType: string;
+            /** @description What the person used, e.g. an AI assistant ("Ada via Claude") */
+            via?: string;
             field: string;
             from?: string;
             to?: string;

@@ -52,7 +52,7 @@ func (s *Service) AddComment(ctx context.Context, actor *authz.Actor, ref, body 
 	var c dbq.Comment
 	err = s.tx(ctx, func(tx pgx.Tx, q *dbq.Queries) error {
 		var err error
-		c, err = q.CreateComment(ctx, dbq.CreateCommentParams{IssueID: i.ID, AuthorID: actor.UserID(), Body: body, Source: commentSource(actor)})
+		c, err = q.CreateComment(ctx, dbq.CreateCommentParams{IssueID: i.ID, AuthorID: actor.UserID(), Body: body, Source: commentSource(actor), Via: via(actor)})
 		if err != nil {
 			return err
 		}

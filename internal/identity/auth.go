@@ -306,6 +306,7 @@ func (a *Auth) Authenticate(r *http.Request) (*authz.Actor, error) {
 		}
 		actor := authz.UserActor(row.User, role)
 		actor.TokenID = &row.ApiToken.ID
+		actor.TokenName = row.ApiToken.Name
 		actor.Scopes = row.ApiToken.Scopes
 		if row.ApiToken.LastUsedAt == nil || time.Since(*row.ApiToken.LastUsedAt) > time.Minute {
 			_ = a.Q.TouchAPIToken(ctx, row.ApiToken.ID)
