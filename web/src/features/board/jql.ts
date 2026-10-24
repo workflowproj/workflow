@@ -3,12 +3,13 @@ export function jqlString(v: string) {
   return `"${v.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"`;
 }
 
-export type QuickFilters = { text: string; mine: boolean; recent: boolean };
+/** QuickFilters are the board and backlog filters; `people` (assignee ids, see people.ts) applies in the browser. */
+export type QuickFilters = { text: string; mine: boolean; recent: boolean; people: string[] };
 
-export const NO_FILTERS: QuickFilters = { text: "", mine: false, recent: false };
+export const NO_FILTERS: QuickFilters = { text: "", mine: false, recent: false, people: [] };
 
 /** quickFilterJql turns the board's quick filters into JQL that the API ANDs with the board filter. */
-export function quickFilterJql(f: QuickFilters): string {
+export function quickFilterJql(f: Pick<QuickFilters, "text" | "mine" | "recent">): string {
   const parts: string[] = [];
   if (f.mine) parts.push("assignee = currentUser()");
   if (f.recent) parts.push("updated >= -1d");
@@ -19,5 +20,5 @@ export function quickFilterJql(f: QuickFilters): string {
 }
 
 export function hasFilters(f: QuickFilters) {
-  return f.mine || f.recent || f.text.trim() !== "";
+  return f.mine || f.recent || f.text.trim() !== "" || f.people.length > 0;
 }

@@ -27,7 +27,8 @@ export function BoardView({
   onOpen,
   onDrop,
 }: {
-  columns: BoardColumnData[];
+  /** Columns as shown; `total` is a column's full count when a filter hides some of its issues. */
+  columns: (BoardColumnData & { total?: number })[];
   mode: SwimlaneMode;
   meId?: string;
   statuses: Map<string, Status>;
@@ -174,8 +175,9 @@ function Cell({ id, items, children, header, fill, danger, over, dimmed }: { id:
   );
 }
 
-function ColumnHeader({ column, statuses }: { column: BoardColumnData; statuses: Map<string, Status> }) {
+function ColumnHeader({ column, statuses }: { column: BoardColumnData & { total?: number }; statuses: Map<string, Status> }) {
   const count = column.issues.length;
+  const total = column.total ?? count;
   const done = column.statusIds.length > 0 && column.statusIds.every((s) => statuses.get(s)?.category === "done");
   const names = column.statusIds.map((s) => statuses.get(s)?.name).filter(Boolean);
   return (
@@ -187,10 +189,12 @@ function ColumnHeader({ column, statuses }: { column: BoardColumnData; statuses:
           title={column.overLimit ? `Over the work-in-progress limit of ${column.wipLimit}` : `Work-in-progress limit: ${column.wipLimit}`}
           className={cn("ml-auto rounded px-1.5 py-0.5 text-[11px] font-semibold tabular-nums", column.overLimit ? "bg-danger text-white" : "bg-surface-3 text-muted")}
         >
-          {count} / {column.wipLimit}
+          {total} / {column.wipLimit}
         </span>
       ) : (
-        <span className="ml-auto text-xs text-faint tabular-nums">{count}</span>
+        <span className="ml-auto text-xs text-faint tabular-nums" title={total !== count ? `${count} of ${total} shown` : undefined}>
+          {total !== count ? `${count} of ${total}` : count}
+        </span>
       )}
     </div>
   );

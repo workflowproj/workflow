@@ -3,9 +3,28 @@ import { Search, X } from "lucide-react";
 import { Button } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { hasFilters, NO_FILTERS, type QuickFilters } from "./jql";
+import type { Person } from "./people";
+import { PeopleFilter } from "./PeopleFilter";
 
-/** QuickFilterBar: free-text search (debounced) plus toggle chips; the page turns them into JQL. */
-export function QuickFilterBar({ value, onChange, recent = true, children }: { value: QuickFilters; onChange: (f: QuickFilters) => void; recent?: boolean; children?: ReactNode }) {
+/**
+ * QuickFilterBar: free-text search (debounced), the assignee avatars and toggle chips. The page
+ * turns text and chips into JQL and applies the people filter itself.
+ */
+export function QuickFilterBar({
+  value,
+  onChange,
+  recent = true,
+  people = [],
+  meId,
+  children,
+}: {
+  value: QuickFilters;
+  onChange: (f: QuickFilters) => void;
+  recent?: boolean;
+  people?: Person[];
+  meId?: string;
+  children?: ReactNode;
+}) {
   const [text, setText] = useState(value.text);
   useEffect(() => setText(value.text), [value.text]);
   useEffect(() => {
@@ -31,6 +50,7 @@ export function QuickFilterBar({ value, onChange, recent = true, children }: { v
           </button>
         )}
       </div>
+      {people.length > 0 && <PeopleFilter people={people} selected={value.people} meId={meId} onChange={(ids) => onChange({ ...value, people: ids })} />}
       <Chip pressed={value.mine} onClick={() => onChange({ ...value, mine: !value.mine })}>
         Only my issues
       </Chip>

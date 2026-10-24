@@ -1,17 +1,18 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { getRouteApi } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DndContext, DragOverlay, type Announcements, type UniqueIdentifier } from "@dnd-kit/core";
 import { ArrowDownToLine, ArrowUpToLine, CalendarRange, ListTodo, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import { api, unwrap } from "@/api/client";
-import { hasPermission, useProject } from "@/api/queries";
-import type { Issue, Project } from "@/api/types";
+import { hasPermission, useMe, useProject } from "@/api/queries";
+import type { Issue, Project, User } from "@/api/types";
 import { Badge, Button, EmptyState, IconButton, MenuItem, MenuLabel, PageSpinner, Popover, useConfirm, useToast } from "@/components/ui";
 import { ErrorBox } from "@/components/ErrorBox";
 import { IssueDrawer } from "@/features/issues/IssueDrawer";
 import { BoardSwitcher } from "@/features/board/BoardSwitcher";
 import { hasFilters, NO_FILTERS, quickFilterJql, type QuickFilters } from "@/features/board/jql";
 import { BACKLOG, findContainer, sumPoints, type Containers } from "@/features/board/model";
+import { filterBacklog, peopleOf } from "@/features/board/people";
 import { QuickFilterBar } from "@/features/board/QuickFilterBar";
 import { backlogQuery, useBoardSelection, type Board, type Sprint } from "@/features/board/queries";
 import { useContainerDnd } from "@/features/board/useContainerDnd";
@@ -55,6 +56,7 @@ function BacklogScreen({ project, boards, board, onSelect, onOpen }: { project: 
   const [filters, setFilters] = useState<QuickFilters>(NO_FILTERS);
   const jql = quickFilterJql(filters);
   const { data, isLoading, error, isPlaceholderData } = useQuery(backlogQuery(board.id, jql));
+  const { data: me } = useMe();
   const move = useBacklogMove(board.id, jql);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [dialog, setDialog] = useState<Dialog>(null);
@@ -69,12 +71,20 @@ function BacklogScreen({ project, boards, board, onSelect, onOpen }: { project: 
     for (const s of data?.sprints ?? []) for (const i of s.issues) m.set(i.id, i);
     return m;
   }, [data]);
+  // The people filter applies here: the lists show only the selected people's issues, while
+  // sprint counts in dialogs still use every issue.
+  const known = useRef(new Map<string, User>());
+  const people = useMemo(() => {
+    for (const i of issues.values()) if (i.assignee) known.current.set(i.assignee.id, i.assignee);
+    return peopleOf(issues.values(), me?.id, filters.people, known.current);
+  }, [issues, me?.id, filters.people]);
   const containers = useMemo(() => {
     const c: Containers = {};
-    for (const s of data?.sprints ?? []) c[s.sprint.id] = s.issues.map((i) => i.id);
-    c[BACKLOG] = (data?.backlog ?? []).map((i) => i.id);
+    const view = data && filterBacklog(data, filters.people);
+    for (const s of view?.sprints ?? []) c[s.sprint.id] = s.issues.map((i) => i.id);
+    c[BACKLOG] = (view?.backlog ?? []).map((i) => i.id);
     return c;
-  }, [data]);
+  }, [data, filters.people]);
   const dnd = useContainerDnd({ containers, onDrop: ({ id, to, list }) => move.drop(id, to, list) });
   const active = dnd.activeId ? issues.get(dnd.activeId) : undefined;
   const target = dnd.activeId ? findContainer(dnd.items, dnd.activeId) : undefined;
@@ -166,7 +176,7 @@ function BacklogScreen({ project, boards, board, onSelect, onOpen }: { project: 
         )}
       </div>
       <div className="mb-4">
-        <QuickFilterBar value={filters} onChange={setFilters} />
+        <QuickFilterBar value={filters} onChange={setFilters} people={people} meId={me?.id} />
       </div>
       {!scrum && <p className="mb-4 text-[13px] text-muted">Kanban boards don't use sprints: this is every open issue in rank order. Drag issues to re-prioritise them.</p>}
       <DndContext
@@ -201,7 +211,13 @@ function BacklogScreen({ project, boards, board, onSelect, onOpen }: { project: 
                 canDrag={canDrag}
                 highlight={!!active && target === sprint.id}
                 rowActions={rowActions}
-                empty={isActive ? "Drag issues here to add them to the active sprint." : "Plan this sprint by dragging issues from the backlog, or create new ones below."}
+                empty={
+                  hasFilters(filters) && list.length > 0
+                    ? "No issues in this sprint match these filters."
+                    : isActive
+                      ? "Drag issues here to add them to the active sprint."
+                      : "Plan this sprint by dragging issues from the backlog, or create new ones below."
+                }
                 footer={canCreate && <InlineCreate projectKey={project.key} sprintId={sprint.id} />}
                 actions={
                   manage && (

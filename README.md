@@ -20,7 +20,8 @@ search and live updates all run on Postgres.
   version; issues stay on their version until a background job migrates them with your status
   mapping. Edit visually in the browser or apply from CI with `wfm workflow apply`.
 - **Boards and planning.** Scrum and Kanban boards with column mapping, swimlanes, WIP limits and
-  quick filters; ranked backlog; sprints with burndown and velocity; releases; cycle time.
+  quick filters, including assignee avatars to show one or several people's work; ranked
+  backlog; sprints with burndown and velocity; releases; cycle time.
 - **JQL search** compiled to SQL, with autocomplete, saved and shared filters.
 - **GitHub and GitLab.** A GitHub App or GitLab token per connection; verified, de-duplicated
   webhooks; branches, commits, pull/merge requests and pipelines linked to issues by key; smart

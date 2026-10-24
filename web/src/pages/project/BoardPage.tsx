@@ -1,9 +1,9 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { getRouteApi, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { CalendarClock, Columns3, ListTodo, TriangleAlert } from "lucide-react";
 import { hasPermission, statusesQuery, useMe, useProject } from "@/api/queries";
-import type { Project } from "@/api/types";
+import type { Project, User } from "@/api/types";
 import { Button, EmptyState, PageSpinner, Select } from "@/components/ui";
 import { ErrorBox } from "@/components/ErrorBox";
 import { IssueDrawer } from "@/features/issues/IssueDrawer";
@@ -11,6 +11,7 @@ import { BoardSwitcher } from "@/features/board/BoardSwitcher";
 import { BoardView } from "@/features/board/BoardView";
 import { hasFilters, NO_FILTERS, quickFilterJql, type QuickFilters } from "@/features/board/jql";
 import { SWIMLANE_LABELS, type SwimlaneMode } from "@/features/board/model";
+import { filterColumns, peopleOf } from "@/features/board/people";
 import { QuickFilterBar } from "@/features/board/QuickFilterBar";
 import { boardDataQuery, useBoardSelection, type Board, type BoardData } from "@/features/board/queries";
 import { primaryLink } from "@/features/board/styles";
@@ -73,7 +74,16 @@ function BoardScreen({ project, boards, board, onSelect, onOpen }: { project: Pr
   const scrum = config.type === "scrum";
   const sprint = data?.sprint;
   const canDrag = ["issue.transition", "issue.edit", "sprint.manage"].some((p) => hasPermission(project, p));
-  const total = data?.columns.reduce((n, c) => n + c.issues.length, 0) ?? 0;
+  // The people filter applies here, so toggling an avatar is instant and the avatars come from
+  // every issue the other filters leave on the board.
+  const known = useRef(new Map<string, User>());
+  const people = useMemo(() => {
+    const all = data?.columns.flatMap((c) => c.issues) ?? [];
+    for (const i of all) if (i.assignee) known.current.set(i.assignee.id, i.assignee);
+    return peopleOf(all, me?.id, filters.people, known.current);
+  }, [data, me?.id, filters.people]);
+  const columns = useMemo(() => filterColumns(data?.columns ?? [], filters.people), [data, filters.people]);
+  const total = columns.reduce((n, c) => n + c.issues.length, 0);
   const noSprint = scrum && !!data && !sprint && !isPlaceholderData;
 
   return (
@@ -89,7 +99,7 @@ function BoardScreen({ project, boards, board, onSelect, onOpen }: { project: Pr
           )}
         </div>
         <div className={cn("flex flex-wrap items-center justify-between gap-2", noSprint && "hidden")}>
-          <QuickFilterBar value={filters} onChange={setFilters} />
+          <QuickFilterBar value={filters} onChange={setFilters} people={people} meId={me?.id} />
           <label className="flex items-center gap-2 text-[13px] whitespace-nowrap text-muted">
             Group by
             <span className="w-36">
@@ -121,7 +131,7 @@ function BoardScreen({ project, boards, board, onSelect, onOpen }: { project: Pr
         ) : !data ? null : scrum && !sprint ? (
           <NoActiveSprint projectKey={project.key} />
         ) : (
-          <BoardView columns={data.columns} mode={mode} meId={me?.id} statuses={statusMap} canDrag={canDrag} onOpen={onOpen} onDrop={move.drop} />
+          <BoardView columns={columns} mode={mode} meId={me?.id} statuses={statusMap} canDrag={canDrag} onOpen={onOpen} onDrop={move.drop} />
         )}
       </div>
       {move.dialogs}
