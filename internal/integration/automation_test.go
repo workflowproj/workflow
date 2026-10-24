@@ -427,3 +427,64 @@ func TestAutomationTargetsCategoriesAndRollup(t *testing.T) {
 		t.Fatalf("run log does not name the parent it moved: %v", runs)
 	}
 }
+
+func TestServerSentEventsAcrossProjects(t *testing.T) {
+	e := newEnv(t)
+	ada := e.login("ada@example.com", "Ada")
+	bob := e.login("bob@example.com", "Bob")
+	ada.createProject("ONE", "kanban")
+	ada.createProject("TWO", "kanban")
+	ada.must("POST", "/api/v1/projects", obj{"key": "PRIV", "name": "Private", "template": "kanban", "access": "private"}, 201, nil)
+	bob.must("GET", "/api/v1/events?projects=ONE,PRIV", nil, 404, nil)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	stream := func(c *Client, query string) <-chan string {
+		req, _ := http.NewRequestWithContext(ctx, "GET", e.Srv.URL+"/api/v1/events?"+query, nil)
+		res, err := c.http.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { res.Body.Close() })
+		lines := make(chan string, 100)
+		go func() {
+			sc := bufio.NewScanner(res.Body)
+			for sc.Scan() {
+				if l := sc.Text(); strings.HasPrefix(l, "data: ") {
+					lines <- l
+				}
+			}
+			close(lines)
+		}()
+		return lines
+	}
+	next := func(lines <-chan string) string {
+		t.Helper()
+		select {
+		case l := <-lines:
+			return l
+		case <-ctx.Done():
+			t.Fatal("timed out waiting for an event")
+		}
+		return ""
+	}
+	both := stream(ada, "projects=ONE,TWO")
+	all := stream(bob, "projects=*")
+	if l := next(both); !strings.Contains(l, `"ONE"`) || !strings.Contains(l, `"TWO"`) {
+		t.Fatalf("ready lists the projects: %s", l)
+	}
+	if l := next(all); strings.Contains(l, "PRIV") || !strings.Contains(l, `"ONE"`) {
+		t.Fatalf("* is the browsable projects: %s", l)
+	}
+	ada.createIssue("PRIV", "task", "Secret", nil)
+	ada.createIssue("TWO", "task", "Second", nil)
+	ada.createIssue("ONE", "task", "First", nil)
+	for _, want := range []string{"TWO-1", "ONE-1"} {
+		if l := next(both); !strings.Contains(l, want) {
+			t.Fatalf("expected %s, got %s", want, l)
+		}
+		if l := next(all); !strings.Contains(l, want) {
+			t.Fatalf("bob expected %s (never PRIV), got %s", want, l)
+		}
+	}
+}

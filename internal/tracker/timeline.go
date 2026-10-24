@@ -99,8 +99,12 @@ func (s *Service) Timeline(ctx context.Context, actor *authz.Actor, keys []strin
 	return out, nil
 }
 
-// projectsByKeys resolves project keys the actor may browse, in the order given; no keys means
+// ProjectsByKeys resolves project keys the actor may browse, in the order given; no keys means
 // every browsable project.
+func (s *Service) ProjectsByKeys(ctx context.Context, actor *authz.Actor, keys []string) ([]dbq.Project, error) {
+	return s.projectsByKeys(ctx, actor, keys)
+}
+
 func (s *Service) projectsByKeys(ctx context.Context, actor *authz.Actor, keys []string) ([]dbq.Project, error) {
 	var out []dbq.Project
 	if len(keys) == 0 {

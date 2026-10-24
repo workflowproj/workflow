@@ -98,7 +98,9 @@ Project admins manage chat channels with `GET/POST /projects/{key}/chat-channels
 ## Live events
 
 `GET /api/v1/events?project=PLAT` is a [server-sent events](https://html.spec.whatwg.org/multipage/server-sent-events.html)
-stream for one project (cookie or token auth). Event names are domain events —
+stream for one project (cookie or token auth); `?projects=PLAT,OPS` follows several (up to
+500), and `?projects=*` every project you can browse when the stream opens. The `ready` event
+lists the projects followed. Event names are domain events —
 `issue.created`, `issue.updated`, `issue.transitioned`, `issue.deleted`, `comment.created`,
 `sprint.started`, `sprint.completed`, `release.released`, `board.updated`, development activity
 (`pr.opened`, `commit.pushed`, …) — with data `{type, projectId, issueId, issueKey, actorId}`.

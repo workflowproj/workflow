@@ -10,19 +10,31 @@ const EVENT_TYPES = [
 
 export type LiveEvent = { type: string; projectId: string; issueId?: string; issueKey?: string; actorId?: string };
 
+/** Which projects a stream follows: one key, several, or every project the viewer can browse. */
+export type LiveScope = string | string[] | "all" | undefined;
+
+/** eventsURL is the stream for a scope (undefined when there is nothing to follow). */
+export function eventsURL(scope: LiveScope): string | undefined {
+  if (!scope || (Array.isArray(scope) && scope.length === 0)) return undefined;
+  if (scope === "all") return "/api/v1/events?projects=*";
+  if (Array.isArray(scope)) return `/api/v1/events?projects=${[...new Set(scope)].sort().map(encodeURIComponent).join(",")}`;
+  return `/api/v1/events?project=${encodeURIComponent(scope)}`;
+}
+
 /**
- * useProjectEvents subscribes to the project's server-sent events and invalidates cached
- * queries so boards, backlogs, searches and open issues refresh live. EventSource reconnects
- * on its own (the server sends `retry: 3000`).
+ * useLiveEvents subscribes to server-sent events for the scope and invalidates cached queries so
+ * boards, backlogs, searches, timelines, dashboards and open issues refresh live. Bursts are
+ * coalesced into one refetch after `debounceMs`. EventSource reconnects on its own (the server
+ * sends `retry: 3000`).
  */
-export function useProjectEvents(projectKey: string | undefined, onEvent?: (e: LiveEvent) => void) {
+export function useLiveEvents(scope: LiveScope, { onEvent, debounceMs = 150 }: { onEvent?: (e: LiveEvent) => void; debounceMs?: number } = {}) {
   const qc = useQueryClient();
+  const url = eventsURL(scope);
   useEffect(() => {
-    if (!projectKey) return;
-    const es = new EventSource(`/api/v1/events?project=${encodeURIComponent(projectKey)}`);
+    if (!url) return;
+    const es = new EventSource(url);
     let timer: ReturnType<typeof setTimeout> | undefined;
     const pending = new Set<string>();
-    // Coalesce bursts (a drag can emit several events) into one refetch.
     const flush = () => {
       for (const k of ["board", "backlog", "search", "sprints", "releases", "timeline", "metrics"]) qc.invalidateQueries({ queryKey: [k] });
       for (const key of pending) {
@@ -41,7 +53,7 @@ export function useProjectEvents(projectKey: string | undefined, onEvent?: (e: L
       }
       if (ev.issueKey) pending.add(ev.issueKey);
       clearTimeout(timer);
-      timer = setTimeout(flush, 150);
+      timer = setTimeout(flush, debounceMs);
       onEvent?.(ev);
     };
     for (const t of EVENT_TYPES) es.addEventListener(t, handle);
@@ -49,5 +61,10 @@ export function useProjectEvents(projectKey: string | undefined, onEvent?: (e: L
       clearTimeout(timer);
       es.close();
     };
-  }, [projectKey, qc, onEvent]);
+  }, [url, qc, onEvent, debounceMs]);
+}
+
+/** useProjectEvents follows one project (boards, backlogs, issue views). */
+export function useProjectEvents(projectKey: string | undefined, onEvent?: (e: LiveEvent) => void) {
+  useLiveEvents(projectKey, { onEvent });
 }

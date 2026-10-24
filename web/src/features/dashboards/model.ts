@@ -344,6 +344,23 @@ export function duplicateGadget(gadgets: Gadget[], id: string): Gadget[] {
 }
 
 /** seedScope suggests projects for a new gadget from the ones the dashboard already uses. */
+/**
+ * liveScope is the projects a dashboard's gadgets read, for one live event stream: every
+ * browsable project as soon as one gadget isn't limited to projects.
+ */
+export function liveScope(gadgets: Gadget[]): string[] | "all" | undefined {
+  const keys = new Set<string>();
+  for (const g of gadgets) {
+    if (gadgetMeta(g.type).scope !== "query") {
+      if (g.config.projectKey) keys.add(g.config.projectKey);
+      continue;
+    }
+    if (!g.config.projectKeys?.length) return "all";
+    for (const k of g.config.projectKeys) keys.add(k);
+  }
+  return keys.size ? [...keys].sort() : undefined;
+}
+
 export function seedScope(gadgets: Gadget[]): GadgetConfig {
   const projectKey = gadgets.map((g) => g.config.projectKey ?? g.config.projectKeys?.[0]).find(Boolean);
   const keys = gadgets.find((g) => g.config.projectKeys?.length)?.config.projectKeys;

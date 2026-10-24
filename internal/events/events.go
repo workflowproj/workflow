@@ -53,8 +53,8 @@ func NewHub(pool *pgxpool.Pool, log *slog.Logger) *Hub {
 	return &Hub{pool: pool, log: log, subs: map[uuid.UUID]map[chan Event]struct{}{}}
 }
 
-// Subscribe returns a channel of events for one project and a function to unsubscribe.
-func (h *Hub) Subscribe(projectID uuid.UUID) (<-chan Event, func()) {
+// Subscribe returns one channel of events for the given projects and a function to unsubscribe.
+func (h *Hub) Subscribe(projectIDs ...uuid.UUID) (<-chan Event, func()) {
 	ch := make(chan Event, 64)
 	h.mu.Lock()
 	if h.closed {
@@ -63,19 +63,23 @@ func (h *Hub) Subscribe(projectID uuid.UUID) (<-chan Event, func()) {
 		subscribers.Inc()
 		return ch, func() { subscribers.Dec() }
 	}
-	if h.subs[projectID] == nil {
-		h.subs[projectID] = map[chan Event]struct{}{}
+	for _, id := range projectIDs {
+		if h.subs[id] == nil {
+			h.subs[id] = map[chan Event]struct{}{}
+		}
+		h.subs[id][ch] = struct{}{}
 	}
-	h.subs[projectID][ch] = struct{}{}
 	h.mu.Unlock()
 	subscribers.Inc()
 	var once sync.Once
 	return ch, func() {
 		once.Do(func() {
 			h.mu.Lock()
-			delete(h.subs[projectID], ch)
-			if len(h.subs[projectID]) == 0 {
-				delete(h.subs, projectID)
+			for _, id := range projectIDs {
+				delete(h.subs[id], ch)
+				if len(h.subs[id]) == 0 {
+					delete(h.subs, id)
+				}
 			}
 			h.mu.Unlock()
 			subscribers.Dec()
@@ -92,9 +96,13 @@ func (h *Hub) Close() {
 		return
 	}
 	h.closed = true
+	done := map[chan Event]bool{} // a stream may be registered under several projects
 	for _, chans := range h.subs {
 		for ch := range chans {
-			close(ch)
+			if !done[ch] {
+				done[ch] = true
+				close(ch)
+			}
 		}
 	}
 	h.subs = map[uuid.UUID]map[chan Event]struct{}{}

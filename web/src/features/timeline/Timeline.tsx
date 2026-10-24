@@ -11,10 +11,9 @@ import { buildRows, dependencies, isOverdue, schedules, stats, todayDay } from "
 import { timelineQuery, useEpicProgress, useTimelineEdits } from "./queries";
 import type { Zoom } from "./scale";
 import { TimelineGrid } from "./TimelineGrid";
-import { Chip, ProjectEvents, Stats, ZoomSwitch, type QuickFilters } from "./Toolbar";
+import { useLiveEvents } from "@/lib/events";
+import { Chip, Stats, ZoomSwitch, type QuickFilters } from "./Toolbar";
 
-/** Live updates come from one event stream per project; beyond this many, the view polls instead. */
-const MAX_STREAMS = 4;
 
 const ZOOM_KEY = "wfm.timeline.zoom";
 function readZoom(): Zoom {
@@ -64,11 +63,9 @@ export function Timeline({
 
   const jql = [baseJql, filters.mine ? "assignee = currentUser()" : ""].filter(Boolean).map((j) => `(${j})`).join(" AND ");
   const query = timelineQuery(projects, jql, showDone ? 90 : 0);
-  const { data, isLoading, error, isPlaceholderData } = useQuery({
-    ...query,
-    refetchInterval: (q) => (live && (q.state.data?.projects.length ?? 0) > MAX_STREAMS ? 30_000 : false),
-  });
-  const streams = live && !!data && data.projects.length <= MAX_STREAMS;
+  const { data, isLoading, error, isPlaceholderData } = useQuery(query);
+  // One event stream follows every project shown.
+  useLiveEvents(live && data ? data.projects.map((p) => p.key) : undefined, { debounceMs: 500 });
   const { data: allProjects = [] } = useQuery(projectsQuery);
   const editable = useMemo(() => new Set(allProjects.filter((p) => p.myPermissions.includes("issue.edit")).map((p) => p.key)), [allProjects]);
   const canEdit = useCallback((key: string) => editable.has(key), [editable]);
@@ -97,7 +94,6 @@ export function Timeline({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {streams && data?.projects.map((p) => <ProjectEvents key={p.key} projectKey={p.key} />)}
       <div className="flex shrink-0 flex-col gap-2.5 px-4 pt-4 pb-3 md:px-6">
         <div className="flex flex-wrap items-center gap-2">
           {picker}

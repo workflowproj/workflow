@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getRouteApi, Link, useBlocker, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Copy, Ellipsis, Globe, LayoutDashboard, Lock, Pencil, Plus, Trash2 } from "lucide-react";
@@ -10,11 +10,11 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { dashboardQuery } from "@/features/dashboards/api";
 import { DashboardGrid } from "@/features/dashboards/DashboardGrid";
 import { GadgetConfigDialog, GadgetGallery } from "@/features/dashboards/GadgetDialogs";
-import { newGadget, sameDashboard, seedScope, toInput, type Dashboard, type DashboardInput } from "@/features/dashboards/model";
+import { liveScope, newGadget, sameDashboard, seedScope, toInput, type Dashboard, type DashboardInput } from "@/features/dashboards/model";
 import { useCreateDashboard } from "@/features/dashboards/NewDashboard";
 import { IssueDrawer } from "@/features/issues/IssueDrawer";
 import { issueQuery } from "@/features/issues/issue-api";
-import { useProjectEvents } from "@/lib/events";
+import { useLiveEvents, useProjectEvents } from "@/lib/events";
 import { formatDateTime, relativeTime } from "@/lib/format";
 
 const route = getRouteApi("/app/dashboards/$dashboardId");
@@ -29,6 +29,9 @@ export function DashboardPage() {
   // Keep the issue open in the drawer live; its changes also refresh the gadgets.
   const { data: open } = useQuery({ ...issueQuery(issue ?? ""), enabled: !!issue });
   useProjectEvents(open?.projectKey);
+  // One stream for every project the gadgets read; bursts refresh the gadgets once.
+  const scope = useMemo(() => liveScope(dashboard?.gadgets ?? []), [dashboard]);
+  useLiveEvents(scope, { debounceMs: 2000 });
 
   if (isLoading) return <PageSpinner label="Loading dashboard" />;
   if (error || !dashboard) {

@@ -5,11 +5,11 @@ import { whereOf, type BreakdownBy } from "./model";
 /*
  * Dashboard queries. Keys: ["dashboards"], ["dashboards", id]; gadget data lives under
  * ["metrics", kind, projects, jql, ...], sprint data under ["sprints", projectKey, ...] and
- * issue lists under ["search", jql, ...], so live events refresh them (lib/events.ts).
- * Gadgets also poll, since a dashboard can span projects nobody is streaming events for.
+ * issue lists under ["search", jql, ...], so the dashboard's live event stream (lib/events.ts)
+ * refreshes them. A slow poll is the safety net for a dropped stream.
  */
 
-const REFRESH = 60_000;
+const REFRESH = 5 * 60_000;
 
 export const dashboardsQuery = queryOptions({
   queryKey: ["dashboards"],

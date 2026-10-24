@@ -5,6 +5,7 @@ import {
   defaultTitle,
   duplicateGadget,
   formatStat,
+  liveScope,
   moveItem,
   newGadget,
   newGadgetId,
@@ -127,5 +128,18 @@ describe("editing", () => {
     const b = { name: "X", gadgets: [{ config: { days: 3, stat: "open" as const }, width: 1, type: "stat" as const, id: "1" }] };
     expect(sameDashboard(a, b)).toBe(true);
     expect(sameDashboard(a, { ...b, shared: true })).toBe(false);
+  });
+});
+
+describe("liveScope", () => {
+  const g = (type: Gadget["type"], config: Gadget["config"]): Gadget => ({ id: type, type, width: 1, config });
+  it("collects the projects the gadgets read", () => {
+    expect(liveScope([g("sprint_burndown", { projectKey: "PLAT" }), g("breakdown", { projectKeys: ["OPS", "PLAT"] })])).toEqual(["OPS", "PLAT"]);
+  });
+  it("follows every project when a gadget reads all of them", () => {
+    expect(liveScope([g("velocity", { projectKey: "PLAT" }), g("stat", {})])).toBe("all");
+  });
+  it("has nothing to follow without gadgets", () => {
+    expect(liveScope([])).toBeUndefined();
   });
 });

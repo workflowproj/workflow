@@ -4,17 +4,10 @@ import { Check, ChevronDown, Crosshair, FolderKanban } from "lucide-react";
 import { projectsQuery } from "@/api/queries";
 import { Button, MenuLabel, Popover } from "@/components/ui";
 import { ProjectAvatar } from "@/layout/AppShell";
-import { useProjectEvents } from "@/lib/events";
 import { cn } from "@/lib/cn";
 import { ZOOMS, type Zoom } from "./scale";
 
 export type QuickFilters = { overdue: boolean; conflicts: boolean; mine: boolean };
-
-/** ProjectEvents keeps one project's live updates open (the timeline mounts one per project). */
-export function ProjectEvents({ projectKey }: { projectKey: string }) {
-  useProjectEvents(projectKey);
-  return null;
-}
 
 export function Chip({ pressed, onClick, children, title }: { pressed: boolean; onClick: () => void; children: ReactNode; title?: string }) {
   return (
