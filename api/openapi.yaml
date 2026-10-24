@@ -77,6 +77,204 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Me' }
         default: { $ref: '#/components/responses/Problem' }
+  /auth/local/login:
+    post:
+      operationId: localLogin
+      tags: [auth]
+      security: []
+      summary: Sign in with an email address and a password (local accounts)
+      description: |
+        On success the session cookie is set (`status: signed_in`). Otherwise the result says what
+        comes next - `totp_required`, `password_change_required` (a temporary password) or
+        `totp_enrollment_required` (`WFM_LOCAL_REQUIRE_2FA`) - and an HttpOnly cookie carries the
+        unfinished sign-in to that step. Wrong credentials always get the same 401. Throttled per
+        client address and per email (429 with `Retry-After`); repeated failures lock the account
+        for a while (429, code `locked`). 404 when `WFM_LOCAL_LOGIN=false`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string }
+                password: { type: string }
+      responses:
+        "200":
+          description: Signed in, or the next step
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LocalLoginResult' }
+        default: { $ref: '#/components/responses/Problem' }
+  /auth/local/login/totp:
+    post:
+      operationId: localLoginTotp
+      tags: [auth]
+      security: []
+      summary: Second sign-in step - an authenticator code or a recovery code
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: { type: string, description: '6-digit code, or a recovery code such as k7dmr-x3qpa' }
+      responses:
+        "200":
+          description: Signed in, or the next step
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LocalLoginResult' }
+        default: { $ref: '#/components/responses/Problem' }
+  /auth/local/login/new-password:
+    post:
+      operationId: localLoginNewPassword
+      tags: [auth]
+      security: []
+      summary: Replace a temporary password during sign-in
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [newPassword]
+              properties:
+                newPassword: { type: string }
+      responses:
+        "200":
+          description: Signed in, or the next step
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LocalLoginResult' }
+        default: { $ref: '#/components/responses/Problem' }
+  /auth/local/login/totp-setup:
+    post:
+      operationId: localLoginTotpSetup
+      tags: [auth]
+      security: []
+      summary: Start the two-factor enrolment required at sign-in
+      responses:
+        "200":
+          description: The secret to add to an authenticator app
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TotpSetup' }
+        default: { $ref: '#/components/responses/Problem' }
+  /auth/local/login/totp-setup/confirm:
+    post:
+      operationId: localLoginTotpConfirm
+      tags: [auth]
+      security: []
+      summary: Finish two-factor enrolment at sign-in; the result carries the recovery codes once
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: { type: string }
+      responses:
+        "200":
+          description: Signed in
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LocalLoginResult' }
+        default: { $ref: '#/components/responses/Problem' }
+  /auth/local/forgot-password:
+    post:
+      operationId: localForgotPassword
+      tags: [auth]
+      security: []
+      summary: Email a password-reset link (valid for one hour) to a local account
+      description: Answers 202 whether or not an account exists for the address.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string }
+      responses:
+        "202": { description: If the address has a local account, a link is on its way }
+        default: { $ref: '#/components/responses/Problem' }
+  /auth/local/link:
+    post:
+      operationId: localLinkInfo
+      tags: [auth]
+      security: []
+      summary: Check an invitation or password-reset link
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string }
+      responses:
+        "200":
+          description: Who the link is for (404 `invalid_link` when used, expired or unknown)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LocalLink' }
+        default: { $ref: '#/components/responses/Problem' }
+  /auth/local/link/redeem:
+    post:
+      operationId: localRedeemLink
+      tags: [auth]
+      security: []
+      summary: Choose a password with an invitation or reset link (single use)
+      description: Ends every session of the person; they then sign in with the new password (and two-factor if on).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, password]
+              properties:
+                token: { type: string }
+                password: { type: string }
+      responses:
+        "200":
+          description: Password set
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LocalLink' }
+        default: { $ref: '#/components/responses/Problem' }
+  /auth/local/password-check:
+    post:
+      operationId: localCheckPassword
+      tags: [auth]
+      security: []
+      summary: Rate a password against the policy while someone types it
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password: { type: string }
+                email: { type: string }
+                displayName: { type: string }
+      responses:
+        "200":
+          description: Strength and policy problems
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PasswordCheck' }
+        default: { $ref: '#/components/responses/Problem' }
   /auth/logout:
     post:
       operationId: logout
@@ -130,6 +328,108 @@ paths:
       parameters: [{ $ref: '#/components/parameters/TokenId' }]
       responses:
         "204": { description: Revoked }
+        default: { $ref: '#/components/responses/Problem' }
+  /me/security:
+    get:
+      operationId: getMySecurity
+      tags: [me]
+      summary: How the signed-in person signs in (password, two-factor)
+      responses:
+        "200":
+          description: Sign-in and two-factor status
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MySecurity' }
+        default: { $ref: '#/components/responses/Problem' }
+  /me/password:
+    post:
+      operationId: changeMyPassword
+      tags: [me]
+      summary: Change your password (local accounts); ends your other sessions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, newPassword]
+              properties:
+                currentPassword: { type: string }
+                newPassword: { type: string }
+      responses:
+        "204": { description: Changed }
+        default: { $ref: '#/components/responses/Problem' }
+  /me/totp/setup:
+    post:
+      operationId: setupMyTotp
+      tags: [me]
+      summary: Start setting up two-factor authentication
+      responses:
+        "200":
+          description: The secret to add to an authenticator app; confirm it with a code
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TotpSetup' }
+        default: { $ref: '#/components/responses/Problem' }
+  /me/totp/confirm:
+    post:
+      operationId: confirmMyTotp
+      tags: [me]
+      summary: Turn two-factor authentication on with a code from the new secret
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: { type: string }
+      responses:
+        "200":
+          description: On; the recovery codes are shown only now
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RecoveryCodes' }
+        default: { $ref: '#/components/responses/Problem' }
+  /me/totp/disable:
+    post:
+      operationId: disableMyTotp
+      tags: [me]
+      summary: Turn two-factor authentication off (needs your password and a code)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password, code]
+              properties:
+                password: { type: string }
+                code: { type: string, description: Authenticator code or a recovery code }
+      responses:
+        "204": { description: Off }
+        default: { $ref: '#/components/responses/Problem' }
+  /me/totp/recovery-codes:
+    post:
+      operationId: regenerateMyRecoveryCodes
+      tags: [me]
+      summary: Replace your recovery codes (needs a code)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: { type: string }
+      responses:
+        "200":
+          description: New codes; the old ones stop working
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RecoveryCodes' }
         default: { $ref: '#/components/responses/Problem' }
   /notifications:
     get:
@@ -286,6 +586,10 @@ paths:
                 email: { type: string, format: email }
                 displayName: { type: string, minLength: 1, maxLength: 200 }
                 orgRole: { $ref: '#/components/schemas/OrgRole' }
+                groupIds:
+                  description: Local groups to add the person to.
+                  type: array
+                  items: { type: string, format: uuid }
       responses:
         "201":
           description: Created
@@ -314,6 +618,84 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/AdminUser' }
+        default: { $ref: '#/components/responses/Problem' }
+  /admin/users/{userId}/invitation:
+    post:
+      operationId: adminInviteUser
+      tags: [admin]
+      summary: Email a person an invitation to choose a password (makes them a local account)
+      description: A new invitation replaces any open one. Refused for people managed by SCIM or Google directory sync.
+      parameters: [{ $ref: '#/components/parameters/UserId' }]
+      responses:
+        "200":
+          description: Sent
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [expiresAt]
+                properties:
+                  expiresAt: { type: string, format: date-time }
+        default: { $ref: '#/components/responses/Problem' }
+    delete:
+      operationId: adminRevokeInvitation
+      tags: [admin]
+      parameters: [{ $ref: '#/components/parameters/UserId' }]
+      responses:
+        "204": { description: Revoked }
+        default: { $ref: '#/components/responses/Problem' }
+  /admin/users/{userId}/temporary-password:
+    post:
+      operationId: adminSetTemporaryPassword
+      tags: [admin]
+      summary: Set a generated temporary password (returned once; changed at next sign-in)
+      parameters: [{ $ref: '#/components/parameters/UserId' }]
+      responses:
+        "200":
+          description: The temporary password
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [password]
+                properties:
+                  password: { type: string }
+        default: { $ref: '#/components/responses/Problem' }
+  /admin/users/{userId}/password-reset:
+    post:
+      operationId: adminSendPasswordReset
+      tags: [admin]
+      summary: Email a local account a password-reset link
+      parameters: [{ $ref: '#/components/parameters/UserId' }]
+      responses:
+        "202": { description: Sent }
+        default: { $ref: '#/components/responses/Problem' }
+  /admin/users/{userId}/unlock:
+    post:
+      operationId: adminUnlockUser
+      tags: [admin]
+      summary: Clear a lockout after repeated failed sign-ins
+      parameters: [{ $ref: '#/components/parameters/UserId' }]
+      responses:
+        "204": { description: Unlocked }
+        default: { $ref: '#/components/responses/Problem' }
+  /admin/users/{userId}/totp:
+    delete:
+      operationId: adminResetTotp
+      tags: [admin]
+      summary: Turn off a person's two-factor authentication (lost device)
+      parameters: [{ $ref: '#/components/parameters/UserId' }]
+      responses:
+        "204": { description: Reset }
+        default: { $ref: '#/components/responses/Problem' }
+  /admin/users/{userId}/password:
+    delete:
+      operationId: adminRemovePassword
+      tags: [admin]
+      summary: Remove a person's password and two-factor (back to single sign-on only)
+      parameters: [{ $ref: '#/components/parameters/UserId' }]
+      responses:
+        "204": { description: Removed }
         default: { $ref: '#/components/responses/Problem' }
   /admin/users/{userId}/tokens:
     get:
@@ -2353,12 +2735,13 @@ components:
 
     AuthProviders:
       type: object
-      required: [providers, devLogin]
+      required: [providers, devLogin, localLogin]
       properties:
         providers:
           type: array
           items: { $ref: '#/components/schemas/AuthProvider' }
         devLogin: { type: boolean }
+        localLogin: { type: boolean, description: Email and password sign-in for local accounts (WFM_LOCAL_LOGIN) }
     AuthProvider:
       type: object
       required: [id, name, loginUrl]
@@ -2402,6 +2785,69 @@ components:
             deactivatedAt: { type: string, format: date-time }
             deletedAt: { type: string, format: date-time }
             createdAt: { type: string, format: date-time }
+            localAccount: { $ref: '#/components/schemas/LocalAccountStatus' }
+    LocalAccountStatus:
+      type: object
+      description: Present for people who sign in with a password here (or are invited to).
+      required: [status, totpEnabled]
+      properties:
+        status:
+          type: string
+          enum: [invited, active, password_change_required]
+          description: invited = no password yet; password_change_required = a temporary password is set
+        invitationExpiresAt: { type: string, format: date-time }
+        totpEnabled: { type: boolean }
+        lockedUntil: { type: string, format: date-time, description: Set while locked after repeated failures }
+        passwordChangedAt: { type: string, format: date-time }
+    LocalLoginResult:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [signed_in, totp_required, password_change_required, totp_enrollment_required] }
+        me: { $ref: '#/components/schemas/Me' }
+        recoveryCodes:
+          description: After two-factor enrolment at sign-in; shown only once.
+          type: array
+          items: { type: string }
+    TotpSetup:
+      type: object
+      required: [secret, otpauthUri, qrCode]
+      properties:
+        secret: { type: string, description: Base32 secret for manual entry }
+        otpauthUri: { type: string }
+        qrCode: { type: string, description: 'The otpauth URI as a QR code: a data: URI of an SVG image' }
+    RecoveryCodes:
+      type: object
+      required: [codes]
+      properties:
+        codes: { type: array, items: { type: string } }
+    MySecurity:
+      type: object
+      required: [localLoginEnabled, localAccount, totpEnabled, recoveryCodesRemaining, require2fa]
+      properties:
+        localLoginEnabled: { type: boolean }
+        localAccount: { type: boolean, description: You have a password here }
+        passwordChangedAt: { type: string, format: date-time }
+        totpEnabled: { type: boolean }
+        totpEnabledAt: { type: string, format: date-time }
+        recoveryCodesRemaining: { type: integer }
+        require2fa: { type: boolean, description: Two-factor authentication is required for local accounts }
+    LocalLink:
+      type: object
+      required: [purpose, email, displayName]
+      properties:
+        purpose: { type: string, enum: [invite, reset] }
+        email: { type: string }
+        displayName: { type: string }
+        expiresAt: { type: string, format: date-time }
+    PasswordCheck:
+      type: object
+      required: [score, label, problems, acceptable]
+      properties:
+        score: { type: integer, minimum: 0, maximum: 4, description: '0 not allowed, 1 weak, 2 fair, 3 good, 4 strong' }
+        label: { type: string }
+        problems: { type: array, items: { type: string } }
+        acceptable: { type: boolean }
     ApiToken:
       type: object
       required: [id, name, prefix, scopes, expiresAt, createdAt]

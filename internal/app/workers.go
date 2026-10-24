@@ -169,6 +169,9 @@ func (a *App) maintenance(ctx context.Context) error {
 	if _, err := q.PruneWebhookEvents(ctx, time.Now().AddDate(0, 0, -30)); err != nil {
 		return err
 	}
+	if err := a.Local.Prune(ctx); err != nil {
+		return err
+	}
 	_, err := a.Automation.PruneChatDeliveries(ctx, time.Now().AddDate(0, 0, -30))
 	return err
 }

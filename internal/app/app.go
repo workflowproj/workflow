@@ -32,6 +32,7 @@ import (
 	"github.com/geoffo-dev/workflow-management/internal/httpapi"
 	"github.com/geoffo-dev/workflow-management/internal/identity"
 	"github.com/geoffo-dev/workflow-management/internal/identity/directory"
+	"github.com/geoffo-dev/workflow-management/internal/identity/local"
 	"github.com/geoffo-dev/workflow-management/internal/identity/scim"
 	"github.com/geoffo-dev/workflow-management/internal/jobs"
 	"github.com/geoffo-dev/workflow-management/internal/mail"
@@ -59,6 +60,8 @@ type App struct {
 	Hub        *events.Hub
 	// Mailer sends email (an in-memory *mail.Memory without WFM_SMTP_HOST).
 	Mailer mail.Sender
+	// Local handles local accounts (email and password sign-in).
+	Local  *local.Service
 	Server *httpapi.Server
 	Scim   *scim.Handler
 }
@@ -167,9 +170,10 @@ func New(ctx context.Context, cfg *config.Config, log *slog.Logger, pool *pgxpoo
 	a.River = client
 	enq.Enqueuer = client
 
+	a.Local = local.New(pool, cfg, box, enq, log.With("module", "local-accounts"))
 	a.Server = &httpapi.Server{
 		Cfg: cfg, Log: log.With("module", "http"), Pool: pool, Q: dbq.New(pool), Tracker: a.Tracker, Auth: a.Auth, Prov: a.Prov,
-		SCM: a.SCM, Automation: a.Automation, Jobs: enq, Hub: a.Hub, Box: box, Mailer: a.Mailer,
+		SCM: a.SCM, Automation: a.Automation, Jobs: enq, Hub: a.Hub, Box: box, Mailer: a.Mailer, Local: a.Local,
 	}
 	return a, nil
 }

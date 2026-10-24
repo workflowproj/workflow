@@ -32,6 +32,7 @@ import (
 	"github.com/geoffo-dev/workflow-management/internal/db/dbq"
 	"github.com/geoffo-dev/workflow-management/internal/events"
 	"github.com/geoffo-dev/workflow-management/internal/identity"
+	"github.com/geoffo-dev/workflow-management/internal/identity/local"
 	"github.com/geoffo-dev/workflow-management/internal/jobs"
 	"github.com/geoffo-dev/workflow-management/internal/mail"
 	"github.com/geoffo-dev/workflow-management/internal/mcpserver"
@@ -55,6 +56,7 @@ type Server struct {
 	Hub        *events.Hub
 	Box        *secure.Box
 	Mailer     mail.Sender
+	Local      *local.Service
 }
 
 var _ api.StrictServerInterface = (*Server)(nil)

@@ -119,6 +119,19 @@ type Config struct {
 
 	// Email. Without a host, messages are kept in memory (and logged) instead of sent.
 	SMTP SMTP
+
+	// Local accounts: email and password sign-in for people an admin adds.
+	Local LocalAccounts
+}
+
+type LocalAccounts struct {
+	// Enabled shows the password form and accepts password sign-in (WFM_LOCAL_LOGIN).
+	Enabled bool
+	// Require2FA makes every local account set up two-factor authentication at sign-in.
+	Require2FA bool
+	// LockoutAttempts consecutive failures lock an account for LockoutDuration (0 disables).
+	LockoutAttempts int
+	LockoutDuration time.Duration
 }
 
 type SMTP struct {
@@ -242,6 +255,10 @@ func LoadFrom(get func(string) string) (*Config, error) {
 			Username: e.str("WFM_SMTP_USERNAME", ""), Password: e.str("WFM_SMTP_PASSWORD", ""),
 			From: e.str("WFM_SMTP_FROM", "Workflow <workflow@localhost>"), TLS: e.str("WFM_SMTP_TLS", "starttls"),
 		},
+		Local: LocalAccounts{
+			Enabled: e.boolean("WFM_LOCAL_LOGIN", true), Require2FA: e.boolean("WFM_LOCAL_REQUIRE_2FA", false),
+			LockoutAttempts: e.integer("WFM_LOCAL_LOCKOUT_ATTEMPTS", 10), LockoutDuration: e.duration("WFM_LOCAL_LOCKOUT_DURATION", 15*time.Minute),
+		},
 	}
 	c.HooksPublicURL = strings.TrimRight(e.str("WFM_HOOKS_PUBLIC_URL", c.PublicURL), "/")
 	c.OIDCProviders = loadOIDC(e)
@@ -253,6 +270,9 @@ func LoadFrom(get func(string) string) (*Config, error) {
 	}
 	if _, err := netmail.ParseAddress(c.SMTP.From); err != nil {
 		e.errs = append(e.errs, fmt.Errorf("WFM_SMTP_FROM: %v", err))
+	}
+	if c.Local.LockoutAttempts < 0 || c.Local.LockoutDuration <= 0 {
+		e.errs = append(e.errs, errors.New("WFM_LOCAL_LOCKOUT_ATTEMPTS must be 0 or more and WFM_LOCAL_LOCKOUT_DURATION positive"))
 	}
 	switch c.Mode {
 	case ModeWeb, ModeHooks, ModeWorker, ModeAll:
