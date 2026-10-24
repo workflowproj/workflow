@@ -181,6 +181,16 @@ type DirectorySyncRun struct {
 	FinishedAt *time.Time
 }
 
+type EmailNotificationSetting struct {
+	UserID       uuid.UUID
+	Deliveries   json.RawMessage
+	DigestHour   int16
+	TimeZone     string
+	Paused       bool
+	LastDigestAt *time.Time
+	UpdatedAt    time.Time
+}
+
 type FieldDefinition struct {
 	ID            uuid.UUID
 	Key           string
@@ -283,15 +293,17 @@ type IssueType struct {
 }
 
 type Notification struct {
-	ID        int64
-	UserID    uuid.UUID
-	IssueID   *uuid.UUID
-	Kind      string
-	Title     string
-	Body      string
-	ActorID   *uuid.UUID
-	ReadAt    *time.Time
-	CreatedAt time.Time
+	ID            int64
+	UserID        uuid.UUID
+	IssueID       *uuid.UUID
+	Kind          string
+	Title         string
+	Body          string
+	ActorID       *uuid.UUID
+	ReadAt        *time.Time
+	CreatedAt     time.Time
+	EmailDelivery *string
+	EmailedAt     *time.Time
 }
 
 type Project struct {

@@ -56,6 +56,32 @@ func (SendEmail) InsertOpts() river.InsertOpts {
 	return river.InsertOpts{Queue: QueueOutbound, MaxAttempts: 8}
 }
 
+// EmailNotify emails one person what happened on one issue since their last email about it.
+// It is scheduled a short window ahead and unique per person, issue and window, so a burst of
+// changes becomes one email (see notify.Schedule).
+type EmailNotify struct {
+	UserID  uuid.UUID `json:"userId"`
+	IssueID uuid.UUID `json:"issueId"`
+}
+
+func (EmailNotify) Kind() string { return "email_notify" }
+
+// EmailDigests queues a digest for everyone due one (periodic).
+type EmailDigests struct{}
+
+func (EmailDigests) Kind() string { return "email_digests" }
+
+// EmailDigest sends one person's daily digest of notifications.
+type EmailDigest struct {
+	UserID uuid.UUID `json:"userId"`
+}
+
+func (EmailDigest) Kind() string { return "email_digest" }
+
+func (EmailDigest) InsertOpts() river.InsertOpts {
+	return river.InsertOpts{MaxAttempts: 5, UniqueOpts: river.UniqueOpts{ByArgs: true, ByState: []rivertype.JobState{rivertype.JobStateAvailable, rivertype.JobStatePending, rivertype.JobStateScheduled, rivertype.JobStateRunning, rivertype.JobStateRetryable}}}
+}
+
 // ProcessWebhook processes a stored inbound SCM webhook event.
 type ProcessWebhook struct {
 	EventID uuid.UUID `json:"eventId"`

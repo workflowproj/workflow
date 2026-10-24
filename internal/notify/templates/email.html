@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="supported-color-schemes" content="light dark">
+<title>{{.Subject}}</title>
+<style>
+  @media (prefers-color-scheme: dark) {
+    .wfm-bg { background-color: #0f1115 !important; }
+    .wfm-card { background-color: #171a20 !important; border-color: #2a2f39 !important; }
+    .wfm-ink { color: #e8eaee !important; }
+    .wfm-muted { color: #a3aab6 !important; }
+    .wfm-faint { color: #7a8291 !important; }
+    .wfm-line { border-color: #2a2f39 !important; }
+    .wfm-quote { background-color: #1e222a !important; border-color: #3a404c !important; color: #e8eaee !important; }
+    .wfm-link { color: #6aa0ff !important; }
+    .wfm-key { color: #6aa0ff !important; }
+    .wfm-pill { background-color: #272c36 !important; color: #e8eaee !important; }
+    .wfm-button { background-color: #4c8dff !important; color: #0b1020 !important; }
+  }
+</style>
+</head>
+<body class="wfm-bg" style="margin:0;padding:0;background-color:#f6f7f9;-webkit-text-size-adjust:100%;">
+{{- if .Preheader}}
+<div style="display:none;font-size:1px;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;">{{.Preheader}}</div>
+{{- end}}
+<table role="presentation" class="wfm-bg" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f6f7f9;">
+<tr><td align="center" style="padding:24px 12px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <tr><td class="wfm-muted" style="padding:0 4px 12px;font-size:13px;line-height:20px;font-weight:600;color:#5d6573;">{{.Brand}}</td></tr>
+  <tr><td class="wfm-card" style="background-color:#ffffff;border:1px solid #e2e5eb;border-radius:8px;padding:24px;">
+    <h1 class="wfm-ink" style="margin:0;font-size:18px;line-height:26px;font-weight:600;color:#171a21;">{{.Headline}}</h1>
+    {{- range .Intro}}
+    <p class="wfm-muted" style="margin:8px 0 0;font-size:14px;line-height:22px;color:#5d6573;">{{.}}</p>
+    {{- end}}
+    {{- range $i, $is := .Issues}}
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:20px;">
+      <tr><td class="wfm-line" style="border-top:1px solid #e2e5eb;padding-top:16px;">
+        <p style="margin:0;font-size:15px;line-height:22px;">
+          <a class="wfm-key" href="{{$is.URL}}" style="color:#2563eb;text-decoration:none;font-weight:600;">{{$is.Key}}</a>
+          <span class="wfm-ink" style="color:#171a21;font-weight:600;">{{$is.Summary}}</span>
+        </p>
+        <p class="wfm-muted" style="margin:6px 0 0;font-size:12px;line-height:18px;color:#5d6573;">
+          <span class="wfm-pill" style="{{pill $is.StatusCategory}}display:inline-block;padding:1px 8px;border-radius:4px;font-size:11px;line-height:18px;font-weight:600;text-transform:uppercase;letter-spacing:0.02em;">{{$is.Status}}</span>
+          {{- if $is.Project}}&nbsp;&nbsp;{{$is.Project}}{{end}}
+        </p>
+        {{- range $is.Events}}
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:14px;">
+          <tr><td style="font-size:14px;line-height:21px;">
+            <span class="wfm-ink" style="color:#171a21;font-weight:600;">{{.Actor}}</span>
+            {{- if .When}}<span class="wfm-faint" style="color:#8b93a1;font-size:12px;">&nbsp;&middot;&nbsp;{{.When}}</span>{{end}}
+            <br><span class="wfm-ink" style="color:#171a21;">{{.What}}</span>
+          </td></tr>
+          {{- if .Excerpt}}
+          <tr><td style="padding-top:8px;">
+            <div class="wfm-quote" style="background-color:#f1f3f6;border-left:3px solid #cdd2db;border-radius:4px;padding:10px 12px;font-size:14px;line-height:21px;color:#171a21;word-break:break-word;">
+              {{- range $j, $l := .ExcerptLines}}{{if $j}}<br>{{end}}{{$l}}{{end -}}
+            </div>
+          </td></tr>
+          {{- end}}
+        </table>
+        {{- end}}
+        {{- if $is.MoreEvents}}
+        <p class="wfm-muted" style="margin:12px 0 0;font-size:13px;line-height:20px;color:#5d6573;">and {{$is.MoreEvents}} more</p>
+        {{- end}}
+        {{- if $is.Open}}
+        <p style="margin:12px 0 0;font-size:13px;line-height:20px;"><a class="wfm-link" href="{{$is.URL}}" style="color:#2563eb;text-decoration:none;font-weight:600;">Open {{$is.Key}} &rarr;</a></p>
+        {{- end}}
+      </td></tr>
+    </table>
+    {{- end}}
+    {{- if .MoreIssues}}
+    <p class="wfm-muted" style="margin:20px 0 0;font-size:13px;line-height:20px;color:#5d6573;">And {{.MoreIssues}} more issue{{if gt .MoreIssues 1}}s{{end}}: <a class="wfm-link" href="{{.MoreURL}}" style="color:#2563eb;">see all notifications</a>.</p>
+    {{- end}}
+    {{- with .Button}}
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:24px;">
+      <tr><td class="wfm-button" style="border-radius:6px;background-color:#2563eb;">
+        <a class="wfm-button" href="{{.URL}}" style="display:inline-block;padding:10px 18px;border-radius:6px;background-color:#2563eb;color:#ffffff;font-size:14px;line-height:20px;font-weight:600;text-decoration:none;">{{.Label}}</a>
+      </td></tr>
+    </table>
+    {{- end}}
+  </td></tr>
+  <tr><td class="wfm-faint" style="padding:16px 4px 0;font-size:12px;line-height:18px;color:#8b93a1;">
+    {{- if .Reason}}{{.Reason}}{{end}}
+    {{- if .TimeZone}} Times are in {{.TimeZone}}.{{end}}
+    {{- if or .ManageURL .Unsub}}<br>{{end}}
+    {{- if .ManageURL}}<a class="wfm-link" href="{{.ManageURL}}" style="color:#5d6573;text-decoration:underline;">Manage email notifications</a>{{end}}
+    {{- if and .ManageURL .Unsub}}&nbsp;&middot;&nbsp;{{end}}
+    {{- with .Unsub}}<a class="wfm-link" href="{{.URL}}" style="color:#5d6573;text-decoration:underline;">{{.Label}}</a>{{end}}
+  </td></tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>

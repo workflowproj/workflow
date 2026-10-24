@@ -35,6 +35,7 @@ import (
 	"github.com/geoffo-dev/workflow-management/internal/identity/scim"
 	"github.com/geoffo-dev/workflow-management/internal/jobs"
 	"github.com/geoffo-dev/workflow-management/internal/mail"
+	"github.com/geoffo-dev/workflow-management/internal/notify"
 	"github.com/geoffo-dev/workflow-management/internal/scm"
 	"github.com/geoffo-dev/workflow-management/internal/secure"
 	"github.com/geoffo-dev/workflow-management/internal/storage"
@@ -59,6 +60,8 @@ type App struct {
 	Hub        *events.Hub
 	// Mailer sends email (an in-memory *mail.Memory without WFM_SMTP_HOST).
 	Mailer mail.Sender
+	// Notify emails notifications (immediately or in digests) per people's settings.
+	Notify *notify.Service
 	Server *httpapi.Server
 	Scim   *scim.Handler
 }
@@ -150,6 +153,7 @@ func New(ctx context.Context, cfg *config.Config, log *slog.Logger, pool *pgxpoo
 	a.Auth = &identity.Auth{Cfg: cfg, Q: dbq.New(pool), Prov: a.Prov, Box: box, Log: log.With("module", "auth"), Track: a.Tracker, HTTPClient: opts.OIDCHTTPClient}
 	a.SCM = scm.NewService(pool, box, cfg, a.Tracker, enq, log.With("module", "scm"))
 	a.Automation = automation.New(pool, a.Tracker, eval, enq, box, cfg, log.With("module", "automation"))
+	a.Notify = notify.New(pool, enq, a.Mailer, box, cfg, log.With("module", "notify"))
 	if cfg.GoogleDirectory.Enabled {
 		a.Syncer = directory.NewSyncer(pool, cfg.GoogleDirectory, a.Prov, log.With("module", "directory"))
 	}
@@ -170,6 +174,7 @@ func New(ctx context.Context, cfg *config.Config, log *slog.Logger, pool *pgxpoo
 	a.Server = &httpapi.Server{
 		Cfg: cfg, Log: log.With("module", "http"), Pool: pool, Q: dbq.New(pool), Tracker: a.Tracker, Auth: a.Auth, Prov: a.Prov,
 		SCM: a.SCM, Automation: a.Automation, Jobs: enq, Hub: a.Hub, Box: box, Mailer: a.Mailer,
+		Notify: a.Notify,
 	}
 	return a, nil
 }
