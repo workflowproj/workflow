@@ -205,16 +205,6 @@ DELETE FROM saved_filters WHERE id = $1;
 -- ---------------------------------------------------------------------------
 -- Reports
 
--- name: StatusHistorySince :many
--- Status changes of issues in a project resolved since a point in time (cycle time report).
-SELECT h.issue_id, h.from_ref, h.to_ref, h.created_at FROM issue_history h
-JOIN issues i ON i.id = h.issue_id
-WHERE i.project_id = @project_id AND h.field = 'status' AND i.resolved_at >= @since
-ORDER BY h.issue_id, h.id;
-
--- name: ResolvedIssuesSince :many
-SELECT * FROM issues WHERE project_id = @project_id AND resolved_at >= @since ORDER BY resolved_at;
-
 -- name: BlockLinksAmong :many
 SELECT * FROM issue_links
 WHERE link_type = 'blocks' AND source_id = ANY(@ids::uuid[]) AND target_id = ANY(@ids::uuid[])

@@ -45,11 +45,14 @@ func (q *Queries) AddWatcher(ctx context.Context, arg AddWatcherParams) error {
 }
 
 const blockLinksAmong = `-- name: BlockLinksAmong :many
+
 SELECT id, source_id, target_id, link_type, created_by, created_at FROM issue_links
 WHERE link_type = 'blocks' AND source_id = ANY($1::uuid[]) AND target_id = ANY($1::uuid[])
 ORDER BY created_at
 `
 
+// ---------------------------------------------------------------------------
+// Reports
 func (q *Queries) BlockLinksAmong(ctx context.Context, ids []uuid.UUID) ([]IssueLink, error) {
 	rows, err := q.db.Query(ctx, blockLinksAmong, ids)
 	if err != nil {
@@ -78,7 +81,7 @@ func (q *Queries) BlockLinksAmong(ctx context.Context, ids []uuid.UUID) ([]Issue
 }
 
 const childIssues = `-- name: ChildIssues :many
-SELECT id, project_id, number, type_id, parent_id, summary, description, status_id, workflow_version_id, priority, assignee_id, reporter_id, sprint_id, story_points, start_date, due_date, labels, resolution, resolved_at, fields, rank, version, created_at, updated_at FROM issues WHERE parent_id = $1 ORDER BY rank
+SELECT id, project_id, number, type_id, parent_id, summary, description, status_id, workflow_version_id, priority, assignee_id, reporter_id, sprint_id, story_points, start_date, due_date, labels, resolution, resolved_at, fields, rank, version, created_at, updated_at, status_changed_at FROM issues WHERE parent_id = $1 ORDER BY rank
 `
 
 func (q *Queries) ChildIssues(ctx context.Context, parentID *uuid.UUID) ([]Issue, error) {
@@ -115,6 +118,7 @@ func (q *Queries) ChildIssues(ctx context.Context, parentID *uuid.UUID) ([]Issue
 			&i.Version,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.StatusChangedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -273,7 +277,7 @@ INSERT INTO issues (project_id, number, type_id, parent_id, summary, description
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8,
         $9, $10, $11, $12, $13, $14, $15, $16,
         $17, $18, $19, $20)
-RETURNING id, project_id, number, type_id, parent_id, summary, description, status_id, workflow_version_id, priority, assignee_id, reporter_id, sprint_id, story_points, start_date, due_date, labels, resolution, resolved_at, fields, rank, version, created_at, updated_at
+RETURNING id, project_id, number, type_id, parent_id, summary, description, status_id, workflow_version_id, priority, assignee_id, reporter_id, sprint_id, story_points, start_date, due_date, labels, resolution, resolved_at, fields, rank, version, created_at, updated_at, status_changed_at
 `
 
 type CreateIssueParams struct {
@@ -348,6 +352,7 @@ func (q *Queries) CreateIssue(ctx context.Context, arg CreateIssueParams) (Issue
 		&i.Version,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.StatusChangedAt,
 	)
 	return i, err
 }
@@ -586,7 +591,7 @@ func (q *Queries) GetFilter(ctx context.Context, id uuid.UUID) (SavedFilter, err
 }
 
 const getIssue = `-- name: GetIssue :one
-SELECT id, project_id, number, type_id, parent_id, summary, description, status_id, workflow_version_id, priority, assignee_id, reporter_id, sprint_id, story_points, start_date, due_date, labels, resolution, resolved_at, fields, rank, version, created_at, updated_at FROM issues WHERE id = $1
+SELECT id, project_id, number, type_id, parent_id, summary, description, status_id, workflow_version_id, priority, assignee_id, reporter_id, sprint_id, story_points, start_date, due_date, labels, resolution, resolved_at, fields, rank, version, created_at, updated_at, status_changed_at FROM issues WHERE id = $1
 `
 
 func (q *Queries) GetIssue(ctx context.Context, id uuid.UUID) (Issue, error) {
@@ -617,12 +622,13 @@ func (q *Queries) GetIssue(ctx context.Context, id uuid.UUID) (Issue, error) {
 		&i.Version,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.StatusChangedAt,
 	)
 	return i, err
 }
 
 const getIssueByNumber = `-- name: GetIssueByNumber :one
-SELECT id, project_id, number, type_id, parent_id, summary, description, status_id, workflow_version_id, priority, assignee_id, reporter_id, sprint_id, story_points, start_date, due_date, labels, resolution, resolved_at, fields, rank, version, created_at, updated_at FROM issues WHERE project_id = $1 AND number = $2
+SELECT id, project_id, number, type_id, parent_id, summary, description, status_id, workflow_version_id, priority, assignee_id, reporter_id, sprint_id, story_points, start_date, due_date, labels, resolution, resolved_at, fields, rank, version, created_at, updated_at, status_changed_at FROM issues WHERE project_id = $1 AND number = $2
 `
 
 type GetIssueByNumberParams struct {
@@ -658,12 +664,13 @@ func (q *Queries) GetIssueByNumber(ctx context.Context, arg GetIssueByNumberPara
 		&i.Version,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.StatusChangedAt,
 	)
 	return i, err
 }
 
 const getIssueForUpdate = `-- name: GetIssueForUpdate :one
-SELECT id, project_id, number, type_id, parent_id, summary, description, status_id, workflow_version_id, priority, assignee_id, reporter_id, sprint_id, story_points, start_date, due_date, labels, resolution, resolved_at, fields, rank, version, created_at, updated_at FROM issues WHERE id = $1 FOR UPDATE
+SELECT id, project_id, number, type_id, parent_id, summary, description, status_id, workflow_version_id, priority, assignee_id, reporter_id, sprint_id, story_points, start_date, due_date, labels, resolution, resolved_at, fields, rank, version, created_at, updated_at, status_changed_at FROM issues WHERE id = $1 FOR UPDATE
 `
 
 func (q *Queries) GetIssueForUpdate(ctx context.Context, id uuid.UUID) (Issue, error) {
@@ -694,6 +701,7 @@ func (q *Queries) GetIssueForUpdate(ctx context.Context, id uuid.UUID) (Issue, e
 		&i.Version,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.StatusChangedAt,
 	)
 	return i, err
 }
@@ -717,7 +725,7 @@ func (q *Queries) GetIssueLink(ctx context.Context, id uuid.UUID) (IssueLink, er
 }
 
 const getIssuesByIDs = `-- name: GetIssuesByIDs :many
-SELECT id, project_id, number, type_id, parent_id, summary, description, status_id, workflow_version_id, priority, assignee_id, reporter_id, sprint_id, story_points, start_date, due_date, labels, resolution, resolved_at, fields, rank, version, created_at, updated_at FROM issues WHERE id = ANY($1::uuid[])
+SELECT id, project_id, number, type_id, parent_id, summary, description, status_id, workflow_version_id, priority, assignee_id, reporter_id, sprint_id, story_points, start_date, due_date, labels, resolution, resolved_at, fields, rank, version, created_at, updated_at, status_changed_at FROM issues WHERE id = ANY($1::uuid[])
 `
 
 func (q *Queries) GetIssuesByIDs(ctx context.Context, ids []uuid.UUID) ([]Issue, error) {
@@ -754,6 +762,7 @@ func (q *Queries) GetIssuesByIDs(ctx context.Context, ids []uuid.UUID) ([]Issue,
 			&i.Version,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.StatusChangedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -1243,60 +1252,6 @@ func (q *Queries) RemoveWatcher(ctx context.Context, arg RemoveWatcherParams) er
 	return err
 }
 
-const resolvedIssuesSince = `-- name: ResolvedIssuesSince :many
-SELECT id, project_id, number, type_id, parent_id, summary, description, status_id, workflow_version_id, priority, assignee_id, reporter_id, sprint_id, story_points, start_date, due_date, labels, resolution, resolved_at, fields, rank, version, created_at, updated_at FROM issues WHERE project_id = $1 AND resolved_at >= $2 ORDER BY resolved_at
-`
-
-type ResolvedIssuesSinceParams struct {
-	ProjectID uuid.UUID
-	Since     *time.Time
-}
-
-func (q *Queries) ResolvedIssuesSince(ctx context.Context, arg ResolvedIssuesSinceParams) ([]Issue, error) {
-	rows, err := q.db.Query(ctx, resolvedIssuesSince, arg.ProjectID, arg.Since)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []Issue{}
-	for rows.Next() {
-		var i Issue
-		if err := rows.Scan(
-			&i.ID,
-			&i.ProjectID,
-			&i.Number,
-			&i.TypeID,
-			&i.ParentID,
-			&i.Summary,
-			&i.Description,
-			&i.StatusID,
-			&i.WorkflowVersionID,
-			&i.Priority,
-			&i.AssigneeID,
-			&i.ReporterID,
-			&i.SprintID,
-			&i.StoryPoints,
-			&i.StartDate,
-			&i.DueDate,
-			&i.Labels,
-			&i.Resolution,
-			&i.ResolvedAt,
-			&i.Fields,
-			&i.Rank,
-			&i.Version,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const setChildrenSprint = `-- name: SetChildrenSprint :exec
 UPDATE issues SET sprint_id = $1, version = version + 1, updated_at = now()
 WHERE parent_id = $2 AND type_id IN (SELECT id FROM issue_types WHERE level < 0)
@@ -1314,7 +1269,7 @@ func (q *Queries) SetChildrenSprint(ctx context.Context, arg SetChildrenSprintPa
 }
 
 const setIssueRank = `-- name: SetIssueRank :one
-UPDATE issues SET rank = $1, version = version + 1, updated_at = now() WHERE id = $2 RETURNING id, project_id, number, type_id, parent_id, summary, description, status_id, workflow_version_id, priority, assignee_id, reporter_id, sprint_id, story_points, start_date, due_date, labels, resolution, resolved_at, fields, rank, version, created_at, updated_at
+UPDATE issues SET rank = $1, version = version + 1, updated_at = now() WHERE id = $2 RETURNING id, project_id, number, type_id, parent_id, summary, description, status_id, workflow_version_id, priority, assignee_id, reporter_id, sprint_id, story_points, start_date, due_date, labels, resolution, resolved_at, fields, rank, version, created_at, updated_at, status_changed_at
 `
 
 type SetIssueRankParams struct {
@@ -1350,56 +1305,9 @@ func (q *Queries) SetIssueRank(ctx context.Context, arg SetIssueRankParams) (Iss
 		&i.Version,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.StatusChangedAt,
 	)
 	return i, err
-}
-
-const statusHistorySince = `-- name: StatusHistorySince :many
-
-SELECT h.issue_id, h.from_ref, h.to_ref, h.created_at FROM issue_history h
-JOIN issues i ON i.id = h.issue_id
-WHERE i.project_id = $1 AND h.field = 'status' AND i.resolved_at >= $2
-ORDER BY h.issue_id, h.id
-`
-
-type StatusHistorySinceParams struct {
-	ProjectID uuid.UUID
-	Since     *time.Time
-}
-
-type StatusHistorySinceRow struct {
-	IssueID   uuid.UUID
-	FromRef   *string
-	ToRef     *string
-	CreatedAt time.Time
-}
-
-// ---------------------------------------------------------------------------
-// Reports
-// Status changes of issues in a project resolved since a point in time (cycle time report).
-func (q *Queries) StatusHistorySince(ctx context.Context, arg StatusHistorySinceParams) ([]StatusHistorySinceRow, error) {
-	rows, err := q.db.Query(ctx, statusHistorySince, arg.ProjectID, arg.Since)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []StatusHistorySinceRow{}
-	for rows.Next() {
-		var i StatusHistorySinceRow
-		if err := rows.Scan(
-			&i.IssueID,
-			&i.FromRef,
-			&i.ToRef,
-			&i.CreatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const updateComment = `-- name: UpdateComment :one
@@ -1469,7 +1377,7 @@ UPDATE issues SET
     resolved_at = $16, fields = $17, rank = $18,
     version = version + 1, updated_at = now()
 WHERE id = $19 AND version = $20
-RETURNING id, project_id, number, type_id, parent_id, summary, description, status_id, workflow_version_id, priority, assignee_id, reporter_id, sprint_id, story_points, start_date, due_date, labels, resolution, resolved_at, fields, rank, version, created_at, updated_at
+RETURNING id, project_id, number, type_id, parent_id, summary, description, status_id, workflow_version_id, priority, assignee_id, reporter_id, sprint_id, story_points, start_date, due_date, labels, resolution, resolved_at, fields, rank, version, created_at, updated_at, status_changed_at
 `
 
 type UpdateIssueParams struct {
@@ -1545,6 +1453,7 @@ func (q *Queries) UpdateIssue(ctx context.Context, arg UpdateIssueParams) (Issue
 		&i.Version,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.StatusChangedAt,
 	)
 	return i, err
 }

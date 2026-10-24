@@ -130,3 +130,31 @@ WITH moved AS (
 INSERT INTO issue_releases (issue_id, release_id)
 SELECT issue_id, sqlc.narg(target_release_id)::uuid FROM moved WHERE sqlc.narg(target_release_id)::uuid IS NOT NULL
 ON CONFLICT DO NOTHING;
+
+-- name: SetBoardCardFields :exec
+UPDATE boards SET card_fields = @card_fields, updated_at = now() WHERE id = @id;
+
+-- name: IssueHistoryFor :many
+-- Status, sprint and story point changes of many issues, oldest first (for metrics).
+SELECT issue_id, field, from_ref, to_ref, from_value, to_value, created_at
+FROM issue_history
+WHERE issue_id = ANY(@ids::uuid[]) AND field IN ('status', 'sprint', 'storyPoints')
+ORDER BY issue_id, created_at, id;
+
+-- name: ClosedSprints :many
+-- The most recently completed sprints of a project, newest first.
+SELECT * FROM sprints WHERE project_id = $1 AND state = 'closed'
+ORDER BY completed_at DESC NULLS LAST, position DESC
+LIMIT $2;
+
+-- name: IssuesEverInSprint :many
+-- Issues in a sprint now, committed to it at the start, or moved in or out of it since.
+SELECT id FROM issues WHERE sprint_id = @sprint_id
+UNION
+SELECT h.issue_id FROM issue_history h
+WHERE h.field = 'sprint' AND (h.to_ref = @sprint_id::text OR h.from_ref = @sprint_id::text)
+UNION
+SELECT unnest(@committed::uuid[]);
+
+-- name: ReleaseIDsOfIssues :many
+SELECT issue_id, release_id FROM issue_releases WHERE issue_id = ANY(@ids::uuid[]);

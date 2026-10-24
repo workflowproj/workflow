@@ -165,6 +165,84 @@ func (e BoardType) Valid() bool {
 	}
 }
 
+// Defines values for BreakdownBy.
+const (
+	BreakdownByAssignee       BreakdownBy = "assignee"
+	BreakdownByEpic           BreakdownBy = "epic"
+	BreakdownByLabel          BreakdownBy = "label"
+	BreakdownByPriority       BreakdownBy = "priority"
+	BreakdownByProject        BreakdownBy = "project"
+	BreakdownByRelease        BreakdownBy = "release"
+	BreakdownBySprint         BreakdownBy = "sprint"
+	BreakdownByStatus         BreakdownBy = "status"
+	BreakdownByStatusCategory BreakdownBy = "statusCategory"
+	BreakdownByType           BreakdownBy = "type"
+)
+
+// Valid indicates whether the value is a known member of the BreakdownBy enum.
+func (e BreakdownBy) Valid() bool {
+	switch e {
+	case BreakdownByAssignee:
+		return true
+	case BreakdownByEpic:
+		return true
+	case BreakdownByLabel:
+		return true
+	case BreakdownByPriority:
+		return true
+	case BreakdownByProject:
+		return true
+	case BreakdownByRelease:
+		return true
+	case BreakdownBySprint:
+		return true
+	case BreakdownByStatus:
+		return true
+	case BreakdownByStatusCategory:
+		return true
+	case BreakdownByType:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CardField.
+const (
+	CardFieldAssignee     CardField = "assignee"
+	CardFieldDaysInColumn CardField = "daysInColumn"
+	CardFieldDev          CardField = "dev"
+	CardFieldDueDate      CardField = "dueDate"
+	CardFieldEpic         CardField = "epic"
+	CardFieldLabels       CardField = "labels"
+	CardFieldPoints       CardField = "points"
+	CardFieldPriority     CardField = "priority"
+)
+
+// Valid indicates whether the value is a known member of the CardField enum.
+func (e CardField) Valid() bool {
+	switch e {
+	case CardFieldAssignee:
+		return true
+	case CardFieldDaysInColumn:
+		return true
+	case CardFieldDev:
+		return true
+	case CardFieldDueDate:
+		return true
+	case CardFieldEpic:
+		return true
+	case CardFieldLabels:
+		return true
+	case CardFieldPoints:
+		return true
+	case CardFieldPriority:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ChatDeliveryStatus.
 const (
 	ChatDeliveryStatusDelivered ChatDeliveryStatus = "delivered"
@@ -243,6 +321,24 @@ func (e ChatProvider) Valid() bool {
 	case ChatProviderMattermost:
 		return true
 	case ChatProviderSlack:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CreatedResolvedInterval.
+const (
+	CreatedResolvedIntervalDay  CreatedResolvedInterval = "day"
+	CreatedResolvedIntervalWeek CreatedResolvedInterval = "week"
+)
+
+// Valid indicates whether the value is a known member of the CreatedResolvedInterval enum.
+func (e CreatedResolvedInterval) Valid() bool {
+	switch e {
+	case CreatedResolvedIntervalDay:
+		return true
+	case CreatedResolvedIntervalWeek:
 		return true
 	default:
 		return false
@@ -333,6 +429,120 @@ func (e FieldType) Valid() bool {
 	}
 }
 
+// Defines values for GadgetConfigChart.
+const (
+	GadgetConfigChartBar   GadgetConfigChart = "bar"
+	GadgetConfigChartDonut GadgetConfigChart = "donut"
+)
+
+// Valid indicates whether the value is a known member of the GadgetConfigChart enum.
+func (e GadgetConfigChart) Valid() bool {
+	switch e {
+	case GadgetConfigChartBar:
+		return true
+	case GadgetConfigChartDonut:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GadgetConfigFlowBy.
+const (
+	GadgetConfigFlowByCategory GadgetConfigFlowBy = "category"
+	GadgetConfigFlowByStatus   GadgetConfigFlowBy = "status"
+)
+
+// Valid indicates whether the value is a known member of the GadgetConfigFlowBy enum.
+func (e GadgetConfigFlowBy) Valid() bool {
+	switch e {
+	case GadgetConfigFlowByCategory:
+		return true
+	case GadgetConfigFlowByStatus:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GadgetConfigInterval.
+const (
+	GadgetConfigIntervalDay  GadgetConfigInterval = "day"
+	GadgetConfigIntervalWeek GadgetConfigInterval = "week"
+)
+
+// Valid indicates whether the value is a known member of the GadgetConfigInterval enum.
+func (e GadgetConfigInterval) Valid() bool {
+	switch e {
+	case GadgetConfigIntervalDay:
+		return true
+	case GadgetConfigIntervalWeek:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GadgetConfigMeasure.
+const (
+	GadgetConfigMeasureIssues GadgetConfigMeasure = "issues"
+	GadgetConfigMeasurePoints GadgetConfigMeasure = "points"
+)
+
+// Valid indicates whether the value is a known member of the GadgetConfigMeasure enum.
+func (e GadgetConfigMeasure) Valid() bool {
+	switch e {
+	case GadgetConfigMeasureIssues:
+		return true
+	case GadgetConfigMeasurePoints:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GadgetType.
+const (
+	GadgetTypeBreakdown       GadgetType = "breakdown"
+	GadgetTypeCreatedResolved GadgetType = "created_resolved"
+	GadgetTypeCumulativeFlow  GadgetType = "cumulative_flow"
+	GadgetTypeCycleTime       GadgetType = "cycle_time"
+	GadgetTypeIssueList       GadgetType = "issue_list"
+	GadgetTypeSprintBurndown  GadgetType = "sprint_burndown"
+	GadgetTypeSprintBurnup    GadgetType = "sprint_burnup"
+	GadgetTypeSprintHealth    GadgetType = "sprint_health"
+	GadgetTypeStat            GadgetType = "stat"
+	GadgetTypeVelocity        GadgetType = "velocity"
+)
+
+// Valid indicates whether the value is a known member of the GadgetType enum.
+func (e GadgetType) Valid() bool {
+	switch e {
+	case GadgetTypeBreakdown:
+		return true
+	case GadgetTypeCreatedResolved:
+		return true
+	case GadgetTypeCumulativeFlow:
+		return true
+	case GadgetTypeCycleTime:
+		return true
+	case GadgetTypeIssueList:
+		return true
+	case GadgetTypeSprintBurndown:
+		return true
+	case GadgetTypeSprintBurnup:
+		return true
+	case GadgetTypeSprintHealth:
+		return true
+	case GadgetTypeStat:
+		return true
+	case GadgetTypeVelocity:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GroupSource.
 const (
 	GroupSourceGoogle GroupSource = "google"
@@ -390,6 +600,48 @@ func (e LinkType) Valid() bool {
 	case LinkTypeDuplicates:
 		return true
 	case LinkTypeRelates:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MetricStat.
+const (
+	MetricStatCreated          MetricStat = "created"
+	MetricStatInProgress       MetricStat = "in_progress"
+	MetricStatMedianCycleHours MetricStat = "median_cycle_hours"
+	MetricStatOpen             MetricStat = "open"
+	MetricStatOpenPoints       MetricStat = "open_points"
+	MetricStatOverdue          MetricStat = "overdue"
+	MetricStatResolved         MetricStat = "resolved"
+	MetricStatResolvedPoints   MetricStat = "resolved_points"
+	MetricStatTodo             MetricStat = "todo"
+	MetricStatUnassigned       MetricStat = "unassigned"
+)
+
+// Valid indicates whether the value is a known member of the MetricStat enum.
+func (e MetricStat) Valid() bool {
+	switch e {
+	case MetricStatCreated:
+		return true
+	case MetricStatInProgress:
+		return true
+	case MetricStatMedianCycleHours:
+		return true
+	case MetricStatOpen:
+		return true
+	case MetricStatOpenPoints:
+		return true
+	case MetricStatOverdue:
+		return true
+	case MetricStatResolved:
+		return true
+	case MetricStatResolvedPoints:
+		return true
+	case MetricStatTodo:
+		return true
+	case MetricStatUnassigned:
 		return true
 	default:
 		return false
@@ -777,6 +1029,42 @@ func (e CreateIssueLinkJSONBodyDirection) Valid() bool {
 	}
 }
 
+// Defines values for GetCreatedResolvedParamsInterval.
+const (
+	GetCreatedResolvedParamsIntervalDay  GetCreatedResolvedParamsInterval = "day"
+	GetCreatedResolvedParamsIntervalWeek GetCreatedResolvedParamsInterval = "week"
+)
+
+// Valid indicates whether the value is a known member of the GetCreatedResolvedParamsInterval enum.
+func (e GetCreatedResolvedParamsInterval) Valid() bool {
+	switch e {
+	case GetCreatedResolvedParamsIntervalDay:
+		return true
+	case GetCreatedResolvedParamsIntervalWeek:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetCumulativeFlowParamsBy.
+const (
+	GetCumulativeFlowParamsByCategory GetCumulativeFlowParamsBy = "category"
+	GetCumulativeFlowParamsByStatus   GetCumulativeFlowParamsBy = "status"
+)
+
+// Valid indicates whether the value is a known member of the GetCumulativeFlowParamsBy enum.
+func (e GetCumulativeFlowParamsBy) Valid() bool {
+	switch e {
+	case GetCumulativeFlowParamsByCategory:
+		return true
+	case GetCumulativeFlowParamsByStatus:
+		return true
+	default:
+		return false
+	}
+}
+
 // AdminUser defines model for AdminUser.
 type AdminUser struct {
 	Active           bool               `json:"active"`
@@ -984,6 +1272,8 @@ type BacklogSprint struct {
 
 // Board defines model for Board.
 type Board struct {
+	// CardFields What cards show besides the summary
+	CardFields        []CardField        `json:"cardFields"`
 	Columns           []BoardColumn      `json:"columns"`
 	DoneRetentionDays int                `json:"doneRetentionDays"`
 	FilterJql         string             `json:"filterJql"`
@@ -1024,6 +1314,9 @@ type BoardData struct {
 
 // BoardInput defines model for BoardInput.
 type BoardInput struct {
+	// CardFields Omit to keep the current fields (new boards get epic, labels, priority, dev, points and assignee).
+	CardFields *[]CardField `json:"cardFields,omitempty"`
+
 	// Columns Omit to derive one column per status from the project's workflows.
 	Columns           *[]BoardColumn `json:"columns,omitempty"`
 	DoneRetentionDays *int           `json:"doneRetentionDays,omitempty"`
@@ -1036,12 +1329,48 @@ type BoardInput struct {
 // BoardType defines model for BoardType.
 type BoardType string
 
-// BurndownPoint defines model for BurndownPoint.
-type BurndownPoint struct {
-	Date            openapi_types.Date `json:"date"`
-	IdealPoints     float64            `json:"idealPoints"`
-	RemainingPoints float64            `json:"remainingPoints"`
+// Breakdown defines model for Breakdown.
+type Breakdown struct {
+	By          BreakdownBy      `json:"by"`
+	Groups      []BreakdownGroup `json:"groups"`
+	Total       int              `json:"total"`
+	TotalPoints float64          `json:"totalPoints"`
 }
+
+// BreakdownBy defines model for BreakdownBy.
+type BreakdownBy string
+
+// BreakdownGroup defines model for BreakdownGroup.
+type BreakdownGroup struct {
+	Category *StatusCategory `json:"category,omitempty"`
+	Color    *string         `json:"color,omitempty"`
+	Count    int             `json:"count"`
+
+	// Key The value (an id, key or name); empty for "None"
+	Key    string  `json:"key"`
+	Label  string  `json:"label"`
+	Points float64 `json:"points"`
+	User   *User   `json:"user,omitempty"`
+}
+
+// BurndownPoint The sprint at the end of each day (today so far for an active sprint).
+type BurndownPoint struct {
+	CompletedIssues int                `json:"completedIssues"`
+	CompletedPoints float64            `json:"completedPoints"`
+	Date            openapi_types.Date `json:"date"`
+
+	// IdealPoints Committed points falling linearly to zero at the end date
+	IdealPoints     float64 `json:"idealPoints"`
+	RemainingIssues int     `json:"remainingIssues"`
+
+	// RemainingPoints Scope minus completed
+	RemainingPoints float64 `json:"remainingPoints"`
+	ScopeIssues     int     `json:"scopeIssues"`
+	ScopePoints     float64 `json:"scopePoints"`
+}
+
+// CardField defines model for CardField.
+type CardField string
 
 // ChatChannel defines model for ChatChannel.
 type ChatChannel struct {
@@ -1122,10 +1451,38 @@ type CommentInput struct {
 	Body string `json:"body"`
 }
 
+// CreatedResolved defines model for CreatedResolved.
+type CreatedResolved struct {
+	Buckets  []CreatedResolvedBucket `json:"buckets"`
+	Days     int                     `json:"days"`
+	Interval CreatedResolvedInterval `json:"interval"`
+}
+
+// CreatedResolvedInterval defines model for CreatedResolved.Interval.
+type CreatedResolvedInterval string
+
+// CreatedResolvedBucket defines model for CreatedResolvedBucket.
+type CreatedResolvedBucket struct {
+	Created int `json:"created"`
+
+	// Open Open at the end of the bucket
+	Open     int                `json:"open"`
+	Resolved int                `json:"resolved"`
+	Start    openapi_types.Date `json:"start"`
+}
+
+// CumulativeFlow defines model for CumulativeFlow.
+type CumulativeFlow struct {
+	Dates  []openapi_types.Date `json:"dates"`
+	Days   int                  `json:"days"`
+	Series []FlowSeries         `json:"series"`
+}
+
 // CycleTimeIssue defines model for CycleTimeIssue.
 type CycleTimeIssue struct {
 	CycleHours float64   `json:"cycleHours"`
 	Key        string    `json:"key"`
+	ProjectKey *string   `json:"projectKey,omitempty"`
 	ResolvedAt time.Time `json:"resolvedAt"`
 	Summary    string    `json:"summary"`
 }
@@ -1137,6 +1494,29 @@ type CycleTimeReport struct {
 	Issues       []CycleTimeIssue `json:"issues"`
 	MedianHours  float64          `json:"medianHours"`
 	P85Hours     float64          `json:"p85Hours"`
+}
+
+// Dashboard defines model for Dashboard.
+type Dashboard struct {
+	CanEdit     bool               `json:"canEdit"`
+	CreatedAt   time.Time          `json:"createdAt"`
+	Description string             `json:"description"`
+	Gadgets     []Gadget           `json:"gadgets"`
+	Id          openapi_types.UUID `json:"id"`
+	Name        string             `json:"name"`
+	Owner       User               `json:"owner"`
+
+	// Shared Visible to everyone in the organisation. Each gadget still shows only what the viewer may browse.
+	Shared    bool      `json:"shared"`
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+// DashboardInput defines model for DashboardInput.
+type DashboardInput struct {
+	Description *string  `json:"description,omitempty"`
+	Gadgets     []Gadget `json:"gadgets"`
+	Name        string   `json:"name"`
+	Shared      *bool    `json:"shared,omitempty"`
 }
 
 // DevLink defines model for DevLink.
@@ -1225,6 +1605,72 @@ type FieldError struct {
 // FieldType defines model for FieldType.
 type FieldType string
 
+// FlowSeries defines model for FlowSeries.
+type FlowSeries struct {
+	Category StatusCategory `json:"category"`
+
+	// Counts One per date
+	Counts []int `json:"counts"`
+
+	// Key A status category
+	Key   string `json:"key"`
+	Label string `json:"label"`
+}
+
+// Gadget defines model for Gadget.
+type Gadget struct {
+	// Config Settings for a gadget; which apply depends on its type. Sprint gadgets and velocity use
+	// projectKey (and sprintId, else the active sprint, else the last completed one); the others
+	// use projectKeys (none means every project the viewer can browse) and jql.
+	Config GadgetConfig `json:"config"`
+
+	// Id Chosen by the client; unique within the dashboard
+	Id    string     `json:"id"`
+	Title *string    `json:"title,omitempty"`
+	Type  GadgetType `json:"type"`
+
+	// Width Columns of a three-column grid
+	Width int `json:"width"`
+}
+
+// GadgetConfig Settings for a gadget; which apply depends on its type. Sprint gadgets and velocity use
+// projectKey (and sprintId, else the active sprint, else the last completed one); the others
+// use projectKeys (none means every project the viewer can browse) and jql.
+type GadgetConfig struct {
+	By    *BreakdownBy       `json:"by,omitempty"`
+	Chart *GadgetConfigChart `json:"chart,omitempty"`
+
+	// Count Sprints shown by velocity
+	Count    *int                  `json:"count,omitempty"`
+	Days     *int                  `json:"days,omitempty"`
+	FlowBy   *GadgetConfigFlowBy   `json:"flowBy,omitempty"`
+	Interval *GadgetConfigInterval `json:"interval,omitempty"`
+	Jql      *string               `json:"jql,omitempty"`
+
+	// Limit Rows shown by an issue list
+	Limit       *int                 `json:"limit,omitempty"`
+	Measure     *GadgetConfigMeasure `json:"measure,omitempty"`
+	ProjectKey  *string              `json:"projectKey,omitempty"`
+	ProjectKeys *[]string            `json:"projectKeys,omitempty"`
+	SprintId    *openapi_types.UUID  `json:"sprintId,omitempty"`
+	Stat        *MetricStat          `json:"stat,omitempty"`
+}
+
+// GadgetConfigChart defines model for GadgetConfig.Chart.
+type GadgetConfigChart string
+
+// GadgetConfigFlowBy defines model for GadgetConfig.FlowBy.
+type GadgetConfigFlowBy string
+
+// GadgetConfigInterval defines model for GadgetConfig.Interval.
+type GadgetConfigInterval string
+
+// GadgetConfigMeasure defines model for GadgetConfig.Measure.
+type GadgetConfigMeasure string
+
+// GadgetType defines model for GadgetType.
+type GadgetType string
+
 // Group defines model for Group.
 type Group struct {
 	Description string             `json:"description"`
@@ -1264,29 +1710,32 @@ type HistoryEntry struct {
 
 // Issue defines model for Issue.
 type Issue struct {
-	Assignee    *User                  `json:"assignee,omitempty"`
-	CreatedAt   time.Time              `json:"createdAt"`
-	Dev         *DevSummary            `json:"dev,omitempty"`
-	DueDate     *openapi_types.Date    `json:"dueDate,omitempty"`
-	Fields      map[string]interface{} `json:"fields"`
-	Id          openapi_types.UUID     `json:"id"`
-	Key         string                 `json:"key"`
-	Labels      []string               `json:"labels"`
-	Parent      *IssueRef              `json:"parent,omitempty"`
-	Priority    Priority               `json:"priority"`
-	ProjectKey  string                 `json:"projectKey"`
-	Rank        string                 `json:"rank"`
-	Reporter    *User                  `json:"reporter,omitempty"`
-	Resolution  *string                `json:"resolution,omitempty"`
-	ResolvedAt  *time.Time             `json:"resolvedAt,omitempty"`
-	SprintId    *openapi_types.UUID    `json:"sprintId,omitempty"`
-	StartDate   *openapi_types.Date    `json:"startDate,omitempty"`
-	Status      Status                 `json:"status"`
-	StoryPoints *float64               `json:"storyPoints,omitempty"`
-	Summary     string                 `json:"summary"`
-	Type        IssueTypeRef           `json:"type"`
-	UpdatedAt   time.Time              `json:"updatedAt"`
-	Version     int                    `json:"version"`
+	Assignee   *User                  `json:"assignee,omitempty"`
+	CreatedAt  time.Time              `json:"createdAt"`
+	Dev        *DevSummary            `json:"dev,omitempty"`
+	DueDate    *openapi_types.Date    `json:"dueDate,omitempty"`
+	Fields     map[string]interface{} `json:"fields"`
+	Id         openapi_types.UUID     `json:"id"`
+	Key        string                 `json:"key"`
+	Labels     []string               `json:"labels"`
+	Parent     *IssueRef              `json:"parent,omitempty"`
+	Priority   Priority               `json:"priority"`
+	ProjectKey string                 `json:"projectKey"`
+	Rank       string                 `json:"rank"`
+	Reporter   *User                  `json:"reporter,omitempty"`
+	Resolution *string                `json:"resolution,omitempty"`
+	ResolvedAt *time.Time             `json:"resolvedAt,omitempty"`
+	SprintId   *openapi_types.UUID    `json:"sprintId,omitempty"`
+	StartDate  *openapi_types.Date    `json:"startDate,omitempty"`
+	Status     Status                 `json:"status"`
+
+	// StatusChangedAt When the issue entered its current status
+	StatusChangedAt *time.Time   `json:"statusChangedAt,omitempty"`
+	StoryPoints     *float64     `json:"storyPoints,omitempty"`
+	Summary         string       `json:"summary"`
+	Type            IssueTypeRef `json:"type"`
+	UpdatedAt       time.Time    `json:"updatedAt"`
+	Version         int          `json:"version"`
 }
 
 // IssueCreate defines model for IssueCreate.
@@ -1309,42 +1758,45 @@ type IssueCreate struct {
 
 // IssueDetail defines model for IssueDetail.
 type IssueDetail struct {
-	Assignee        *User                  `json:"assignee,omitempty"`
-	Attachments     []Attachment           `json:"attachments"`
-	Children        []Issue                `json:"children"`
-	CreatedAt       time.Time              `json:"createdAt"`
-	Description     string                 `json:"description"`
-	Dev             *DevSummary            `json:"dev,omitempty"`
-	Development     []DevLink              `json:"development"`
-	DueDate         *openapi_types.Date    `json:"dueDate,omitempty"`
-	Fields          map[string]interface{} `json:"fields"`
-	Id              openapi_types.UUID     `json:"id"`
-	Key             string                 `json:"key"`
-	Labels          []string               `json:"labels"`
-	Links           []IssueLink            `json:"links"`
-	Parent          *IssueRef              `json:"parent,omitempty"`
-	Permissions     IssuePermissions       `json:"permissions"`
-	Priority        Priority               `json:"priority"`
-	Progress        *IssueProgress         `json:"progress,omitempty"`
-	Project         ProjectRef             `json:"project"`
-	ProjectKey      string                 `json:"projectKey"`
-	Rank            string                 `json:"rank"`
-	Releases        []Release              `json:"releases"`
-	Reporter        *User                  `json:"reporter,omitempty"`
-	Resolution      *string                `json:"resolution,omitempty"`
-	ResolvedAt      *time.Time             `json:"resolvedAt,omitempty"`
-	Sprint          *Sprint                `json:"sprint,omitempty"`
-	SprintId        *openapi_types.UUID    `json:"sprintId,omitempty"`
-	StartDate       *openapi_types.Date    `json:"startDate,omitempty"`
-	Status          Status                 `json:"status"`
-	StoryPoints     *float64               `json:"storyPoints,omitempty"`
-	SuggestedBranch *string                `json:"suggestedBranch,omitempty"`
-	Summary         string                 `json:"summary"`
-	Type            IssueTypeRef           `json:"type"`
-	UpdatedAt       time.Time              `json:"updatedAt"`
-	Version         int                    `json:"version"`
-	WatcherCount    int                    `json:"watcherCount"`
-	Watching        bool                   `json:"watching"`
+	Assignee    *User                  `json:"assignee,omitempty"`
+	Attachments []Attachment           `json:"attachments"`
+	Children    []Issue                `json:"children"`
+	CreatedAt   time.Time              `json:"createdAt"`
+	Description string                 `json:"description"`
+	Dev         *DevSummary            `json:"dev,omitempty"`
+	Development []DevLink              `json:"development"`
+	DueDate     *openapi_types.Date    `json:"dueDate,omitempty"`
+	Fields      map[string]interface{} `json:"fields"`
+	Id          openapi_types.UUID     `json:"id"`
+	Key         string                 `json:"key"`
+	Labels      []string               `json:"labels"`
+	Links       []IssueLink            `json:"links"`
+	Parent      *IssueRef              `json:"parent,omitempty"`
+	Permissions IssuePermissions       `json:"permissions"`
+	Priority    Priority               `json:"priority"`
+	Progress    *IssueProgress         `json:"progress,omitempty"`
+	Project     ProjectRef             `json:"project"`
+	ProjectKey  string                 `json:"projectKey"`
+	Rank        string                 `json:"rank"`
+	Releases    []Release              `json:"releases"`
+	Reporter    *User                  `json:"reporter,omitempty"`
+	Resolution  *string                `json:"resolution,omitempty"`
+	ResolvedAt  *time.Time             `json:"resolvedAt,omitempty"`
+	Sprint      *Sprint                `json:"sprint,omitempty"`
+	SprintId    *openapi_types.UUID    `json:"sprintId,omitempty"`
+	StartDate   *openapi_types.Date    `json:"startDate,omitempty"`
+	Status      Status                 `json:"status"`
+
+	// StatusChangedAt When the issue entered its current status
+	StatusChangedAt *time.Time   `json:"statusChangedAt,omitempty"`
+	StoryPoints     *float64     `json:"storyPoints,omitempty"`
+	SuggestedBranch *string      `json:"suggestedBranch,omitempty"`
+	Summary         string       `json:"summary"`
+	Type            IssueTypeRef `json:"type"`
+	UpdatedAt       time.Time    `json:"updatedAt"`
+	Version         int          `json:"version"`
+	WatcherCount    int          `json:"watcherCount"`
+	Watching        bool         `json:"watching"`
 }
 
 // IssueLink defines model for IssueLink.
@@ -1354,6 +1806,36 @@ type IssueLink struct {
 	Issue     IssueRef           `json:"issue"`
 	Label     string             `json:"label"`
 	Type      LinkType           `json:"type"`
+}
+
+// IssueMetrics defines model for IssueMetrics.
+type IssueMetrics struct {
+	// AgeHours Created to now, or to resolution
+	AgeHours  float64   `json:"ageHours"`
+	CreatedAt time.Time `json:"createdAt"`
+
+	// CycleTimeHours Started to resolved, or started to now while still open
+	CycleTimeHours *float64 `json:"cycleTimeHours,omitempty"`
+
+	// LeadTimeHours Created to resolved (resolved issues only)
+	LeadTimeHours *float64 `json:"leadTimeHours,omitempty"`
+
+	// Reopened Times it left a done status for another
+	Reopened   int        `json:"reopened"`
+	ResolvedAt *time.Time `json:"resolvedAt,omitempty"`
+
+	// Sprints Sprints it has been part of
+	Sprints int `json:"sprints"`
+
+	// StartedAt First entered an in-progress status
+	StartedAt      *time.Time `json:"startedAt,omitempty"`
+	StatusAgeHours float64    `json:"statusAgeHours"`
+
+	// StatusSince When the issue entered its current status
+	StatusSince time.Time `json:"statusSince"`
+
+	// TimeInStatus Total time in each status visited, in the order first visited
+	TimeInStatus []StatusTime `json:"timeInStatus"`
 }
 
 // IssuePatch defines model for IssuePatch.
@@ -1460,6 +1942,37 @@ type Me struct {
 
 	// Source Where the account is managed; scim and google profiles are read-only here
 	Source UserSource `json:"source"`
+}
+
+// MetricStat defines model for MetricStat.
+type MetricStat string
+
+// MetricsSummary defines model for MetricsSummary.
+type MetricsSummary struct {
+	// Created Created in the window
+	Created    int `json:"created"`
+	Days       int `json:"days"`
+	InProgress int `json:"inProgress"`
+
+	// MedianCycleHours Of issues resolved in the window
+	MedianCycleHours *float64 `json:"medianCycleHours,omitempty"`
+
+	// Open Not in a done status
+	Open       int     `json:"open"`
+	OpenPoints float64 `json:"openPoints"`
+
+	// Overdue Open with a due date before today
+	Overdue int `json:"overdue"`
+
+	// Resolved Resolved in the window
+	Resolved int `json:"resolved"`
+
+	// ResolvedPoints Story points resolved in the window
+	ResolvedPoints float64 `json:"resolvedPoints"`
+	Todo           int     `json:"todo"`
+
+	// Unassigned Open without an assignee
+	Unassigned int `json:"unassigned"`
 }
 
 // MoveRequest defines model for MoveRequest.
@@ -1879,12 +2392,24 @@ type SprintInput struct {
 
 // SprintReport defines model for SprintReport.
 type SprintReport struct {
+	AddedIssues int `json:"addedIssues"`
+
+	// AddedPoints Points of issues added after the start
+	AddedPoints     float64         `json:"addedPoints"`
 	Burndown        []BurndownPoint `json:"burndown"`
 	CommittedIssues int             `json:"committedIssues"`
-	CommittedPoints float64         `json:"committedPoints"`
-	CompletedIssues int             `json:"completedIssues"`
-	CompletedPoints float64         `json:"completedPoints"`
-	Sprint          Sprint          `json:"sprint"`
+
+	// CommittedPoints Story points in the sprint when it started
+	CommittedPoints float64 `json:"committedPoints"`
+	CompletedIssues int     `json:"completedIssues"`
+
+	// CompletedPoints Points done in the sprint, including work added after it started
+	CompletedPoints float64 `json:"completedPoints"`
+	RemovedIssues   int     `json:"removedIssues"`
+
+	// RemovedPoints Points of issues taken out after the start
+	RemovedPoints float64 `json:"removedPoints"`
+	Sprint        Sprint  `json:"sprint"`
 }
 
 // SprintState defines model for SprintState.
@@ -1899,6 +2424,13 @@ type Status struct {
 
 // StatusCategory defines model for StatusCategory.
 type StatusCategory string
+
+// StatusTime defines model for StatusTime.
+type StatusTime struct {
+	Hours  float64 `json:"hours"`
+	Status Status  `json:"status"`
+	Visits int     `json:"visits"`
+}
 
 // Swimlanes defines model for Swimlanes.
 type Swimlanes string
@@ -2004,6 +2536,26 @@ type ValidatorDef struct {
 	// Expr CEL expression that must evaluate to true
 	Expr    string  `json:"expr"`
 	Message *string `json:"message,omitempty"`
+}
+
+// Velocity defines model for Velocity.
+type Velocity struct {
+	AverageIssues float64 `json:"averageIssues"`
+
+	// AveragePoints Completed points per sprint
+	AveragePoints float64          `json:"averagePoints"`
+	Sprints       []VelocitySprint `json:"sprints"`
+}
+
+// VelocitySprint defines model for VelocitySprint.
+type VelocitySprint struct {
+	CommittedIssues int     `json:"committedIssues"`
+	CommittedPoints float64 `json:"committedPoints"`
+	CompletedIssues int     `json:"completedIssues"`
+
+	// CompletedPoints All work done in the sprint, including work added after the start
+	CompletedPoints float64 `json:"completedPoints"`
+	Sprint          Sprint  `json:"sprint"`
 }
 
 // WebhookDelivery defines model for WebhookDelivery.
@@ -2177,6 +2729,9 @@ type CommentId = openapi_types.UUID
 // ConnectionId defines model for ConnectionId.
 type ConnectionId = openapi_types.UUID
 
+// DashboardId defines model for DashboardId.
+type DashboardId = openapi_types.UUID
+
 // EventId defines model for EventId.
 type EventId = openapi_types.UUID
 
@@ -2200,6 +2755,15 @@ type LinkId = openapi_types.UUID
 
 // MemberId defines model for MemberId.
 type MemberId = openapi_types.UUID
+
+// MetricDays defines model for MetricDays.
+type MetricDays = int
+
+// MetricJql defines model for MetricJql.
+type MetricJql = string
+
+// MetricProjects defines model for MetricProjects.
+type MetricProjects = string
 
 // Offset defines model for Offset.
 type Offset = int
@@ -2356,6 +2920,72 @@ type AddWatcherJSONBody struct {
 	UserId *openapi_types.UUID `json:"userId,omitempty"`
 }
 
+// GetBreakdownParams defines parameters for GetBreakdown.
+type GetBreakdownParams struct {
+	// Projects Comma-separated project keys; omit for every project you can browse
+	Projects *MetricProjects `form:"projects,omitempty" json:"projects,omitempty"`
+
+	// Jql Optional JQL the issues must also match
+	Jql *MetricJql  `form:"jql,omitempty" json:"jql,omitempty"`
+	By  BreakdownBy `form:"by" json:"by"`
+}
+
+// GetCreatedResolvedParams defines parameters for GetCreatedResolved.
+type GetCreatedResolvedParams struct {
+	// Projects Comma-separated project keys; omit for every project you can browse
+	Projects *MetricProjects `form:"projects,omitempty" json:"projects,omitempty"`
+
+	// Jql Optional JQL the issues must also match
+	Jql *MetricJql `form:"jql,omitempty" json:"jql,omitempty"`
+
+	// Days Window in days
+	Days     *MetricDays                       `form:"days,omitempty" json:"days,omitempty"`
+	Interval *GetCreatedResolvedParamsInterval `form:"interval,omitempty" json:"interval,omitempty"`
+}
+
+// GetCreatedResolvedParamsInterval defines parameters for GetCreatedResolved.
+type GetCreatedResolvedParamsInterval string
+
+// GetCycleTimeMetricsParams defines parameters for GetCycleTimeMetrics.
+type GetCycleTimeMetricsParams struct {
+	// Projects Comma-separated project keys; omit for every project you can browse
+	Projects *MetricProjects `form:"projects,omitempty" json:"projects,omitempty"`
+
+	// Jql Optional JQL the issues must also match
+	Jql *MetricJql `form:"jql,omitempty" json:"jql,omitempty"`
+
+	// Days Window in days
+	Days *MetricDays `form:"days,omitempty" json:"days,omitempty"`
+}
+
+// GetCumulativeFlowParams defines parameters for GetCumulativeFlow.
+type GetCumulativeFlowParams struct {
+	// Projects Comma-separated project keys; omit for every project you can browse
+	Projects *MetricProjects `form:"projects,omitempty" json:"projects,omitempty"`
+
+	// Jql Optional JQL the issues must also match
+	Jql *MetricJql `form:"jql,omitempty" json:"jql,omitempty"`
+
+	// Days Window in days
+	Days *MetricDays                `form:"days,omitempty" json:"days,omitempty"`
+	By   *GetCumulativeFlowParamsBy `form:"by,omitempty" json:"by,omitempty"`
+}
+
+// GetCumulativeFlowParamsBy defines parameters for GetCumulativeFlow.
+type GetCumulativeFlowParamsBy string
+
+// GetMetricsSummaryParams defines parameters for GetMetricsSummary.
+type GetMetricsSummaryParams struct {
+	// Projects Comma-separated project keys; omit for every project you can browse
+	Projects *MetricProjects `form:"projects,omitempty" json:"projects,omitempty"`
+
+	// Jql Optional JQL the issues must also match
+	Jql *MetricJql `form:"jql,omitempty" json:"jql,omitempty"`
+
+	// Days Window in days
+	Days *MetricDays `form:"days,omitempty" json:"days,omitempty"`
+}
+
 // ListNotificationsParams defines parameters for ListNotifications.
 type ListNotificationsParams struct {
 	Unread *bool  `form:"unread,omitempty" json:"unread,omitempty"`
@@ -2403,6 +3033,12 @@ type LinkProjectRepositoryJSONBody struct {
 // ListSprintsParams defines parameters for ListSprints.
 type ListSprintsParams struct {
 	State *SprintState `form:"state,omitempty" json:"state,omitempty"`
+}
+
+// GetVelocityParams defines parameters for GetVelocity.
+type GetVelocityParams struct {
+	// Count How many of the most recently completed sprints
+	Count *int `form:"count,omitempty" json:"count,omitempty"`
 }
 
 // ShipReleaseJSONBody defines parameters for ShipRelease.
@@ -2545,6 +3181,12 @@ type UpdateChatChannelJSONRequestBody = ChatChannelPatch
 
 // UpdateCommentJSONRequestBody defines body for UpdateComment for application/json ContentType.
 type UpdateCommentJSONRequestBody = CommentInput
+
+// CreateDashboardJSONRequestBody defines body for CreateDashboard for application/json ContentType.
+type CreateDashboardJSONRequestBody = DashboardInput
+
+// UpdateDashboardJSONRequestBody defines body for UpdateDashboard for application/json ContentType.
+type UpdateDashboardJSONRequestBody = DashboardInput
 
 // CreateFieldJSONRequestBody defines body for CreateField for application/json ContentType.
 type CreateFieldJSONRequestBody = FieldDefinitionInput
@@ -2801,6 +3443,21 @@ type ServerInterface interface {
 	// (PATCH /comments/{commentId})
 	UpdateComment(w http.ResponseWriter, r *http.Request, commentId CommentId)
 
+	// (GET /dashboards)
+	ListDashboards(w http.ResponseWriter, r *http.Request)
+
+	// (POST /dashboards)
+	CreateDashboard(w http.ResponseWriter, r *http.Request)
+
+	// (DELETE /dashboards/{dashboardId})
+	DeleteDashboard(w http.ResponseWriter, r *http.Request, dashboardId DashboardId)
+
+	// (GET /dashboards/{dashboardId})
+	GetDashboard(w http.ResponseWriter, r *http.Request, dashboardId DashboardId)
+
+	// (PUT /dashboards/{dashboardId})
+	UpdateDashboard(w http.ResponseWriter, r *http.Request, dashboardId DashboardId)
+
 	// (GET /fields)
 	ListFields(w http.ResponseWriter, r *http.Request)
 
@@ -2863,6 +3520,9 @@ type ServerInterface interface {
 
 	// (POST /issues/{issueKey}/links)
 	CreateIssueLink(w http.ResponseWriter, r *http.Request, issueKey IssueKey)
+	// GetIssueMetrics Lead time, cycle time and time in each status, derived from the issue's history
+	// (GET /issues/{issueKey}/metrics)
+	GetIssueMetrics(w http.ResponseWriter, r *http.Request, issueKey IssueKey)
 
 	// (POST /issues/{issueKey}/move)
 	MoveIssue(w http.ResponseWriter, r *http.Request, issueKey IssueKey)
@@ -2893,6 +3553,21 @@ type ServerInterface interface {
 
 	// (DELETE /me/tokens/{tokenId})
 	RevokeMyToken(w http.ResponseWriter, r *http.Request, tokenId TokenId)
+	// GetBreakdown Matching issues grouped by a field, with counts and story points
+	// (GET /metrics/breakdown)
+	GetBreakdown(w http.ResponseWriter, r *http.Request, params GetBreakdownParams)
+	// GetCreatedResolved Issues created and resolved per day or week, with the number open at the end of each
+	// (GET /metrics/created-resolved)
+	GetCreatedResolved(w http.ResponseWriter, r *http.Request, params GetCreatedResolvedParams)
+	// GetCycleTimeMetrics Cycle time of matching issues resolved in the window (first in progress to resolved)
+	// (GET /metrics/cycle-time)
+	GetCycleTimeMetrics(w http.ResponseWriter, r *http.Request, params GetCycleTimeMetricsParams)
+	// GetCumulativeFlow Cumulative flow, the number of matching issues in each status (or category) at the end of each day
+	// (GET /metrics/flow)
+	GetCumulativeFlow(w http.ResponseWriter, r *http.Request, params GetCumulativeFlowParams)
+	// GetMetricsSummary Counts and totals for the matching issues (open, created and resolved in the window, overdue...)
+	// (GET /metrics/summary)
+	GetMetricsSummary(w http.ResponseWriter, r *http.Request, params GetMetricsSummaryParams)
 
 	// (GET /notifications)
 	ListNotifications(w http.ResponseWriter, r *http.Request, params ListNotificationsParams)
@@ -2989,6 +3664,9 @@ type ServerInterface interface {
 
 	// (POST /projects/{projectKey}/sprints)
 	CreateSprint(w http.ResponseWriter, r *http.Request, projectKey ProjectKey)
+
+	// (GET /projects/{projectKey}/velocity)
+	GetVelocity(w http.ResponseWriter, r *http.Request, projectKey ProjectKey, params GetVelocityParams)
 
 	// (DELETE /releases/{releaseId})
 	DeleteRelease(w http.ResponseWriter, r *http.Request, releaseId ReleaseId)
@@ -4318,6 +4996,112 @@ func (siw *ServerInterfaceWrapper) UpdateComment(w http.ResponseWriter, r *http.
 	handler.ServeHTTP(w, r)
 }
 
+// ListDashboards operation middleware
+func (siw *ServerInterfaceWrapper) ListDashboards(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListDashboards(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateDashboard operation middleware
+func (siw *ServerInterfaceWrapper) CreateDashboard(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateDashboard(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteDashboard operation middleware
+func (siw *ServerInterfaceWrapper) DeleteDashboard(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "dashboardId" -------------
+	var dashboardId DashboardId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "dashboardId", r.PathValue("dashboardId"), &dashboardId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dashboardId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteDashboard(w, r, dashboardId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetDashboard operation middleware
+func (siw *ServerInterfaceWrapper) GetDashboard(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "dashboardId" -------------
+	var dashboardId DashboardId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "dashboardId", r.PathValue("dashboardId"), &dashboardId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dashboardId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetDashboard(w, r, dashboardId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateDashboard operation middleware
+func (siw *ServerInterfaceWrapper) UpdateDashboard(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "dashboardId" -------------
+	var dashboardId DashboardId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "dashboardId", r.PathValue("dashboardId"), &dashboardId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dashboardId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateDashboard(w, r, dashboardId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListFields operation middleware
 func (siw *ServerInterfaceWrapper) ListFields(w http.ResponseWriter, r *http.Request) {
 
@@ -4811,6 +5595,32 @@ func (siw *ServerInterfaceWrapper) CreateIssueLink(w http.ResponseWriter, r *htt
 	handler.ServeHTTP(w, r)
 }
 
+// GetIssueMetrics operation middleware
+func (siw *ServerInterfaceWrapper) GetIssueMetrics(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "issueKey" -------------
+	var issueKey IssueKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "issueKey", r.PathValue("issueKey"), &issueKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "issueKey", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetIssueMetrics(w, r, issueKey)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // MoveIssue operation middleware
 func (siw *ServerInterfaceWrapper) MoveIssue(w http.ResponseWriter, r *http.Request) {
 
@@ -5035,6 +5845,327 @@ func (siw *ServerInterfaceWrapper) RevokeMyToken(w http.ResponseWriter, r *http.
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.RevokeMyToken(w, r, tokenId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetBreakdown operation middleware
+func (siw *ServerInterfaceWrapper) GetBreakdown(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetBreakdownParams
+
+	// ------------- Optional query parameter "projects" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "projects", r.URL.Query(), &params.Projects, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "projects"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "projects", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "jql" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "jql", r.URL.Query(), &params.Jql, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "jql"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "jql", Err: err})
+		}
+		return
+	}
+
+	// ------------- Required query parameter "by" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "by", r.URL.Query(), &params.By, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "by"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "by", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetBreakdown(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetCreatedResolved operation middleware
+func (siw *ServerInterfaceWrapper) GetCreatedResolved(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetCreatedResolvedParams
+
+	// ------------- Optional query parameter "projects" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "projects", r.URL.Query(), &params.Projects, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "projects"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "projects", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "jql" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "jql", r.URL.Query(), &params.Jql, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "jql"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "jql", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "days" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "days", r.URL.Query(), &params.Days, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "days"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "days", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "interval" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "interval", r.URL.Query(), &params.Interval, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "interval"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "interval", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetCreatedResolved(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetCycleTimeMetrics operation middleware
+func (siw *ServerInterfaceWrapper) GetCycleTimeMetrics(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetCycleTimeMetricsParams
+
+	// ------------- Optional query parameter "projects" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "projects", r.URL.Query(), &params.Projects, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "projects"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "projects", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "jql" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "jql", r.URL.Query(), &params.Jql, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "jql"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "jql", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "days" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "days", r.URL.Query(), &params.Days, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "days"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "days", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetCycleTimeMetrics(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetCumulativeFlow operation middleware
+func (siw *ServerInterfaceWrapper) GetCumulativeFlow(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetCumulativeFlowParams
+
+	// ------------- Optional query parameter "projects" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "projects", r.URL.Query(), &params.Projects, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "projects"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "projects", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "jql" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "jql", r.URL.Query(), &params.Jql, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "jql"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "jql", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "days" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "days", r.URL.Query(), &params.Days, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "days"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "days", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "by" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "by", r.URL.Query(), &params.By, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "by"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "by", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetCumulativeFlow(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetMetricsSummary operation middleware
+func (siw *ServerInterfaceWrapper) GetMetricsSummary(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetMetricsSummaryParams
+
+	// ------------- Optional query parameter "projects" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "projects", r.URL.Query(), &params.Projects, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "projects"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "projects", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "jql" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "jql", r.URL.Query(), &params.Jql, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "jql"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "jql", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "days" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "days", r.URL.Query(), &params.Days, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "days"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "days", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetMetricsSummary(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -5904,6 +7035,48 @@ func (siw *ServerInterfaceWrapper) CreateSprint(w http.ResponseWriter, r *http.R
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateSprint(w, r, projectKey)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetVelocity operation middleware
+func (siw *ServerInterfaceWrapper) GetVelocity(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "projectKey" -------------
+	var projectKey ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "projectKey", r.PathValue("projectKey"), &projectKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "projectKey", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetVelocityParams
+
+	// ------------- Optional query parameter "count" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "count", r.URL.Query(), &params.Count, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "count"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "count", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetVelocity(w, r, projectKey, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -6940,6 +8113,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{projectKey}/repositories", wrapper.LinkProjectRepository)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/projects/{projectKey}/repositories/{repositoryId}", wrapper.UnlinkProjectRepository)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{projectKey}/reports/cycle-time", wrapper.GetCycleTimeReport)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{projectKey}/velocity", wrapper.GetVelocity)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/workflows", wrapper.ListWorkflows)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/workflows", wrapper.CreateWorkflow)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/workflows/apply", wrapper.ApplyWorkflow)
@@ -6969,6 +8143,16 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/releases/{releaseId}", wrapper.UpdateRelease)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/releases/{releaseId}/release", wrapper.ShipRelease)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/timeline", wrapper.GetTimeline)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/dashboards", wrapper.ListDashboards)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/dashboards", wrapper.CreateDashboard)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/dashboards/{dashboardId}", wrapper.DeleteDashboard)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/dashboards/{dashboardId}", wrapper.GetDashboard)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/dashboards/{dashboardId}", wrapper.UpdateDashboard)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/metrics/summary", wrapper.GetMetricsSummary)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/metrics/flow", wrapper.GetCumulativeFlow)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/metrics/created-resolved", wrapper.GetCreatedResolved)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/metrics/breakdown", wrapper.GetBreakdown)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/metrics/cycle-time", wrapper.GetCycleTimeMetrics)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/search", wrapper.SearchIssues)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/search/fields", wrapper.GetSearchMetadata)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/filters", wrapper.ListFilters)
@@ -6987,6 +8171,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/comments/{commentId}", wrapper.DeleteComment)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/comments/{commentId}", wrapper.UpdateComment)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/issues/{issueKey}/history", wrapper.ListIssueHistory)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/issues/{issueKey}/metrics", wrapper.GetIssueMetrics)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/issues/{issueKey}/links", wrapper.CreateIssueLink)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/issue-links/{linkId}", wrapper.DeleteIssueLink)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/issues/{issueKey}/watchers", wrapper.ListWatchers)
@@ -8768,6 +9953,195 @@ func (response UpdateCommentdefaultApplicationProblemPlusJSONResponse) VisitUpda
 	return err
 }
 
+type ListDashboardsRequestObject struct {
+}
+
+type ListDashboardsResponseObject interface {
+	VisitListDashboardsResponse(w http.ResponseWriter) error
+}
+
+type ListDashboards200JSONResponse []Dashboard
+
+func (response ListDashboards200JSONResponse) VisitListDashboardsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDashboardsdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListDashboardsdefaultApplicationProblemPlusJSONResponse) VisitListDashboardsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDashboardRequestObject struct {
+	Body *CreateDashboardJSONRequestBody
+}
+
+type CreateDashboardResponseObject interface {
+	VisitCreateDashboardResponse(w http.ResponseWriter) error
+}
+
+type CreateDashboard201JSONResponse Dashboard
+
+func (response CreateDashboard201JSONResponse) VisitCreateDashboardResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDashboarddefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response CreateDashboarddefaultApplicationProblemPlusJSONResponse) VisitCreateDashboardResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteDashboardRequestObject struct {
+	DashboardId DashboardId `json:"dashboardId"`
+}
+
+type DeleteDashboardResponseObject interface {
+	VisitDeleteDashboardResponse(w http.ResponseWriter) error
+}
+
+type DeleteDashboard204Response struct {
+}
+
+func (response DeleteDashboard204Response) VisitDeleteDashboardResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteDashboarddefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response DeleteDashboarddefaultApplicationProblemPlusJSONResponse) VisitDeleteDashboardResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDashboardRequestObject struct {
+	DashboardId DashboardId `json:"dashboardId"`
+}
+
+type GetDashboardResponseObject interface {
+	VisitGetDashboardResponse(w http.ResponseWriter) error
+}
+
+type GetDashboard200JSONResponse Dashboard
+
+func (response GetDashboard200JSONResponse) VisitGetDashboardResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDashboarddefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetDashboarddefaultApplicationProblemPlusJSONResponse) VisitGetDashboardResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateDashboardRequestObject struct {
+	DashboardId DashboardId `json:"dashboardId"`
+	Body        *UpdateDashboardJSONRequestBody
+}
+
+type UpdateDashboardResponseObject interface {
+	VisitUpdateDashboardResponse(w http.ResponseWriter) error
+}
+
+type UpdateDashboard200JSONResponse Dashboard
+
+func (response UpdateDashboard200JSONResponse) VisitUpdateDashboardResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateDashboarddefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response UpdateDashboarddefaultApplicationProblemPlusJSONResponse) VisitUpdateDashboardResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListFieldsRequestObject struct {
 }
 
@@ -9568,6 +10942,45 @@ func (response CreateIssueLinkdefaultApplicationProblemPlusJSONResponse) VisitCr
 	return err
 }
 
+type GetIssueMetricsRequestObject struct {
+	IssueKey IssueKey `json:"issueKey"`
+}
+
+type GetIssueMetricsResponseObject interface {
+	VisitGetIssueMetricsResponse(w http.ResponseWriter) error
+}
+
+type GetIssueMetrics200JSONResponse IssueMetrics
+
+func (response GetIssueMetrics200JSONResponse) VisitGetIssueMetricsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetIssueMetricsdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetIssueMetricsdefaultApplicationProblemPlusJSONResponse) VisitGetIssueMetricsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type MoveIssueRequestObject struct {
 	IssueKey IssueKey `json:"issueKey"`
 	Body     *MoveIssueJSONRequestBody
@@ -9931,6 +11344,201 @@ type RevokeMyTokendefaultApplicationProblemPlusJSONResponse struct {
 }
 
 func (response RevokeMyTokendefaultApplicationProblemPlusJSONResponse) VisitRevokeMyTokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetBreakdownRequestObject struct {
+	Params GetBreakdownParams
+}
+
+type GetBreakdownResponseObject interface {
+	VisitGetBreakdownResponse(w http.ResponseWriter) error
+}
+
+type GetBreakdown200JSONResponse Breakdown
+
+func (response GetBreakdown200JSONResponse) VisitGetBreakdownResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetBreakdowndefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetBreakdowndefaultApplicationProblemPlusJSONResponse) VisitGetBreakdownResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCreatedResolvedRequestObject struct {
+	Params GetCreatedResolvedParams
+}
+
+type GetCreatedResolvedResponseObject interface {
+	VisitGetCreatedResolvedResponse(w http.ResponseWriter) error
+}
+
+type GetCreatedResolved200JSONResponse CreatedResolved
+
+func (response GetCreatedResolved200JSONResponse) VisitGetCreatedResolvedResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCreatedResolveddefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetCreatedResolveddefaultApplicationProblemPlusJSONResponse) VisitGetCreatedResolvedResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCycleTimeMetricsRequestObject struct {
+	Params GetCycleTimeMetricsParams
+}
+
+type GetCycleTimeMetricsResponseObject interface {
+	VisitGetCycleTimeMetricsResponse(w http.ResponseWriter) error
+}
+
+type GetCycleTimeMetrics200JSONResponse CycleTimeReport
+
+func (response GetCycleTimeMetrics200JSONResponse) VisitGetCycleTimeMetricsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCycleTimeMetricsdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetCycleTimeMetricsdefaultApplicationProblemPlusJSONResponse) VisitGetCycleTimeMetricsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCumulativeFlowRequestObject struct {
+	Params GetCumulativeFlowParams
+}
+
+type GetCumulativeFlowResponseObject interface {
+	VisitGetCumulativeFlowResponse(w http.ResponseWriter) error
+}
+
+type GetCumulativeFlow200JSONResponse CumulativeFlow
+
+func (response GetCumulativeFlow200JSONResponse) VisitGetCumulativeFlowResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCumulativeFlowdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetCumulativeFlowdefaultApplicationProblemPlusJSONResponse) VisitGetCumulativeFlowResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMetricsSummaryRequestObject struct {
+	Params GetMetricsSummaryParams
+}
+
+type GetMetricsSummaryResponseObject interface {
+	VisitGetMetricsSummaryResponse(w http.ResponseWriter) error
+}
+
+type GetMetricsSummary200JSONResponse MetricsSummary
+
+func (response GetMetricsSummary200JSONResponse) VisitGetMetricsSummaryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMetricsSummarydefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetMetricsSummarydefaultApplicationProblemPlusJSONResponse) VisitGetMetricsSummaryResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -11164,6 +12772,46 @@ type CreateSprintdefaultApplicationProblemPlusJSONResponse struct {
 }
 
 func (response CreateSprintdefaultApplicationProblemPlusJSONResponse) VisitCreateSprintResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetVelocityRequestObject struct {
+	ProjectKey ProjectKey `json:"projectKey"`
+	Params     GetVelocityParams
+}
+
+type GetVelocityResponseObject interface {
+	VisitGetVelocityResponse(w http.ResponseWriter) error
+}
+
+type GetVelocity200JSONResponse Velocity
+
+func (response GetVelocity200JSONResponse) VisitGetVelocityResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetVelocitydefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetVelocitydefaultApplicationProblemPlusJSONResponse) VisitGetVelocityResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -12462,6 +14110,21 @@ type StrictServerInterface interface {
 	// (PATCH /comments/{commentId})
 	UpdateComment(ctx context.Context, request UpdateCommentRequestObject) (UpdateCommentResponseObject, error)
 
+	// (GET /dashboards)
+	ListDashboards(ctx context.Context, request ListDashboardsRequestObject) (ListDashboardsResponseObject, error)
+
+	// (POST /dashboards)
+	CreateDashboard(ctx context.Context, request CreateDashboardRequestObject) (CreateDashboardResponseObject, error)
+
+	// (DELETE /dashboards/{dashboardId})
+	DeleteDashboard(ctx context.Context, request DeleteDashboardRequestObject) (DeleteDashboardResponseObject, error)
+
+	// (GET /dashboards/{dashboardId})
+	GetDashboard(ctx context.Context, request GetDashboardRequestObject) (GetDashboardResponseObject, error)
+
+	// (PUT /dashboards/{dashboardId})
+	UpdateDashboard(ctx context.Context, request UpdateDashboardRequestObject) (UpdateDashboardResponseObject, error)
+
 	// (GET /fields)
 	ListFields(ctx context.Context, request ListFieldsRequestObject) (ListFieldsResponseObject, error)
 
@@ -12524,6 +14187,9 @@ type StrictServerInterface interface {
 
 	// (POST /issues/{issueKey}/links)
 	CreateIssueLink(ctx context.Context, request CreateIssueLinkRequestObject) (CreateIssueLinkResponseObject, error)
+	// GetIssueMetrics Lead time, cycle time and time in each status, derived from the issue's history
+	// (GET /issues/{issueKey}/metrics)
+	GetIssueMetrics(ctx context.Context, request GetIssueMetricsRequestObject) (GetIssueMetricsResponseObject, error)
 
 	// (POST /issues/{issueKey}/move)
 	MoveIssue(ctx context.Context, request MoveIssueRequestObject) (MoveIssueResponseObject, error)
@@ -12554,6 +14220,21 @@ type StrictServerInterface interface {
 
 	// (DELETE /me/tokens/{tokenId})
 	RevokeMyToken(ctx context.Context, request RevokeMyTokenRequestObject) (RevokeMyTokenResponseObject, error)
+	// GetBreakdown Matching issues grouped by a field, with counts and story points
+	// (GET /metrics/breakdown)
+	GetBreakdown(ctx context.Context, request GetBreakdownRequestObject) (GetBreakdownResponseObject, error)
+	// GetCreatedResolved Issues created and resolved per day or week, with the number open at the end of each
+	// (GET /metrics/created-resolved)
+	GetCreatedResolved(ctx context.Context, request GetCreatedResolvedRequestObject) (GetCreatedResolvedResponseObject, error)
+	// GetCycleTimeMetrics Cycle time of matching issues resolved in the window (first in progress to resolved)
+	// (GET /metrics/cycle-time)
+	GetCycleTimeMetrics(ctx context.Context, request GetCycleTimeMetricsRequestObject) (GetCycleTimeMetricsResponseObject, error)
+	// GetCumulativeFlow Cumulative flow, the number of matching issues in each status (or category) at the end of each day
+	// (GET /metrics/flow)
+	GetCumulativeFlow(ctx context.Context, request GetCumulativeFlowRequestObject) (GetCumulativeFlowResponseObject, error)
+	// GetMetricsSummary Counts and totals for the matching issues (open, created and resolved in the window, overdue...)
+	// (GET /metrics/summary)
+	GetMetricsSummary(ctx context.Context, request GetMetricsSummaryRequestObject) (GetMetricsSummaryResponseObject, error)
 
 	// (GET /notifications)
 	ListNotifications(ctx context.Context, request ListNotificationsRequestObject) (ListNotificationsResponseObject, error)
@@ -12650,6 +14331,9 @@ type StrictServerInterface interface {
 
 	// (POST /projects/{projectKey}/sprints)
 	CreateSprint(ctx context.Context, request CreateSprintRequestObject) (CreateSprintResponseObject, error)
+
+	// (GET /projects/{projectKey}/velocity)
+	GetVelocity(ctx context.Context, request GetVelocityRequestObject) (GetVelocityResponseObject, error)
 
 	// (DELETE /releases/{releaseId})
 	DeleteRelease(ctx context.Context, request DeleteReleaseRequestObject) (DeleteReleaseResponseObject, error)
@@ -14067,6 +15751,146 @@ func (sh *strictHandler) UpdateComment(w http.ResponseWriter, r *http.Request, c
 	}
 }
 
+// ListDashboards operation middleware
+func (sh *strictHandler) ListDashboards(w http.ResponseWriter, r *http.Request) {
+	var request ListDashboardsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListDashboards(ctx, request.(ListDashboardsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListDashboards")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListDashboardsResponseObject); ok {
+		if err := validResponse.VisitListDashboardsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateDashboard operation middleware
+func (sh *strictHandler) CreateDashboard(w http.ResponseWriter, r *http.Request) {
+	var request CreateDashboardRequestObject
+
+	var body CreateDashboardJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateDashboard(ctx, request.(CreateDashboardRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateDashboard")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateDashboardResponseObject); ok {
+		if err := validResponse.VisitCreateDashboardResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteDashboard operation middleware
+func (sh *strictHandler) DeleteDashboard(w http.ResponseWriter, r *http.Request, dashboardId DashboardId) {
+	var request DeleteDashboardRequestObject
+
+	request.DashboardId = dashboardId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteDashboard(ctx, request.(DeleteDashboardRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteDashboard")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteDashboardResponseObject); ok {
+		if err := validResponse.VisitDeleteDashboardResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetDashboard operation middleware
+func (sh *strictHandler) GetDashboard(w http.ResponseWriter, r *http.Request, dashboardId DashboardId) {
+	var request GetDashboardRequestObject
+
+	request.DashboardId = dashboardId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetDashboard(ctx, request.(GetDashboardRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetDashboard")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetDashboardResponseObject); ok {
+		if err := validResponse.VisitGetDashboardResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateDashboard operation middleware
+func (sh *strictHandler) UpdateDashboard(w http.ResponseWriter, r *http.Request, dashboardId DashboardId) {
+	var request UpdateDashboardRequestObject
+
+	request.DashboardId = dashboardId
+
+	var body UpdateDashboardJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateDashboard(ctx, request.(UpdateDashboardRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateDashboard")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateDashboardResponseObject); ok {
+		if err := validResponse.VisitUpdateDashboardResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ListFields operation middleware
 func (sh *strictHandler) ListFields(w http.ResponseWriter, r *http.Request) {
 	var request ListFieldsRequestObject
@@ -14673,6 +16497,32 @@ func (sh *strictHandler) CreateIssueLink(w http.ResponseWriter, r *http.Request,
 	}
 }
 
+// GetIssueMetrics operation middleware
+func (sh *strictHandler) GetIssueMetrics(w http.ResponseWriter, r *http.Request, issueKey IssueKey) {
+	var request GetIssueMetricsRequestObject
+
+	request.IssueKey = issueKey
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetIssueMetrics(ctx, request.(GetIssueMetricsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetIssueMetrics")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetIssueMetricsResponseObject); ok {
+		if err := validResponse.VisitGetIssueMetricsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // MoveIssue operation middleware
 func (sh *strictHandler) MoveIssue(w http.ResponseWriter, r *http.Request, issueKey IssueKey) {
 	var request MoveIssueRequestObject
@@ -14949,6 +16799,136 @@ func (sh *strictHandler) RevokeMyToken(w http.ResponseWriter, r *http.Request, t
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(RevokeMyTokenResponseObject); ok {
 		if err := validResponse.VisitRevokeMyTokenResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetBreakdown operation middleware
+func (sh *strictHandler) GetBreakdown(w http.ResponseWriter, r *http.Request, params GetBreakdownParams) {
+	var request GetBreakdownRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetBreakdown(ctx, request.(GetBreakdownRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetBreakdown")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetBreakdownResponseObject); ok {
+		if err := validResponse.VisitGetBreakdownResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetCreatedResolved operation middleware
+func (sh *strictHandler) GetCreatedResolved(w http.ResponseWriter, r *http.Request, params GetCreatedResolvedParams) {
+	var request GetCreatedResolvedRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetCreatedResolved(ctx, request.(GetCreatedResolvedRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetCreatedResolved")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetCreatedResolvedResponseObject); ok {
+		if err := validResponse.VisitGetCreatedResolvedResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetCycleTimeMetrics operation middleware
+func (sh *strictHandler) GetCycleTimeMetrics(w http.ResponseWriter, r *http.Request, params GetCycleTimeMetricsParams) {
+	var request GetCycleTimeMetricsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetCycleTimeMetrics(ctx, request.(GetCycleTimeMetricsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetCycleTimeMetrics")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetCycleTimeMetricsResponseObject); ok {
+		if err := validResponse.VisitGetCycleTimeMetricsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetCumulativeFlow operation middleware
+func (sh *strictHandler) GetCumulativeFlow(w http.ResponseWriter, r *http.Request, params GetCumulativeFlowParams) {
+	var request GetCumulativeFlowRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetCumulativeFlow(ctx, request.(GetCumulativeFlowRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetCumulativeFlow")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetCumulativeFlowResponseObject); ok {
+		if err := validResponse.VisitGetCumulativeFlowResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetMetricsSummary operation middleware
+func (sh *strictHandler) GetMetricsSummary(w http.ResponseWriter, r *http.Request, params GetMetricsSummaryParams) {
+	var request GetMetricsSummaryRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetMetricsSummary(ctx, request.(GetMetricsSummaryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetMetricsSummary")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetMetricsSummaryResponseObject); ok {
+		if err := validResponse.VisitGetMetricsSummaryResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -15876,6 +17856,33 @@ func (sh *strictHandler) CreateSprint(w http.ResponseWriter, r *http.Request, pr
 	}
 }
 
+// GetVelocity operation middleware
+func (sh *strictHandler) GetVelocity(w http.ResponseWriter, r *http.Request, projectKey ProjectKey, params GetVelocityParams) {
+	var request GetVelocityRequestObject
+
+	request.ProjectKey = projectKey
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetVelocity(ctx, request.(GetVelocityRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetVelocity")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetVelocityResponseObject); ok {
+		if err := validResponse.VisitGetVelocityResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // DeleteRelease operation middleware
 func (sh *strictHandler) DeleteRelease(w http.ResponseWriter, r *http.Request, releaseId ReleaseId) {
 	var request DeleteReleaseRequestObject
@@ -16726,239 +18733,288 @@ func (sh *strictHandler) GetWorkflowVersion(w http.ResponseWriter, r *http.Reque
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
-	"FspuYr67hCS9Z1gIRCZfPn75fwEAAP//",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

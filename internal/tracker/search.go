@@ -82,22 +82,29 @@ func (s *Service) ValidateJQL(ctx context.Context, actor *authz.Actor, jql strin
 	return jqlError(err)
 }
 
+// compileWhere turns JQL into a SQL condition over issues aliased i, limited to projectIDs ($1);
+// extraArgs take $2 onwards, ahead of the query's own arguments.
+func (s *Service) compileWhere(ctx context.Context, actor *authz.Actor, projectIDs []uuid.UUID, jql string, extraArgs []any, order []search.Order) (where, orderBy string, args []any, err error) {
+	env, err := s.searchEnv(ctx, actor)
+	if err != nil {
+		return "", "", nil, err
+	}
+	args = append([]any{projectIDs}, extraArgs...)
+	compiled, err := search.CompileString(jql, env, len(args), order)
+	if err != nil {
+		return "", "", nil, jqlError(err)
+	}
+	return "i.project_id = ANY($1::uuid[]) AND " + compiled.Where, compiled.OrderBy, append(args, compiled.Args...), nil
+}
+
 func (s *Service) runSearch(ctx context.Context, actor *authz.Actor, projectIDs []uuid.UUID, sq SearchQuery) ([]dbq.Issue, int, error) {
 	if len(projectIDs) == 0 {
 		return []dbq.Issue{}, 0, nil
 	}
-	env, err := s.searchEnv(ctx, actor)
+	where, orderBy, args, err := s.compileWhere(ctx, actor, projectIDs, sq.JQL, sq.ExtraArgs, sq.DefaultOrder)
 	if err != nil {
 		return nil, 0, err
 	}
-	args := []any{projectIDs}
-	args = append(args, sq.ExtraArgs...)
-	compiled, err := search.CompileString(sq.JQL, env, len(args), sq.DefaultOrder)
-	if err != nil {
-		return nil, 0, jqlError(err)
-	}
-	args = append(args, compiled.Args...)
-	where := "i.project_id = ANY($1::uuid[]) AND " + compiled.Where
 	for _, e := range sq.Extra {
 		where += " AND " + e
 	}
@@ -108,7 +115,7 @@ func (s *Service) runSearch(ctx context.Context, actor *authz.Actor, projectIDs 
 	if err := s.Pool.QueryRow(ctx, "SELECT count(*) FROM issues i WHERE "+where, args...).Scan(&total); err != nil {
 		return nil, 0, fmt.Errorf("search count: %w", err)
 	}
-	rows, err := s.Pool.Query(ctx, fmt.Sprintf("SELECT i.id FROM issues i WHERE %s ORDER BY %s LIMIT %d OFFSET %d", where, compiled.OrderBy, sq.Limit, sq.Offset), args...)
+	rows, err := s.Pool.Query(ctx, fmt.Sprintf("SELECT i.id FROM issues i WHERE %s ORDER BY %s LIMIT %d OFFSET %d", where, orderBy, sq.Limit, sq.Offset), args...)
 	if err != nil {
 		return nil, 0, fmt.Errorf("search: %w", err)
 	}

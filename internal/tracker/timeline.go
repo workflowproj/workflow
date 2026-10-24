@@ -41,29 +41,9 @@ type ProjectRelease struct {
 // out, and so are issues resolved more than doneDays ago.
 func (s *Service) Timeline(ctx context.Context, actor *authz.Actor, keys []string, jql string, doneDays int) (Timeline, error) {
 	var out Timeline
-	if len(keys) == 0 {
-		ps, err := s.ListProjects(ctx, actor)
-		if err != nil {
-			return out, err
-		}
-		for _, p := range ps {
-			out.Projects = append(out.Projects, p.Project)
-		}
-	} else {
-		seen := map[uuid.UUID]bool{}
-		for _, k := range keys {
-			if k = strings.TrimSpace(k); k == "" {
-				continue
-			}
-			p, _, err := s.ProjectFor(ctx, actor, k, authz.ProjectBrowse)
-			if err != nil {
-				return out, err
-			}
-			if !seen[p.ID] {
-				seen[p.ID] = true
-				out.Projects = append(out.Projects, p)
-			}
-		}
+	var err error
+	if out.Projects, err = s.projectsByKeys(ctx, actor, keys); err != nil {
+		return out, err
 	}
 	if doneDays < 0 || doneDays > 3650 {
 		return out, apperr.Invalid("doneDays", "doneDays must be between 0 and 3650")
@@ -114,6 +94,37 @@ func (s *Service) Timeline(ctx context.Context, actor *authz.Actor, keys []strin
 		}
 		for _, r := range releases {
 			out.Releases = append(out.Releases, ProjectRelease{ProjectKey: p.Key, Release: r})
+		}
+	}
+	return out, nil
+}
+
+// projectsByKeys resolves project keys the actor may browse, in the order given; no keys means
+// every browsable project.
+func (s *Service) projectsByKeys(ctx context.Context, actor *authz.Actor, keys []string) ([]dbq.Project, error) {
+	var out []dbq.Project
+	if len(keys) == 0 {
+		ps, err := s.ListProjects(ctx, actor)
+		if err != nil {
+			return nil, err
+		}
+		for _, p := range ps {
+			out = append(out, p.Project)
+		}
+		return out, nil
+	}
+	seen := map[uuid.UUID]bool{}
+	for _, k := range keys {
+		if k = strings.TrimSpace(k); k == "" {
+			continue
+		}
+		p, _, err := s.ProjectFor(ctx, actor, k, authz.ProjectBrowse)
+		if err != nil {
+			return nil, err
+		}
+		if !seen[p.ID] {
+			seen[p.ID] = true
+			out = append(out, p)
 		}
 	}
 	return out, nil

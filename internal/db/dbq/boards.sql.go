@@ -68,6 +68,52 @@ func (q *Queries) BoardColumns(ctx context.Context, boardID uuid.UUID) ([]BoardC
 	return items, nil
 }
 
+const closedSprints = `-- name: ClosedSprints :many
+SELECT id, project_id, name, goal, state, start_date, end_date, completed_at, position, committed_issue_ids, committed_points, completed_issue_ids, created_at FROM sprints WHERE project_id = $1 AND state = 'closed'
+ORDER BY completed_at DESC NULLS LAST, position DESC
+LIMIT $2
+`
+
+type ClosedSprintsParams struct {
+	ProjectID uuid.UUID
+	Limit     int32
+}
+
+// The most recently completed sprints of a project, newest first.
+func (q *Queries) ClosedSprints(ctx context.Context, arg ClosedSprintsParams) ([]Sprint, error) {
+	rows, err := q.db.Query(ctx, closedSprints, arg.ProjectID, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Sprint{}
+	for rows.Next() {
+		var i Sprint
+		if err := rows.Scan(
+			&i.ID,
+			&i.ProjectID,
+			&i.Name,
+			&i.Goal,
+			&i.State,
+			&i.StartDate,
+			&i.EndDate,
+			&i.CompletedAt,
+			&i.Position,
+			&i.CommittedIssueIds,
+			&i.CommittedPoints,
+			&i.CompletedIssueIds,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const completeSprint = `-- name: CompleteSprint :one
 UPDATE sprints SET state = 'closed', completed_at = now(),
     completed_issue_ids = coalesce((SELECT array_agg(i.id) FROM issues i JOIN statuses s ON s.id = i.status_id
@@ -110,7 +156,7 @@ func (q *Queries) CountSprints(ctx context.Context, projectID uuid.UUID) (int64,
 const createBoard = `-- name: CreateBoard :one
 INSERT INTO boards (project_id, name, type, filter_jql, swimlanes, done_retention_days, position)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, project_id, name, type, filter_jql, swimlanes, done_retention_days, position, created_at, updated_at
+RETURNING id, project_id, name, type, filter_jql, swimlanes, done_retention_days, position, created_at, updated_at, card_fields
 `
 
 type CreateBoardParams struct {
@@ -145,6 +191,7 @@ func (q *Queries) CreateBoard(ctx context.Context, arg CreateBoardParams) (Board
 		&i.Position,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.CardFields,
 	)
 	return i, err
 }
@@ -299,7 +346,7 @@ func (q *Queries) DeleteSprint(ctx context.Context, id uuid.UUID) error {
 }
 
 const getBoard = `-- name: GetBoard :one
-SELECT id, project_id, name, type, filter_jql, swimlanes, done_retention_days, position, created_at, updated_at FROM boards WHERE id = $1
+SELECT id, project_id, name, type, filter_jql, swimlanes, done_retention_days, position, created_at, updated_at, card_fields FROM boards WHERE id = $1
 `
 
 func (q *Queries) GetBoard(ctx context.Context, id uuid.UUID) (Board, error) {
@@ -316,6 +363,7 @@ func (q *Queries) GetBoard(ctx context.Context, id uuid.UUID) (Board, error) {
 		&i.Position,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.CardFields,
 	)
 	return i, err
 }
@@ -440,8 +488,89 @@ func (q *Queries) GetSprintsByIDs(ctx context.Context, ids []uuid.UUID) ([]Sprin
 	return items, nil
 }
 
+const issueHistoryFor = `-- name: IssueHistoryFor :many
+SELECT issue_id, field, from_ref, to_ref, from_value, to_value, created_at
+FROM issue_history
+WHERE issue_id = ANY($1::uuid[]) AND field IN ('status', 'sprint', 'storyPoints')
+ORDER BY issue_id, created_at, id
+`
+
+type IssueHistoryForRow struct {
+	IssueID   uuid.UUID
+	Field     string
+	FromRef   *string
+	ToRef     *string
+	FromValue *string
+	ToValue   *string
+	CreatedAt time.Time
+}
+
+// Status, sprint and story point changes of many issues, oldest first (for metrics).
+func (q *Queries) IssueHistoryFor(ctx context.Context, ids []uuid.UUID) ([]IssueHistoryForRow, error) {
+	rows, err := q.db.Query(ctx, issueHistoryFor, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []IssueHistoryForRow{}
+	for rows.Next() {
+		var i IssueHistoryForRow
+		if err := rows.Scan(
+			&i.IssueID,
+			&i.Field,
+			&i.FromRef,
+			&i.ToRef,
+			&i.FromValue,
+			&i.ToValue,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const issuesEverInSprint = `-- name: IssuesEverInSprint :many
+SELECT id FROM issues WHERE sprint_id = $1
+UNION
+SELECT h.issue_id FROM issue_history h
+WHERE h.field = 'sprint' AND (h.to_ref = $1::text OR h.from_ref = $1::text)
+UNION
+SELECT unnest($2::uuid[])
+`
+
+type IssuesEverInSprintParams struct {
+	SprintID  *uuid.UUID
+	Committed []uuid.UUID
+}
+
+// Issues in a sprint now, committed to it at the start, or moved in or out of it since.
+func (q *Queries) IssuesEverInSprint(ctx context.Context, arg IssuesEverInSprintParams) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, issuesEverInSprint, arg.SprintID, arg.Committed)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listBoards = `-- name: ListBoards :many
-SELECT id, project_id, name, type, filter_jql, swimlanes, done_retention_days, position, created_at, updated_at FROM boards WHERE project_id = $1 ORDER BY position, created_at
+SELECT id, project_id, name, type, filter_jql, swimlanes, done_retention_days, position, created_at, updated_at, card_fields FROM boards WHERE project_id = $1 ORDER BY position, created_at
 `
 
 func (q *Queries) ListBoards(ctx context.Context, projectID uuid.UUID) ([]Board, error) {
@@ -464,6 +593,7 @@ func (q *Queries) ListBoards(ctx context.Context, projectID uuid.UUID) ([]Board,
 			&i.Position,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.CardFields,
 		); err != nil {
 			return nil, err
 		}
@@ -623,6 +753,44 @@ func (q *Queries) MoveOpenSprintIssues(ctx context.Context, arg MoveOpenSprintIs
 	return result.RowsAffected(), nil
 }
 
+const releaseIDsOfIssues = `-- name: ReleaseIDsOfIssues :many
+SELECT issue_id, release_id FROM issue_releases WHERE issue_id = ANY($1::uuid[])
+`
+
+func (q *Queries) ReleaseIDsOfIssues(ctx context.Context, ids []uuid.UUID) ([]IssueRelease, error) {
+	rows, err := q.db.Query(ctx, releaseIDsOfIssues, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []IssueRelease{}
+	for rows.Next() {
+		var i IssueRelease
+		if err := rows.Scan(&i.IssueID, &i.ReleaseID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const setBoardCardFields = `-- name: SetBoardCardFields :exec
+UPDATE boards SET card_fields = $1, updated_at = now() WHERE id = $2
+`
+
+type SetBoardCardFieldsParams struct {
+	CardFields []string
+	ID         uuid.UUID
+}
+
+func (q *Queries) SetBoardCardFields(ctx context.Context, arg SetBoardCardFieldsParams) error {
+	_, err := q.db.Exec(ctx, setBoardCardFields, arg.CardFields, arg.ID)
+	return err
+}
+
 const sprintDoneEvents = `-- name: SprintDoneEvents :many
 SELECT h.issue_id, min(h.created_at)::timestamptz AS done_at
 FROM issue_history h JOIN statuses s ON s.id::text = h.to_ref
@@ -727,7 +895,7 @@ func (q *Queries) StartSprint(ctx context.Context, arg StartSprintParams) (Sprin
 const updateBoard = `-- name: UpdateBoard :one
 UPDATE boards SET name = $2, type = $3, filter_jql = $4, swimlanes = $5, done_retention_days = $6, updated_at = now()
 WHERE id = $1
-RETURNING id, project_id, name, type, filter_jql, swimlanes, done_retention_days, position, created_at, updated_at
+RETURNING id, project_id, name, type, filter_jql, swimlanes, done_retention_days, position, created_at, updated_at, card_fields
 `
 
 type UpdateBoardParams struct {
@@ -760,6 +928,7 @@ func (q *Queries) UpdateBoard(ctx context.Context, arg UpdateBoardParams) (Board
 		&i.Position,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.CardFields,
 	)
 	return i, err
 }

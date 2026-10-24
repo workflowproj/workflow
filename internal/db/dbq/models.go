@@ -93,6 +93,7 @@ type Board struct {
 	Position          int32
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
+	CardFields        []string
 }
 
 type BoardColumn struct {
@@ -141,6 +142,17 @@ type Comment struct {
 	Source    string
 	EditedAt  *time.Time
 	CreatedAt time.Time
+}
+
+type Dashboard struct {
+	ID          uuid.UUID
+	OwnerID     uuid.UUID
+	Name        string
+	Description string
+	Shared      bool
+	Gadgets     json.RawMessage
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
 }
 
 type DevLink struct {
@@ -226,6 +238,7 @@ type Issue struct {
 	Version           int32
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
+	StatusChangedAt   time.Time
 }
 
 type IssueHistory struct {

@@ -783,6 +783,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{projectKey}/velocity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getVelocity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workflows": {
         parameters: {
             query?: never;
@@ -1097,6 +1113,124 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/dashboards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listDashboards"];
+        put?: never;
+        post: operations["createDashboard"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dashboards/{dashboardId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getDashboard"];
+        /** @description Owner or organisation admin only. */
+        put: operations["updateDashboard"];
+        post?: never;
+        delete: operations["deleteDashboard"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/metrics/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Counts and totals for the matching issues (open, created and resolved in the window, overdue...) */
+        get: operations["getMetricsSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/metrics/flow": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Cumulative flow, the number of matching issues in each status (or category) at the end of each day */
+        get: operations["getCumulativeFlow"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/metrics/created-resolved": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Issues created and resolved per day or week, with the number open at the end of each */
+        get: operations["getCreatedResolved"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/metrics/breakdown": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Matching issues grouped by a field, with counts and story points */
+        get: operations["getBreakdown"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/metrics/cycle-time": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Cycle time of matching issues resolved in the window (first in progress to resolved) */
+        get: operations["getCycleTimeMetrics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/search": {
         parameters: {
             query?: never;
@@ -1273,6 +1407,23 @@ export interface paths {
             cookie?: never;
         };
         get: operations["listIssueHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/issues/{issueKey}/metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lead time, cycle time and time in each status, derived from the issue's history */
+        get: operations["getIssueMetrics"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1894,6 +2045,209 @@ export interface components {
             cycleHours: number;
             /** Format: date-time */
             resolvedAt: string;
+            projectKey?: string;
+        };
+        IssueMetrics: {
+            /** Format: date-time */
+            createdAt: string;
+            /**
+             * Format: date-time
+             * @description First entered an in-progress status
+             */
+            startedAt?: string;
+            /** Format: date-time */
+            resolvedAt?: string;
+            /**
+             * Format: double
+             * @description Created to resolved (resolved issues only)
+             */
+            leadTimeHours?: number;
+            /**
+             * Format: double
+             * @description Started to resolved, or started to now while still open
+             */
+            cycleTimeHours?: number;
+            /**
+             * Format: double
+             * @description Created to now, or to resolution
+             */
+            ageHours: number;
+            /**
+             * Format: date-time
+             * @description When the issue entered its current status
+             */
+            statusSince: string;
+            /** Format: double */
+            statusAgeHours: number;
+            /** @description Total time in each status visited, in the order first visited */
+            timeInStatus: components["schemas"]["StatusTime"][];
+            /** @description Times it left a done status for another */
+            reopened: number;
+            /** @description Sprints it has been part of */
+            sprints: number;
+        };
+        StatusTime: {
+            status: components["schemas"]["Status"];
+            /** Format: double */
+            hours: number;
+            visits: number;
+        };
+        Dashboard: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            description: string;
+            owner: components["schemas"]["User"];
+            /** @description Visible to everyone in the organisation. Each gadget still shows only what the viewer may browse. */
+            shared: boolean;
+            canEdit: boolean;
+            gadgets: components["schemas"]["Gadget"][];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        DashboardInput: {
+            name: string;
+            description?: string;
+            shared?: boolean;
+            gadgets: components["schemas"]["Gadget"][];
+        };
+        Gadget: {
+            /** @description Chosen by the client; unique within the dashboard */
+            id: string;
+            type: components["schemas"]["GadgetType"];
+            title?: string;
+            /** @description Columns of a three-column grid */
+            width: number;
+            config: components["schemas"]["GadgetConfig"];
+        };
+        /** @enum {string} */
+        GadgetType: "sprint_burndown" | "sprint_burnup" | "sprint_health" | "velocity" | "cumulative_flow" | "created_resolved" | "cycle_time" | "breakdown" | "stat" | "issue_list";
+        /**
+         * @description Settings for a gadget; which apply depends on its type. Sprint gadgets and velocity use
+         *     projectKey (and sprintId, else the active sprint, else the last completed one); the others
+         *     use projectKeys (none means every project the viewer can browse) and jql.
+         */
+        GadgetConfig: {
+            projectKey?: string;
+            /** Format: uuid */
+            sprintId?: string;
+            projectKeys?: string[];
+            jql?: string;
+            days?: number;
+            /** @enum {string} */
+            interval?: "day" | "week";
+            by?: components["schemas"]["BreakdownBy"];
+            /** @enum {string} */
+            flowBy?: "category" | "status";
+            /** @enum {string} */
+            measure?: "issues" | "points";
+            /** @enum {string} */
+            chart?: "bar" | "donut";
+            stat?: components["schemas"]["MetricStat"];
+            /** @description Sprints shown by velocity */
+            count?: number;
+            /** @description Rows shown by an issue list */
+            limit?: number;
+        };
+        /** @enum {string} */
+        MetricStat: "open" | "todo" | "in_progress" | "created" | "resolved" | "overdue" | "unassigned" | "open_points" | "resolved_points" | "median_cycle_hours";
+        MetricsSummary: {
+            days: number;
+            /** @description Not in a done status */
+            open: number;
+            todo: number;
+            inProgress: number;
+            /** @description Created in the window */
+            created: number;
+            /** @description Resolved in the window */
+            resolved: number;
+            /** @description Open with a due date before today */
+            overdue: number;
+            /** @description Open without an assignee */
+            unassigned: number;
+            /** Format: double */
+            openPoints: number;
+            /**
+             * Format: double
+             * @description Story points resolved in the window
+             */
+            resolvedPoints: number;
+            /**
+             * Format: double
+             * @description Of issues resolved in the window
+             */
+            medianCycleHours?: number;
+        };
+        CumulativeFlow: {
+            days: number;
+            dates: string[];
+            series: components["schemas"]["FlowSeries"][];
+        };
+        FlowSeries: {
+            /** @description A status category */
+            key: string;
+            label: string;
+            category: components["schemas"]["StatusCategory"];
+            /** @description One per date */
+            counts: number[];
+        };
+        CreatedResolved: {
+            days: number;
+            /** @enum {string} */
+            interval: "day" | "week";
+            buckets: components["schemas"]["CreatedResolvedBucket"][];
+        };
+        CreatedResolvedBucket: {
+            /** Format: date */
+            start: string;
+            created: number;
+            resolved: number;
+            /** @description Open at the end of the bucket */
+            open: number;
+        };
+        /** @enum {string} */
+        BreakdownBy: "status" | "statusCategory" | "priority" | "type" | "assignee" | "label" | "epic" | "sprint" | "release" | "project";
+        Breakdown: {
+            by: components["schemas"]["BreakdownBy"];
+            total: number;
+            /** Format: double */
+            totalPoints: number;
+            groups: components["schemas"]["BreakdownGroup"][];
+        };
+        BreakdownGroup: {
+            /** @description The value (an id, key or name); empty for "None" */
+            key: string;
+            label: string;
+            count: number;
+            /** Format: double */
+            points: number;
+            category?: components["schemas"]["StatusCategory"];
+            color?: string;
+            user?: components["schemas"]["User"];
+        };
+        Velocity: {
+            /**
+             * Format: double
+             * @description Completed points per sprint
+             */
+            averagePoints: number;
+            /** Format: double */
+            averageIssues: number;
+            sprints: components["schemas"]["VelocitySprint"][];
+        };
+        VelocitySprint: {
+            sprint: components["schemas"]["Sprint"];
+            /** Format: double */
+            committedPoints: number;
+            /**
+             * Format: double
+             * @description All work done in the sprint, including work added after the start
+             */
+            completedPoints: number;
+            committedIssues: number;
+            completedIssues: number;
         };
         Workflow: {
             /** Format: uuid */
@@ -2020,9 +2374,13 @@ export interface components {
             swimlanes: components["schemas"]["Swimlanes"];
             doneRetentionDays: number;
             columns: components["schemas"]["BoardColumn"][];
+            /** @description What cards show besides the summary */
+            cardFields: components["schemas"]["CardField"][];
         };
         /** @enum {string} */
         BoardType: "scrum" | "kanban";
+        /** @enum {string} */
+        CardField: "epic" | "labels" | "priority" | "dev" | "points" | "assignee" | "dueDate" | "daysInColumn";
         /** @enum {string} */
         Swimlanes: "none" | "assignee" | "epic" | "priority" | "type";
         BoardColumn: {
@@ -2040,6 +2398,8 @@ export interface components {
             doneRetentionDays?: number;
             /** @description Omit to derive one column per status from the project's workflows. */
             columns?: components["schemas"]["BoardColumn"][];
+            /** @description Omit to keep the current fields (new boards get epic, labels, priority, dev, points and assignee). */
+            cardFields?: components["schemas"]["CardField"][];
         };
         BoardData: {
             board: components["schemas"]["Board"];
@@ -2091,21 +2451,53 @@ export interface components {
         };
         SprintReport: {
             sprint: components["schemas"]["Sprint"];
-            /** Format: double */
+            /**
+             * Format: double
+             * @description Story points in the sprint when it started
+             */
             committedPoints: number;
-            /** Format: double */
+            /**
+             * Format: double
+             * @description Points done in the sprint, including work added after it started
+             */
             completedPoints: number;
             committedIssues: number;
             completedIssues: number;
+            /**
+             * Format: double
+             * @description Points of issues added after the start
+             */
+            addedPoints: number;
+            /**
+             * Format: double
+             * @description Points of issues taken out after the start
+             */
+            removedPoints: number;
+            addedIssues: number;
+            removedIssues: number;
             burndown: components["schemas"]["BurndownPoint"][];
         };
+        /** @description The sprint at the end of each day (today so far for an active sprint). */
         BurndownPoint: {
             /** Format: date */
             date: string;
-            /** Format: double */
+            /**
+             * Format: double
+             * @description Scope minus completed
+             */
             remainingPoints: number;
-            /** Format: double */
+            /**
+             * Format: double
+             * @description Committed points falling linearly to zero at the end date
+             */
             idealPoints: number;
+            /** Format: double */
+            scopePoints: number;
+            /** Format: double */
+            completedPoints: number;
+            remainingIssues: number;
+            scopeIssues: number;
+            completedIssues: number;
         };
         Release: {
             /** Format: uuid */
@@ -2189,6 +2581,11 @@ export interface components {
                 [key: string]: unknown;
             };
             dev?: components["schemas"]["DevSummary"];
+            /**
+             * Format: date-time
+             * @description When the issue entered its current status
+             */
+            statusChangedAt?: string;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -2770,6 +3167,13 @@ export interface components {
         WorkflowId: string;
         BoardId: string;
         SprintId: string;
+        DashboardId: string;
+        /** @description Comma-separated project keys; omit for every project you can browse */
+        MetricProjects: string;
+        /** @description Optional JQL the issues must also match */
+        MetricJql: string;
+        /** @description Window in days */
+        MetricDays: number;
         ReleaseId: string;
         CommentId: string;
         LinkId: string;
@@ -4408,6 +4812,33 @@ export interface operations {
             default: components["responses"]["Problem"];
         };
     };
+    getVelocity: {
+        parameters: {
+            query?: {
+                /** @description How many of the most recently completed sprints */
+                count?: number;
+            };
+            header?: never;
+            path: {
+                /** @description Project key (or id) */
+                projectKey: components["parameters"]["ProjectKey"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Committed and completed work per completed sprint, oldest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Velocity"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
     listWorkflows: {
         parameters: {
             query?: {
@@ -5174,6 +5605,264 @@ export interface operations {
             default: components["responses"]["Problem"];
         };
     };
+    listDashboards: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Your dashboards, then those others share with everyone */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Dashboard"][];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    createDashboard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DashboardInput"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Dashboard"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getDashboard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dashboardId: components["parameters"]["DashboardId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The dashboard */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Dashboard"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    updateDashboard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dashboardId: components["parameters"]["DashboardId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DashboardInput"];
+            };
+        };
+        responses: {
+            /** @description Updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Dashboard"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    deleteDashboard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dashboardId: components["parameters"]["DashboardId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getMetricsSummary: {
+        parameters: {
+            query?: {
+                /** @description Comma-separated project keys; omit for every project you can browse */
+                projects?: components["parameters"]["MetricProjects"];
+                /** @description Optional JQL the issues must also match */
+                jql?: components["parameters"]["MetricJql"];
+                /** @description Window in days */
+                days?: components["parameters"]["MetricDays"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Summary */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MetricsSummary"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getCumulativeFlow: {
+        parameters: {
+            query?: {
+                /** @description Comma-separated project keys; omit for every project you can browse */
+                projects?: components["parameters"]["MetricProjects"];
+                /** @description Optional JQL the issues must also match */
+                jql?: components["parameters"]["MetricJql"];
+                /** @description Window in days */
+                days?: components["parameters"]["MetricDays"];
+                by?: "category" | "status";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One series per category or status (todo, in progress, done). Issues resolved before the window are left out, so the done band is work finished in it. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CumulativeFlow"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getCreatedResolved: {
+        parameters: {
+            query?: {
+                /** @description Comma-separated project keys; omit for every project you can browse */
+                projects?: components["parameters"]["MetricProjects"];
+                /** @description Optional JQL the issues must also match */
+                jql?: components["parameters"]["MetricJql"];
+                /** @description Window in days */
+                days?: components["parameters"]["MetricDays"];
+                interval?: "day" | "week";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Buckets, oldest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreatedResolved"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getBreakdown: {
+        parameters: {
+            query: {
+                /** @description Comma-separated project keys; omit for every project you can browse */
+                projects?: components["parameters"]["MetricProjects"];
+                /** @description Optional JQL the issues must also match */
+                jql?: components["parameters"]["MetricJql"];
+                by: components["schemas"]["BreakdownBy"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Groups, largest first ("None" last); priority and status category keep their natural order. An issue with several labels or releases counts in each. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Breakdown"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getCycleTimeMetrics: {
+        parameters: {
+            query?: {
+                /** @description Comma-separated project keys; omit for every project you can browse */
+                projects?: components["parameters"]["MetricProjects"];
+                /** @description Optional JQL the issues must also match */
+                jql?: components["parameters"]["MetricJql"];
+                /** @description Window in days */
+                days?: components["parameters"]["MetricDays"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cycle times */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CycleTimeReport"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
     searchIssues: {
         parameters: {
             query?: {
@@ -5612,6 +6301,30 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HistoryEntry"][];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getIssueMetrics: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Issue key such as PLAT-12 (or id) */
+                issueKey: components["parameters"]["IssueKey"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Metrics */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssueMetrics"];
                 };
             };
             default: components["responses"]["Problem"];

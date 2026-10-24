@@ -166,7 +166,7 @@ func (l *lookups) issue(i dbq.Issue) api.Issue {
 		Status: StatusView(l.statuses[i.StatusID]), Priority: api.Priority(i.Priority), SprintId: i.SprintID,
 		StoryPoints: i.StoryPoints, StartDate: dateView(i.StartDate), DueDate: dateView(i.DueDate),
 		Labels: i.Labels, Resolution: i.Resolution, ResolvedAt: i.ResolvedAt, Rank: i.Rank, Version: int(i.Version),
-		Fields: map[string]any{}, CreatedAt: i.CreatedAt, UpdatedAt: i.UpdatedAt,
+		Fields: map[string]any{}, CreatedAt: i.CreatedAt, UpdatedAt: i.UpdatedAt, StatusChangedAt: &i.StatusChangedAt,
 	}
 	if v.Labels == nil {
 		v.Labels = []string{}
@@ -282,7 +282,7 @@ func (s *Service) IssueDetail(ctx context.Context, actor *authz.Actor, i dbq.Iss
 		Priority: base.Priority, Assignee: base.Assignee, Reporter: base.Reporter, Parent: base.Parent, SprintId: base.SprintId,
 		StoryPoints: base.StoryPoints, StartDate: base.StartDate, DueDate: base.DueDate, Labels: base.Labels,
 		Resolution: base.Resolution, ResolvedAt: base.ResolvedAt, Rank: base.Rank, Version: base.Version, Fields: base.Fields,
-		Dev: base.Dev, CreatedAt: base.CreatedAt, UpdatedAt: base.UpdatedAt,
+		Dev: base.Dev, StatusChangedAt: base.StatusChangedAt, CreatedAt: base.CreatedAt, UpdatedAt: base.UpdatedAt,
 		Description: i.Description,
 		Project:     api.ProjectRef{Id: p.ID, Key: p.Key, Name: p.Name},
 		Children:    []api.Issue{}, Links: []api.IssueLink{}, Development: []api.DevLink{}, Attachments: []api.Attachment{}, Releases: []api.Release{},

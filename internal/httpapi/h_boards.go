@@ -15,6 +15,10 @@ func boardView(b dbq.Board, projectKey string, cols []dbq.BoardColumn) api.Board
 	v := api.Board{
 		Id: b.ID, ProjectKey: projectKey, Name: b.Name, Type: api.BoardType(b.Type), FilterJql: b.FilterJql,
 		Swimlanes: api.Swimlanes(b.Swimlanes), DoneRetentionDays: int(b.DoneRetentionDays), Columns: []api.BoardColumn{},
+		CardFields: []api.CardField{},
+	}
+	for _, f := range b.CardFields {
+		v.CardFields = append(v.CardFields, api.CardField(f))
 	}
 	for _, c := range cols {
 		id := c.ID
@@ -35,6 +39,12 @@ func boardInput(b api.BoardInput) tracker.BoardInput {
 	}
 	if b.DoneRetentionDays != nil {
 		in.DoneRetentionDays = *b.DoneRetentionDays
+	}
+	if b.CardFields != nil {
+		in.CardFields = []string{}
+		for _, f := range *b.CardFields {
+			in.CardFields = append(in.CardFields, string(f))
+		}
 	}
 	if b.Columns != nil {
 		in.Columns = []tracker.BoardColumnInput{}
@@ -275,10 +285,14 @@ func (s *Server) GetSprintReport(ctx context.Context, req api.GetSprintReportReq
 	}
 	out := api.GetSprintReport200JSONResponse{
 		Sprint: tracker.SprintView(rep.Sprint), CommittedPoints: rep.CommittedPoints, CompletedPoints: rep.CompletedPoints,
-		CommittedIssues: rep.CommittedIssues, CompletedIssues: rep.CompletedIssues, Burndown: []api.BurndownPoint{},
+		CommittedIssues: rep.CommittedIssues, CompletedIssues: rep.CompletedIssues, AddedPoints: rep.AddedPoints, RemovedPoints: rep.RemovedPoints,
+		AddedIssues: rep.AddedIssues, RemovedIssues: rep.RemovedIssues, Burndown: []api.BurndownPoint{},
 	}
 	for _, b := range rep.Burndown {
-		out.Burndown = append(out.Burndown, api.BurndownPoint{Date: openapiDate(b.Date), RemainingPoints: b.Remaining, IdealPoints: b.Ideal})
+		out.Burndown = append(out.Burndown, api.BurndownPoint{
+			Date: openapiDate(b.Date), RemainingPoints: b.Remaining, IdealPoints: b.Ideal, ScopePoints: b.Scope, CompletedPoints: b.Completed,
+			RemainingIssues: b.RemainingIssues, ScopeIssues: b.ScopeIssues, CompletedIssues: b.DoneIssues,
+		})
 	}
 	return out, nil
 }

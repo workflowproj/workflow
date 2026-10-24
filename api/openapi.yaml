@@ -28,6 +28,8 @@ tags:
   - name: releases
   - name: issues
   - name: search
+  - name: dashboards
+  - name: metrics
   - name: scm
   - name: automation
   - name: webhooks
@@ -990,6 +992,20 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/CycleTimeReport' }
         default: { $ref: '#/components/responses/Problem' }
+  /projects/{projectKey}/velocity:
+    get:
+      operationId: getVelocity
+      tags: [sprints]
+      parameters:
+        - { $ref: '#/components/parameters/ProjectKey' }
+        - { name: count, in: query, description: How many of the most recently completed sprints, schema: { type: integer, default: 7, minimum: 1, maximum: 20 } }
+      responses:
+        "200":
+          description: Committed and completed work per completed sprint, oldest first
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Velocity' }
+        default: { $ref: '#/components/responses/Problem' }
 
   # ---------------------------------------------------------------------------
   # Workflows
@@ -1463,6 +1479,146 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Timeline' }
         default: { $ref: '#/components/responses/Problem' }
+  /dashboards:
+    get:
+      operationId: listDashboards
+      tags: [dashboards]
+      responses:
+        "200":
+          description: Your dashboards, then those others share with everyone
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Dashboard' }
+        default: { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: createDashboard
+      tags: [dashboards]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DashboardInput' }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Dashboard' }
+        default: { $ref: '#/components/responses/Problem' }
+  /dashboards/{dashboardId}:
+    get:
+      operationId: getDashboard
+      tags: [dashboards]
+      parameters: [{ $ref: '#/components/parameters/DashboardId' }]
+      responses:
+        "200":
+          description: The dashboard
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Dashboard' }
+        default: { $ref: '#/components/responses/Problem' }
+    put:
+      operationId: updateDashboard
+      tags: [dashboards]
+      description: Owner or organisation admin only.
+      parameters: [{ $ref: '#/components/parameters/DashboardId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DashboardInput' }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Dashboard' }
+        default: { $ref: '#/components/responses/Problem' }
+    delete:
+      operationId: deleteDashboard
+      tags: [dashboards]
+      parameters: [{ $ref: '#/components/parameters/DashboardId' }]
+      responses:
+        "204": { description: Deleted }
+        default: { $ref: '#/components/responses/Problem' }
+  /metrics/summary:
+    get:
+      operationId: getMetricsSummary
+      tags: [metrics]
+      summary: Counts and totals for the matching issues (open, created and resolved in the window, overdue...)
+      parameters: [{ $ref: '#/components/parameters/MetricProjects' }, { $ref: '#/components/parameters/MetricJql' }, { $ref: '#/components/parameters/MetricDays' }]
+      responses:
+        "200":
+          description: Summary
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MetricsSummary' }
+        default: { $ref: '#/components/responses/Problem' }
+  /metrics/flow:
+    get:
+      operationId: getCumulativeFlow
+      tags: [metrics]
+      summary: Cumulative flow, the number of matching issues in each status (or category) at the end of each day
+      parameters:
+        - { $ref: '#/components/parameters/MetricProjects' }
+        - { $ref: '#/components/parameters/MetricJql' }
+        - { $ref: '#/components/parameters/MetricDays' }
+        - { name: by, in: query, schema: { type: string, enum: [category, status], default: category } }
+      responses:
+        "200":
+          description: 'One series per category or status (todo, in progress, done). Issues resolved before the window are left out, so the done band is work finished in it.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CumulativeFlow' }
+        default: { $ref: '#/components/responses/Problem' }
+  /metrics/created-resolved:
+    get:
+      operationId: getCreatedResolved
+      tags: [metrics]
+      summary: Issues created and resolved per day or week, with the number open at the end of each
+      parameters:
+        - { $ref: '#/components/parameters/MetricProjects' }
+        - { $ref: '#/components/parameters/MetricJql' }
+        - { $ref: '#/components/parameters/MetricDays' }
+        - { name: interval, in: query, schema: { type: string, enum: [day, week], default: day } }
+      responses:
+        "200":
+          description: Buckets, oldest first
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CreatedResolved' }
+        default: { $ref: '#/components/responses/Problem' }
+  /metrics/breakdown:
+    get:
+      operationId: getBreakdown
+      tags: [metrics]
+      summary: Matching issues grouped by a field, with counts and story points
+      parameters:
+        - { $ref: '#/components/parameters/MetricProjects' }
+        - { $ref: '#/components/parameters/MetricJql' }
+        - { name: by, in: query, required: true, schema: { $ref: '#/components/schemas/BreakdownBy' } }
+      responses:
+        "200":
+          description: 'Groups, largest first ("None" last); priority and status category keep their natural order. An issue with several labels or releases counts in each.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Breakdown' }
+        default: { $ref: '#/components/responses/Problem' }
+  /metrics/cycle-time:
+    get:
+      operationId: getCycleTimeMetrics
+      tags: [metrics]
+      summary: Cycle time of matching issues resolved in the window (first in progress to resolved)
+      parameters: [{ $ref: '#/components/parameters/MetricProjects' }, { $ref: '#/components/parameters/MetricJql' }, { $ref: '#/components/parameters/MetricDays' }]
+      responses:
+        "200":
+          description: Cycle times
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CycleTimeReport' }
+        default: { $ref: '#/components/responses/Problem' }
   /search:
     get:
       operationId: searchIssues
@@ -1713,6 +1869,19 @@ paths:
               schema:
                 type: array
                 items: { $ref: '#/components/schemas/HistoryEntry' }
+        default: { $ref: '#/components/responses/Problem' }
+  /issues/{issueKey}/metrics:
+    get:
+      operationId: getIssueMetrics
+      tags: [issues]
+      summary: Lead time, cycle time and time in each status, derived from the issue's history
+      parameters: [{ $ref: '#/components/parameters/IssueKey' }]
+      responses:
+        "200":
+          description: Metrics
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IssueMetrics' }
         default: { $ref: '#/components/responses/Problem' }
   /issues/{issueKey}/links:
     post:
@@ -2127,6 +2296,10 @@ components:
     WorkflowId: { name: workflowId, in: path, required: true, schema: { type: string, format: uuid } }
     BoardId: { name: boardId, in: path, required: true, schema: { type: string, format: uuid } }
     SprintId: { name: sprintId, in: path, required: true, schema: { type: string, format: uuid } }
+    DashboardId: { name: dashboardId, in: path, required: true, schema: { type: string, format: uuid } }
+    MetricProjects: { name: projects, in: query, description: 'Comma-separated project keys; omit for every project you can browse', schema: { type: string } }
+    MetricJql: { name: jql, in: query, description: 'Optional JQL the issues must also match', schema: { type: string } }
+    MetricDays: { name: days, in: query, description: Window in days, ending today, schema: { type: integer, default: 30, minimum: 1, maximum: 365 } }
     ReleaseId: { name: releaseId, in: path, required: true, schema: { type: string, format: uuid } }
     CommentId: { name: commentId, in: path, required: true, schema: { type: string, format: uuid } }
     LinkId: { name: linkId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -2486,6 +2659,182 @@ components:
         summary: { type: string }
         cycleHours: { type: number, format: double }
         resolvedAt: { type: string, format: date-time }
+        projectKey: { type: string }
+
+    IssueMetrics:
+      type: object
+      required: [createdAt, ageHours, statusSince, statusAgeHours, timeInStatus, reopened, sprints]
+      properties:
+        createdAt: { type: string, format: date-time }
+        startedAt: { type: string, format: date-time, description: First entered an in-progress status }
+        resolvedAt: { type: string, format: date-time }
+        leadTimeHours: { type: number, format: double, description: Created to resolved (resolved issues only) }
+        cycleTimeHours: { type: number, format: double, description: 'Started to resolved, or started to now while still open' }
+        ageHours: { type: number, format: double, description: 'Created to now, or to resolution' }
+        statusSince: { type: string, format: date-time, description: When the issue entered its current status }
+        statusAgeHours: { type: number, format: double }
+        timeInStatus:
+          description: Total time in each status visited, in the order first visited
+          type: array
+          items: { $ref: '#/components/schemas/StatusTime' }
+        reopened: { type: integer, description: Times it left a done status for another }
+        sprints: { type: integer, description: Sprints it has been part of }
+    StatusTime:
+      type: object
+      required: [status, hours, visits]
+      properties:
+        status: { $ref: '#/components/schemas/Status' }
+        hours: { type: number, format: double }
+        visits: { type: integer }
+
+    Dashboard:
+      type: object
+      required: [id, name, description, owner, shared, canEdit, gadgets, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: string }
+        owner: { $ref: '#/components/schemas/User' }
+        shared: { type: boolean, description: 'Visible to everyone in the organisation. Each gadget still shows only what the viewer may browse.' }
+        canEdit: { type: boolean }
+        gadgets: { type: array, items: { $ref: '#/components/schemas/Gadget' } }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    DashboardInput:
+      type: object
+      required: [name, gadgets]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80 }
+        description: { type: string, maxLength: 500 }
+        shared: { type: boolean }
+        gadgets: { type: array, maxItems: 40, items: { $ref: '#/components/schemas/Gadget' } }
+    Gadget:
+      type: object
+      required: [id, type, width, config]
+      properties:
+        id: { type: string, minLength: 1, maxLength: 40, description: Chosen by the client; unique within the dashboard }
+        type: { $ref: '#/components/schemas/GadgetType' }
+        title: { type: string, maxLength: 80 }
+        width: { type: integer, minimum: 1, maximum: 3, description: Columns of a three-column grid }
+        config: { $ref: '#/components/schemas/GadgetConfig' }
+    GadgetType:
+      type: string
+      enum: [sprint_burndown, sprint_burnup, sprint_health, velocity, cumulative_flow, created_resolved, cycle_time, breakdown, stat, issue_list]
+    GadgetConfig:
+      type: object
+      description: |
+        Settings for a gadget; which apply depends on its type. Sprint gadgets and velocity use
+        projectKey (and sprintId, else the active sprint, else the last completed one); the others
+        use projectKeys (none means every project the viewer can browse) and jql.
+      properties:
+        projectKey: { type: string }
+        sprintId: { type: string, format: uuid }
+        projectKeys: { type: array, maxItems: 20, items: { type: string } }
+        jql: { type: string, maxLength: 2000 }
+        days: { type: integer, minimum: 1, maximum: 365 }
+        interval: { type: string, enum: [day, week] }
+        by: { $ref: '#/components/schemas/BreakdownBy' }
+        flowBy: { type: string, enum: [category, status] }
+        measure: { type: string, enum: [issues, points] }
+        chart: { type: string, enum: [bar, donut] }
+        stat: { $ref: '#/components/schemas/MetricStat' }
+        count: { type: integer, minimum: 1, maximum: 20, description: Sprints shown by velocity }
+        limit: { type: integer, minimum: 1, maximum: 50, description: Rows shown by an issue list }
+    MetricStat:
+      type: string
+      enum: [open, todo, in_progress, created, resolved, overdue, unassigned, open_points, resolved_points, median_cycle_hours]
+
+    MetricsSummary:
+      type: object
+      required: [days, open, todo, inProgress, created, resolved, overdue, unassigned, openPoints, resolvedPoints]
+      properties:
+        days: { type: integer }
+        open: { type: integer, description: Not in a done status }
+        todo: { type: integer }
+        inProgress: { type: integer }
+        created: { type: integer, description: Created in the window }
+        resolved: { type: integer, description: Resolved in the window }
+        overdue: { type: integer, description: Open with a due date before today }
+        unassigned: { type: integer, description: Open without an assignee }
+        openPoints: { type: number, format: double }
+        resolvedPoints: { type: number, format: double, description: Story points resolved in the window }
+        medianCycleHours: { type: number, format: double, description: Of issues resolved in the window }
+    CumulativeFlow:
+      type: object
+      required: [days, dates, series]
+      properties:
+        days: { type: integer }
+        dates: { type: array, items: { type: string, format: date } }
+        series:
+          type: array
+          items: { $ref: '#/components/schemas/FlowSeries' }
+    FlowSeries:
+      type: object
+      required: [key, label, category, counts]
+      properties:
+        key: { type: string, description: A status category, or a status id }
+        label: { type: string }
+        category: { $ref: '#/components/schemas/StatusCategory' }
+        counts: { type: array, items: { type: integer }, description: One per date }
+    CreatedResolved:
+      type: object
+      required: [days, interval, buckets]
+      properties:
+        days: { type: integer }
+        interval: { type: string, enum: [day, week] }
+        buckets:
+          type: array
+          items: { $ref: '#/components/schemas/CreatedResolvedBucket' }
+    CreatedResolvedBucket:
+      type: object
+      required: [start, created, resolved, open]
+      properties:
+        start: { type: string, format: date }
+        created: { type: integer }
+        resolved: { type: integer }
+        open: { type: integer, description: Open at the end of the bucket }
+    BreakdownBy:
+      type: string
+      enum: [status, statusCategory, priority, type, assignee, label, epic, sprint, release, project]
+    Breakdown:
+      type: object
+      required: [by, total, totalPoints, groups]
+      properties:
+        by: { $ref: '#/components/schemas/BreakdownBy' }
+        total: { type: integer }
+        totalPoints: { type: number, format: double }
+        groups:
+          type: array
+          items: { $ref: '#/components/schemas/BreakdownGroup' }
+    BreakdownGroup:
+      type: object
+      required: [key, label, count, points]
+      properties:
+        key: { type: string, description: 'The value (an id, key or name); empty for "None"' }
+        label: { type: string }
+        count: { type: integer }
+        points: { type: number, format: double }
+        category: { $ref: '#/components/schemas/StatusCategory' }
+        color: { type: string }
+        user: { $ref: '#/components/schemas/User' }
+    Velocity:
+      type: object
+      required: [sprints, averagePoints, averageIssues]
+      properties:
+        averagePoints: { type: number, format: double, description: Completed points per sprint }
+        averageIssues: { type: number, format: double }
+        sprints:
+          type: array
+          items: { $ref: '#/components/schemas/VelocitySprint' }
+    VelocitySprint:
+      type: object
+      required: [sprint, committedPoints, completedPoints, committedIssues, completedIssues]
+      properties:
+        sprint: { $ref: '#/components/schemas/Sprint' }
+        committedPoints: { type: number, format: double }
+        completedPoints: { type: number, format: double, description: 'All work done in the sprint, including work added after the start' }
+        committedIssues: { type: integer }
+        completedIssues: { type: integer }
 
     Workflow:
       type: object
@@ -2644,7 +2993,7 @@ components:
 
     Board:
       type: object
-      required: [id, projectKey, name, type, filterJql, swimlanes, doneRetentionDays, columns]
+      required: [id, projectKey, name, type, filterJql, swimlanes, doneRetentionDays, columns, cardFields]
       properties:
         id: { type: string, format: uuid }
         projectKey: { type: string }
@@ -2654,7 +3003,9 @@ components:
         swimlanes: { $ref: '#/components/schemas/Swimlanes' }
         doneRetentionDays: { type: integer }
         columns: { type: array, items: { $ref: '#/components/schemas/BoardColumn' } }
+        cardFields: { type: array, items: { $ref: '#/components/schemas/CardField' }, description: What cards show besides the summary, type and key, in this order }
     BoardType: { type: string, enum: [scrum, kanban] }
+    CardField: { type: string, enum: [epic, labels, priority, dev, points, assignee, dueDate, daysInColumn] }
     Swimlanes: { type: string, enum: [none, assignee, epic, priority, type] }
     BoardColumn:
       type: object
@@ -2677,6 +3028,11 @@ components:
           description: Omit to derive one column per status from the project's workflows.
           type: array
           items: { $ref: '#/components/schemas/BoardColumn' }
+        cardFields:
+          description: Omit to keep the current fields (new boards get epic, labels, priority, dev, points and assignee).
+          type: array
+          maxItems: 8
+          items: { $ref: '#/components/schemas/CardField' }
     BoardData:
       type: object
       required: [board, columns, unmappedStatusIds]
@@ -2736,23 +3092,33 @@ components:
         endDate: { type: [string, 'null'], format: date }
     SprintReport:
       type: object
-      required: [sprint, committedPoints, completedPoints, committedIssues, completedIssues, burndown]
+      required: [sprint, committedPoints, completedPoints, committedIssues, completedIssues, addedPoints, removedPoints, addedIssues, removedIssues, burndown]
       properties:
         sprint: { $ref: '#/components/schemas/Sprint' }
-        committedPoints: { type: number, format: double }
-        completedPoints: { type: number, format: double }
+        committedPoints: { type: number, format: double, description: Story points in the sprint when it started }
+        completedPoints: { type: number, format: double, description: 'Points done in the sprint, including work added after it started' }
         committedIssues: { type: integer }
         completedIssues: { type: integer }
+        addedPoints: { type: number, format: double, description: Points of issues added after the start }
+        removedPoints: { type: number, format: double, description: Points of issues taken out after the start }
+        addedIssues: { type: integer }
+        removedIssues: { type: integer }
         burndown:
           type: array
           items: { $ref: '#/components/schemas/BurndownPoint' }
     BurndownPoint:
       type: object
-      required: [date, remainingPoints, idealPoints]
+      description: The sprint at the end of each day (today so far for an active sprint).
+      required: [date, remainingPoints, idealPoints, scopePoints, completedPoints, remainingIssues, scopeIssues, completedIssues]
       properties:
         date: { type: string, format: date }
-        remainingPoints: { type: number, format: double }
-        idealPoints: { type: number, format: double }
+        remainingPoints: { type: number, format: double, description: Scope minus completed }
+        idealPoints: { type: number, format: double, description: Committed points falling linearly to zero at the end date }
+        scopePoints: { type: number, format: double }
+        completedPoints: { type: number, format: double }
+        remainingIssues: { type: integer }
+        scopeIssues: { type: integer }
+        completedIssues: { type: integer }
     Release:
       type: object
       required: [id, name, description, state, position, issueCount, doneCount]
@@ -2831,6 +3197,7 @@ components:
         version: { type: integer }
         fields: { type: object, additionalProperties: true }
         dev: { $ref: '#/components/schemas/DevSummary' }
+        statusChangedAt: { type: string, format: date-time, description: When the issue entered its current status }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
     IssueDetail:

@@ -30,7 +30,12 @@ type BoardInput struct {
 	DoneRetentionDays int
 	// Columns nil = derive one column per project status.
 	Columns []BoardColumnInput
+	// CardFields nil = keep the current fields (the defaults for a new board).
+	CardFields []string
 }
+
+// CardFields are what board cards can show besides the summary, type and key.
+var CardFields = []string{"epic", "labels", "priority", "dev", "points", "assignee", "dueDate", "daysInColumn"}
 
 func (s *Service) deriveColumns(ctx context.Context, q *dbq.Queries, projectID uuid.UUID) ([]BoardColumnInput, error) {
 	sts, err := s.projectStatuses(ctx, q, projectID)
@@ -93,6 +98,16 @@ func (s *Service) validateBoard(ctx context.Context, actor *authz.Actor, in *Boa
 			seen[id] = c.Name
 		}
 	}
+	seenField := map[string]bool{}
+	for _, f := range in.CardFields {
+		if !slices.Contains(CardFields, f) {
+			return apperr.Invalid("cardFields", "unknown card field %q", f)
+		}
+		if seenField[f] {
+			return apperr.Invalid("cardFields", "%q is listed twice", f)
+		}
+		seenField[f] = true
+	}
 	if in.FilterJQL != "" {
 		return s.ValidateJQL(ctx, actor, in.FilterJQL)
 	}
@@ -128,6 +143,12 @@ func (s *Service) CreateBoard(ctx context.Context, actor *authz.Actor, ref strin
 		})
 		if err != nil {
 			return err
+		}
+		if in.CardFields != nil {
+			if err := q.SetBoardCardFields(ctx, dbq.SetBoardCardFieldsParams{ID: b.ID, CardFields: in.CardFields}); err != nil {
+				return err
+			}
+			b.CardFields = in.CardFields
 		}
 		cols := in.Columns
 		if cols == nil {
@@ -187,6 +208,12 @@ func (s *Service) UpdateBoard(ctx context.Context, actor *authz.Actor, id uuid.U
 			if err := writeColumns(ctx, q, id, in.Columns); err != nil {
 				return err
 			}
+		}
+		if in.CardFields != nil {
+			if err := q.SetBoardCardFields(ctx, dbq.SetBoardCardFieldsParams{ID: id, CardFields: in.CardFields}); err != nil {
+				return err
+			}
+			b.CardFields = in.CardFields
 		}
 		return s.emit(ctx, tx, actor, p, nil, "board.updated", map[string]any{"boardId": id})
 	})
@@ -522,21 +549,23 @@ func (s *Service) CompleteSprint(ctx context.Context, actor *authz.Actor, id uui
 }
 
 type BurndownPoint struct {
-	Date      time.Time
-	Remaining float64
-	Ideal     float64
+	Date                                     time.Time
+	Remaining, Ideal, Scope, Completed       float64
+	RemainingIssues, ScopeIssues, DoneIssues int
 }
 
 type SprintReport struct {
-	Sprint          dbq.Sprint
-	CommittedPoints float64
-	CompletedPoints float64
-	CommittedIssues int
-	CompletedIssues int
-	Burndown        []BurndownPoint
+	Sprint                     dbq.Sprint
+	CommittedPoints            float64
+	CompletedPoints            float64
+	CommittedIssues            int
+	CompletedIssues            int
+	AddedPoints, RemovedPoints float64
+	AddedIssues, RemovedIssues int
+	Burndown                   []BurndownPoint
 }
 
-// SprintReport derives commitment from the snapshot taken at start and burndown from history.
+// SprintReport is the burndown and completion of a sprint the actor can see.
 func (s *Service) SprintReport(ctx context.Context, actor *authz.Actor, id uuid.UUID) (SprintReport, error) {
 	sp, err := s.Q.GetSprint(ctx, id)
 	if err != nil {
@@ -549,6 +578,13 @@ func (s *Service) SprintReport(ctx context.Context, actor *authz.Actor, id uuid.
 	if _, err := s.requireAccess(ctx, actor, p, authz.ProjectBrowse); err != nil {
 		return SprintReport{}, apperr.NotFound("sprint")
 	}
+	return s.sprintReport(ctx, sp)
+}
+
+// sprintReport replays the sprint from its start: which issues were in it (the commitment
+// snapshot, then sprint changes from history), their story points and whether they were done,
+// at the end of each day. Scope added after the start raises the line; removed scope lowers it.
+func (s *Service) sprintReport(ctx context.Context, sp dbq.Sprint) (SprintReport, error) {
 	rep := SprintReport{Sprint: sp, CommittedPoints: sp.CommittedPoints, CommittedIssues: len(sp.CommittedIssueIds)}
 	if sp.State == "future" || sp.StartDate == nil {
 		stats, err := s.Q.SprintIssueStats(ctx, &sp.ID)
@@ -558,67 +594,182 @@ func (s *Service) SprintReport(ctx context.Context, actor *authz.Actor, id uuid.
 		rep.CommittedPoints, rep.CommittedIssues = stats.Points, int(stats.Issues)
 		return rep, nil
 	}
-	committed, err := s.Q.GetIssuesByIDs(ctx, sp.CommittedIssueIds)
+	ids, err := s.Q.IssuesEverInSprint(ctx, dbq.IssuesEverInSprintParams{SprintID: &sp.ID, Committed: sp.CommittedIssueIds})
 	if err != nil {
 		return rep, err
 	}
-	points := map[uuid.UUID]float64{}
-	for _, i := range committed {
-		if i.StoryPoints != nil {
-			points[i.ID] = *i.StoryPoints
-		}
-	}
-	doneAt, err := s.Q.SprintDoneEvents(ctx, sp.CommittedIssueIds)
+	issues, err := s.Q.GetIssuesByIDs(ctx, ids)
 	if err != nil {
 		return rep, err
 	}
+	hist, err := s.historyByIssue(ctx, ids)
+	if err != nil {
+		return rep, err
+	}
+	statuses, err := s.statusMap(ctx)
+	if err != nil {
+		return rep, err
+	}
+	start := *sp.StartDate
 	end := s.Now()
-	if sp.EndDate != nil && sp.EndDate.Before(end) {
-		end = *sp.EndDate
-	}
 	if sp.CompletedAt != nil {
 		end = *sp.CompletedAt
 	}
-	start := *sp.StartDate
+	committed := map[uuid.UUID]bool{}
+	for _, cid := range sp.CommittedIssueIds {
+		committed[cid] = true
+	}
+	sprintRef := sp.ID.String()
+
+	// Membership: committed issues start in the sprint; others start in it only when their
+	// first sprint change after the start takes them out (they were created into it). Each
+	// later change moves them in or out. Completing a sprint moves unfinished issues on
+	// without history, so nothing after `end` is replayed.
+	type member struct {
+		issue    dbq.Issue
+		from     time.Time
+		initial  bool
+		changes  []historyRow
+		timeline []statusChange
+	}
+	members := make([]member, 0, len(issues))
+	for _, i := range issues {
+		m := member{issue: i, from: start, initial: committed[i.ID], timeline: statusTimeline(i.CreatedAt, i.StatusID, hist[i.ID])}
+		for _, h := range hist[i.ID] {
+			if h.Field == "sprint" && h.CreatedAt.After(start) && (deref(h.ToRef) == sprintRef || deref(h.FromRef) == sprintRef) {
+				m.changes = append(m.changes, h)
+			}
+		}
+		if !m.initial {
+			if len(m.changes) > 0 {
+				m.initial = deref(m.changes[0].FromRef) == sprintRef
+			} else {
+				m.initial = i.SprintID != nil && *i.SprintID == sp.ID
+			}
+			if i.CreatedAt.After(start) {
+				m.from = i.CreatedAt
+			}
+		}
+		members = append(members, m)
+	}
+	inAt := func(m member, t time.Time) bool {
+		if t.Before(m.from) {
+			return false
+		}
+		in := m.initial
+		for _, h := range m.changes {
+			if h.CreatedAt.After(t) {
+				break
+			}
+			in = deref(h.ToRef) == sprintRef
+		}
+		return in
+	}
+	doneAt := func(m member, t time.Time) bool {
+		id, ok := statusAt(m.timeline, t)
+		return ok && statuses[id].Category == "done"
+	}
+
+	totalDays := 1
+	if sp.EndDate != nil {
+		totalDays = max(int(sp.EndDate.Sub(start).Hours()/24)+1, 1)
+	}
+	for d := 0; d < 120; d++ {
+		day := start.AddDate(0, 0, d)
+		if day.After(end) {
+			break
+		}
+		at := day.AddDate(0, 0, 1)
+		if at.After(end) {
+			at = end
+		}
+		pt := BurndownPoint{Date: day}
+		for _, m := range members {
+			if !inAt(m, at) {
+				continue
+			}
+			pts := pointsAt(m.issue.StoryPoints, hist[m.issue.ID], at)
+			pt.Scope += pts
+			pt.ScopeIssues++
+			if doneAt(m, at) {
+				pt.Completed += pts
+				pt.DoneIssues++
+			}
+		}
+		pt.Remaining, pt.RemainingIssues = pt.Scope-pt.Completed, pt.ScopeIssues-pt.DoneIssues
+		pt.Ideal = max(rep.CommittedPoints*(1-float64(d)/float64(max(totalDays-1, 1))), 0)
+		rep.Burndown = append(rep.Burndown, pt)
+	}
+
+	// Totals at the end: completion (the snapshot taken when a sprint is completed), and scope
+	// that came and went after the start.
 	completedSet := map[uuid.UUID]bool{}
 	if sp.State == "closed" {
 		for _, cid := range sp.CompletedIssueIds {
 			completedSet[cid] = true
 		}
-	} else {
-		for _, i := range committed {
-			if st, err := statusInfo(ctx, s.Q, i.StatusID); err == nil && st.Category == "done" && i.SprintID != nil && *i.SprintID == sp.ID {
-				completedSet[i.ID] = true
-			}
-		}
 	}
-	for cid := range completedSet {
-		if slices.Contains(sp.CommittedIssueIds, cid) {
+	for _, m := range members {
+		id := m.issue.ID
+		pts := pointsAt(m.issue.StoryPoints, hist[id], end)
+		inEnd := inAt(m, end)
+		if sp.State != "closed" && inEnd && doneAt(m, end) {
+			completedSet[id] = true
+		}
+		if completedSet[id] {
 			rep.CompletedIssues++
-			rep.CompletedPoints += points[cid]
+			rep.CompletedPoints += pts
 		}
-	}
-	days := int(end.Sub(start).Hours()/24) + 1
-	if days < 1 {
-		days = 1
-	}
-	totalDays := days
-	if sp.EndDate != nil {
-		totalDays = max(int(sp.EndDate.Sub(start).Hours()/24)+1, 1)
-	}
-	for d := 0; d < days && d < 120; d++ {
-		day := start.AddDate(0, 0, d)
-		dayEnd := day.AddDate(0, 0, 1)
-		remaining := rep.CommittedPoints
-		for _, ev := range doneAt {
-			if ev.DoneAt.Before(dayEnd) && completedSet[ev.IssueID] {
-				remaining -= points[ev.IssueID]
-			}
+		everIn := committed[id] || m.initial || slices.ContainsFunc(m.changes, func(h historyRow) bool { return deref(h.ToRef) == sprintRef })
+		if !committed[id] && everIn && !m.from.After(end) {
+			rep.AddedIssues++
+			rep.AddedPoints += pts
 		}
-		ideal := rep.CommittedPoints * (1 - float64(d)/float64(max(totalDays-1, 1)))
-		rep.Burndown = append(rep.Burndown, BurndownPoint{Date: day, Remaining: remaining, Ideal: max(ideal, 0)})
+		if everIn && !inEnd && !completedSet[id] {
+			rep.RemovedIssues++
+			rep.RemovedPoints += pts
+		}
 	}
 	return rep, nil
+}
+
+func deref(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
+type VelocitySprint struct {
+	Sprint                           dbq.Sprint
+	CommittedPoints, CompletedPoints float64
+	CommittedIssues, CompletedIssues int
+}
+
+// Velocity is committed and completed work of a project's last `count` completed sprints,
+// oldest first.
+func (s *Service) Velocity(ctx context.Context, actor *authz.Actor, ref string, count int) ([]VelocitySprint, error) {
+	if count < 1 || count > 20 {
+		return nil, apperr.Invalid("count", "count must be between 1 and 20")
+	}
+	p, _, err := s.ProjectFor(ctx, actor, ref, authz.ProjectBrowse)
+	if err != nil {
+		return nil, err
+	}
+	sprints, err := s.Q.ClosedSprints(ctx, dbq.ClosedSprintsParams{ProjectID: p.ID, Limit: int32(count)})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]VelocitySprint, 0, len(sprints))
+	for k := len(sprints) - 1; k >= 0; k-- {
+		rep, err := s.sprintReport(ctx, sprints[k])
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, VelocitySprint{Sprint: rep.Sprint, CommittedPoints: rep.CommittedPoints, CompletedPoints: rep.CompletedPoints,
+			CommittedIssues: rep.CommittedIssues, CompletedIssues: rep.CompletedIssues})
+	}
+	return out, nil
 }
 
 // ---------------------------------------------------------------------------

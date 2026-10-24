@@ -312,11 +312,7 @@ func (s *Server) GetCycleTimeReport(ctx context.Context, req api.GetCycleTimeRep
 	if err != nil {
 		return nil, err
 	}
-	out := api.GetCycleTimeReport200JSONResponse{Days: rep.Days, AverageHours: rep.Average, MedianHours: rep.Median, P85Hours: rep.P85, Issues: []api.CycleTimeIssue{}}
-	for _, i := range rep.Issues {
-		out.Issues = append(out.Issues, api.CycleTimeIssue{Key: i.Key, Summary: i.Summary, CycleHours: i.Hours, ResolvedAt: i.ResolvedAt})
-	}
-	return out, nil
+	return api.GetCycleTimeReport200JSONResponse(cycleTimeView(rep)), nil
 }
 
 // ---------------------------------------------------------------------------

@@ -3,11 +3,8 @@ package tracker
 import (
 	"context"
 	"encoding/json"
-	"math"
 	"slices"
-	"sort"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 
@@ -119,86 +116,6 @@ func (s *Service) DeleteField(ctx context.Context, actor *authz.Actor, id uuid.U
 	}
 	Audit(ctx, s.Q, actor, "field.delete", "field", id.String(), nil, map[string]any{"key": f.Key})
 	return nil
-}
-
-// ---------------------------------------------------------------------------
-// Reports
-
-type CycleTimeEntry struct {
-	Key        string
-	Summary    string
-	Hours      float64
-	ResolvedAt time.Time
-}
-
-type CycleTimeReport struct {
-	Days                 int
-	Average, Median, P85 float64
-	Issues               []CycleTimeEntry
-}
-
-// CycleTime measures, from issue history, the time from first entering an in-progress status
-// to resolution, for issues resolved in the last `days` days.
-func (s *Service) CycleTime(ctx context.Context, actor *authz.Actor, ref string, days int) (CycleTimeReport, error) {
-	p, _, err := s.ProjectFor(ctx, actor, ref, authz.ProjectBrowse)
-	if err != nil {
-		return CycleTimeReport{}, err
-	}
-	since := s.Now().AddDate(0, 0, -days)
-	resolved, err := s.Q.ResolvedIssuesSince(ctx, dbq.ResolvedIssuesSinceParams{ProjectID: p.ID, Since: &since})
-	if err != nil {
-		return CycleTimeReport{}, err
-	}
-	hist, err := s.Q.StatusHistorySince(ctx, dbq.StatusHistorySinceParams{ProjectID: p.ID, Since: &since})
-	if err != nil {
-		return CycleTimeReport{}, err
-	}
-	statuses, err := s.Q.ListStatuses(ctx)
-	if err != nil {
-		return CycleTimeReport{}, err
-	}
-	category := map[string]string{}
-	for _, st := range statuses {
-		category[st.ID.String()] = st.Category
-	}
-	started := map[uuid.UUID]time.Time{}
-	for _, h := range hist {
-		if h.ToRef == nil || category[*h.ToRef] != "in_progress" {
-			continue
-		}
-		if t, ok := started[h.IssueID]; !ok || h.CreatedAt.Before(t) {
-			started[h.IssueID] = h.CreatedAt
-		}
-	}
-	rep := CycleTimeReport{Days: days, Issues: []CycleTimeEntry{}}
-	var hours []float64
-	for _, i := range resolved {
-		if i.ResolvedAt == nil {
-			continue
-		}
-		start, ok := started[i.ID]
-		if !ok {
-			start = i.CreatedAt
-		}
-		h := i.ResolvedAt.Sub(start).Hours()
-		if h < 0 {
-			h = 0
-		}
-		h = math.Round(h*10) / 10
-		hours = append(hours, h)
-		rep.Issues = append(rep.Issues, CycleTimeEntry{Key: issueKey(p, i), Summary: i.Summary, Hours: h, ResolvedAt: *i.ResolvedAt})
-	}
-	if len(hours) > 0 {
-		sum := 0.0
-		for _, h := range hours {
-			sum += h
-		}
-		sort.Float64s(hours)
-		rep.Average = math.Round(sum/float64(len(hours))*10) / 10
-		rep.Median = hours[len(hours)/2]
-		rep.P85 = hours[min(len(hours)-1, int(math.Ceil(0.85*float64(len(hours))))-1)]
-	}
-	return rep, nil
 }
 
 // ---------------------------------------------------------------------------
