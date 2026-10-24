@@ -317,6 +317,10 @@ func (c *Client) do(method, path string, body any, hdr ...string) Response {
 		req.Header.Set("Authorization", "Bearer "+c.token)
 	}
 	for i := 0; i+1 < len(hdr); i += 2 {
+		if hdr[i] == "Host" {
+			req.Host = hdr[i+1] // the client ignores a Host header
+			continue
+		}
 		req.Header.Set(hdr[i], hdr[i+1])
 	}
 	res, err := c.http.Do(req)

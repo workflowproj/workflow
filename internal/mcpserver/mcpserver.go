@@ -40,7 +40,14 @@ type Server struct {
 func (s *Server) Handler() http.Handler {
 	h := mcp.NewStreamableHTTPHandler(func(r *http.Request) *mcp.Server {
 		return s.server(identity.ActorFrom(r.Context()))
-	}, &mcp.StreamableHTTPOptions{Stateless: true, JSONResponse: true, Logger: s.Log})
+	}, &mcp.StreamableHTTPOptions{
+		Stateless: true, JSONResponse: true, Logger: s.Log,
+		// The SDK's DNS-rebinding guard rejects requests that reach a loopback address with
+		// another Host, which is every request behind a service-mesh sidecar, a local reverse
+		// proxy or kubectl port-forward. It protects unauthenticated local servers; /mcp needs
+		// a bearer token, which a rebinding web page cannot send.
+		DisableLocalhostProtection: true,
+	})
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !strings.HasPrefix(r.Header.Get("Authorization"), "Bearer ") {
 			unauthorized(w, "send an access token: Authorization: Bearer <token>")

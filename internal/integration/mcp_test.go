@@ -168,10 +168,16 @@ func TestMCPServer(t *testing.T) {
 		}
 	}
 
+	// Behind a sidecar or local reverse proxy, requests reach the server from loopback with the
+	// public host name; the bearer token is what protects /mcp.
+	r := ada.do("POST", "/mcp", json.RawMessage(`{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"proxy","version":"1"}}}`),
+		"Host", "wfm.example.com", "Authorization", "Bearer "+token(ada, "read"), "Accept", "application/json, text/event-stream")
+	eq(t, r.Status, http.StatusOK, "proxied host name: "+string(r.Body))
+
 	// The OpenAPI description is published.
 	var spec obj
 	ada.get("/api/v1/openapi.json", &spec)
 	eq(t, str(spec, "info", "title") != "", true, "openapi.json")
-	r := ada.do("GET", "/api/v1/openapi.yaml", nil)
+	r = ada.do("GET", "/api/v1/openapi.yaml", nil)
 	eq(t, strings.HasPrefix(string(r.Body), "openapi:"), true, "openapi.yaml")
 }
