@@ -2215,6 +2215,8 @@ export interface components {
             /** @enum {string} */
             status: "signed_in" | "totp_required" | "password_change_required" | "totp_enrollment_required";
             me?: components["schemas"]["Me"];
+            /** @description With password_change_required: the name a new password must not contain */
+            displayName?: string;
             /** @description After two-factor enrolment at sign-in; shown only once. */
             recoveryCodes?: string[];
         };

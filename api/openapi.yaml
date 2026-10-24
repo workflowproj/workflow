@@ -2805,6 +2805,7 @@ components:
       properties:
         status: { type: string, enum: [signed_in, totp_required, password_change_required, totp_enrollment_required] }
         me: { $ref: '#/components/schemas/Me' }
+        displayName: { type: string, description: 'With password_change_required: the name a new password must not contain' }
         recoveryCodes:
           description: After two-factor enrolment at sign-in; shown only once.
           type: array

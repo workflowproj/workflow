@@ -10,6 +10,7 @@ import { SettingsSection } from "@/features/settings/common";
 import { ConnectSnippets } from "@/features/settings/tokens/ConnectSnippets";
 import { CreateTokenDialog, TokenTable } from "@/features/settings/tokens/Tokens";
 import { SourceBadge, sourceLabel } from "@/features/admin/badges";
+import { SignInSecurity } from "@/features/auth/SignInSecurity";
 
 const managed = new Set(["scim", "google"]);
 
@@ -63,6 +64,8 @@ export function ProfilePage() {
             : "Your name, email and picture come from your sign-in provider and update when you sign in. Ask an administrator to change your role."}
         </div>
       </SettingsSection>
+
+      <SignInSecurity />
 
       <SettingsSection
         title="Personal access tokens"

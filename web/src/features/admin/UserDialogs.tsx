@@ -2,10 +2,12 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bot, Plus, UserRound } from "lucide-react";
 import { api, ApiError, unwrap, type Schemas } from "@/api/client";
+import { providersQuery } from "@/api/queries";
 import { Button, Field, Input, Modal, PageSpinner, Select, useToast } from "@/components/ui";
 import { ErrorBox } from "@/components/ErrorBox";
 import { CodeBlock } from "@/features/settings/common";
 import { CreateTokenDialog, TokenTable } from "@/features/settings/tokens/Tokens";
+import { GroupChoice, SignInChoice, startSignIn, TemporaryPasswordDialog, type SignInMethod } from "@/features/admin/LocalAccount";
 import { cn } from "@/lib/cn";
 
 export type AdminUser = Schemas["AdminUser"];
@@ -17,14 +19,42 @@ export function CreateUserDialog({ onClose, initialKind = "human" }: { onClose: 
   const [email, setEmail] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [orgRole, setOrgRole] = useState<Schemas["OrgRole"]>("member");
+  // People sign in with single sign-on, or (local accounts) a password from an invitation or a temporary one.
+  const { data: providers } = useQuery(providersQuery);
+  const sso = (providers?.providers.length ?? 0) > 0;
+  const local = !!providers?.localLogin;
+  const [chosen, setMethod] = useState<SignInMethod | null>(null);
+  const method: SignInMethod = !local ? "sso" : (chosen ?? (sso ? "sso" : "invite"));
+  const [groupIds, setGroupIds] = useState<string[]>([]);
+  const [temp, setTemp] = useState<{ user: AdminUser; password: string } | null>(null);
   const create = useMutation({
-    mutationFn: () => unwrap(api.POST("/admin/users", { body: { kind, displayName: displayName.trim(), orgRole, ...(email.trim() ? { email: email.trim() } : {}) } })),
-    onSuccess: (u) => {
+    mutationFn: async () => {
+      const human = kind === "human";
+      const u = await unwrap(
+        api.POST("/admin/users", { body: { kind, displayName: displayName.trim(), orgRole, ...(email.trim() ? { email: email.trim() } : {}), ...(human && groupIds.length ? { groupIds } : {}) } }),
+      );
+      try {
+        return { u, password: human ? await startSignIn(u.id, method) : null, failed: null };
+      } catch (e) {
+        return { u, password: null, failed: e };
+      }
+    },
+    onSuccess: ({ u, password, failed }) => {
       qc.invalidateQueries({ queryKey: ["admin-users"] });
-      toast.success(kind === "service" ? `Created service account ${u.displayName}. Issue it a token from the user list.` : `Added ${u.displayName}`);
+      if (failed) {
+        toast.error(new Error(`Added ${u.displayName}, but ${method === "invite" ? "the invitation" : "setting a temporary password"} failed: ${failed instanceof Error ? failed.message : failed}`));
+      } else if (password) {
+        setTemp({ user: u, password });
+        return;
+      } else {
+        toast.success(
+          kind === "service" ? `Created service account ${u.displayName}. Issue it a token from the user list.` : method === "invite" ? `Added ${u.displayName} and emailed an invitation` : `Added ${u.displayName}`,
+        );
+      }
       onClose();
     },
   });
+  if (temp) return <TemporaryPasswordDialog user={temp.user} password={temp.password} onClose={onClose} />;
   const fe = create.error instanceof ApiError ? create.error.fieldErrors() : {};
   return (
     <Modal
@@ -51,7 +81,7 @@ export function CreateUserDialog({ onClose, initialKind = "human" }: { onClose: 
         <div role="radiogroup" aria-label="Account type" className="grid grid-cols-2 gap-2">
           {(
             [
-              ["human", UserRound, "Person", "Pre-provision someone before they sign in."],
+              ["human", UserRound, "Person", "Someone who signs in with single sign-on or a password."],
               ["service", Bot, "Service account", "For CI, bots and the CLI; uses tokens."],
             ] as const
           ).map(([k, Icon, label, hint]) => (
@@ -81,7 +111,7 @@ export function CreateUserDialog({ onClose, initialKind = "human" }: { onClose: 
           label="Email"
           required={kind === "human"}
           error={fe.email}
-          hint={kind === "service" ? "Optional; a placeholder address is generated." : "They are matched by this address when they first sign in."}
+          hint={kind === "service" ? "Optional; a placeholder address is generated." : method === "sso" ? "They are matched by this address when they first sign in." : "They sign in with this address."}
         >
           {(id) => <Input id={id} type="email" value={email} onChange={(e) => setEmail(e.target.value)} />}
         </Field>
@@ -94,6 +124,18 @@ export function CreateUserDialog({ onClose, initialKind = "human" }: { onClose: 
             </Select>
           )}
         </Field>
+        {kind === "human" && local && (
+          <div className="flex flex-col gap-1.5">
+            <p className="text-[13px] font-medium">How they sign in</p>
+            <SignInChoice value={method} onChange={setMethod} sso={sso} />
+          </div>
+        )}
+        {kind === "human" && (
+          <div className="flex flex-col gap-1.5">
+            <p className="text-[13px] font-medium">Groups</p>
+            <GroupChoice value={groupIds} onChange={setGroupIds} />
+          </div>
+        )}
         {create.error && Object.keys(fe).length === 0 && <ErrorBox error={create.error} />}
       </form>
     </Modal>

@@ -79,7 +79,11 @@ func (s *Server) loginResult(ctx context.Context, st local.Step, err error) (api
 	w, r := httpFrom(ctx)
 	if st.Stage != "" {
 		s.challengeCookie(w, st.Challenge, 600)
-		return api.LocalLoginResult{Status: stageStatus[st.Stage]}, nil
+		res := api.LocalLoginResult{Status: stageStatus[st.Stage]}
+		if st.Stage == local.StagePasswordChange {
+			res.DisplayName = &st.User.DisplayName
+		}
+		return res, nil
 	}
 	s.challengeCookie(w, "", -1)
 	if c, err := r.Cookie(identity.SessionCookie); err == nil {
