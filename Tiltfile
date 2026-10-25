@@ -58,6 +58,13 @@ if not use_cnpg:
                  objects=["wfm-dev-database:secret", "postgres:networkpolicy"])
     db_deps = ["postgres"]
 
+# -- keycloak ------------------------------------------------------------------------------------
+# Sign-in, directory sync and API tokens (values-dev.yaml points the app at it); the realm and its
+# test users are described in docs/identity.md.
+k8s_yaml(kustomize("deploy/k3d/keycloak"))
+k8s_resource("keycloak", labels=["infra"],
+             links=[link("http://keycloak.localhost:8081/admin", "Keycloak admin (admin / admin)")])
+
 # -- chart ---------------------------------------------------------------------------------------
 values = ["deploy/k3d/values-dev.yaml"] + (["deploy/k3d/values-cnpg.yaml"] if use_cnpg else [])
 k8s_yaml(helm(

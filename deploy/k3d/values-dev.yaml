@@ -1,5 +1,6 @@
-# Chart values for the local k3d cluster (Tilt) and the CI e2e job: development sign-in, one replica
-# each, Traefik ingress on *.localhost, NetworkPolicies on (k3s enforces them).
+# Chart values for the local k3d cluster (Tilt) and the CI e2e job: development sign-in plus Keycloak
+# (deploy/k3d/keycloak: sign-in, directory sync, API tokens), one replica each, Traefik ingress on
+# *.localhost, NetworkPolicies on (k3s enforces them).
 # Database: the throwaway PostgreSQL in postgres.yaml. Add values-cnpg.yaml to use CloudNativePG.
 image:
   repository: ghcr.io/geoffo-dev/workflow-management
@@ -18,11 +19,38 @@ config:
   WFM_WEBHOOK_ALLOW_PRIVATE: "true"
   # Immediate notification emails after 10 seconds rather than 2 minutes (faster e2e runs).
   WFM_EMAIL_BATCH_WINDOW: "10s"
+  # The e2e suite signs in as this development account and needs it to be an admin, also when
+  # Keycloak sync has created the first accounts. alice is the realm's admin.
+  WFM_BOOTSTRAP_ADMINS: "e2e-admin@example.com,alice@example.com"
+  # Keycloak sign-in (deploy/k3d/keycloak). keycloak.localhost:8081 is the same address for
+  # browsers (Traefik) and pods (CoreDNS rewrite), so discovery and tokens agree on the issuer.
+  WFM_OIDC_PROVIDERS: keycloak
+  WFM_OIDC_KEYCLOAK_ISSUER: "http://keycloak.localhost:8081/realms/wfm"
+  WFM_OIDC_KEYCLOAK_CLIENT_ID: workflow
+  WFM_OIDC_KEYCLOAK_DISPLAY_NAME: Keycloak
+  WFM_OIDC_KEYCLOAK_GROUPS_CLAIM: groups
+  WFM_OIDC_KEYCLOAK_SINGLE_LOGOUT: "true"
+  # Access tokens for the API: audience workflow-api (not the sign-in client); the workflow-ci
+  # client's client-credentials tokens act as the ci-bot service account.
+  WFM_OIDC_KEYCLOAK_API_AUDIENCE: workflow-api
+  WFM_OIDC_KEYCLOAK_API_CLIENTS: "workflow-ci=ci-bot"
+  # Keycloak directory sync: members of /workflow-users get accounts; wfm-* groups are mirrored.
+  WFM_KEYCLOAK_ENABLED: "true"
+  WFM_KEYCLOAK_URL: "http://keycloak.keycloak.svc.cluster.local:8081"
+  WFM_KEYCLOAK_REALM: wfm
+  WFM_KEYCLOAK_CLIENT_ID: workflow-sync
+  WFM_KEYCLOAK_PROVIDER: keycloak
+  WFM_KEYCLOAK_SYNC_GROUP: /workflow-users
+  WFM_KEYCLOAK_GROUP_PREFIX: wfm-
+  WFM_KEYCLOAK_SYNC_INTERVAL: 5m
 
 secrets:
   create: true
   values:
     WFM_SECRET_KEY: "development-only-secret-key-not-for-production"
+    # The development realm's client secrets (deploy/k3d/keycloak/realm-wfm.json).
+    WFM_OIDC_KEYCLOAK_CLIENT_SECRET: "workflow-dev-client-secret"
+    WFM_KEYCLOAK_CLIENT_SECRET: "workflow-sync-dev-secret"
 
 database:
   cnpg:
@@ -94,6 +122,13 @@ networkPolicy:
         podSelector:
           matchLabels:
             app.kubernetes.io/name: traefik
+      # Keycloak's back-channel logout (POST /auth/keycloak/backchannel-logout).
+      - namespaceSelector:
+          matchLabels:
+            kubernetes.io/metadata.name: keycloak
+        podSelector:
+          matchLabels:
+            app.kubernetes.io/name: keycloak
   hooks:
     ingressFrom:
       - namespaceSelector:
@@ -108,3 +143,15 @@ networkPolicy:
         - podSelector:
             matchLabels:
               app.kubernetes.io/name: postgres
+    extraRules:
+      # Keycloak: OIDC discovery, token exchange and keys (web), directory sync (worker).
+      - to:
+          - namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: keycloak
+            podSelector:
+              matchLabels:
+                app.kubernetes.io/name: keycloak
+        ports:
+          - port: 8080
+            protocol: TCP
