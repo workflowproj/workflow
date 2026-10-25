@@ -26,7 +26,7 @@ import (
 )
 
 const instructions = `Workflow is the team's issue tracker (projects, epics, stories, tasks, bugs, sub-tasks, sprints, releases).
-Issues are identified by keys such as PLAT-12. Find work with search_issues (JQL), read one with get_issue (it lists the
+Issues are identified by keys such as PLAT-12. Find work with search_issues (a JQL-like query language), read one with get_issue (it lists the
 transitions available right now), and learn a project's issue types, boards and sprints with get_project.
 Status changes go through the project's workflow: use transition_issue with one of the transitions get_issue lists.
 Everything you do is recorded in the issue history as the person who owns the access token.`
@@ -76,6 +76,11 @@ func (s *Server) Handler() http.Handler {
 		}
 		if err != nil || a == nil || a.TokenID == nil {
 			s.challenge(w, http.StatusUnauthorized, "invalid_token", "invalid or expired access token")
+			return
+		}
+		// Customers of a service desk only use its portal.
+		if a.IsCustomer() {
+			s.challenge(w, http.StatusForbidden, "access_denied", "customers use the help centre portal; assistants are for agents")
 			return
 		}
 		// Changes are recorded as "<person> via <token name>", e.g. "Ada via Claude".

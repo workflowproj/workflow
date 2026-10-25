@@ -82,7 +82,7 @@ func (s *Service) keyInUse(ctx context.Context, q *dbq.Queries, key string, exce
 }
 
 func (s *Service) CreateProject(ctx context.Context, actor *authz.Actor, in ProjectInput) (dbq.Project, error) {
-	if actor.User == nil || actor.OrgRole == "guest" {
+	if actor.User == nil || actor.OrgRole == "guest" || actor.IsCustomer() {
 		return dbq.Project{}, apperr.Forbidden("guests cannot create projects")
 	}
 	in.Key = strings.ToUpper(strings.TrimSpace(in.Key))
@@ -131,6 +131,11 @@ func (s *Service) CreateProject(ctx context.Context, actor *authz.Actor, in Proj
 		}
 		if err := s.applyTemplate(ctx, tx, q, actor, project, tpl); err != nil {
 			return err
+		}
+		if s.AfterCreateProject != nil {
+			if err := s.AfterCreateProject(ctx, tx, q, actor, project); err != nil {
+				return err
+			}
 		}
 		Audit(ctx, q, actor, "project.create", "project", project.ID.String(), &project.ID, map[string]any{"key": project.Key, "template": tpl.ID})
 		return nil
@@ -307,6 +312,11 @@ func (s *Service) AddMember(ctx context.Context, actor *authz.Actor, ref string,
 	if err != nil {
 		return dbq.ProjectMember{}, apperr.Invalid("roleKey", "unknown role %q", roleKey)
 	}
+	if userID != nil {
+		if u, err := s.Q.GetUser(ctx, *userID); err == nil && u.OrgRole == authz.OrgCustomer {
+			return dbq.ProjectMember{}, apperr.Invalid("userId", "%s is a customer: customers use the portal. Change their organisation role to make them an agent.", u.DisplayName)
+		}
+	}
 	var m dbq.ProjectMember
 	err = s.tx(ctx, func(tx pgx.Tx, q *dbq.Queries) error {
 		var err error
@@ -401,10 +411,19 @@ func (s *Service) userCanBrowse(ctx context.Context, u dbq.User, p dbq.Project) 
 	return access.CanBrowse(), nil
 }
 
-// EffectiveOrgRole combines a user's own role with roles mapped from their groups.
+// EffectiveOrgRole combines a user's own role with roles mapped from their groups. Customers
+// stay customers: only changing their own role gives them more.
 func (s *Service) EffectiveOrgRole(ctx context.Context, u dbq.User) (string, error) {
+	return EffectiveOrgRoleWith(ctx, s.Q, u)
+}
+
+// EffectiveOrgRoleWith is EffectiveOrgRole read through q (a caller's transaction).
+func EffectiveOrgRoleWith(ctx context.Context, q *dbq.Queries, u dbq.User) (string, error) {
 	role := u.OrgRole
-	roles, err := s.Q.EffectiveOrgRoles(ctx, u.ID)
+	if role == authz.OrgCustomer {
+		return role, nil
+	}
+	roles, err := q.EffectiveOrgRoles(ctx, u.ID)
 	if err != nil {
 		return role, err
 	}
@@ -587,7 +606,12 @@ func (s *Service) DeleteIssueType(ctx context.Context, actor *authz.Actor, ref s
 	if n > 0 {
 		return apperr.Conflict("type_in_use", "%d issue(s) use this type; change their type first", n)
 	}
-	return s.Q.DeleteIssueType(ctx, t.ID)
+	if err := s.Q.DeleteIssueType(ctx, t.ID); db.IsForeignKeyViolation(err) {
+		return apperr.Conflict("type_in_use", "request types create issues of this type; change them first")
+	} else if err != nil {
+		return err
+	}
+	return nil
 }
 
 // projectStatuses returns the statuses used by the project's workflows, ordered by category

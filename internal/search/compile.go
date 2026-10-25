@@ -27,6 +27,9 @@ type Env struct {
 	CustomFields []CustomField
 	// Units turn durations such as 1d into seconds (the default 8-hour day when unset).
 	Units timetrack.Units
+	// SLACalendars lists the calendars of SLA clocks for remaining() (called only when a query
+	// uses it; nil means every clock runs around the clock).
+	SLACalendars func() ([]SLACalendar, error)
 }
 
 // Compiled is a WHERE expression and ORDER BY list over the issues table aliased as `i`.
@@ -312,6 +315,16 @@ func (b *builder) clause(c Clause) (string, error) {
 		}, "NOT "+worklogExists+")")
 	case "worklogdate":
 		return b.worklogDate(c)
+	case "timetofirstresponse", "firstresponse":
+		return b.slaField(c, "first_response")
+	case "timetoresolution":
+		return b.slaField(c, "resolution")
+	case "requesttype", "customerrequesttype":
+		return b.requestTypeField(c)
+	case "approval", "approvals":
+		return b.approvalField(c)
+	case "participant", "participants", "requestparticipants":
+		return b.participantField(c)
 	}
 	if cf, ok := b.customField(c.Field); ok {
 		return b.customClause(c, cf)
@@ -475,7 +488,7 @@ func inEpics(epics string) string {
 
 const allEpics = "SELECT e.id FROM issues e JOIN issue_types et ON et.id = e.type_id WHERE et.level >= 1"
 
-// linkDescription is one side of a link type, as Jira words it: "blocks" is the source's side
+// linkDescription is one side of a link type, as people word it: "blocks" is the source's side
 // of a blocks link, "is blocked by" the target's.
 type linkDescription struct {
 	typ  string
@@ -955,6 +968,10 @@ func orderExpr(o Order) (string, error) {
 		return "i.remaining_estimate_seconds", nil
 	case "timespent":
 		return timeSpentExpr, nil
+	case "timetofirstresponse", "firstresponse":
+		return slaOrder("first_response"), nil
+	case "timetoresolution":
+		return slaOrder("resolution"), nil
 	}
 	return "", errAt(o.Pos, "cannot order by %q", o.Field)
 }
@@ -997,6 +1014,11 @@ var Fields = []struct {
 	{"timeSpent", "duration", []string{"=", "!=", ">", ">=", "<", "<=", "is", "is not"}},
 	{"worklogAuthor", "user", []string{"=", "!=", "in", "not in", "is", "is not"}},
 	{"worklogDate", "date", []string{"=", "!=", ">", ">=", "<", "<=", "is", "is not"}},
+	{"timeToFirstResponse", "sla", []string{"=", "!=", "<", "<=", ">", ">=", "is", "is not"}},
+	{"timeToResolution", "sla", []string{"=", "!=", "<", "<=", ">", ">=", "is", "is not"}},
+	{"requestType", "requestType", []string{"=", "!=", "in", "not in", "is", "is not"}},
+	{"approval", "approval", []string{"=", "!=", "is", "is not"}},
+	{"participant", "user", []string{"=", "!=", "in", "not in", "is", "is not"}},
 }
 
 var Functions = []string{
@@ -1004,4 +1026,6 @@ var Functions = []string{
 	"releasedVersions()", "unreleasedVersions()", "now()", "startOfDay()", "endOfDay()",
 	"startOfWeek()", "endOfWeek()", "startOfMonth()", "endOfMonth()", "startOfYear()", "endOfYear()",
 	"linkedIssues(\"KEY\")", "blockedIssues()", "blockingIssues()",
+	"breached()", "running()", "paused()", "completed()", "remaining(\"2h\")",
+	"pending()", "approved()", "declined()", "pendingBy(currentUser())",
 }

@@ -3,7 +3,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, CircleAlert } from "lucide-react";
 import { api, ApiError, unwrap, type Schemas } from "@/api/client";
 import type { IssueDetail, User } from "@/api/types";
-import { Button, Modal, useToast } from "@/components/ui";
+import { useProject } from "@/api/queries";
+import { Button, Checkbox, Modal, useToast } from "@/components/ui";
 import { MarkdownEditor } from "@/components/MarkdownEditor";
 import { StatusBadge } from "@/components/issue-bits";
 import { afterTransition } from "./issue-api";
@@ -41,12 +42,16 @@ export function TransitionScreenDialog({
 
   const [values, setValues] = useState<Values>({});
   const [comment, setComment] = useState("");
+  // Service requests: a transition's comment is an internal note unless shared with the customer.
+  const service = useProject(projectKey).data?.template === "service";
+  const [share, setShare] = useState(false);
   const [missing, setMissing] = useState<Record<string, string>>({});
 
   const run = useMutation({
     mutationFn: () => {
       const body: Schemas["TransitionRequest"] = { transitionId: transition!.id, fields: serialize(fields, values) };
       if (comment.trim()) body.comment = comment.trim();
+      if (comment.trim() && service) body.commentVisibility = share ? "public" : "internal";
       return unwrap(api.POST("/issues/{issueKey}/transitions", { params: { path: { issueKey } }, body }));
     },
     onSuccess: (issue) => {
@@ -73,6 +78,7 @@ export function TransitionScreenDialog({
     }
     setValues(v);
     setComment("");
+    setShare(false);
     setMissing({});
     run.reset();
     // Reset only when (re)opened, not when the cached issue refreshes underneath.
@@ -154,6 +160,7 @@ export function TransitionScreenDialog({
               />
             )}
           </ScreenRow>
+          {service && <Checkbox label="Send this comment to the customer (otherwise it is an internal note)" checked={share} onChange={(e) => setShare(e.target.checked)} />}
         </form>
       )}
     </Modal>

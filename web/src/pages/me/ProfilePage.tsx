@@ -99,7 +99,7 @@ export function ProfilePage() {
             <p className="flex gap-2">
               <Bot className="mt-0.5 size-4 shrink-0 text-faint" />
               <span>
-                MCP endpoint <code className="font-mono text-ink">{server}/mcp</code>. Tools: search issues (JQL), get an issue, project, board or sprint report, metrics, create, update, transition, comment and link
+                MCP endpoint <code className="font-mono text-ink">{server}/mcp</code>. Tools: search issues, get an issue, project, board or sprint report, metrics, create, update, transition, comment and link
                 issues. Changes appear in the issue history under your name.
               </span>
             </p>

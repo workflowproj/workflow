@@ -41,6 +41,7 @@ import (
 	"github.com/geoffo-dev/workflow-management/internal/oauth"
 	"github.com/geoffo-dev/workflow-management/internal/scm"
 	"github.com/geoffo-dev/workflow-management/internal/secure"
+	"github.com/geoffo-dev/workflow-management/internal/servicedesk"
 	"github.com/geoffo-dev/workflow-management/internal/telemetry"
 	"github.com/geoffo-dev/workflow-management/internal/tracker"
 )
@@ -64,6 +65,8 @@ type Server struct {
 	JiraImport *jiraimport.Service
 	// OAuth is the authorisation server for AI assistants connecting to /mcp.
 	OAuth *oauth.Server
+	// ServiceDesk serves service projects' settings, queues and requests, and the customer portal.
+	ServiceDesk *servicedesk.Service
 
 	limitState limitState
 }
@@ -394,6 +397,10 @@ func (s *Server) authenticate(next http.Handler) http.Handler {
 			return
 		}
 		if err := identity.CheckScope(a, r.Method, r.URL.Path); err != nil {
+			WriteProblem(s.Log, w, r, err)
+			return
+		}
+		if err := portalOnly(a, r.URL.Path); err != nil {
 			WriteProblem(s.Log, w, r, err)
 			return
 		}

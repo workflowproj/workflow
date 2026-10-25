@@ -26,6 +26,7 @@ import (
 	"github.com/geoffo-dev/workflow-management/internal/db/dbq"
 	"github.com/geoffo-dev/workflow-management/internal/events"
 	"github.com/geoffo-dev/workflow-management/internal/jobs"
+	"github.com/geoffo-dev/workflow-management/internal/search"
 	"github.com/geoffo-dev/workflow-management/internal/storage"
 	"github.com/geoffo-dev/workflow-management/internal/workflow"
 )
@@ -40,6 +41,15 @@ type Service struct {
 	Cfg     *config.Config
 	Log     *slog.Logger
 	Now     func() time.Time
+
+	// AfterCreateProject runs in the transaction that creates a project (the service desk sets
+	// up service projects).
+	AfterCreateProject func(ctx context.Context, tx pgx.Tx, q *dbq.Queries, actor *authz.Actor, p dbq.Project) error
+	// OnEvent runs in the transaction of every change that emits a domain event, before the
+	// event is queued (the service desk recomputes SLA clocks and queues customer emails).
+	OnEvent func(ctx context.Context, tx pgx.Tx, actor *authz.Actor, p dbq.Project, issue *dbq.Issue, event string, data map[string]any) error
+	// SLACalendars lists the calendars JQL's remaining() measures SLA clocks in.
+	SLACalendars func(ctx context.Context, q *dbq.Queries) ([]search.SLACalendar, error)
 }
 
 func New(pool *pgxpool.Pool, eval *workflow.Evaluator, enq jobs.Enqueuer, store storage.Store, cfg *config.Config, log *slog.Logger) *Service {
@@ -101,7 +111,7 @@ func (t Template) WorkflowSources() ([]string, error) {
 
 var templates = func() []Template {
 	var out []Template
-	for _, id := range []string{"scrum", "kanban", "bug_tracking"} {
+	for _, id := range []string{"scrum", "kanban", "bug_tracking", "service"} {
 		b, err := templateFS.ReadFile("templates/" + id + ".yaml")
 		if err != nil {
 			panic(err)
@@ -230,6 +240,12 @@ func canEdit(access authz.Access, actor *authz.Actor, i dbq.Issue) bool {
 	return own && access.Has(authz.IssueEdit)
 }
 
+// CanEdit reports whether an actor may edit an issue (their own with issue.edit, anyone's with
+// issue.edit_others).
+func CanEdit(access authz.Access, actor *authz.Actor, i dbq.Issue) bool {
+	return canEdit(access, actor, i)
+}
+
 // ---------------------------------------------------------------------------
 // History, events and audit
 
@@ -268,11 +284,16 @@ func (s *Service) emit(ctx context.Context, tx pgx.Tx, actor *authz.Actor, p dbq
 	if err := events.Publish(ctx, tx, ev); err != nil {
 		return err
 	}
-	if s.Jobs == nil {
-		return nil
-	}
 	if data == nil {
 		data = map[string]any{}
+	}
+	if s.OnEvent != nil && IsServiceProject(p) {
+		if err := s.OnEvent(ctx, tx, actor, p, issue, event, data); err != nil {
+			return err
+		}
+	}
+	if s.Jobs == nil {
+		return nil
 	}
 	if issue != nil {
 		data["issueKey"] = issueKey(p, *issue)
@@ -318,6 +339,13 @@ func Audit(ctx context.Context, q *dbq.Queries, actor *authz.Actor, action, targ
 }
 
 func issueKey(p dbq.Project, i dbq.Issue) string { return fmt.Sprintf("%s-%d", p.Key, i.Number) }
+
+// ServiceTemplate is the template of service projects: a customer portal, request types,
+// queues, SLAs and approvals (see the servicedesk package).
+const ServiceTemplate = "service"
+
+// IsServiceProject reports a service project.
+func IsServiceProject(p dbq.Project) bool { return p.Template == ServiceTemplate }
 
 // workflowDef loads and decodes a workflow version definition.
 func workflowDef(ctx context.Context, q *dbq.Queries, versionID uuid.UUID) (*workflow.Definition, dbq.WorkflowVersion, error) {

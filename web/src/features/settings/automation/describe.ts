@@ -117,6 +117,8 @@ function describeWhen(t: Trigger, s: string): string {
       return `When a pipeline for ${s} completes`;
     case "schedule":
       return `${cronLabel(t.cron)}, for issues matching “${t.jql ?? ""}”`;
+    case "sla.breached":
+      return `When ${s} misses an SLA goal`;
   }
 }
 

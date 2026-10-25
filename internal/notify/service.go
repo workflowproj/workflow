@@ -108,11 +108,15 @@ func (s *Service) Update(ctx context.Context, userID uuid.UUID, p Patch) (Settin
 			return err
 		}
 		for kind, d := range p.Deliveries {
-			if _, ok := KindByKey(kind); !ok {
+			k, ok := KindByKey(kind)
+			if !ok {
 				return apperr.Invalid("preferences", "unknown notification kind %q", kind)
 			}
 			if !ValidDelivery(d) {
 				return apperr.Invalid("preferences", "delivery must be immediate, digest or off, got %q", d)
+			}
+			if k.Portal && d == Digest {
+				return apperr.Invalid("preferences", "%s are emailed immediately or not at all", k.Label)
 			}
 			cur.Deliveries[kind] = d
 		}

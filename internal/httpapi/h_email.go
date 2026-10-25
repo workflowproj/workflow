@@ -21,9 +21,16 @@ func (s *Server) emailSettingsView(a *authz.Actor, st notify.Settings) api.Email
 		NextDigestAt: st.NextDigest(s.Notify.Now()), EmailConfigured: s.Notify.Transport() == "smtp",
 	}
 	for _, k := range notify.Kinds {
+		if a.IsCustomer() && !k.Portal {
+			continue // customers only follow requests in the portal
+		}
+		var choices []api.EmailDelivery
+		for _, d := range k.Deliveries() {
+			choices = append(choices, api.EmailDelivery(d))
+		}
 		out.Preferences = append(out.Preferences, api.EmailNotificationPreference{
 			Kind: k.Key, Label: k.Label, Description: k.Description,
-			Delivery: api.EmailDelivery(st.Delivery(k.Key)), DefaultDelivery: api.EmailDelivery(k.Default),
+			Delivery: api.EmailDelivery(st.Delivery(k.Key)), DefaultDelivery: api.EmailDelivery(k.Default), Deliveries: &choices,
 		})
 	}
 	return out

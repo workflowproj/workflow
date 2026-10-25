@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, Outlet, useNavigate, useParams, useRouterState } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bell, CalendarClock, FolderKanban, GanttChart, LayoutDashboard, LogOut, Menu, Plus, Search, Settings, Shield, UserRound } from "lucide-react";
+import { Bell, CalendarClock, FolderKanban, GanttChart, LayoutDashboard, LifeBuoy, LogOut, Menu, Plus, Search, Settings, Shield, UserRound } from "lucide-react";
 import { api, unwrap } from "@/api/client";
 import { projectsQuery, useMe } from "@/api/queries";
 import { Button, IconButton, MenuItem, Popover } from "@/components/ui";
 import { UserAvatar } from "@/components/UserAvatar";
 import { CreateIssueDialog } from "@/features/issues/CreateIssueDialog";
+import { portalDesksQuery } from "@/features/servicedesk/api";
 import { ThemeMenu } from "./ThemeMenu";
 import { cn } from "@/lib/cn";
 
@@ -74,6 +75,7 @@ export function AppShell() {
 function Sidebar({ className }: { className?: string }) {
   const { data: me } = useMe();
   const { data: projects = [] } = useQuery(projectsQuery);
+  const { data: desks = [] } = useQuery({ ...portalDesksQuery, staleTime: 5 * 60_000 });
   const params = useParams({ strict: false }) as { projectKey?: string };
   const navItem = "flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm text-muted hover:bg-surface-2 hover:text-ink";
   const active = { className: "!bg-accent-soft !text-accent font-medium" };
@@ -104,6 +106,11 @@ function Sidebar({ className }: { className?: string }) {
         <Link to="/notifications" className={navItem} activeProps={active}>
           <Bell className="size-4" /> Notifications
         </Link>
+        {desks.length > 0 && (
+          <Link to="/portal" className={navItem}>
+            <LifeBuoy className="size-4" /> Help centre
+          </Link>
+        )}
       </nav>
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
         <p className="px-2.5 pt-3 pb-1.5 text-[11px] font-semibold tracking-wide text-faint uppercase">Projects</p>
@@ -111,7 +118,7 @@ function Sidebar({ className }: { className?: string }) {
         {projects.map((p) => (
           <Link
             key={p.id}
-            to="/projects/$projectKey/board"
+            to={p.template === "service" ? "/projects/$projectKey/queues" : "/projects/$projectKey/board"}
             params={{ projectKey: p.key }}
             className={cn(navItem, "py-1", params.projectKey === p.key && "bg-surface-2 text-ink")}
           >

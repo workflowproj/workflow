@@ -109,6 +109,9 @@ func (a *App) handlers() []handler {
 		reg(5*time.Minute, func(ctx context.Context, _ jobs.AutomationSchedule) error { return a.Automation.RunScheduled(ctx) }),
 		reg(10*time.Minute, func(ctx context.Context, _ jobs.Maintenance) error { return a.maintenance(ctx) }),
 		reg(a.JiraImport.Budget+5*time.Minute, a.JiraImport.Work),
+		reg(time.Minute, a.ServiceDesk.HandleEvent),
+		reg(5*time.Minute, func(ctx context.Context, _ jobs.SLACheck) error { return a.ServiceDesk.CheckBreaches(ctx) }),
+		reg(30*time.Minute, a.ServiceDesk.RecomputeProject),
 	}
 }
 
@@ -138,6 +141,7 @@ func (a *App) periodicJobs() []*river.PeriodicJob {
 		every(time.Minute, jobs.AutomationSchedule{}),
 		every(time.Hour, jobs.Maintenance{}),
 		every(5*time.Minute, jobs.EmailDigests{}),
+		every(time.Minute, jobs.SLACheck{}),
 	}
 	if a.Cfg.SCMReconcileInterval > 0 {
 		out = append(out, every(a.Cfg.SCMReconcileInterval, jobs.SCMReconcile{}))

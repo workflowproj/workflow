@@ -223,7 +223,7 @@ export function IssueNavigator({
 function ModeSwitch({ mode, onChange }: { mode: Mode; onChange: (m: Mode) => void }) {
   const opts = [
     { id: "basic" as const, label: "Basic", icon: Rows3 },
-    { id: "jql" as const, label: "JQL", icon: Code2 },
+    { id: "jql" as const, label: "Query", icon: Code2 },
   ];
   return (
     <div role="radiogroup" aria-label="Search mode" className="inline-flex h-9 shrink-0 rounded-md border border-line-strong bg-surface-2 p-0.5">

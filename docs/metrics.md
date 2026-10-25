@@ -30,7 +30,7 @@ project and person, and exports CSV.
 
 ## Flow metrics
 
-Over any set of projects, narrowed by JQL:
+Over any set of projects, narrowed by a query:
 
 - **Summary** — open (to do / in progress), created and resolved in the window, overdue,
   unassigned, open and resolved story points, median cycle time.

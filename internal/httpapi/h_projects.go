@@ -74,6 +74,9 @@ func (s *Server) CreateProject(ctx context.Context, req api.CreateProjectRequest
 	}
 	b := req.Body
 	openRole := "member"
+	if b.Template == tracker.ServiceTemplate {
+		openRole = "" // agents see internal notes: service projects are private unless asked
+	}
 	if b.OpenRoleKey != nil {
 		openRole = *b.OpenRoleKey
 	}

@@ -11,6 +11,13 @@ settings, by email: right away, in a daily digest, or not at all.
 | **Comments** | the reporter, the assignee and everyone watching the issue | daily digest |
 | **Status changes** | the reporter, the assignee and everyone watching the issue, plus whoever a workflow transition's `notify` post-function names | daily digest |
 | **Automation** | whoever an automation rule's *Notify* action names | daily digest |
+| **SLA breaches** | the assignee of a service request that misses an SLA goal | immediately |
+| **My requests** | customers following a service request in the help centre: received, replied to, waiting for them, resolved | immediately (no digest) |
+| **Approvals** | people asked to approve a service request | immediately (no digest) |
+
+*My requests* and *Approvals* are the [service desk](service-desk.md#emails)'s emails; they link
+to the help centre and are the only kinds customers have. Customers get no in-app notifications,
+and people who work in the project get the normal kinds above instead of *My requests*.
 
 Nobody is notified about their own changes. Creating an issue, commenting on it or being
 assigned to it makes you a watcher; anyone can watch or stop watching an issue from its page.

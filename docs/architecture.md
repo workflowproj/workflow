@@ -48,7 +48,7 @@ or, for open projects without an explicit membership, the project's open role.
   touches one row.
 - **Optimistic locking**: every issue has a `version`; updates with a stale version answer 409.
 - **Custom fields** live in a JSONB column validated against field definitions.
-- **Search**: `internal/search` parses JQL and compiles it to parameterised SQL. Text search uses
+- **Search**: `internal/search` parses the query language and compiles it to parameterised SQL. Text search uses
   a `tsvector` expression index plus `pg_trgm` for fuzzy matching. Results are always limited
   to projects the caller may browse.
 

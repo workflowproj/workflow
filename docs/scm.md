@@ -12,7 +12,7 @@ What you get on each issue:
 
 - **Development panel**: branches, commits, pull/merge requests (state and review), latest
   pipeline status; summarised on board cards.
-- **Smart commits** — Jira-style commands in commit messages, run as the committer (matched by
+- **Smart commits** — commands in commit messages, run as the committer (matched by
   email to an active account, with that person's permissions; unknown committers are linked
   but cannot change issues):
   - `PLAT-12 #comment Fixed the retry logic` adds a comment.

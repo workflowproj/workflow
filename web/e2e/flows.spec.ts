@@ -74,7 +74,7 @@ test("board: keyboard drag moves a card to the next column", async ({ page }) =>
   await expect.poll(async () => (await a.get(`/issues/${task.key}`)).status.name, { timeout: 15_000 }).toBe("Selected for Development");
 });
 
-test("search: JQL results and error positions", async ({ page }) => {
+test("search: query results and error positions", async ({ page }) => {
   const { key, a } = await setup(page, "SR", "kanban");
   await a.post("/issues", { projectKey: key, typeKey: "bug", summary: "Searchable needle bug" });
   await a.post("/issues", { projectKey: key, typeKey: "task", summary: "Unrelated haystack" });
@@ -85,8 +85,8 @@ test("search: JQL results and error positions", async ({ page }) => {
 
   // A broken query from a link opens in the JQL editor with the server's message.
   await page.goto(`/issues?jql=${encodeURIComponent(`project = ${key} AND colour = red`)}`);
-  await expect(page.getByLabel("JQL query")).toBeVisible();
-  await expect(page.getByText(/colour/i).filter({ hasNot: page.getByLabel("JQL query") }).last()).toBeVisible();
+  await expect(page.getByLabel("Search query")).toBeVisible();
+  await expect(page.getByText(/colour/i).filter({ hasNot: page.getByLabel("Search query") }).last()).toBeVisible();
 });
 
 test("workflow editor shows the project's workflow and its YAML", async ({ page }) => {

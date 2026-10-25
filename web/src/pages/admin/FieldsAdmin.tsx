@@ -29,7 +29,7 @@ export function FieldsAdmin() {
     <div className="flex flex-col gap-4">
       <PageHeader
         title="Custom fields"
-        subtitle="Extra fields on issues, searchable with JQL and usable in workflow screens, conditions and automation."
+        subtitle="Extra fields on issues, searchable and usable in workflow screens, conditions and automation."
         actions={
           <Button variant="primary" icon={<Plus className="size-4" />} onClick={() => setEditing("new")}>
             New field

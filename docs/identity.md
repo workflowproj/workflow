@@ -223,45 +223,8 @@ the realm, URL, sign-in provider and access group and has a *Run now* button. Th
 shortly after the worker starts. Just-in-time accounts are off while Keycloak sync is on
 (`WFM_JIT_PROVISIONING=auto`).
 
-### Development realm (k3d)
-
-`deploy/k3d/keycloak` runs Keycloak 26.4 in development mode for the local k3d cluster (Tilt) and
-the CI end-to-end job, importing the realm `wfm` from `realm-wfm.json` at every start. The admin
-console is `http://keycloak.localhost:8081/admin` (`admin` / `admin`). The issuer is
-`http://keycloak.localhost:8081/realms/wfm` for browsers (through Traefik) and for pods alike:
-a CoreDNS rewrite (`coredns-custom.yaml`) resolves `keycloak.localhost` to the Keycloak Service,
-which listens on 8081. `deploy/k3d/values-dev.yaml` configures the app for it; development sign-in
-stays on.
-
-| Client | Type | Settings | Used by |
-|---|---|---|---|
-| `workflow` | confidential, standard flow only | secret `workflow-dev-client-secret`; PKCE S256 required; redirect URIs `http://wfm.localhost:8081/auth/keycloak/callback`, `http://localhost:8080/auth/keycloak/callback`; post-logout redirects to the same hosts; back-channel logout URL `http://wfm-web.wfm.svc.cluster.local/auth/keycloak/backchannel-logout` with *session required*; front-channel logout off; mapper `groups` (group membership, full path, in ID, access and userinfo tokens) | sign-in (`WFM_OIDC_KEYCLOAK_*`) |
-| `workflow-sync` | confidential, service account only | secret `workflow-sync-dev-secret`; service account roles `realm-management` `view-users`, `query-groups` | directory sync (`WFM_KEYCLOAK_*`) |
-| `workflow-api` | confidential, no flows | none (it names the audience) | `WFM_OIDC_KEYCLOAK_API_AUDIENCE=workflow-api` |
-| `workflow-ci` | confidential, service account only | secret `workflow-ci-dev-secret`; audience mapper adding `workflow-api` to access tokens; tokens carry `azp` and `client_id` = `workflow-ci` | API tokens as the `ci-bot` service account (`WFM_OIDC_KEYCLOAK_API_CLIENTS=workflow-ci=ci-bot`) |
-| `workflow-cli` | public, password grant and device flow | audience mapper `workflow-api`, `groups` mapper; the password grant is for tests only | people's own API tokens |
-
-| User | Password | Email | Groups | Synced? |
-|---|---|---|---|---|
-| `alice` | `alice-dev-password` | alice@example.com (verified) | `/workflow-users`, `/wfm-admins` | yes; bootstrap admin |
-| `bob` | `bob-dev-password` | bob@example.com (verified) | `/workflow-users`, `/wfm-engineering/wfm-platform` | yes |
-| `carol` | `carol-dev-password` | carol@example.com (verified) | `/wfm-engineering` | no: not in the access group |
-| `dave` | `dave-dev-password` | dave@example.com (verified) | `/workflow-users` | no: disabled |
-
-The app syncs members of `/workflow-users` every 5 minutes and mirrors the `wfm-*` groups
-(`wfm-admins`, `wfm-engineering`, `wfm-engineering/wfm-platform`). Realm settings: SSL required
-for external requests only, no self-registration, unique emails, login with email allowed.
-
-To run the sync against a real Keycloak outside the cluster, start one with this realm and run the
-opt-in integration test:
-
-```sh
-docker run -d --name kc -p 127.0.0.1:8180:8080 -e KC_BOOTSTRAP_ADMIN_USERNAME=admin \
-  -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin \
-  -v $PWD/deploy/k3d/keycloak/realm-wfm.json:/opt/keycloak/data/import/realm-wfm.json:ro \
-  quay.io/keycloak/keycloak:26.4.7 start-dev --import-realm
-WFM_TEST_KEYCLOAK_URL=http://127.0.0.1:8180 go test ./internal/integration -run TestKeycloakRealm
-```
+To try all of this locally, the repository's k3d setup runs a development Keycloak with a ready
+realm; see [CONTRIBUTING.md](../CONTRIBUTING.md#development-keycloak-realm).
 
 ## Local accounts
 
@@ -365,7 +328,9 @@ Administration: `/api/v1/admin/users/{id}/invitation` (POST, DELETE), `…/tempo
 **Organisation roles**: `admin` (everything, including administration), `member` (sees open
 projects and can create projects), `guest` (only projects they are explicitly added to). A group
 can be mapped to an organisation role; a person gets the highest of their own and their
-groups' roles.
+groups' roles. `customer` is for the people a [service desk](service-desk.md#customers)
+supports: they only use the help centre, groups never raise their role, and they cannot be
+project members.
 
 **Projects** are *open* (every member gets the project's open role, `member` by default) or
 *private*. Project roles — built-in `viewer`, `member`, `admin`, plus custom roles — are granted

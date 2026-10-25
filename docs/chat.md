@@ -5,7 +5,7 @@ Two integrations, each optional:
 - **Channel notifications** — a project posts what happens (new issues, status changes,
   comments, sprints, releases, pull requests, failed pipelines) into Slack or Mattermost
   channels, through each channel's incoming webhook. Automation rules can post too.
-- **The `/wfm` command** — look up an issue or run a JQL search from chat.
+- **The `/wfm` command** — look up an issue or run a search from chat.
 
 ## Channel notifications
 
@@ -28,7 +28,7 @@ Two integrations, each optional:
 | `pr.opened`, `pr.merged` | a linked pull/merge request opens or merges |
 | `pipeline.failed` | a linked CI pipeline fails |
 
-   *Everything* also covers event types added in later versions. An optional **JQL filter**
+   *Everything* also covers event types added in later versions. An optional **query filter**
    limits issue events to matching issues, e.g. `type = Bug AND priority >= High` for an
    on-call channel; it does not apply to sprint and release events, nor to messages from
    automation rules, and `currentUser()` matches nobody here.

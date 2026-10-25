@@ -55,7 +55,7 @@ Codes worth handling:
 | `duplicate_key` | 409 | project key in use |
 | `too_large` | 413 | attachment over the size limit |
 
-A JQL error answers 400 with `position`, the character offset of the problem.
+A query error answers 400 with `position`, the character offset of the problem.
 
 ## Common calls
 

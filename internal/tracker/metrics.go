@@ -44,7 +44,7 @@ func (s *Service) scopeWhere(ctx context.Context, actor *authz.Actor, sc MetricS
 	for i, p := range projects {
 		ids[i] = p.ID
 	}
-	where, _, args, err := s.compileWhere(ctx, actor, ids, sc.JQL, extraArgs, nil)
+	where, _, args, err := s.compileWhere(ctx, s.Q, actor, ids, sc.JQL, extraArgs, nil)
 	return where, args, projects, err
 }
 

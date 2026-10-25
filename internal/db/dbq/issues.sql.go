@@ -165,9 +165,9 @@ func (q *Queries) CountUnreadNotifications(ctx context.Context, userID uuid.UUID
 
 const createAttachment = `-- name: CreateAttachment :one
 
-INSERT INTO attachments (issue_id, uploader_id, filename, content_type, size_bytes, object_key)
-VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, issue_id, uploader_id, filename, content_type, size_bytes, object_key, created_at
+INSERT INTO attachments (issue_id, uploader_id, filename, content_type, size_bytes, object_key, public)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING id, issue_id, uploader_id, filename, content_type, size_bytes, object_key, created_at, public
 `
 
 type CreateAttachmentParams struct {
@@ -177,6 +177,7 @@ type CreateAttachmentParams struct {
 	ContentType string
 	SizeBytes   int64
 	ObjectKey   string
+	Public      bool
 }
 
 // ---------------------------------------------------------------------------
@@ -189,6 +190,7 @@ func (q *Queries) CreateAttachment(ctx context.Context, arg CreateAttachmentPara
 		arg.ContentType,
 		arg.SizeBytes,
 		arg.ObjectKey,
+		arg.Public,
 	)
 	var i Attachment
 	err := row.Scan(
@@ -200,13 +202,14 @@ func (q *Queries) CreateAttachment(ctx context.Context, arg CreateAttachmentPara
 		&i.SizeBytes,
 		&i.ObjectKey,
 		&i.CreatedAt,
+		&i.Public,
 	)
 	return i, err
 }
 
 const createComment = `-- name: CreateComment :one
 
-INSERT INTO comments (issue_id, author_id, body, source, via) VALUES ($1, $2, $3, $4, $5) RETURNING id, issue_id, author_id, body, source, edited_at, created_at, via
+INSERT INTO comments (issue_id, author_id, body, source, via, internal) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, issue_id, author_id, body, source, edited_at, created_at, via, internal
 `
 
 type CreateCommentParams struct {
@@ -215,6 +218,7 @@ type CreateCommentParams struct {
 	Body     string
 	Source   string
 	Via      *string
+	Internal bool
 }
 
 // ---------------------------------------------------------------------------
@@ -226,6 +230,7 @@ func (q *Queries) CreateComment(ctx context.Context, arg CreateCommentParams) (C
 		arg.Body,
 		arg.Source,
 		arg.Via,
+		arg.Internal,
 	)
 	var i Comment
 	err := row.Scan(
@@ -237,6 +242,7 @@ func (q *Queries) CreateComment(ctx context.Context, arg CreateCommentParams) (C
 		&i.EditedAt,
 		&i.CreatedAt,
 		&i.Via,
+		&i.Internal,
 	)
 	return i, err
 }
@@ -534,7 +540,7 @@ func (q *Queries) EpicProgress(ctx context.Context, ids []uuid.UUID) ([]EpicProg
 }
 
 const getAttachment = `-- name: GetAttachment :one
-SELECT id, issue_id, uploader_id, filename, content_type, size_bytes, object_key, created_at FROM attachments WHERE id = $1
+SELECT id, issue_id, uploader_id, filename, content_type, size_bytes, object_key, created_at, public FROM attachments WHERE id = $1
 `
 
 func (q *Queries) GetAttachment(ctx context.Context, id uuid.UUID) (Attachment, error) {
@@ -549,6 +555,7 @@ func (q *Queries) GetAttachment(ctx context.Context, id uuid.UUID) (Attachment, 
 		&i.SizeBytes,
 		&i.ObjectKey,
 		&i.CreatedAt,
+		&i.Public,
 	)
 	return i, err
 }
@@ -565,7 +572,7 @@ func (q *Queries) GetBlob(ctx context.Context, key string) ([]byte, error) {
 }
 
 const getComment = `-- name: GetComment :one
-SELECT id, issue_id, author_id, body, source, edited_at, created_at, via FROM comments WHERE id = $1
+SELECT id, issue_id, author_id, body, source, edited_at, created_at, via, internal FROM comments WHERE id = $1
 `
 
 func (q *Queries) GetComment(ctx context.Context, id uuid.UUID) (Comment, error) {
@@ -580,6 +587,7 @@ func (q *Queries) GetComment(ctx context.Context, id uuid.UUID) (Comment, error)
 		&i.EditedAt,
 		&i.CreatedAt,
 		&i.Via,
+		&i.Internal,
 	)
 	return i, err
 }
@@ -917,7 +925,7 @@ func (q *Queries) IssueReleases(ctx context.Context, issueID uuid.UUID) ([]Relea
 }
 
 const listAttachments = `-- name: ListAttachments :many
-SELECT id, issue_id, uploader_id, filename, content_type, size_bytes, object_key, created_at FROM attachments WHERE issue_id = $1 ORDER BY created_at
+SELECT id, issue_id, uploader_id, filename, content_type, size_bytes, object_key, created_at, public FROM attachments WHERE issue_id = $1 ORDER BY created_at
 `
 
 func (q *Queries) ListAttachments(ctx context.Context, issueID uuid.UUID) ([]Attachment, error) {
@@ -938,6 +946,7 @@ func (q *Queries) ListAttachments(ctx context.Context, issueID uuid.UUID) ([]Att
 			&i.SizeBytes,
 			&i.ObjectKey,
 			&i.CreatedAt,
+			&i.Public,
 		); err != nil {
 			return nil, err
 		}
@@ -950,7 +959,7 @@ func (q *Queries) ListAttachments(ctx context.Context, issueID uuid.UUID) ([]Att
 }
 
 const listComments = `-- name: ListComments :many
-SELECT id, issue_id, author_id, body, source, edited_at, created_at, via FROM comments WHERE issue_id = $1 ORDER BY created_at
+SELECT id, issue_id, author_id, body, source, edited_at, created_at, via, internal FROM comments WHERE issue_id = $1 ORDER BY created_at
 `
 
 func (q *Queries) ListComments(ctx context.Context, issueID uuid.UUID) ([]Comment, error) {
@@ -971,6 +980,7 @@ func (q *Queries) ListComments(ctx context.Context, issueID uuid.UUID) ([]Commen
 			&i.EditedAt,
 			&i.CreatedAt,
 			&i.Via,
+			&i.Internal,
 		); err != nil {
 			return nil, err
 		}
@@ -1344,7 +1354,7 @@ func (q *Queries) SetIssueRank(ctx context.Context, arg SetIssueRankParams) (Iss
 }
 
 const updateComment = `-- name: UpdateComment :one
-UPDATE comments SET body = $2, edited_at = now() WHERE id = $1 RETURNING id, issue_id, author_id, body, source, edited_at, created_at, via
+UPDATE comments SET body = $2, edited_at = now() WHERE id = $1 RETURNING id, issue_id, author_id, body, source, edited_at, created_at, via, internal
 `
 
 type UpdateCommentParams struct {
@@ -1364,6 +1374,7 @@ func (q *Queries) UpdateComment(ctx context.Context, arg UpdateCommentParams) (C
 		&i.EditedAt,
 		&i.CreatedAt,
 		&i.Via,
+		&i.Internal,
 	)
 	return i, err
 }

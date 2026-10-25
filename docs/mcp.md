@@ -1,7 +1,7 @@
 # AI assistants (MCP)
 
 Workflow is a [Model Context Protocol](https://modelcontextprotocol.io) server, so Claude and
-other AI assistants can work with your issues: find work with JQL, read an issue with its
+other AI assistants can work with your issues: find work with a search, read an issue with its
 comments and timing, file and update issues, move them through their workflow, and report on
 sprints and flow.
 
@@ -93,21 +93,21 @@ internal ingress, like the UI and API; assistants must be able to reach that add
 | `whoami` | who the assistant acts as: organisation role, scopes and the connected app |
 | `list_projects` | projects you can browse |
 | `get_project` | issue types (keys for creating issues), boards and columns, open sprints, unreleased releases, labels |
-| `search_issues` | JQL search, one line per issue, paged (`limit` up to 100) |
-| `get_issue` | fields, description, parent, children, links, pull requests, recent comments, time tracking (estimated, logged, remaining), lead/cycle time and time in each status, and the transitions available now |
+| `search_issues` | A [search](search.md), one line per issue, paged (`limit` up to 100) |
+| `get_issue` | fields, description, parent, children, links, pull requests, recent comments, time tracking (estimated, logged, remaining), lead/cycle time and time in each status, and the transitions available now; for service requests, the request type, SLA clocks and approvals, with each comment labelled reply to customer or internal note |
 | `get_board` | a board's columns and issues (the active sprint on a Scrum board) |
 | `get_sprint_report` | a sprint's commitment, completion, scope change and day-by-day burndown |
-| `get_metrics` | `summary`, `breakdown`, `cycle_time`, `created_resolved`, `cumulative_flow` or `velocity` over projects and JQL |
+| `get_metrics` | `summary`, `breakdown`, `cycle_time`, `created_resolved`, `cumulative_flow` or `velocity` over projects and a query |
 | `find_users` | people by name or email |
 | `create_issue` | create an issue (type, summary, Markdown description, priority, assignee by email or `me`, parent, labels, points, sprint, dates) |
 | `update_issue` | change fields; `clear` empties them |
 | `transition_issue` | run a workflow transition by id, name or target status, with screen fields and a comment |
-| `add_comment` | comment (Markdown) |
+| `add_comment` | comment (Markdown); on service requests an internal note unless `visibility` is `public` (a reply the customer is emailed) |
 | `log_work` | log time spent (`2h`, `1d 4h`), when it was done, a description; the remaining estimate goes down by the time logged unless `remainingEstimate` sets it or `leaveEstimate` keeps it |
 | `link_issues` | `blocks`, `relates`, `duplicates` or `clones` |
 
 Read tools are annotated read-only; nothing deletes. An app you allowed only to read is offered
-only the read tools. Errors (an invalid JQL position, a validator refusing a transition, a
+only the read tools. Errors (the position of a query error, a validator refusing a transition, a
 missing permission) come back as tool errors with the reason, so the assistant can correct
 itself.
 

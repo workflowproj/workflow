@@ -1,6 +1,6 @@
-# JQL
+# Search
 
-Search uses a JQL-style query language. Queries compile to parameterised SQL and are always
+Search uses a JQL-like query language. Queries compile to parameterised SQL and are always
 limited to projects you can browse. Errors report the character position they refer to, which
 the UI highlights.
 
@@ -49,6 +49,10 @@ fixVersion = "2026.11" AND statusCategory != Done
 | `timeSpent` | `=` `!=` `<` `<=` `>` `>=` `is [not] EMPTY` | durations; the sum of the worklogs, `0` in comparisons and `EMPTY` when none were logged |
 | `worklogAuthor` | `=` `!=` `in` `not in` `is [not] EMPTY` | people who logged work (as for `assignee`); `EMPTY` means no work logged |
 | `worklogDate` | `=` `!=` `<` `<=` `>` `>=` `is [not] EMPTY` | dates: issues with work done then (`!=` with none done then) |
+| `"Time to first response"`, `"Time to resolution"` | `=` `!=` `<` `<=` `>` `>=` `is [not] EMPTY` | service requests' SLA clocks: `breached()`, `running()`, `paused()`, `completed()`, or `remaining("2h")` (below) |
+| `"Request type"` (`requestType`) | `=` `!=` `in` `not in` `is [not] EMPTY` | request type name or id; `EMPTY` for issues not shown in the help centre |
+| `approval` | `=` `!=` `is [not] EMPTY` | `pending()`, `approved()`, `declined()`, `pendingBy(currentUser())` |
+| `participant` | `=` `!=` `in` `not in` `is [not] EMPTY` | people a request is shared with (as for `assignee`) |
 | custom fields | depends on type | by key or name (`severity = High`), or `cf[key]` |
 
 Custom fields by type: `text`/`url` support `~`, `=`, `is EMPTY`; `number` and `date` support
@@ -69,6 +73,24 @@ Issue functions go with `issue in` (or `key in`):
 sprint in openSprints() AND issue in blockedIssues()          blocked sprint work
 epic = PLAT-1 AND statusCategory != Done                       what's left in an epic
 issue in linkedIssues("PLAT-42", "is blocked by") AND statusCategory != Done
+```
+
+## Service desk
+
+Service requests have SLA clocks (see [service-desk.md](service-desk.md#slas)). Compare a clock
+with a state — `breached()` (past its goal, running or stopped), `running()`, `paused()` or
+`completed()` (stopped, met or missed) — or its time left with `remaining()`: working time in
+the goal's calendar, so `< remaining("2h")` matches clocks with less than two working hours
+left (a paused clock by what it has left), and `> remaining("0m")` leaves out clocks already
+past their goal. Units are `m`, `h`, `d` (24 hours) and `w`. `IS EMPTY` matches requests
+without that SLA.
+
+```
+"Time to first response" = breached() AND assignee is EMPTY
+"Time to resolution" < remaining("2h") AND "Time to resolution" > remaining("0m")
+"Request type" = "Get IT help" AND approval = pendingBy(currentUser())
+participant = currentUser() OR reporter = currentUser()
+resolution = Unresolved ORDER BY "Time to resolution" ASC
 ```
 
 ## Durations
@@ -96,14 +118,15 @@ originalEstimate is EMPTY AND statusCategory != Done
 ## Ordering
 
 `ORDER BY` accepts `rank`, `key`, `created`, `updated`, `resolved`, `due`, `start`, `priority`,
-`summary`, `status`, `assignee`, `storyPoints`, `type`, `originalEstimate`, `remainingEstimate` and
-`timeSpent`.
+`summary`, `status`, `assignee`, `storyPoints`, `type`, `originalEstimate`, `remainingEstimate`,
+`timeSpent`, `"Time to first response"` and `"Time to resolution"` (soonest breach first; stopped
+clocks and issues without the SLA last).
 
 ## Saved filters
 
 Save any query as a filter (Issues → Save). Shared filters are visible to everyone; only the
 owner (or an organisation admin) can change or delete them. Boards and scheduled automation
-rules also take JQL.
+rules use the same query language.
 
 ## API
 

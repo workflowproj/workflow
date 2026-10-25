@@ -19,6 +19,7 @@ import { ActivitySection } from "./ActivitySection";
 import { DetailsPanel } from "./DetailsPanel";
 import { MetricsPanel } from "./MetricsPanel";
 import { TimeTrackingPanel } from "@/features/time/TimeTrackingPanel";
+import { RequestPanel } from "@/features/servicedesk/RequestPanel";
 
 /**
  * IssueView is the full issue view: header, description, sub-tasks, links, comments,
@@ -52,6 +53,7 @@ function IssueLayout({ gone }: { gone: boolean }) {
   const [problem, setProblem] = useState<unknown>(null);
   const { upload, uploading } = useAttachmentUpload(issue.key);
   const { over, handlers } = useFileDrop(issue.permissions.comment, upload);
+  const { data: project } = useProject(issue.projectKey);
   return (
     <div className="@container/issue relative min-h-full" {...handlers}>
       <IssueTopBar />
@@ -76,6 +78,7 @@ function IssueLayout({ gone }: { gone: boolean }) {
           {!!problem && <TransitionProblem error={problem} onDismiss={() => setProblem(null)} />}
         </div>
         <aside className="flex min-w-0 flex-col gap-4 [grid-area:side]">
+          {project?.template === "service" && <RequestPanel />}
           <DetailsPanel />
           <TimeTrackingPanel />
           <MetricsPanel />

@@ -55,7 +55,7 @@ func New(pool *pgxpool.Pool, tr *tracker.Service, eval *workflow.Evaluator, enq 
 // ---------------------------------------------------------------------------
 // Rules
 
-var TriggerTypes = []string{"issue.created", "issue.transitioned", "issue.field_changed", "pr.opened", "pr.merged", "commit.pushed", "branch.created", "pipeline.completed", "schedule"}
+var TriggerTypes = []string{"issue.created", "issue.transitioned", "issue.field_changed", "pr.opened", "pr.merged", "commit.pushed", "branch.created", "pipeline.completed", "schedule", "sla.breached"}
 var ActionTypes = []string{"transition", "assign", "set_field", "comment", "add_label", "webhook", "notify", "rollup_dates", "chat"}
 
 // ActionTargets are the issues an action can apply to, relative to the one that triggered the rule.
@@ -118,7 +118,7 @@ func (s *Service) validate(ctx context.Context, actor *authz.Actor, projectID uu
 		n := sched.Next(time.Now().UTC())
 		next = &n
 		if strings.TrimSpace(in.Trigger.JQL) == "" {
-			return nil, apperr.Invalid("trigger.jql", "scheduled rules need a JQL query selecting the issues to act on")
+			return nil, apperr.Invalid("trigger.jql", "scheduled rules need a query selecting the issues to act on")
 		}
 		if err := s.Tracker.ValidateJQL(ctx, actor, in.Trigger.JQL); err != nil {
 			return nil, err
@@ -282,7 +282,7 @@ func (s *Service) Runs(ctx context.Context, actor *authz.Actor, id uuid.UUID, li
 var triggerForEvent = map[string]string{
 	"issue.created": "issue.created", "issue.transitioned": "issue.transitioned", "issue.updated": "issue.field_changed",
 	"pr.opened": "pr.opened", "pr.merged": "pr.merged", "commit.pushed": "commit.pushed",
-	"branch.created": "branch.created", "pipeline.completed": "pipeline.completed",
+	"branch.created": "branch.created", "pipeline.completed": "pipeline.completed", "sla.breached": "sla.breached",
 }
 
 // HandleDomainEvent is the worker entry point for jobs.DomainEvent.
@@ -674,6 +674,10 @@ func (s *Service) notifyRecipients(ctx context.Context, issue dbq.Issue, who str
 		}
 		ids = append(ids, w...)
 	}
+	ids, err := s.Tracker.OnlyAgents(ctx, issue.ProjectID, ids)
+	if err != nil {
+		return err
+	}
 	return s.Tracker.Notify(ctx, s.Q, ids, except, &issue.ID, kind, title, body)
 }
 
@@ -700,6 +704,8 @@ func (s *Service) notifyForEvent(ctx context.Context, ev jobs.DomainEvent, data 
 		return s.notifyRecipients(ctx, issue, "involved", ev.ActorID, "transitioned", title, fmt.Sprintf("Moved from %v to %v", data["from"], data["to"]))
 	case "comment.created":
 		return s.notifyRecipients(ctx, issue, "involved", ev.ActorID, "commented", title, fmt.Sprint(data["body"]))
+	case "sla.breached":
+		return s.notifyRecipients(ctx, issue, "assignee", nil, "sla", title, fmt.Sprintf("%v breached", data["sla"]))
 	}
 	return nil
 }
@@ -735,7 +741,7 @@ func (s *Service) HandlePostFunction(ctx context.Context, pf jobs.PostFunction) 
 // ---------------------------------------------------------------------------
 // Outbound webhooks
 
-var WebhookEvents = []string{"*", "issue.created", "issue.updated", "issue.transitioned", "issue.deleted", "comment.created", "sprint.started", "sprint.completed", "release.released"}
+var WebhookEvents = []string{"*", "issue.created", "issue.updated", "issue.transitioned", "issue.deleted", "comment.created", "sprint.started", "sprint.completed", "release.released", "sla.breached"}
 
 func (s *Service) dispatchWebhooks(ctx context.Context, ev jobs.DomainEvent, data map[string]any) error {
 	if !slices.Contains(WebhookEvents[1:], ev.Event) {

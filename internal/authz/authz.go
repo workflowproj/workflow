@@ -29,6 +29,8 @@ const (
 	ReleaseManage   Permission = "release.manage"
 	BoardManage     Permission = "board.manage"
 	ProjectAdmin    Permission = "project.admin"
+	// CustomerManage lets agents invite and remove a service project's customers.
+	CustomerManage Permission = "customer.manage"
 )
 
 type PermissionInfo struct {
@@ -50,6 +52,7 @@ var Permissions = []PermissionInfo{
 	{ReleaseManage, "Manage releases"},
 	{BoardManage, "Create and configure boards"},
 	{ProjectAdmin, "Administer the project: settings, members, issue types, workflows, integrations"},
+	{CustomerManage, "Invite and remove the customers of a service project"},
 }
 
 func IsKnown(p string) bool {
@@ -71,9 +74,23 @@ const (
 	ActorAutomation ActorType = "automation"
 	ActorSCM        ActorType = "scm"
 	ActorSystem     ActorType = "system"
+	// ActorPortal is a person acting through the customer portal of one service project. The
+	// servicedesk package checks first that they may use the request (or raise one there), then
+	// acts for them with only PortalPermissions, in that project only. HTTP authentication never
+	// produces this actor.
+	ActorPortal ActorType = "portal"
 )
 
-var orgRank = map[string]int{"guest": 0, "member": 1, "admin": 2}
+// OrgCustomer is the organisation role of customers: people who only use the customer portal.
+// They hold no project permissions (whatever their memberships), so every agent page and API
+// refuses them, and groups never raise their role.
+const OrgCustomer = "customer"
+
+// PortalPermissions are what a portal actor may do in its project: read the request it was
+// checked against, raise requests, reply and attach files.
+var PortalPermissions = []Permission{ProjectBrowse, IssueCreate, IssueComment}
+
+var orgRank = map[string]int{"customer": -1, "guest": 0, "member": 1, "admin": 2}
 
 // HigherOrgRole returns the more privileged of two organisation roles.
 func HigherOrgRole(a, b string) string {
@@ -105,6 +122,8 @@ type Actor struct {
 	// Depth counts automation rules triggering further rules; RuleID is the rule acting.
 	Depth  int
 	RuleID *uuid.UUID
+	// PortalProject is the one project a portal actor acts in.
+	PortalProject *uuid.UUID
 
 	mu    sync.Mutex
 	cache map[uuid.UUID]Access
@@ -120,6 +139,11 @@ func AutomationActor(ruleID uuid.UUID, depth int) *Actor {
 	return &Actor{Type: ActorAutomation, OrgRole: "admin", RuleID: &ruleID, Depth: depth}
 }
 
+// PortalActor acts for a person in the customer portal of one project (see ActorPortal).
+func PortalActor(u dbq.User, projectID uuid.UUID) *Actor {
+	return &Actor{User: &u, Type: ActorPortal, OrgRole: u.OrgRole, PortalProject: &projectID, Via: "portal"}
+}
+
 func (a *Actor) UserID() *uuid.UUID {
 	if a == nil || a.User == nil {
 		return nil
@@ -133,6 +157,11 @@ func (a *Actor) IsOrgAdmin() bool { return a.OrgRole == "admin" }
 // ViaToken reports authentication with a token (personal, OAuth or an IdP's access token) rather
 // than a browser session: scopes apply, and session-only actions are refused.
 func (a *Actor) ViaToken() bool { return a != nil && (a.TokenID != nil || a.External) }
+
+// IsCustomer reports a person who may only use the customer portal.
+func (a *Actor) IsCustomer() bool {
+	return a != nil && (a.OrgRole == OrgCustomer || (a.User != nil && a.User.OrgRole == OrgCustomer))
+}
 
 // Privileged actors (automation, system) are not subject to project permissions.
 func (a *Actor) Privileged() bool { return a.Type == ActorAutomation || a.Type == ActorSystem }
@@ -184,7 +213,14 @@ func (r *Resolver) Access(ctx context.Context, actor *Actor, project dbq.Project
 	if actor.Privileged() {
 		return Access{Roles: []string{"*"}, perms: allPermissions()}, nil
 	}
-	if actor.User == nil {
+	if actor.Type == ActorPortal {
+		if actor.User == nil || actor.PortalProject == nil || *actor.PortalProject != project.ID {
+			return Access{}, nil
+		}
+		return NewAccess([]string{"portal"}, PortalPermissions), nil
+	}
+	// Customers hold no project permissions, whatever memberships they have.
+	if actor.User == nil || actor.IsCustomer() {
 		return Access{}, nil
 	}
 	actor.mu.Lock()
