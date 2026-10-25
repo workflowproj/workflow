@@ -2,8 +2,11 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/cn";
 
-/** Markdown renders user content safely (raw HTML is not rendered). Issue keys link to issues. */
-export function Markdown({ children, className }: { children: string; className?: string }) {
+/**
+ * Markdown renders user content safely (raw HTML is not rendered). Issue keys link to issues,
+ * except with `issueLinks={false}` (the customer portal, whose people cannot open issues).
+ */
+export function Markdown({ children, className, issueLinks = true }: { children: string; className?: string; issueLinks?: boolean }) {
   return (
     <div className={cn("prose-wfm text-sm", className)}>
       <ReactMarkdown
@@ -16,7 +19,7 @@ export function Markdown({ children, className }: { children: string; className?
           ),
         }}
       >
-        {linkIssueKeys(children)}
+        {issueLinks ? linkIssueKeys(children) : children}
       </ReactMarkdown>
     </div>
   );

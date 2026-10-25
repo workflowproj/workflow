@@ -221,7 +221,7 @@ ON CONFLICT (issue_id, metric) DO UPDATE SET
 DELETE FROM issue_slas WHERE issue_id = $1 AND metric = $2;
 
 -- name: IssueSLAsFor :many
-SELECT * FROM issue_slas WHERE issue_id = ANY(@ids::uuid[]) ORDER BY metric DESC;
+SELECT * FROM issue_slas WHERE issue_id = ANY(@ids::uuid[]) ORDER BY metric;
 
 -- name: DueSLABreaches :many
 -- Running clocks past their target that nobody was told about yet.

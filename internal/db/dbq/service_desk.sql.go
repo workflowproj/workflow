@@ -617,7 +617,7 @@ func (q *Queries) IsServiceCustomer(ctx context.Context, arg IsServiceCustomerPa
 }
 
 const issueSLAsFor = `-- name: IssueSLAsFor :many
-SELECT issue_id, metric, project_id, goal_id, calendar_id, target_seconds, state, elapsed_seconds, cycle_started_at, stopped_at, breach_at, breached, breached_at, breach_notified_at, computed_at FROM issue_slas WHERE issue_id = ANY($1::uuid[]) ORDER BY metric DESC
+SELECT issue_id, metric, project_id, goal_id, calendar_id, target_seconds, state, elapsed_seconds, cycle_started_at, stopped_at, breach_at, breached, breached_at, breach_notified_at, computed_at FROM issue_slas WHERE issue_id = ANY($1::uuid[]) ORDER BY metric
 `
 
 func (q *Queries) IssueSLAsFor(ctx context.Context, ids []uuid.UUID) ([]IssueSla, error) {

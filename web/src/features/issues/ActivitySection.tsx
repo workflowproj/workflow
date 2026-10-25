@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
-import { ArrowRight, MessageSquare } from "lucide-react";
+import { ArrowRight, Lock, MessageSquare, Reply } from "lucide-react";
 import { api, unwrap, type Schemas } from "@/api/client";
-import { useMe } from "@/api/queries";
+import { useMe, useProject } from "@/api/queries";
 import { Badge, Button, PageSpinner, useConfirm, useToast } from "@/components/ui";
 import { ErrorBox } from "@/components/ErrorBox";
 import { Markdown } from "@/components/Markdown";
@@ -121,6 +121,16 @@ function CommentItem({ comment: c }: { comment: Comment }) {
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-sm">
           <span className="font-medium">{author.displayName}</span>
           {via && <Badge tone={c.source === "automation" ? "accent" : "neutral"}>{via}</Badge>}
+          {c.visibility === "internal" && (
+            <Badge tone="warning">
+              <Lock aria-hidden className="size-3" /> Internal note
+            </Badge>
+          )}
+          {c.visibility === "public" && c.source !== "portal" && (
+            <Badge tone="success">
+              <Reply aria-hidden className="size-3" /> Reply to customer
+            </Badge>
+          )}
           <time dateTime={c.createdAt} title={formatDateTime(c.createdAt)} className="text-xs text-muted">
             {relativeTime(c.createdAt)}
           </time>
@@ -144,7 +154,7 @@ function CommentItem({ comment: c }: { comment: Comment }) {
           </div>
         ) : (
           <>
-            <Markdown className="mt-1">{c.body}</Markdown>
+            <Markdown className={cn("mt-1", c.visibility === "internal" && "rounded-md border-l-2 border-warning bg-warning-soft/40 px-3 py-1.5")}>{c.body}</Markdown>
             {c.canEdit && (
               <div className="mt-1 flex gap-3 text-xs text-muted">
                 <button type="button" className="hover:text-ink hover:underline" onClick={() => setDraft(c.body)}>
@@ -169,24 +179,37 @@ function CommentItem({ comment: c }: { comment: Comment }) {
   );
 }
 
+type Visibility = Schemas["Visibility"];
+
 function Composer() {
   const { issue } = useIssue();
   const { data: me } = useMe();
+  const { data: project } = useProject(issue.projectKey);
   const qc = useQueryClient();
   const toast = useToast();
   const [open, setOpen] = useState(false);
   const [body, setBody] = useState("");
+  // Service requests: a reply reaches the customer, an internal note only agents.
+  const service = project?.template === "service";
+  const [visibility, setVisibility] = useState<Visibility>("internal");
+  const start = (v?: Visibility) => {
+    if (v) setVisibility(v);
+    setOpen(true);
+  };
   const post = useMutation({
-    mutationFn: (text: string) => unwrap(api.POST("/issues/{issueKey}/comments", { params: { path: { issueKey: issue.key } }, body: { body: text } })),
+    mutationFn: (text: string) =>
+      unwrap(api.POST("/issues/{issueKey}/comments", { params: { path: { issueKey: issue.key } }, body: service ? { body: text, visibility } : { body: text } })),
     onSuccess: (c) => {
       qc.setQueryData<Comment[]>(["issue-comments", issue.key], (list) => [...(list ?? []).filter((x) => x.id !== c.id), { ...c, canEdit: true }]);
       qc.invalidateQueries({ queryKey: ["issue-comments", issue.key] });
+      if (service) qc.invalidateQueries({ queryKey: ["issue", issue.key, "request"] });
       setBody("");
       setOpen(false);
     },
     onError: (err) => toast.error(err),
   });
   const submit = () => body.trim() && !post.isPending && post.mutate(body.trim());
+  const internal = service && visibility === "internal";
   // Escape collapses an empty composer; a draft is kept (and the drawer stays open).
   useEscapeLayer(open, () => !body.trim() && setOpen(false));
   return (
@@ -194,11 +217,19 @@ function Composer() {
       <UserAvatar user={me} size={28} className="mt-0.5" />
       <div className="min-w-0 flex-1">
         {open ? (
-          <div>
-            <MarkdownEditor value={body} onChange={setBody} autoFocus onSubmit={submit} minHeight={80} placeholder="Add a comment… Markdown is supported" />
+          <div className={cn(internal && "rounded-lg border-l-2 border-warning bg-warning-soft/40 p-2")}>
+            {service && <VisibilityToggle value={visibility} onChange={setVisibility} />}
+            <MarkdownEditor
+              value={body}
+              onChange={setBody}
+              autoFocus
+              onSubmit={submit}
+              minHeight={80}
+              placeholder={!service ? "Add a comment… Markdown is supported" : internal ? "Only agents will see this note…" : "Reply to the customer… they get it by email too"}
+            />
             <div className="mt-2 flex items-center gap-2">
               <Button size="sm" variant="primary" onClick={submit} loading={post.isPending} disabled={!body.trim()}>
-                Comment
+                {!service ? "Comment" : internal ? "Add internal note" : "Send reply"}
               </Button>
               <Button
                 size="sm"
@@ -213,16 +244,53 @@ function Composer() {
               <span className="ml-auto hidden text-xs text-faint sm:inline">⌘/Ctrl + Enter to send</span>
             </div>
           </div>
+        ) : service ? (
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" icon={<Lock className="size-3.5" />} onClick={() => start("internal")}>
+              Add internal note
+            </Button>
+            <Button size="sm" icon={<Reply className="size-3.5" />} onClick={() => start("public")}>
+              Reply to customer
+            </Button>
+          </div>
         ) : (
           <button
             type="button"
-            onClick={() => setOpen(true)}
+            onClick={() => start()}
             className="h-9 w-full rounded-md border border-line-strong bg-surface px-3 text-left text-sm text-faint hover:border-accent"
           >
             Add a comment…
           </button>
         )}
       </div>
+    </div>
+  );
+}
+
+/** VisibilityToggle switches a service request comment between an internal note and a reply to the customer. */
+function VisibilityToggle({ value, onChange }: { value: Visibility; onChange: (v: Visibility) => void }) {
+  const options = [
+    { v: "internal" as const, label: "Internal note", icon: Lock },
+    { v: "public" as const, label: "Reply to customer", icon: Reply },
+  ];
+  return (
+    <div role="radiogroup" aria-label="Who sees this comment" className="mb-2 inline-flex rounded-md border border-line-strong bg-surface p-0.5">
+      {options.map((o) => (
+        <button
+          key={o.v}
+          type="button"
+          role="radio"
+          aria-checked={value === o.v}
+          onClick={() => onChange(o.v)}
+          className={cn(
+            "inline-flex h-7 items-center gap-1.5 rounded px-2.5 text-[13px] font-medium focus-visible:outline-2 focus-visible:outline-accent",
+            value === o.v ? (o.v === "internal" ? "bg-warning-soft text-warning" : "bg-success-soft text-success") : "text-muted hover:text-ink",
+          )}
+        >
+          <o.icon aria-hidden className="size-3.5" />
+          {o.label}
+        </button>
+      ))}
     </div>
   );
 }
@@ -247,6 +315,14 @@ const FIELD_LABELS: Record<string, string> = {
   resolution: "resolution",
   originalEstimate: "original estimate",
   remainingEstimate: "remaining estimate",
+  requestType: "request type",
+};
+
+// Service requests: what kind of comment was added (the history keeps no comment text).
+const COMMENT_KINDS: Record<string, string> = {
+  "Internal note": "added an internal note",
+  "Reply to customer": "replied to the customer",
+  "Reply from the portal": "commented from the help centre",
 };
 
 const actorNames: Record<string, string> = { automation: "Automation", system: "System", scm: "Git integration" };
@@ -317,6 +393,24 @@ function Change({ entry: h }: { entry: HistoryEntry }) {
       ) : (
         <span className="text-muted">
           deleted logged work <Value v={h.from} field={h.field} />
+        </span>
+      );
+    case "comment":
+      return <span className="text-muted">{COMMENT_KINDS[h.to ?? ""] ?? "commented"}</span>;
+    case "approval":
+      return (
+        <span className="text-muted">
+          updated the approval: <Value v={h.to} field={h.field} />
+        </span>
+      );
+    case "participants":
+      return h.to ? (
+        <span className="text-muted">
+          shared the request with <Value v={h.to} field={h.field} />
+        </span>
+      ) : (
+        <span className="text-muted">
+          stopped sharing the request with <Value v={h.from} field={h.field} />
         </span>
       );
     case "link":

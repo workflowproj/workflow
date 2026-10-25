@@ -1,7 +1,7 @@
 import { createRootRouteWithContext, createRoute, createRouter, lazyRouteComponent, Outlet, redirect } from "@tanstack/react-router";
 import type { QueryClient } from "@tanstack/react-query";
 import { ApiError } from "@/api/client";
-import { meQuery } from "@/api/queries";
+import { meQuery, projectQuery } from "@/api/queries";
 import { AppShell } from "@/layout/AppShell";
 import { NotFound } from "@/layout/NotFound";
 import { PageSpinner } from "@/components/ui";
@@ -79,21 +79,58 @@ const consentRoute = createRoute({
 });
 
 // Everything else requires a session; a 401 sends people to the login page and back.
+// Customers only use the help centre: the agent app sends them to the portal.
 const appRoute = createRoute({
   getParentRoute: () => rootRoute,
   id: "app",
   beforeLoad: async ({ context, location }) => {
+    let me;
     try {
-      await context.queryClient.ensureQueryData(meQuery);
+      me = await context.queryClient.ensureQueryData(meQuery);
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) {
         throw redirect({ to: "/login", search: { returnTo: location.href } });
       }
       throw e;
     }
+    if (me.orgRole === "customer") throw redirect({ to: location.pathname.startsWith("/profile") ? "/portal/profile" : "/portal" });
   },
   component: AppShell,
 });
+
+// The help centre (customer portal): its own layout, for customers and anyone raising a request.
+const portalRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/portal",
+  beforeLoad: async ({ context, location }) => {
+    try {
+      await context.queryClient.ensureQueryData(meQuery);
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) throw redirect({ to: "/login", search: { returnTo: location.href } });
+      throw e;
+    }
+  },
+  component: lazyRouteComponent(() => import("@/pages/portal/PortalLayout"), "PortalLayout"),
+});
+const portalHomeRoute = createRoute({ getParentRoute: () => portalRoute, path: "/", component: lazyRouteComponent(() => import("@/pages/portal/PortalHome"), "PortalHome") });
+const portalRequestsRoute = createRoute({
+  getParentRoute: () => portalRoute,
+  path: "/requests",
+  validateSearch: (s: Record<string, unknown>): { status?: "open" | "closed" | "all" } => ({ status: s.status === "closed" || s.status === "all" || s.status === "open" ? s.status : undefined }),
+  component: lazyRouteComponent(() => import("@/pages/portal/PortalRequestsPage"), "PortalRequestsPage"),
+});
+const portalRequestRoute = createRoute({
+  getParentRoute: () => portalRoute,
+  path: "/requests/$issueKey",
+  validateSearch: (s: Record<string, unknown>): { created?: boolean } => ({ created: s.created === true || s.created === "true" ? true : undefined }),
+  component: lazyRouteComponent(() => import("@/pages/portal/PortalRequestPage"), "PortalRequestPage"),
+});
+const portalApprovalsRoute = createRoute({ getParentRoute: () => portalRoute, path: "/approvals", component: lazyRouteComponent(() => import("@/pages/portal/PortalRequestsPage"), "PortalApprovalsPage") });
+const portalProfileRoute = createRoute({ getParentRoute: () => portalRoute, path: "/profile", component: lazyRouteComponent(() => import("@/pages/portal/PortalProfilePage"), "PortalProfilePage") });
+const portalDeskRoute = createRoute({ getParentRoute: () => portalRoute, path: "/$projectKey", component: lazyRouteComponent(() => import("@/pages/portal/PortalDeskPage"), "PortalDeskPage") });
+const portalCreateRoute = createRoute({ getParentRoute: () => portalRoute, path: "/$projectKey/new/$requestTypeId", component: lazyRouteComponent(() => import("@/pages/portal/PortalCreatePage"), "PortalCreatePage") });
+// Self sign-up (signed out), for desks that allow it.
+const portalSignupRoute = createRoute({ getParentRoute: () => rootRoute, path: "/portal/signup/$projectKey", component: lazyRouteComponent(() => import("@/pages/portal/PortalSignupPage"), "PortalSignupPage") });
 
 const indexRoute = createRoute({
   getParentRoute: () => appRoute,
@@ -109,8 +146,10 @@ const projectRoute = createRoute({ getParentRoute: () => appRoute, path: "/proje
 const projectIndexRoute = createRoute({
   getParentRoute: () => projectRoute,
   path: "/",
-  beforeLoad: ({ params }) => {
-    throw redirect({ to: "/projects/$projectKey/board", params });
+  beforeLoad: async ({ context, params }) => {
+    // Service projects open on their queues.
+    const p = await context.queryClient.ensureQueryData(projectQuery(params.projectKey)).catch(() => null);
+    throw redirect({ to: p?.template === "service" ? "/projects/$projectKey/queues" : "/projects/$projectKey/board", params });
   },
 });
 const boardRoute = createRoute({ getParentRoute: () => projectRoute, path: "/board", validateSearch: issueSearch, component: BoardPage });
@@ -129,9 +168,16 @@ const projectTimelineRoute = createRoute({
   validateSearch: (s: Record<string, unknown>): { jql?: string; issue?: string } => ({ jql: str(s.jql), issue: str(s.issue) }),
   component: lazyRouteComponent(() => import("@/pages/project/ProjectTimelinePage"), "ProjectTimelinePage"),
 });
+const queuesRoute = createRoute({
+  getParentRoute: () => projectRoute,
+  path: "/queues",
+  validateSearch: (s: Record<string, unknown>): { queue?: string; issue?: string } => ({ queue: str(s.queue), issue: str(s.issue) }),
+  component: lazyRouteComponent(() => import("@/pages/project/QueuesPage"), "QueuesPage"),
+});
 const releasesRoute = createRoute({ getParentRoute: () => projectRoute, path: "/releases", validateSearch: issueSearch, component: lazyRouteComponent(() => import("@/pages/project/ReleasesPage"), "ReleasesPage") });
 const reportsRoute = createRoute({ getParentRoute: () => projectRoute, path: "/reports", component: lazyRouteComponent(() => import("@/pages/project/ReportsPage"), "ReportsPage") });
 
+const customersRoute = createRoute({ getParentRoute: () => projectRoute, path: "/customers", component: lazyRouteComponent(() => import("@/pages/project/CustomersPage"), "CustomersPage") });
 const settingsRoute = createRoute({ getParentRoute: () => projectRoute, path: "/settings", component: SettingsLayout });
 const settingsIndexRoute = createRoute({ getParentRoute: () => settingsRoute, path: "/", component: lazyRouteComponent(() => import("@/pages/settings/GeneralSettings"), "GeneralSettings") });
 const membersRoute = createRoute({ getParentRoute: () => settingsRoute, path: "/members", component: lazyRouteComponent(() => import("@/pages/settings/MembersSettings"), "MembersSettings") });
@@ -143,6 +189,10 @@ const repositoriesRoute = createRoute({ getParentRoute: () => settingsRoute, pat
 const automationRoute = createRoute({ getParentRoute: () => settingsRoute, path: "/automation", component: lazyRouteComponent(() => import("@/pages/settings/AutomationSettings"), "AutomationSettings") });
 const chatSettingsRoute = createRoute({ getParentRoute: () => settingsRoute, path: "/chat", component: lazyRouteComponent(() => import("@/pages/settings/ChatSettings"), "ChatSettings") });
 const projectWebhooksRoute = createRoute({ getParentRoute: () => settingsRoute, path: "/webhooks", component: lazyRouteComponent(() => import("@/pages/settings/WebhooksSettings"), "WebhooksSettings") });
+const portalSettingsRoute = createRoute({ getParentRoute: () => settingsRoute, path: "/portal", component: lazyRouteComponent(() => import("@/pages/settings/ServiceDeskSettings"), "PortalSettings") });
+const requestTypesRoute = createRoute({ getParentRoute: () => settingsRoute, path: "/request-types", component: lazyRouteComponent(() => import("@/pages/settings/RequestTypesSettings"), "RequestTypesSettings") });
+const queuesSettingsRoute = createRoute({ getParentRoute: () => settingsRoute, path: "/queues", component: lazyRouteComponent(() => import("@/pages/settings/ServiceDeskSettings"), "QueuesSettings") });
+const slaSettingsRoute = createRoute({ getParentRoute: () => settingsRoute, path: "/slas", component: lazyRouteComponent(() => import("@/pages/settings/SlaSettings"), "SlaSettings") });
 
 const searchRoute = createRoute({
   getParentRoute: () => appRoute,
@@ -203,6 +253,8 @@ export const routeTree = rootRoute.addChildren([
   forgotPasswordRoute,
   inviteRoute,
   resetPasswordRoute,
+  portalSignupRoute,
+  portalRoute.addChildren([portalHomeRoute, portalRequestsRoute, portalRequestRoute, portalApprovalsRoute, portalProfileRoute, portalDeskRoute, portalCreateRoute]),
   appRoute.addChildren([
     indexRoute,
     projectsRoute,
@@ -212,6 +264,8 @@ export const routeTree = rootRoute.addChildren([
       backlogRoute,
       projectTimelineRoute,
       projectIssuesRoute,
+      queuesRoute,
+      customersRoute,
       releasesRoute,
       reportsRoute,
       settingsRoute.addChildren([
@@ -225,6 +279,10 @@ export const routeTree = rootRoute.addChildren([
         automationRoute,
         chatSettingsRoute,
         projectWebhooksRoute,
+        portalSettingsRoute,
+        requestTypesRoute,
+        queuesSettingsRoute,
+        slaSettingsRoute,
       ]),
     ]),
     searchRoute,

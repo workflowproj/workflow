@@ -1034,9 +1034,9 @@ func serviceRequestText(sr api.ServiceRequest) string {
 		case c.State == api.SlaStateStopped:
 			state = "met"
 		case c.Breached:
-			state = "breached " + duration(float64(-c.RemainingSeconds)/3600) + " ago"
+			state = "breached " + slaTime(-c.RemainingSeconds) + " ago"
 		default:
-			state = duration(float64(c.RemainingSeconds)/3600) + " left"
+			state = slaTime(c.RemainingSeconds) + " left"
 		}
 		if c.State == api.SlaStatePaused {
 			state += " (paused)"
@@ -1055,6 +1055,15 @@ func serviceRequestText(sr api.ServiceRequest) string {
 		fmt.Fprintf(&b, "Approval: %s (%s; %s)\n", a.Status, a.Mode, strings.Join(who, ", "))
 	}
 	return b.String()
+}
+
+// slaTime writes SLA working time in hours: a working day is not 24 hours.
+func slaTime(seconds int64) string {
+	h := float64(seconds) / 3600
+	if h < 1 {
+		return fmt.Sprintf("%.0fm", h*60)
+	}
+	return strconv.FormatFloat(float64(int(h*10+0.5))/10, 'f', -1, 64) + "h"
 }
 
 func duration(h float64) string {
