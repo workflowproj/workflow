@@ -132,7 +132,7 @@ export function TriggerFields({
               </div>
             )}
           </Field>
-          <Field label="Issues (JQL)" error={errors["trigger.jql"]} hint="Searched within this project; the actions run once for each match." className="sm:col-span-2">
+          <Field label="Issues (query)" error={errors["trigger.jql"]} hint="Searched within this project; the actions run once for each match." className="sm:col-span-2">
             {(id) => (
               <Input
                 id={id}

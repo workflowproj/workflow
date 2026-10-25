@@ -18,7 +18,7 @@ export const TRIGGERS: { type: TriggerType; label: string; group: "Issues" | "De
   { type: "commit.pushed", label: "Commit pushed", group: "Development", hint: "A commit mentioning the issue key is pushed." },
   { type: "branch.created", label: "Branch created", group: "Development", hint: "A branch named after the issue key is created." },
   { type: "pipeline.completed", label: "Pipeline completed", group: "Development", hint: "CI for a branch or commit of the issue succeeds or fails (event.status)." },
-  { type: "schedule", label: "On a schedule", group: "Schedule", hint: "Runs the actions for every issue matching a JQL query." },
+  { type: "schedule", label: "On a schedule", group: "Schedule", hint: "Runs the actions for every issue matching a query." },
 ];
 
 export const ACTIONS: { type: ActionType; label: string }[] = [

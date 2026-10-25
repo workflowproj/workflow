@@ -71,7 +71,7 @@ func (s *Service) validateDashboard(ctx context.Context, actor *authz.Actor, in 
 		}
 		if c.Jql != nil && *c.Jql != "" {
 			if len(*c.Jql) > 2000 {
-				return apperr.Invalid(field("config.jql"), "JQL must be at most 2000 characters")
+				return apperr.Invalid(field("config.jql"), "the query must be at most 2000 characters")
 			}
 			if err := s.ValidateJQL(ctx, actor, *c.Jql); err != nil {
 				if e, ok := err.(*apperr.Error); ok {

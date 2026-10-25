@@ -87,7 +87,7 @@ func (s *Service) chatCommand(r *http.Request, text, command string) chat.Messag
 		command = "/wfm"
 	}
 	ctx := r.Context()
-	help := chat.Message{Text: fmt.Sprintf("**%s KEY-123** shows an issue · **%s search** *JQL* lists matches (up to five), e.g. `%s search assignee = \"ada@example.com\" AND statusCategory != Done`", command, command, command)}
+	help := chat.Message{Text: fmt.Sprintf("**%s KEY-123** shows an issue · **%s search** *query* lists matches (up to five), e.g. `%s search assignee = \"ada@example.com\" AND statusCategory != Done`", command, command, command)}
 	if text == "" || strings.EqualFold(text, "help") {
 		return help
 	}

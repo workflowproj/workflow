@@ -159,7 +159,7 @@ export function JqlEditor({
           value={value}
           placeholder={placeholder}
           role="combobox"
-          aria-label="JQL query"
+          aria-label="Search query"
           aria-expanded={showList}
           aria-controls={listId}
           aria-autocomplete="list"

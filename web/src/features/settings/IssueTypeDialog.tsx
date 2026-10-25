@@ -143,7 +143,7 @@ export function IssueTypeDialog({ open, onClose, projectKey, type }: { open: boo
               />
             )}
           </Field>
-          <Field label="Key" required error={keyError} hint={type ? "Keys can't change; JQL uses them (type = spike)." : "Used in JQL and the API."}>
+          <Field label="Key" required error={keyError} hint={type ? "Keys can't change; searches use them (type = spike)." : "Used in searches and the API."}>
             {(id) => (
               <Input
                 id={id}

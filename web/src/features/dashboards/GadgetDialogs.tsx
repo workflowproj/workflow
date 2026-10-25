@@ -134,7 +134,7 @@ function ConfigForm({ gadget, onClose, onSave }: { gadget: Gadget; onClose: () =
           <Group label="Projects" hint="None picked means every project the viewer can browse.">
             <ProjectPicker value={c.projectKeys ?? []} onChange={(keys) => set({ projectKeys: keys.length ? keys : undefined })} />
           </Group>
-          <Group label="JQL" hint={gadget.type === "issue_list" ? "Optional. ORDER BY sets the list's order." : "Optional. Narrows the issues further."}>
+          <Group label="Query" hint={gadget.type === "issue_list" ? "Optional. ORDER BY sets the list's order." : "Optional. Narrows the issues further."}>
             <JqlEditor
               value={c.jql ?? ""}
               onChange={(v) => set({ jql: v })}

@@ -133,7 +133,7 @@ export function BoardEditor({ board, projectKey, statuses, onDeleted }: { board:
             </div>
           </fieldset>
           <Field
-            label="Filter (JQL)"
+            label="Filter (query)"
             error={fe.filterJql ?? fe.jql}
             hint="Narrows the board to matching issues of this project, e.g. labels = web AND type != epic. Leave empty for all."
             className="sm:col-span-2"

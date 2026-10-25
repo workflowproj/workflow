@@ -118,7 +118,7 @@ func (s *Service) validate(ctx context.Context, actor *authz.Actor, projectID uu
 		n := sched.Next(time.Now().UTC())
 		next = &n
 		if strings.TrimSpace(in.Trigger.JQL) == "" {
-			return nil, apperr.Invalid("trigger.jql", "scheduled rules need a JQL query selecting the issues to act on")
+			return nil, apperr.Invalid("trigger.jql", "scheduled rules need a query selecting the issues to act on")
 		}
 		if err := s.Tracker.ValidateJQL(ctx, actor, in.Trigger.JQL); err != nil {
 			return nil, err

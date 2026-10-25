@@ -112,7 +112,7 @@ export function FieldDialog({ field, onClose }: { field?: FieldDef; onClose: () 
               />
             )}
           </Field>
-          <Field label="Key" required error={(field ? undefined : fe.key) ?? dupe} hint={field ? "Fixed once created." : "Used in JQL, CEL (issue.fields.key) and the API."}>
+          <Field label="Key" required error={(field ? undefined : fe.key) ?? dupe} hint={field ? "Fixed once created." : "Used in searches, CEL (issue.fields.key) and the API."}>
             {(id) => (
               <Input
                 id={id}
