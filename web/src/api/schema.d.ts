@@ -214,6 +214,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** @description Ends the session. When it came from a sign-in provider with single logout on (WFM_OIDC_<ID>_SINGLE_LOGOUT), the response is the provider's end-session URL to send the browser to, so the person is signed out there too and comes back to /login. */
         post: operations["logout"];
         delete?: never;
         options?: never;
@@ -2549,7 +2550,7 @@ export interface components {
         /** @enum {string} */
         UserKind: "human" | "service";
         /** @enum {string} */
-        UserSource: "jit" | "scim" | "google" | "admin" | "dev" | "system";
+        UserSource: "jit" | "scim" | "google" | "keycloak" | "admin" | "dev" | "system";
         User: {
             /** Format: uuid */
             id: string;
@@ -2676,8 +2677,11 @@ export interface components {
             orgRole?: components["schemas"]["OrgRole"];
             memberCount: number;
         };
-        /** @enum {string} */
-        GroupSource: "local" | "scim" | "google";
+        /**
+         * @description local: managed here. scim, google, keycloak: synced from that directory. oidc: from a sign-in token's groups claim.
+         * @enum {string}
+         */
+        GroupSource: "local" | "scim" | "google" | "keycloak" | "oidc";
         GroupDetail: components["schemas"]["Group"] & {
             members: components["schemas"]["User"][];
         };
@@ -2734,9 +2738,26 @@ export interface components {
         };
         DirectorySyncStatus: {
             configured: boolean;
+            /**
+             * @description The configured directory (absent when none is)
+             * @enum {string}
+             */
+            source?: "google" | "keycloak";
+            /** @description Minutes between scheduled runs; 0 means manual runs only */
             intervalMinutes: number;
+            /** @description Access group: a Google group email, or a Keycloak group path */
             group?: string;
             orgUnit?: string;
+            /** @description Groups are mirrored too */
+            syncGroups?: boolean;
+            /** @description Only groups whose email (Google) or name (Keycloak) starts with this are mirrored */
+            groupPrefix?: string;
+            /** @description Keycloak base URL */
+            url?: string;
+            /** @description Keycloak realm */
+            realm?: string;
+            /** @description Sign-in provider (WFM_OIDC_PROVIDERS id) whose subjects are the Keycloak user ids */
+            provider?: string;
             runs: components["schemas"]["DirectorySyncRun"][];
         };
         ScimConnection: {
@@ -2759,6 +2780,11 @@ export interface components {
             /** Format: uuid */
             id: string;
             trigger: string;
+            /**
+             * @description The directory that was synced
+             * @enum {string}
+             */
+            source: "google" | "keycloak";
             /** @enum {string} */
             status: "running" | "succeeded" | "failed";
             stats: {
@@ -4893,6 +4919,18 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description Signed out here; finish at the sign-in provider */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uri */
+                        redirectUrl: string;
+                    };
+                };
+            };
             /** @description Signed out */
             204: {
                 headers: {

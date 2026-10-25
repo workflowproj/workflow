@@ -45,7 +45,7 @@ func (p *Provisioner) JITEnabled(ctx context.Context) bool {
 	case config.JITDisabled:
 		return false
 	}
-	if p.Cfg.GoogleDirectory.Enabled {
+	if p.Cfg.GoogleDirectory.Enabled || p.Cfg.Keycloak.Enabled {
 		return false
 	}
 	n, err := p.Q.CountActiveScimConnections(ctx)

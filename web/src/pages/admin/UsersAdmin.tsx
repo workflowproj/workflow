@@ -75,7 +75,7 @@ export function UsersAdmin() {
         </Select>
         <Select aria-label="Source" value={source} onChange={(e) => setSource(e.target.value as typeof source)} className="!w-36">
           <option value="">Any source</option>
-          {(["google", "scim", "jit", "admin", "dev", "system"] as const).map((s) => (
+          {(["google", "keycloak", "scim", "jit", "admin", "dev", "system"] as const).map((s) => (
             <option key={s} value={s}>
               {sourceLabel(s)}
             </option>

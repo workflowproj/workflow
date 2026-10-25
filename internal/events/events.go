@@ -43,6 +43,9 @@ var subscribers = promauto.NewGauge(prometheus.GaugeOpts{Name: "wfm_sse_subscrib
 type Hub struct {
 	pool *pgxpool.Pool
 	log  *slog.Logger
+	// ListenURL, when set, is a direct database address for the LISTEN session. It is needed
+	// when the pool goes through a transaction-mode pooler, where LISTEN does not work.
+	ListenURL string
 
 	mu     sync.RWMutex
 	subs   map[uuid.UUID]map[chan Event]struct{}
@@ -138,16 +141,16 @@ func (h *Hub) Run(ctx context.Context) {
 }
 
 func (h *Hub) listen(ctx context.Context) error {
-	conn, err := h.pool.Acquire(ctx)
+	conn, release, err := h.listenConn(ctx)
 	if err != nil {
 		return err
 	}
-	defer conn.Release()
+	defer release()
 	if _, err := conn.Exec(ctx, "LISTEN "+Channel); err != nil {
 		return err
 	}
 	for {
-		n, err := conn.Conn().WaitForNotification(ctx)
+		n, err := conn.WaitForNotification(ctx)
 		if err != nil {
 			return err
 		}
@@ -157,4 +160,25 @@ func (h *Hub) listen(ctx context.Context) error {
 		}
 		h.dispatch(ev)
 	}
+}
+
+// listenConn returns a session that can LISTEN: a dedicated direct connection when ListenURL
+// is set, otherwise one held from the pool.
+func (h *Hub) listenConn(ctx context.Context) (*pgx.Conn, func(), error) {
+	if h.ListenURL != "" {
+		conn, err := pgx.Connect(ctx, h.ListenURL)
+		if err != nil {
+			return nil, nil, err
+		}
+		return conn, func() {
+			closeCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			_ = conn.Close(closeCtx)
+		}, nil
+	}
+	pc, err := h.pool.Acquire(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	return pc.Conn(), pc.Release, nil
 }

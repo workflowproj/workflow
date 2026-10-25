@@ -5,7 +5,9 @@ type Source = Schemas["UserSource"] | Schemas["GroupSource"];
 
 const sources: Record<Source, { label: string; tone: Tone; hint: string }> = {
   google: { label: "Google", tone: "accent", hint: "Synced from Google Workspace" },
+  keycloak: { label: "Keycloak", tone: "accent", hint: "Synced from a Keycloak realm" },
   scim: { label: "SCIM", tone: "accent", hint: "Provisioned by your identity provider over SCIM" },
+  oidc: { label: "Sign-in", tone: "accent", hint: "From the groups in people's sign-in tokens; updated at each sign-in" },
   jit: { label: "JIT", tone: "neutral", hint: "Created on first sign-in" },
   admin: { label: "Admin", tone: "neutral", hint: "Created by an administrator" },
   dev: { label: "Dev", tone: "warning", hint: "Created by the development login" },
@@ -17,9 +19,9 @@ export function sourceLabel(s: Source) {
   return sources[s]?.label ?? s;
 }
 
-/** isDirectoryManaged: SCIM and Google directory sync own the profile; it is read-only here. */
+/** isDirectoryManaged: SCIM and directory sync (Google, Keycloak) own the profile; it is read-only here. */
 export function isDirectoryManaged(s: Source) {
-  return s === "scim" || s === "google";
+  return s === "scim" || s === "google" || s === "keycloak";
 }
 
 export function SourceBadge({ source }: { source: Source }) {

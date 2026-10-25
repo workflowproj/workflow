@@ -125,6 +125,16 @@ spec:
         - podSelector:
             matchLabels:
               cnpg.io/cluster: {{ $cluster }}
+    {{- if include "wfm.poolerEnabled" . }}
+    # PgBouncer -> the primary.
+    - from:
+        - podSelector:
+            matchLabels:
+              cnpg.io/poolerName: {{ include "wfm.cnpgPoolerName" . }}
+      ports:
+        - port: 5432
+          protocol: TCP
+    {{- end }}
     # The operator talks to each instance manager (8000) and to PostgreSQL.
     - from:
         - namespaceSelector:
@@ -156,5 +166,42 @@ spec:
     - from:
         {{- toYaml . | nindent 8 }}
     {{- end }}
+{{- if include "wfm.poolerEnabled" . }}
+---
+# Ingress to the PgBouncer pooler: the app pods, and Prometheus for its metrics.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $fullname }}-database-pooler
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "wfm.componentLabels" (dict "root" . "component" "database-pooler") | nindent 4 }}
+  annotations:
+    {{- include "wfm.syncWave" $wave | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      cnpg.io/poolerName: {{ include "wfm.cnpgPoolerName" . }}
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "wfm.selectorLabels" . | nindent 14 }}
+            matchExpressions:
+              - key: app.kubernetes.io/component
+                operator: In
+                values: [web, hooks, worker]
+      ports:
+        - port: 5432
+          protocol: TCP
+    {{- with $np.metrics.from }}
+    - from:
+        {{- toYaml . | nindent 8 }}
+      ports:
+        - port: 9127
+          protocol: TCP
+    {{- end }}
+{{- end }}
 {{- end }}
 {{- end }}

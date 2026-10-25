@@ -59,8 +59,11 @@ type App struct {
 	Auth       *identity.Auth
 	SCM        *scm.Service
 	Automation *automation.Service
-	Syncer     *directory.Syncer
-	Hub        *events.Hub
+	// Syncer is the Google Workspace directory sync (nil unless configured).
+	Syncer *directory.Syncer
+	// Directory is the configured directory sync, Google Workspace or Keycloak (nil when none is).
+	Directory directory.Runner
+	Hub       *events.Hub
 	// Mailer sends email (an in-memory *mail.Memory without WFM_SMTP_HOST).
 	Mailer mail.Sender
 	// Notify emails notifications (immediately or in digests) per people's settings.
@@ -104,7 +107,7 @@ func OpenWithRetry(ctx context.Context, databaseURL string, wait time.Duration, 
 }
 
 func Open(ctx context.Context, cfg *config.Config) (*pgxpool.Pool, error) {
-	return OpenURL(ctx, cfg.DatabaseURL)
+	return OpenURL(ctx, cfg.AppDatabaseURL())
 }
 
 func OpenURL(ctx context.Context, databaseURL string) (*pgxpool.Pool, error) {
@@ -145,7 +148,12 @@ func New(ctx context.Context, cfg *config.Config, log *slog.Logger, pool *pgxpoo
 		runWorkers = *opts.Workers
 	}
 	// The River client is created first (insert-only), then services, then workers are attached.
-	rcfg := &river.Config{Logger: log.With("component", "river"), JobTimeout: 5 * time.Minute}
+	// Behind a transaction-mode pooler River cannot LISTEN, so it polls for new jobs and for
+	// leadership changes instead.
+	rcfg := &river.Config{
+		Logger: log.With("component", "river"), JobTimeout: 5 * time.Minute,
+		PollOnly: cfg.DatabasePooled(), FetchPollInterval: cfg.WorkerPollInterval,
+	}
 	if runWorkers {
 		rcfg.Queues = map[string]river.QueueConfig{
 			river.QueueDefault: {MaxWorkers: cfg.WorkerConcurrency},
@@ -163,10 +171,17 @@ func New(ctx context.Context, cfg *config.Config, log *slog.Logger, pool *pgxpoo
 	a.SCM = scm.NewService(pool, box, cfg, a.Tracker, enq, log.With("module", "scm"))
 	a.Automation = automation.New(pool, a.Tracker, eval, enq, box, cfg, log.With("module", "automation"))
 	a.Notify = notify.New(pool, enq, a.Mailer, box, cfg, log.With("module", "notify"))
-	if cfg.GoogleDirectory.Enabled {
+	switch {
+	case cfg.GoogleDirectory.Enabled:
 		a.Syncer = directory.NewSyncer(pool, cfg.GoogleDirectory, a.Prov, log.With("module", "directory"))
+		a.Directory = a.Syncer
+	case cfg.Keycloak.Enabled:
+		a.Directory = directory.NewKeycloakSyncer(pool, cfg.Keycloak, a.Prov, log.With("module", "directory"))
 	}
 	a.Hub = events.NewHub(pool, log.With("module", "events"))
+	if cfg.DatabasePooled() {
+		a.Hub.ListenURL = cfg.DirectDatabaseURL()
+	}
 	a.Scim = &scim.Handler{Pool: pool, Q: dbq.New(pool), Prov: a.Prov, BaseURL: cfg.HooksPublicURL + "/scim/v2", Log: log.With("module", "scim")}
 	a.JiraImport = jiraimport.New(pool, box, cfg, a.Tracker, enq, log.With("module", "jira-import"))
 

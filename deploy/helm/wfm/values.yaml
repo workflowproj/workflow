@@ -86,7 +86,7 @@ otelKubernetesAttributes: true
 goMemLimitFromResources: true
 
 # Secret environment (WFM_SECRET_KEY, WFM_GOOGLE_CLIENT_SECRET, WFM_OIDC_<ID>_CLIENT_SECRET,
-# WFM_GOOGLE_SERVICE_ACCOUNT_KEY, WFM_S3_ACCESS_KEY/SECRET_KEY, ...). Every key in the Secret is
+# WFM_GOOGLE_SERVICE_ACCOUNT_KEY, WFM_KEYCLOAK_CLIENT_SECRET, WFM_S3_ACCESS_KEY/SECRET_KEY, ...). Every key in the Secret is
 # loaded as an environment variable. Pick ONE source:
 secrets:
   # 1. A Secret managed outside the chart (Sealed Secrets, SOPS via KSOPS, Vault agent, kubectl).
@@ -158,6 +158,26 @@ database:
       podAntiAffinityType: preferred
     # Create a PodMonitor for the instances (needs the Prometheus Operator CRDs).
     enablePodMonitor: false
+    # PgBouncer in front of the primary (a CNPG Pooler), so adding app pods does not add
+    # PostgreSQL connections. The app sends its queries through the pooler and keeps one direct
+    # session per web pod for live events; workers poll for jobs instead of LISTENing
+    # (worker.pollInterval). The migration job and KEDA keep using the direct address.
+    pooler:
+      enabled: false
+      instances: 2
+      # transaction is the mode the app is built for; session gives no pooling benefit.
+      poolMode: transaction
+      # pgbouncer.ini settings. max_prepared_statements lets pgx's prepared statements work in
+      # transaction mode (PgBouncer 1.21+).
+      parameters:
+        max_client_conn: "1000"
+        default_pool_size: "40"
+        max_prepared_statements: "200"
+      resources: {}
+      # Extra pod spec fields for the pooler pods: affinity, tolerations, priorityClassName, ...
+      podSpec: {}
+      monitoring:
+        enablePodMonitor: false
     annotations: {}
     # Annotations for the instances' ServiceAccount, e.g. eks.amazonaws.com/role-arn for S3 backups.
     serviceAccountAnnotations: {}
@@ -391,6 +411,10 @@ worker:
       memory: 128Mi
     limits:
       memory: 512Mi
+  # How often workers look for new jobs (WFM_WORKER_POLL_INTERVAL). Without a pooler workers
+  # also LISTEN, so this is only a fallback; with database.cnpg.pooler it is the pickup delay.
+  # Empty uses the app default (1s).
+  pollInterval: ""
   # Scale on queue depth with KEDA's PostgreSQL scaler (needs KEDA). Never scales below 1: a running
   # worker elects the leader that enqueues periodic jobs, so zero workers would never wake up.
   keda:

@@ -209,6 +209,7 @@ func newFakeIdP(t *testing.T) *fakeIdP {
 			"issuer": f.URL, "authorization_endpoint": f.URL + "/authorize", "token_endpoint": f.URL + "/token",
 			"jwks_uri": f.URL + "/jwks", "id_token_signing_alg_values_supported": []string{"RS256"},
 			"response_types_supported": []string{"code"}, "subject_types_supported": []string{"public"},
+			"end_session_endpoint": f.URL + "/logout",
 		})
 	})
 	mux.HandleFunc("GET /jwks", func(w http.ResponseWriter, r *http.Request) {
@@ -248,6 +249,14 @@ func newFakeIdP(t *testing.T) *fakeIdP {
 	f.Server = httptest.NewServer(mux)
 	t.Cleanup(f.Close)
 	return f
+}
+
+// sign signs claims with the IdP's key (logout tokens, access tokens for the API).
+func (f *fakeIdP) sign(claims jwt.MapClaims) string {
+	tok := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+	tok.Header["kid"] = "k1"
+	signed, _ := tok.SignedString(f.key)
+	return signed
 }
 
 // signIn runs the browser side of the authorisation code flow and returns the final redirect.
@@ -555,6 +564,257 @@ func TestTokensScopesAndCSRF(t *testing.T) {
 	for _, want := range []string{"token.create", "token.revoke", "user.create"} {
 		if !actions[want] {
 			t.Fatalf("audit lacks %s: %v", want, actions)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Groups from sign-in tokens, logout from the IdP, IdP access tokens for the API
+
+// meID is the id of whoever the client is signed in as.
+func meID(c *Client) string {
+	var me obj
+	c.get("/api/v1/me", &me)
+	return str(me, "id")
+}
+
+func TestOIDCGroupsClaim(t *testing.T) {
+	idp := newFakeIdP(t)
+	e := oidcEnv(t, idp, withEnv("WFM_OIDC_CORP_GROUPS_CLAIM", "groups,realm_access.roles"), withEnv("WFM_OIDC_CORP_GROUPS_PREFIX", "wfm-"))
+	admin := e.anon()
+	idp.signIn(t, admin, "corp", jwt.MapClaims{"sub": "u-1", "email": "ada@example.com", "email_verified": true, "name": "Ada"})
+	bob := e.anon()
+	signIn := func(groups, roles []any) {
+		idp.signIn(t, bob, "corp", jwt.MapClaims{"sub": "u-2", "email": "bob@example.com", "email_verified": true, "name": "Bob",
+			"groups": groups, "realm_access": map[string]any{"roles": roles}})
+	}
+	groups := func() map[string]obj {
+		var list []obj
+		admin.get("/api/v1/groups", &list)
+		out := map[string]obj{}
+		for _, g := range list {
+			out[str(g, "displayName")] = g
+		}
+		return out
+	}
+	members := func(g obj) []string {
+		var d obj
+		admin.get("/api/v1/groups/"+str(g, "id"), &d)
+		var out []string
+		for _, m := range d["members"].([]any) {
+			out = append(out, str(m.(map[string]any), "email"))
+		}
+		return out
+	}
+
+	// Values at every claim path count, with Keycloak's leading "/" trimmed and the prefix applied.
+	signIn([]any{"/wfm-admins", "/sales"}, []any{"wfm-qa", "offline_access"})
+	g := groups()
+	if _, ok := g["corp/wfm-admins"]; !ok {
+		t.Fatalf("claim groups: %v", g)
+	}
+	if _, ok := g["corp/sales"]; ok {
+		t.Fatal("the prefix filters groups")
+	}
+	eq(t, str(g["corp/wfm-qa"], "source"), "oidc", "nested claim path, source oidc")
+	eq(t, fmt.Sprint(members(g["corp/wfm-admins"])), "[bob@example.com]", "member")
+
+	// Group -> role mappings apply; the IdP owns the name.
+	admin.must("PATCH", "/api/v1/admin/groups/"+str(g["corp/wfm-admins"], "id"), obj{"orgRole": "admin"}, 200, nil)
+	admin.must("PATCH", "/api/v1/admin/groups/"+str(g["corp/wfm-admins"], "id"), obj{"displayName": "Renamed"}, 400, nil)
+	var me obj
+	bob.get("/api/v1/me", &me)
+	eq(t, str(me, "orgRole"), "admin", "role from the group mapping")
+
+	// The next sign-in is authoritative: a group the token no longer lists is left.
+	signIn([]any{"/sales"}, []any{"wfm-qa"})
+	bob.get("/api/v1/me", &me)
+	eq(t, str(me, "orgRole"), "member", "mapping gone with the membership")
+	eq(t, len(members(groups()["corp/wfm-admins"])), 0, "membership removed")
+	eq(t, fmt.Sprint(members(groups()["corp/wfm-qa"])), "[bob@example.com]", "kept")
+
+	// Groups managed elsewhere are untouched by sign-in.
+	var local obj
+	admin.must("POST", "/api/v1/admin/groups", obj{"displayName": "Local team"}, 201, &local)
+	admin.must("PUT", "/api/v1/admin/groups/"+str(local, "id")+"/members/"+meID(bob), nil, 204, nil)
+	signIn([]any{}, nil)
+	eq(t, fmt.Sprint(members(local)), "[bob@example.com]", "local group kept")
+	eq(t, len(members(groups()["corp/wfm-qa"])), 0, "no claim groups left")
+}
+
+func TestOIDCBackchannelLogout(t *testing.T) {
+	idp := newFakeIdP(t)
+	e := oidcEnv(t, idp)
+	session := func(sub, sid string) *Client {
+		c := e.anon()
+		idp.signIn(t, c, "corp", jwt.MapClaims{"sub": sub, "sid": sid, "email": sub + "@example.com", "email_verified": true})
+		c.must("GET", "/api/v1/me", nil, 200, nil)
+		return c
+	}
+	adaLaptop, adaPhone, bob := session("ada", "sid-laptop"), session("ada", "sid-phone"), session("bob", "sid-bob")
+	now := time.Now()
+	logoutToken := func(extra jwt.MapClaims) string {
+		c := jwt.MapClaims{"iss": idp.URL, "aud": "wfm-client", "iat": now.Unix(), "exp": now.Add(2 * time.Minute).Unix(), "jti": fmt.Sprint(now.UnixNano()),
+			"events": map[string]any{"http://schemas.openid.net/event/backchannel-logout": map[string]any{}}}
+		for k, v := range extra {
+			if v == nil {
+				delete(c, k)
+				continue
+			}
+			c[k] = v
+		}
+		return idp.sign(c)
+	}
+	post := func(tok string) Response {
+		return e.anon().do("POST", "/auth/corp/backchannel-logout", "logout_token="+url.QueryEscape(tok), "Content-Type", "application/x-www-form-urlencoded")
+	}
+
+	// Tokens that are not valid logout tokens change nothing.
+	for name, tok := range map[string]string{
+		"garbage":       "not-a-jwt",
+		"wrong aud":     logoutToken(jwt.MapClaims{"aud": "someone-else", "sid": "sid-laptop"}),
+		"expired":       logoutToken(jwt.MapClaims{"exp": now.Add(-time.Minute).Unix(), "sid": "sid-laptop"}),
+		"no exp":        logoutToken(jwt.MapClaims{"exp": nil, "sid": "sid-laptop"}),
+		"nonce":         logoutToken(jwt.MapClaims{"nonce": "n", "sid": "sid-laptop"}),
+		"no event":      logoutToken(jwt.MapClaims{"events": nil, "sid": "sid-laptop"}),
+		"no sid or sub": logoutToken(nil),
+	} {
+		r := post(tok)
+		if r.Status != http.StatusBadRequest || r.Header.Get("Cache-Control") != "no-store" {
+			t.Fatalf("%s: %d %s", name, r.Status, r.Body)
+		}
+	}
+	adaLaptop.must("GET", "/api/v1/me", nil, 200, nil)
+
+	// By sid: that one session ends.
+	r := post(logoutToken(jwt.MapClaims{"sid": "sid-laptop", "sub": "ada"}))
+	eq(t, r.Status, http.StatusOK, "logout by sid: "+string(r.Body))
+	eq(t, r.Header.Get("Cache-Control"), "no-store", "no-store")
+	adaLaptop.must("GET", "/api/v1/me", nil, 401, nil)
+	adaPhone.must("GET", "/api/v1/me", nil, 200, nil)
+
+	// By sub: every session of that person at this provider ends; others stay.
+	adaTablet := session("ada", "")
+	eq(t, post(logoutToken(jwt.MapClaims{"sub": "ada"})).Status, http.StatusOK, "logout by sub")
+	adaPhone.must("GET", "/api/v1/me", nil, 401, nil)
+	adaTablet.must("GET", "/api/v1/me", nil, 401, nil)
+	bob.must("GET", "/api/v1/me", nil, 200, nil)
+
+	// Unknown providers are refused.
+	eq(t, e.anon().do("POST", "/auth/nope/backchannel-logout", "logout_token=x", "Content-Type", "application/x-www-form-urlencoded").Status, http.StatusBadRequest, "unknown provider")
+}
+
+func TestOIDCSingleLogout(t *testing.T) {
+	idp := newFakeIdP(t)
+	e := oidcEnv(t, idp, withEnv("WFM_OIDC_CORP_SINGLE_LOGOUT", "true"))
+	c := e.anon()
+	idp.signIn(t, c, "corp", jwt.MapClaims{"sub": "ada", "email": "ada@example.com", "email_verified": true})
+	var out struct {
+		RedirectURL string `json:"redirectUrl"`
+	}
+	c.must("POST", "/api/v1/auth/logout", nil, 200, &out)
+	u, err := url.Parse(out.RedirectURL)
+	if err != nil || !strings.HasPrefix(out.RedirectURL, idp.URL+"/logout?") {
+		t.Fatalf("redirect: %q", out.RedirectURL)
+	}
+	q := u.Query()
+	eq(t, q.Get("client_id"), "wfm-client", "client_id")
+	eq(t, q.Get("post_logout_redirect_uri"), e.Cfg.PublicURL+"/login", "back to the login page")
+	if parts := strings.Split(q.Get("id_token_hint"), "."); len(parts) != 3 {
+		t.Fatalf("id_token_hint: %q", q.Get("id_token_hint"))
+	}
+	c.must("GET", "/api/v1/me", nil, 401, nil)
+
+	// Without single logout (or for sessions that did not come from the provider) it is a plain 204.
+	plain := oidcEnv(t, idp)
+	p := plain.anon()
+	idp.signIn(t, p, "corp", jwt.MapClaims{"sub": "ada", "email": "ada@example.com", "email_verified": true})
+	p.must("POST", "/api/v1/auth/logout", nil, 204, nil)
+	dev := e.login("dev@example.com", "Dev")
+	dev.must("POST", "/api/v1/auth/logout", nil, 204, nil)
+}
+
+func TestOIDCAccessTokensForTheAPI(t *testing.T) {
+	idp := newFakeIdP(t)
+	e := oidcEnv(t, idp, withEnv("WFM_OIDC_CORP_API_AUDIENCE", "wfm-api"), withEnv("WFM_OIDC_CORP_API_CLIENTS", "ci-pipeline=ci-bot@service.example"))
+	admin := e.anon()
+	idp.signIn(t, admin, "corp", jwt.MapClaims{"sub": "u-ada", "email": "ada@example.com", "email_verified": true, "name": "Ada"})
+	admin.createProject("EXT", "kanban")
+	bob := e.anon()
+	idp.signIn(t, bob, "corp", jwt.MapClaims{"sub": "u-bob", "email": "bob@example.com", "email_verified": true, "name": "Bob"})
+	var bot obj
+	admin.must("POST", "/api/v1/admin/users", obj{"kind": "service", "displayName": "CI bot", "email": "ci-bot@service.example"}, 201, &bot)
+	admin.must("POST", "/api/v1/projects/EXT/members", obj{"userId": str(bot, "id"), "roleKey": "member"}, 201, nil)
+
+	now := time.Now()
+	token := func(extra jwt.MapClaims) *Client {
+		c := jwt.MapClaims{"iss": idp.URL, "aud": "wfm-api", "iat": now.Unix(), "exp": now.Add(5 * time.Minute).Unix(), "typ": "Bearer", "sub": "u-bob", "scope": "openid wfm:read"}
+		for k, v := range extra {
+			if v == nil {
+				delete(c, k)
+				continue
+			}
+			c[k] = v
+		}
+		return e.withToken(idp.sign(c)) // sends no CSRF header
+
+	}
+
+	// A person's token, read-only: reads work, writes do not.
+	var me obj
+	token(nil).must("GET", "/api/v1/me", nil, 200, &me)
+	eq(t, str(me, "email"), "bob@example.com", "acts as the person with that subject")
+	token(nil).must("POST", "/api/v1/issues", obj{"projectKey": "EXT", "typeKey": "task", "summary": "nope"}, 403, nil)
+
+	// wfm:write allows changes (no CSRF header needed), but not administration.
+	writer := token(jwt.MapClaims{"scope": "wfm:read wfm:write"})
+	writer.must("POST", "/api/v1/issues", obj{"projectKey": "EXT", "typeKey": "task", "summary": "from a pipeline"}, 201, nil)
+	writer.must("GET", "/api/v1/admin/users", nil, 403, nil)
+	token(jwt.MapClaims{"sub": "u-ada", "scope": "wfm:admin"}).must("GET", "/api/v1/admin/users", nil, 200, nil)
+	writer.must("POST", "/api/v1/me/tokens", obj{"name": "x", "scopes": []string{"read"}, "expiresInDays": 1}, 403, nil)
+
+	// A client in API_CLIENTS acts as its service account (client-credentials tokens).
+	ci := token(jwt.MapClaims{"sub": "service-account-ci-pipeline", "azp": "ci-pipeline", "client_id": "ci-pipeline", "scope": "wfm:write"})
+	var issue obj
+	ci.must("POST", "/api/v1/issues", obj{"projectKey": "EXT", "typeKey": "task", "summary": "from CI"}, 201, &issue)
+	eq(t, str(issue, "reporter", "kind"), "service", "service account")
+
+	// Refused: sign-in ID tokens (client id as audience), ID/logout token types, expired tokens,
+	// unknown subjects, other issuers, and tokens without a wfm scope.
+	for name, c := range map[string]*Client{
+		"id token audience": token(jwt.MapClaims{"aud": "wfm-client"}),
+		"typ ID":            token(jwt.MapClaims{"typ": "ID"}),
+		"logout token":      token(jwt.MapClaims{"typ": "Logout", "events": map[string]any{"http://schemas.openid.net/event/backchannel-logout": map[string]any{}}}),
+		"expired":           token(jwt.MapClaims{"exp": now.Add(-time.Minute).Unix()}),
+		"unknown subject":   token(jwt.MapClaims{"sub": "u-nobody"}),
+		"other issuer":      token(jwt.MapClaims{"iss": "https://elsewhere.example"}),
+		"unknown client":    token(jwt.MapClaims{"sub": "service-account-x", "client_id": "other-client"}),
+	} {
+		if r := c.do("GET", "/api/v1/me", nil); r.Status != http.StatusUnauthorized {
+			t.Fatalf("%s: %d %s", name, r.Status, r.Body)
+		}
+	}
+	token(jwt.MapClaims{"scope": "openid profile"}).must("GET", "/api/v1/me", nil, 403, nil)
+
+	// Deactivated people's tokens stop working at once.
+	admin.must("PATCH", "/api/v1/admin/users/"+meID(bob), obj{"active": false}, 200, nil)
+	token(nil).must("GET", "/api/v1/me", nil, 401, nil)
+}
+
+func TestOIDCGroupsClaimDefersToKeycloakSync(t *testing.T) {
+	// With Keycloak directory sync bringing this provider's groups, the claim adds no copies.
+	idp := newFakeIdP(t)
+	e := oidcEnv(t, idp, withEnv("WFM_OIDC_CORP_GROUPS_CLAIM", "groups"),
+		withEnv("WFM_KEYCLOAK_ENABLED", "true"), withEnv("WFM_KEYCLOAK_PROVIDER", "corp"), withEnv("WFM_KEYCLOAK_URL", idp.URL),
+		withEnv("WFM_KEYCLOAK_REALM", "acme"), withEnv("WFM_KEYCLOAK_CLIENT_ID", "sync"), withEnv("WFM_KEYCLOAK_CLIENT_SECRET", "s"),
+		withEnv("WFM_KEYCLOAK_SYNC_INTERVAL", "0"), withEnv("WFM_JIT_PROVISIONING", "true"))
+	c := e.anon()
+	idp.signIn(t, c, "corp", jwt.MapClaims{"sub": "u-1", "email": "ada@example.com", "email_verified": true, "groups": []any{"/wfm-admins"}})
+	var groups []obj
+	c.get("/api/v1/groups", &groups)
+	for _, g := range groups {
+		if str(g, "source") == "oidc" {
+			t.Fatalf("claim group created alongside Keycloak sync: %v", g)
 		}
 	}
 }

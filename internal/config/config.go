@@ -38,6 +38,18 @@ type OIDCProvider struct {
 	Scopes       []string
 	// AllowedDomains restricts sign-in. For Google the `hd` claim is checked; otherwise the email domain.
 	AllowedDomains []string
+	// GroupsClaim lists claim paths ("groups", "realm_access.roles") whose values are kept as
+	// the person's groups from this provider at each sign-in, for group -> role mappings.
+	GroupsClaim []string
+	// GroupsPrefix keeps only claim values starting with it (e.g. "wfm-"), matched before any
+	// leading "/" is trimmed from a Keycloak group path.
+	GroupsPrefix string
+	// SingleLogout signs people out of the IdP too (RP-initiated logout) when they sign out.
+	SingleLogout bool
+	// APIAudience accepts the IdP's access tokens for the API when their audience is this value.
+	APIAudience string
+	// APIClients maps an IdP client id (client-credentials tokens) to a Workflow service account username.
+	APIClients map[string]string
 }
 
 func (p OIDCProvider) IsGoogle() bool { return p.Issuer == GoogleIssuer }
@@ -85,6 +97,10 @@ type Config struct {
 	HTTPAddr    string
 	MetricsAddr string
 	DatabaseURL string
+	// DatabasePoolerHost sends queries to a transaction-mode pooler; see database.go.
+	DatabasePoolerHost string
+	// DatabaseDirectURL is the direct address when DatabaseURL points at a pooler.
+	DatabaseDirectURL string
 	// PublicURL is where people reach the web UI and API.
 	PublicURL string
 	// HooksPublicURL is the internet-facing base for /hooks and /scim (defaults to PublicURL).
@@ -101,13 +117,18 @@ type Config struct {
 	BootstrapAdmins []string
 
 	GoogleDirectory GoogleDirectory
+	// Keycloak directory sync through the Keycloak Admin REST API.
+	Keycloak Keycloak
 	// Anonymise users deleted upstream after this long. 0 disables anonymisation.
 	DeletedUserRetention time.Duration
 
 	S3                 S3
 	AttachmentMaxBytes int64
 
-	WorkerConcurrency    int
+	WorkerConcurrency int
+	// WorkerPollInterval is how often workers look for new jobs. Behind a pooler, workers
+	// cannot LISTEN for new-job notifications, so this is the pickup latency.
+	WorkerPollInterval   time.Duration
 	SCMReconcileInterval time.Duration
 	// Maximum depth of automation rules triggering other rules.
 	AutomationMaxDepth int
@@ -259,19 +280,21 @@ func Load() (*Config, error) { return LoadFrom(os.Getenv) }
 func LoadFrom(get func(string) string) (*Config, error) {
 	e := &env{get: get}
 	c := &Config{
-		Mode:            Mode(e.str("WFM_MODE", string(ModeAll))),
-		HTTPAddr:        e.str("WFM_HTTP_ADDR", ":8080"),
-		MetricsAddr:     e.str("WFM_METRICS_ADDR", ":9090"),
-		DatabaseURL:     e.str("WFM_DATABASE_URL", DefaultDatabaseURL),
-		PublicURL:       strings.TrimRight(e.str("WFM_PUBLIC_URL", "http://localhost:8080"), "/"),
-		SecretKey:       e.str("WFM_SECRET_KEY", ""),
-		SessionTTL:      e.duration("WFM_SESSION_TTL", 7*24*time.Hour),
-		LogLevel:        e.str("WFM_LOG_LEVEL", "info"),
-		LogFormat:       e.str("WFM_LOG_FORMAT", "json"),
-		DevLogin:        e.boolean("WFM_DEV_LOGIN", false),
-		Production:      e.str("WFM_ENV", "production") == "production",
-		JITProvisioning: JITMode(e.str("WFM_JIT_PROVISIONING", string(JITAuto))),
-		BootstrapAdmins: e.list("WFM_BOOTSTRAP_ADMINS"),
+		Mode:               Mode(e.str("WFM_MODE", string(ModeAll))),
+		HTTPAddr:           e.str("WFM_HTTP_ADDR", ":8080"),
+		MetricsAddr:        e.str("WFM_METRICS_ADDR", ":9090"),
+		DatabaseURL:        e.str("WFM_DATABASE_URL", DefaultDatabaseURL),
+		DatabasePoolerHost: e.str("WFM_DATABASE_POOLER_HOST", ""),
+		DatabaseDirectURL:  e.str("WFM_DATABASE_DIRECT_URL", ""),
+		PublicURL:          strings.TrimRight(e.str("WFM_PUBLIC_URL", "http://localhost:8080"), "/"),
+		SecretKey:          e.str("WFM_SECRET_KEY", ""),
+		SessionTTL:         e.duration("WFM_SESSION_TTL", 7*24*time.Hour),
+		LogLevel:           e.str("WFM_LOG_LEVEL", "info"),
+		LogFormat:          e.str("WFM_LOG_FORMAT", "json"),
+		DevLogin:           e.boolean("WFM_DEV_LOGIN", false),
+		Production:         e.str("WFM_ENV", "production") == "production",
+		JITProvisioning:    JITMode(e.str("WFM_JIT_PROVISIONING", string(JITAuto))),
+		BootstrapAdmins:    e.list("WFM_BOOTSTRAP_ADMINS"),
 		GoogleDirectory: GoogleDirectory{
 			Enabled:           e.boolean("WFM_GOOGLE_DIRECTORY_ENABLED", false),
 			ServiceAccountKey: e.str("WFM_GOOGLE_SERVICE_ACCOUNT_KEY", ""),
@@ -294,6 +317,7 @@ func LoadFrom(get func(string) string) (*Config, error) {
 		},
 		AttachmentMaxBytes:      int64(e.integer("WFM_ATTACHMENT_MAX_MB", 25)) * 1024 * 1024,
 		WorkerConcurrency:       e.integer("WFM_WORKER_CONCURRENCY", 10),
+		WorkerPollInterval:      e.duration("WFM_WORKER_POLL_INTERVAL", time.Second),
 		SCMReconcileInterval:    e.duration("WFM_SCM_RECONCILE_INTERVAL", 30*time.Minute),
 		AutomationMaxDepth:      e.integer("WFM_AUTOMATION_MAX_DEPTH", 5),
 		OutboundAllowedHosts:    e.list("WFM_OUTBOUND_ALLOWED_HOSTS"),
@@ -356,6 +380,9 @@ func LoadFrom(get func(string) string) (*Config, error) {
 		e.errs = append(e.errs, fmt.Errorf("WFM_TIME_DAYS_PER_WEEK: must be more than 0 and at most 7, got %v", d))
 	}
 	c.OIDCProviders = loadOIDC(e)
+	c.Keycloak = loadKeycloak(e)
+	e.errs = append(e.errs, validateDatabase(c)...)
+	e.errs = append(e.errs, validateDirectory(c)...)
 
 	switch c.SMTP.TLS {
 	case "starttls", "tls", "none":
@@ -448,6 +475,18 @@ func loadOIDC(e *env) []OIDCProvider {
 		p.AllowedDomains = e.list(prefix + "ALLOWED_DOMAINS")
 		if len(p.AllowedDomains) == 0 {
 			p.AllowedDomains = globalDomains
+		}
+		p.GroupsClaim = e.rawList(prefix + "GROUPS_CLAIM")
+		p.GroupsPrefix = e.str(prefix+"GROUPS_PREFIX", "")
+		p.SingleLogout = e.boolean(prefix+"SINGLE_LOGOUT", false)
+		p.APIAudience = e.str(prefix+"API_AUDIENCE", "")
+		p.APIClients = e.pairs(prefix + "API_CLIENTS")
+		if p.APIAudience != "" && p.APIAudience == p.ClientID {
+			// Sign-in ID tokens carry the client id as audience; they must not work as API tokens.
+			e.errs = append(e.errs, fmt.Errorf("%sAPI_AUDIENCE must differ from %sCLIENT_ID", prefix, prefix))
+		}
+		if len(p.APIClients) > 0 && p.APIAudience == "" {
+			e.errs = append(e.errs, fmt.Errorf("%sAPI_CLIENTS needs %sAPI_AUDIENCE", prefix, prefix))
 		}
 		if p.Issuer == "" || p.ClientID == "" || p.ClientSecret == "" {
 			e.errs = append(e.errs, fmt.Errorf("OIDC provider %q needs %sISSUER, %sCLIENT_ID and %sCLIENT_SECRET", id, prefix, prefix, prefix))

@@ -77,6 +77,15 @@ spec:
             {{- end }}
           env:
             {{- include "wfm.commonEnv" $ | nindent 12 }}
+            {{- if include "wfm.poolerEnabled" $ }}
+            # Queries go through PgBouncer; listeners stay on the direct address above.
+            - name: WFM_DATABASE_POOLER_HOST
+              value: {{ printf "%s:5432" (include "wfm.cnpgPoolerName" $) | quote }}
+            {{- end }}
+            {{- with $.Values.worker.pollInterval }}
+            - name: WFM_WORKER_POLL_INTERVAL
+              value: {{ . | quote }}
+            {{- end }}
             {{- if $.Values.otelKubernetesAttributes }}
             - name: OTEL_RESOURCE_ATTRIBUTES
               value: {{ printf "k8s.namespace.name=$(POD_NAMESPACE),k8s.pod.name=$(POD_NAME),k8s.node.name=$(NODE_NAME),k8s.deployment.name=%s,service.namespace=%s" $fullname $.Release.Namespace | quote }}

@@ -35,7 +35,7 @@ func createAdmin(args []string) error {
 	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn}))
 	ctx, stop := signalContext()
 	defer stop()
-	pool, err := app.OpenWithRetry(ctx, cfg.DatabaseURL, time.Minute, log)
+	pool, err := app.OpenWithRetry(ctx, cfg.AppDatabaseURL(), time.Minute, log)
 	if err != nil {
 		return err
 	}

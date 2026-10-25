@@ -280,7 +280,20 @@ paths:
     post:
       operationId: logout
       tags: [auth]
+      description: >-
+        Ends the session. When it came from a sign-in provider with single logout on
+        (WFM_OIDC_<ID>_SINGLE_LOGOUT), the response is the provider's end-session URL to send the
+        browser to, so the person is signed out there too and comes back to /login.
       responses:
+        "200":
+          description: Signed out here; finish at the sign-in provider
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [redirectUrl]
+                properties:
+                  redirectUrl: { type: string, format: uri }
         "204": { description: Signed out }
         default: { $ref: '#/components/responses/Problem' }
   /me:
@@ -3155,7 +3168,7 @@ components:
         name: { type: string }
         loginUrl: { type: string }
     UserKind: { type: string, enum: [human, service] }
-    UserSource: { type: string, enum: [jit, scim, google, admin, dev, system] }
+    UserSource: { type: string, enum: [jit, scim, google, keycloak, admin, dev, system] }
 
     User:
       type: object
@@ -3290,7 +3303,10 @@ components:
         email: { type: string }
         orgRole: { $ref: '#/components/schemas/OrgRole' }
         memberCount: { type: integer }
-    GroupSource: { type: string, enum: [local, scim, google] }
+    GroupSource:
+      type: string
+      description: 'local: managed here. scim, google, keycloak: synced from that directory. oidc: from a sign-in token''s groups claim.'
+      enum: [local, scim, google, keycloak, oidc]
     GroupDetail:
       allOf:
         - $ref: '#/components/schemas/Group'
@@ -3362,9 +3378,15 @@ components:
       required: [configured, intervalMinutes, runs]
       properties:
         configured: { type: boolean }
-        intervalMinutes: { type: integer }
-        group: { type: string }
+        source: { type: string, enum: [google, keycloak], description: The configured directory (absent when none is) }
+        intervalMinutes: { type: integer, description: Minutes between scheduled runs; 0 means manual runs only }
+        group: { type: string, description: 'Access group: a Google group email, or a Keycloak group path' }
         orgUnit: { type: string }
+        syncGroups: { type: boolean, description: Groups are mirrored too }
+        groupPrefix: { type: string, description: Only groups whose email (Google) or name (Keycloak) starts with this are mirrored }
+        url: { type: string, description: Keycloak base URL }
+        realm: { type: string, description: Keycloak realm }
+        provider: { type: string, description: 'Sign-in provider (WFM_OIDC_PROVIDERS id) whose subjects are the Keycloak user ids' }
         runs: { type: array, items: { $ref: '#/components/schemas/DirectorySyncRun' } }
     ScimConnection:
       type: object
@@ -3387,10 +3409,11 @@ components:
             baseUrl: { type: string }
     DirectorySyncRun:
       type: object
-      required: [id, trigger, status, stats, startedAt]
+      required: [id, trigger, source, status, stats, startedAt]
       properties:
         id: { type: string, format: uuid }
         trigger: { type: string }
+        source: { type: string, enum: [google, keycloak], description: The directory that was synced }
         status: { type: string, enum: [running, succeeded, failed] }
         stats: { type: object, additionalProperties: { type: integer } }
         error: { type: string }

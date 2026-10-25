@@ -95,6 +95,9 @@ type Actor struct {
 	TokenID   *uuid.UUID
 	TokenName string
 	Scopes    []string
+	// External is set for an access token issued by an OIDC provider (no TokenID); like a
+	// personal access token it is limited by Scopes and never counts as a browser session.
+	External bool
 	// Via names what the person used to act, recorded with their changes: the app connected
 	// with OAuth or the token's name for an AI assistant over MCP ("Ada via Claude"). Empty for
 	// the web app and plain API calls.
@@ -126,6 +129,10 @@ func (a *Actor) UserID() *uuid.UUID {
 }
 
 func (a *Actor) IsOrgAdmin() bool { return a.OrgRole == "admin" }
+
+// ViaToken reports authentication with a token (personal, OAuth or an IdP's access token) rather
+// than a browser session: scopes apply, and session-only actions are refused.
+func (a *Actor) ViaToken() bool { return a != nil && (a.TokenID != nil || a.External) }
 
 // Privileged actors (automation, system) are not subject to project permissions.
 func (a *Actor) Privileged() bool { return a.Type == ActorAutomation || a.Type == ActorSystem }

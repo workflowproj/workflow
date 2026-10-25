@@ -10,6 +10,8 @@ are comma-separated. Invalid configuration stops the process at startup with eve
 | `WFM_MODE` | `all` | `web`, `hooks`, `worker` or `all` (also `wfm serve --mode=`) |
 | `WFM_ENV` | `production` | anything else enables development conveniences and relaxes `WFM_SECRET_KEY` |
 | `WFM_DATABASE_URL` | `postgres://wfm:wfm@localhost:5432/wfm?sslmode=disable` | PostgreSQL 16+ (17 recommended) |
+| `WFM_DATABASE_POOLER_HOST` | — | `host[:port]` of a transaction-mode PgBouncer (such as a CNPG `Pooler`). Queries go there with the credentials and database of `WFM_DATABASE_URL`, which stays the direct address for live-event listeners and migrations. See [deployment.md](deployment.md#connection-pooling) |
+| `WFM_DATABASE_DIRECT_URL` | — | the other way round: set when `WFM_DATABASE_URL` already points at the pooler, to give the direct address. Set one of the two, not both |
 | `WFM_PUBLIC_URL` | `http://localhost:8080` | external URL of the UI; used for OIDC redirects and links |
 | `WFM_HOOKS_PUBLIC_URL` | `WFM_PUBLIC_URL` | external URL where `/hooks` and `/scim` are reachable |
 | `WFM_SECRET_KEY` | — | **required in production**; 32+ random bytes; encrypts stored secrets (SCM keys, webhook secrets) and signs cookies. Keep it stable — changing it makes stored secrets unreadable |
@@ -46,6 +48,11 @@ See [identity.md](identity.md).
 | `WFM_OIDC_PROVIDERS` | `google` if a Google client id is set | provider ids, e.g. `google,okta` |
 | `WFM_OIDC_<ID>_ISSUER`, `_CLIENT_ID`, `_CLIENT_SECRET` | — | per provider (Google's issuer is preset) |
 | `WFM_OIDC_<ID>_DISPLAY_NAME`, `_SCOPES`, `_ALLOWED_DOMAINS` | | optional per provider |
+| `WFM_OIDC_<ID>_GROUPS_CLAIM` | — | claim paths whose values are the person's groups at each sign-in, e.g. `groups,realm_access.roles` ([identity.md](identity.md#groups-from-the-sign-in-token)) |
+| `WFM_OIDC_<ID>_GROUPS_PREFIX` | — | only claim groups starting with this |
+| `WFM_OIDC_<ID>_SINGLE_LOGOUT` | `false` | signing out also signs out of the provider (RP-initiated logout) |
+| `WFM_OIDC_<ID>_API_AUDIENCE` | — | accept the provider's access tokens with this audience as API tokens; must differ from `_CLIENT_ID` |
+| `WFM_OIDC_<ID>_API_CLIENTS` | — | `clientid=serviceaccount,…`: client-credentials tokens act as that service account |
 | `WFM_ALLOWED_DOMAINS` | — | default allowed domains for every provider |
 | `WFM_JIT_PROVISIONING` | `auto` | `auto`, `true`, `false` |
 | `WFM_BOOTSTRAP_ADMINS` | — | emails that are always organisation admins |
@@ -63,6 +70,15 @@ See [identity.md](identity.md).
 | `WFM_GOOGLE_SYNC_INTERVAL` | `15m` | |
 | `WFM_GOOGLE_SYNC_GROUPS` | `true` | mirror groups |
 | `WFM_GOOGLE_GROUP_PREFIX` | — | only mirror groups whose email starts with this |
+| `WFM_KEYCLOAK_ENABLED` | `false` | Keycloak directory sync ([identity.md](identity.md#keycloak-directory-sync)); not together with Google's |
+| `WFM_KEYCLOAK_URL` | — | Keycloak's base URL, e.g. `https://sso.example.com` (may be a private, in-cluster address) |
+| `WFM_KEYCLOAK_REALM` | — | the realm to sync |
+| `WFM_KEYCLOAK_CLIENT_ID`, `WFM_KEYCLOAK_CLIENT_SECRET` | — | a confidential client whose service account has the `realm-management` roles `view-users` and `query-groups` |
+| `WFM_KEYCLOAK_PROVIDER` | `keycloak` | the `WFM_OIDC_PROVIDERS` id people sign in with; their Keycloak user id is the subject there |
+| `WFM_KEYCLOAK_SYNC_GROUP` | — (everyone) | access group path, e.g. `/workflow-users`; its subgroups' members count too |
+| `WFM_KEYCLOAK_SYNC_GROUPS` | `true` | mirror groups (named by path) and their direct members |
+| `WFM_KEYCLOAK_GROUP_PREFIX` | — | only mirror groups whose name starts with this (case-insensitive) |
+| `WFM_KEYCLOAK_SYNC_INTERVAL` | `15m` | `0` runs only on *Run now* |
 
 ## AI assistants (OAuth)
 
@@ -105,6 +121,7 @@ Durations such as `1w 2d 3h` count working days and weeks; see [time-tracking.md
 | Variable | Default | |
 |---|---|---|
 | `WFM_WORKER_CONCURRENCY` | `10` | jobs per queue per worker process |
+| `WFM_WORKER_POLL_INTERVAL` | `1s` | how often workers look for new jobs. Without a pooler they are also woken by `NOTIFY`; behind one they only poll, so this is the pickup delay (minimum `100ms`) |
 | `WFM_SCM_RECONCILE_INTERVAL` | `30m` | `0` disables |
 | `WFM_AUTOMATION_MAX_DEPTH` | `5` | maximum chain of rules triggering rules |
 | `WFM_WEBHOOK_ALLOW_PRIVATE` | `false` | allow outbound calls to any private address (prefer the allowlist below) |

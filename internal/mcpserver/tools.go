@@ -78,7 +78,7 @@ func (t *tools) whoami(ctx context.Context, _ *mcp.CallToolRequest, _ none) (*mc
 		return nil, nil, err
 	}
 	scopes := "session"
-	if t.actor.TokenID != nil {
+	if t.actor.ViaToken() {
 		scopes = strings.Join(t.actor.Scopes, ", ")
 	}
 	out := fmt.Sprintf("%s <%s>\nOrganisation role: %s\nToken scopes: %s", me.DisplayName, me.Email, me.OrgRole, scopes)

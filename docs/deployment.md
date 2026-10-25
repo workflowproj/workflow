@@ -126,10 +126,47 @@ so deleting the release or the Argo CD Application never deletes the database.
 - k3s: `instances: 1` on `local-path`. Single-node means no failover; enable backups.
 - EKS: `instances: 3` with required zone anti-affinity, separate WAL volumes, synchronous
   failover handled by CNPG; PodDisruptionBudgets come from the operator.
-- Connections: each app pod opens up to 10 connections (more on large nodes). Size
-  `max_connections` for `(web + hooks + worker max replicas) × 10 + 20`. The web pods hold a
-  `LISTEN` connection for live events, so do not put a transaction-mode PgBouncer (CNPG `Pooler`)
-  in front of them.
+- Connections: each app pod opens up to 10 connections (more on large nodes). Without a pooler,
+  size `max_connections` for `(web + hooks + worker max replicas) × 10 + 20`. Once replica
+  counts make that large, turn on the pooler below.
+
+### Connection pooling
+
+`database.cnpg.pooler.enabled: true` puts PgBouncer in front of the primary (a CNPG `Pooler`
+named `<cluster>-pooler-rw`, transaction mode), so adding app pods adds client connections to
+PgBouncer rather than PostgreSQL sessions.
+
+```yaml
+database:
+  cnpg:
+    pooler:
+      enabled: true
+      instances: 2
+      parameters:
+        default_pool_size: "40"        # server connections per database/user
+        max_client_conn: "1000"
+        max_prepared_statements: "200" # pgx prepared statements in transaction mode
+```
+
+What changes when it is on:
+
+| Connection | Goes to | Why |
+|---|---|---|
+| App queries (web, hooks, worker) | the pooler (`WFM_DATABASE_POOLER_HOST`) | transaction pooling keeps PostgreSQL sessions flat as pods scale |
+| Live events on each web pod | the primary, one session per pod | `LISTEN` needs a session of its own, which transaction pooling cannot give |
+| River (worker) | the pooler, in poll-only mode | workers look for jobs every `worker.pollInterval` (default `1s`) instead of `LISTEN`ing; leader election also polls |
+| Migration job, KEDA scaler | the primary | schema changes and the queue-depth query use the direct address in `<cluster>-app` |
+
+Size `default_pool_size` for the busiest moment: roughly the jobs and requests that run at
+once, not the number of pods. PostgreSQL then needs `max_connections` of about
+`default_pool_size × pooler instances + web replicas + 20`. Prepared statements need PgBouncer
+1.21 or later with `max_prepared_statements` above zero (the CNPG pooler images qualify). The
+app uses no session state (`SET`, advisory locks, temporary tables), so transaction mode is
+safe. With network policies on, the chart allows app pods to reach the pooler, the pooler to
+reach the primary, and Prometheus to scrape the pooler.
+
+For an external PostgreSQL behind your own PgBouncer, set `WFM_DATABASE_URL` to the pooler and
+`WFM_DATABASE_DIRECT_URL` to the server itself (through `secrets.*` or `extraEnv`).
 
 ### Backups and restore
 
@@ -182,7 +219,8 @@ With NetworkPolicies on, list the database's addresses in `networkPolicy.egress.
 All keys of the app Secret become environment variables (`envFrom`). It must contain
 `WFM_SECRET_KEY` (32+ characters; keep it stable, it encrypts stored SCM keys and webhook secrets)
 and whatever else is secret: `WFM_GOOGLE_CLIENT_SECRET`, `WFM_OIDC_<ID>_CLIENT_SECRET`,
-`WFM_GOOGLE_SERVICE_ACCOUNT_KEY`, `WFM_S3_ACCESS_KEY`/`WFM_S3_SECRET_KEY` (omit with IRSA).
+`WFM_GOOGLE_SERVICE_ACCOUNT_KEY`, `WFM_KEYCLOAK_CLIENT_SECRET`, `WFM_S3_ACCESS_KEY`/`WFM_S3_SECRET_KEY`
+(omit with IRSA).
 
 - **Production (EKS): External Secrets.** `secrets.externalSecret.enabled=true` with a
   `ClusterSecretStore` (AWS Secrets Manager, Vault, ...). `dataFrom.extract` maps a JSON document
@@ -449,12 +487,14 @@ tilt down && k3d cluster delete wfm
 ```
 
 Tilt deploys the same chart with `deploy/k3d/values-dev.yaml` (development sign-in, one replica
-each, NetworkPolicies on). For UI work trigger the `vite` resource: Vite on :5173 proxies `/api` to
+each, NetworkPolicies on) and Keycloak from `deploy/k3d/keycloak` (sign-in, directory sync and API
+tokens against the `wfm` realm; see [identity.md](identity.md#development-realm-k3d)). For UI work trigger the `vite` resource: Vite on :5173 proxies `/api` to
 the port-forwarded web pod.
 
 CI (`.github/workflows/ci.yml`) runs on every pull request: Go vet, generated-code drift and tests
 against a `postgres:17` service; web typecheck, tests and build; `helm lint` + `kubeconform` of
 every overlay (CRDs validated against the datree catalog); the image build; and an end-to-end job
-that creates an ephemeral k3d cluster, installs CloudNativePG, installs and upgrades the chart
-with development sign-in, checks the ingress split through Traefik, and runs the Playwright suite
-against a port-forward of the web Service.
+that creates an ephemeral k3d cluster, deploys Keycloak, installs CloudNativePG, installs and
+upgrades the chart with development sign-in and Keycloak, checks the ingress split through
+Traefik, that sign-in redirects to Keycloak and that a Keycloak directory sync provisions the
+realm's access group, and runs the Playwright suite against a port-forward of the web Service.

@@ -187,13 +187,18 @@ func (q *Queries) CreateAPIToken(ctx context.Context, arg CreateAPITokenParams) 
 
 const createDirectorySyncRun = `-- name: CreateDirectorySyncRun :one
 
-INSERT INTO directory_sync_runs (trigger) VALUES ($1) RETURNING id, trigger, status, stats, error, started_at, finished_at
+INSERT INTO directory_sync_runs (trigger, source) VALUES ($1, $2) RETURNING id, trigger, status, stats, error, started_at, finished_at, source
 `
+
+type CreateDirectorySyncRunParams struct {
+	Trigger string
+	Source  string
+}
 
 // ---------------------------------------------------------------------------
 // Directory sync & audit
-func (q *Queries) CreateDirectorySyncRun(ctx context.Context, trigger string) (DirectorySyncRun, error) {
-	row := q.db.QueryRow(ctx, createDirectorySyncRun, trigger)
+func (q *Queries) CreateDirectorySyncRun(ctx context.Context, arg CreateDirectorySyncRunParams) (DirectorySyncRun, error) {
+	row := q.db.QueryRow(ctx, createDirectorySyncRun, arg.Trigger, arg.Source)
 	var i DirectorySyncRun
 	err := row.Scan(
 		&i.ID,
@@ -203,6 +208,7 @@ func (q *Queries) CreateDirectorySyncRun(ctx context.Context, trigger string) (D
 		&i.Error,
 		&i.StartedAt,
 		&i.FinishedAt,
+		&i.Source,
 	)
 	return i, err
 }
@@ -317,15 +323,20 @@ func (q *Queries) CreateScimConnection(ctx context.Context, arg CreateScimConnec
 }
 
 const createSession = `-- name: CreateSession :exec
-INSERT INTO sessions (id, user_id, expires_at, ip, user_agent) VALUES ($1, $2, $3, $4, $5)
+INSERT INTO sessions (id, user_id, expires_at, ip, user_agent, idp_provider, idp_subject, idp_sid, idp_id_token)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 `
 
 type CreateSessionParams struct {
-	ID        string
-	UserID    uuid.UUID
-	ExpiresAt time.Time
-	Ip        *string
-	UserAgent *string
+	ID          string
+	UserID      uuid.UUID
+	ExpiresAt   time.Time
+	Ip          *string
+	UserAgent   *string
+	IdpProvider *string
+	IdpSubject  *string
+	IdpSid      *string
+	IdpIDToken  *string
 }
 
 func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) error {
@@ -335,6 +346,10 @@ func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) er
 		arg.ExpiresAt,
 		arg.Ip,
 		arg.UserAgent,
+		arg.IdpProvider,
+		arg.IdpSubject,
+		arg.IdpSid,
+		arg.IdpIDToken,
 	)
 	return err
 }
@@ -442,6 +457,40 @@ DELETE FROM sessions WHERE id = $1
 func (q *Queries) DeleteSession(ctx context.Context, id string) error {
 	_, err := q.db.Exec(ctx, deleteSession, id)
 	return err
+}
+
+const deleteSessionsByIDPSid = `-- name: DeleteSessionsByIDPSid :execrows
+DELETE FROM sessions WHERE idp_provider = $1 AND idp_sid = $2
+`
+
+type DeleteSessionsByIDPSidParams struct {
+	Provider *string
+	Sid      *string
+}
+
+func (q *Queries) DeleteSessionsByIDPSid(ctx context.Context, arg DeleteSessionsByIDPSidParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteSessionsByIDPSid, arg.Provider, arg.Sid)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteSessionsByIDPSubject = `-- name: DeleteSessionsByIDPSubject :execrows
+DELETE FROM sessions WHERE idp_provider = $1 AND idp_subject = $2
+`
+
+type DeleteSessionsByIDPSubjectParams struct {
+	Provider *string
+	Subject  *string
+}
+
+func (q *Queries) DeleteSessionsByIDPSubject(ctx context.Context, arg DeleteSessionsByIDPSubjectParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteSessionsByIDPSubject, arg.Provider, arg.Subject)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const deleteUserSessions = `-- name: DeleteUserSessions :exec
@@ -717,6 +766,54 @@ func (q *Queries) GetScimConnectionByToken(ctx context.Context, tokenHash string
 	return i, err
 }
 
+const getServiceAccountByUsername = `-- name: GetServiceAccountByUsername :one
+SELECT id, kind, email, username, display_name, given_name, family_name, avatar_url, org_role, active, source, google_id, scim_connection_id, scim_external_id, deactivated_at, deleted_at, anonymized_at, last_login_at, created_at, updated_at FROM users WHERE kind = 'service' AND lower(username) = lower($1::text) AND active AND deleted_at IS NULL
+`
+
+func (q *Queries) GetServiceAccountByUsername(ctx context.Context, username string) (User, error) {
+	row := q.db.QueryRow(ctx, getServiceAccountByUsername, username)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Kind,
+		&i.Email,
+		&i.Username,
+		&i.DisplayName,
+		&i.GivenName,
+		&i.FamilyName,
+		&i.AvatarUrl,
+		&i.OrgRole,
+		&i.Active,
+		&i.Source,
+		&i.GoogleID,
+		&i.ScimConnectionID,
+		&i.ScimExternalID,
+		&i.DeactivatedAt,
+		&i.DeletedAt,
+		&i.AnonymizedAt,
+		&i.LastLoginAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getSessionIDP = `-- name: GetSessionIDP :one
+SELECT idp_provider, idp_id_token FROM sessions WHERE id = $1
+`
+
+type GetSessionIDPRow struct {
+	IdpProvider *string
+	IdpIDToken  *string
+}
+
+func (q *Queries) GetSessionIDP(ctx context.Context, id string) (GetSessionIDPRow, error) {
+	row := q.db.QueryRow(ctx, getSessionIDP, id)
+	var i GetSessionIDPRow
+	err := row.Scan(&i.IdpProvider, &i.IdpIDToken)
+	return i, err
+}
+
 const getSessionUser = `-- name: GetSessionUser :one
 SELECT users.id, users.kind, users.email, users.username, users.display_name, users.given_name, users.family_name, users.avatar_url, users.org_role, users.active, users.source, users.google_id, users.scim_connection_id, users.scim_external_id, users.deactivated_at, users.deleted_at, users.anonymized_at, users.last_login_at, users.created_at, users.updated_at, sessions.last_seen_at AS session_last_seen
 FROM sessions JOIN users ON users.id = sessions.user_id
@@ -827,6 +924,44 @@ SELECT id, kind, email, username, display_name, given_name, family_name, avatar_
 
 func (q *Queries) GetUserByGoogleID(ctx context.Context, googleID *string) (User, error) {
 	row := q.db.QueryRow(ctx, getUserByGoogleID, googleID)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Kind,
+		&i.Email,
+		&i.Username,
+		&i.DisplayName,
+		&i.GivenName,
+		&i.FamilyName,
+		&i.AvatarUrl,
+		&i.OrgRole,
+		&i.Active,
+		&i.Source,
+		&i.GoogleID,
+		&i.ScimConnectionID,
+		&i.ScimExternalID,
+		&i.DeactivatedAt,
+		&i.DeletedAt,
+		&i.AnonymizedAt,
+		&i.LastLoginAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getUserByIdentity = `-- name: GetUserByIdentity :one
+SELECT u.id, u.kind, u.email, u.username, u.display_name, u.given_name, u.family_name, u.avatar_url, u.org_role, u.active, u.source, u.google_id, u.scim_connection_id, u.scim_external_id, u.deactivated_at, u.deleted_at, u.anonymized_at, u.last_login_at, u.created_at, u.updated_at FROM users u JOIN user_identities ui ON ui.user_id = u.id
+WHERE ui.provider = $1 AND ui.subject = $2
+`
+
+type GetUserByIdentityParams struct {
+	Provider string
+	Subject  string
+}
+
+func (q *Queries) GetUserByIdentity(ctx context.Context, arg GetUserByIdentityParams) (User, error) {
+	row := q.db.QueryRow(ctx, getUserByIdentity, arg.Provider, arg.Subject)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -1064,7 +1199,7 @@ func (q *Queries) ListAudit(ctx context.Context, arg ListAuditParams) ([]AuditEv
 }
 
 const listDirectorySyncRuns = `-- name: ListDirectorySyncRuns :many
-SELECT id, trigger, status, stats, error, started_at, finished_at FROM directory_sync_runs ORDER BY started_at DESC LIMIT $1
+SELECT id, trigger, status, stats, error, started_at, finished_at, source FROM directory_sync_runs ORDER BY started_at DESC LIMIT $1
 `
 
 func (q *Queries) ListDirectorySyncRuns(ctx context.Context, limit int32) ([]DirectorySyncRun, error) {
@@ -1084,6 +1219,7 @@ func (q *Queries) ListDirectorySyncRuns(ctx context.Context, limit int32) ([]Dir
 			&i.Error,
 			&i.StartedAt,
 			&i.FinishedAt,
+			&i.Source,
 		); err != nil {
 			return nil, err
 		}
@@ -1296,6 +1432,45 @@ func (q *Queries) ListUserTokens(ctx context.Context, userID uuid.UUID) ([]ApiTo
 			&i.LastUsedAt,
 			&i.RevokedAt,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listUsersBySourceWithIdentity = `-- name: ListUsersBySourceWithIdentity :many
+SELECT u.id, u.active, ui.subject
+FROM users u
+LEFT JOIN user_identities ui ON ui.user_id = u.id AND ui.provider = $1
+WHERE u.source = $2 AND u.deleted_at IS NULL
+`
+
+type ListUsersBySourceWithIdentityParams struct {
+	Provider string
+	Source   string
+}
+
+type ListUsersBySourceWithIdentityRow struct {
+	ID      uuid.UUID
+	Active  bool
+	Subject *string
+}
+
+// Users a directory provisioned, with their subject at that directory's sign-in provider.
+func (q *Queries) ListUsersBySourceWithIdentity(ctx context.Context, arg ListUsersBySourceWithIdentityParams) ([]ListUsersBySourceWithIdentityRow, error) {
+	rows, err := q.db.Query(ctx, listUsersBySourceWithIdentity, arg.Provider, arg.Source)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListUsersBySourceWithIdentityRow{}
+	for rows.Next() {
+		var i ListUsersBySourceWithIdentityRow
+		if err := rows.Scan(&i.ID, &i.Active, &i.Subject); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -1735,6 +1910,49 @@ SELECT g.id, g.display_name, g.description, g.source, g.scim_connection_id, g.ex
 
 func (q *Queries) UserGroups(ctx context.Context, userID uuid.UUID) ([]Group, error) {
 	rows, err := q.db.Query(ctx, userGroups, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Group{}
+	for rows.Next() {
+		var i Group
+		if err := rows.Scan(
+			&i.ID,
+			&i.DisplayName,
+			&i.Description,
+			&i.Source,
+			&i.ScimConnectionID,
+			&i.ExternalID,
+			&i.Email,
+			&i.OrgRole,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const userGroupsBySourcePrefix = `-- name: UserGroupsBySourcePrefix :many
+SELECT g.id, g.display_name, g.description, g.source, g.scim_connection_id, g.external_id, g.email, g.org_role, g.created_at, g.updated_at FROM groups g JOIN group_members gm ON gm.group_id = g.id
+WHERE gm.user_id = $1 AND g.source = $2 AND g.external_id LIKE $3::text || '%'
+`
+
+type UserGroupsBySourcePrefixParams struct {
+	UserID uuid.UUID
+	Source string
+	Prefix string
+}
+
+// A person's groups from one source whose external id starts with the prefix (one OIDC provider).
+func (q *Queries) UserGroupsBySourcePrefix(ctx context.Context, arg UserGroupsBySourcePrefixParams) ([]Group, error) {
+	rows, err := q.db.Query(ctx, userGroupsBySourcePrefix, arg.UserID, arg.Source, arg.Prefix)
 	if err != nil {
 		return nil, err
 	}

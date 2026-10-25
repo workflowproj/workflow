@@ -46,7 +46,11 @@ func (s *Server) DevLogin(ctx context.Context, req api.DevLoginRequestObject) (a
 
 func (s *Server) Logout(ctx context.Context, _ api.LogoutRequestObject) (api.LogoutResponseObject, error) {
 	w, r := httpFrom(ctx)
+	next := s.Auth.LogoutURL(ctx, r)
 	s.Auth.EndSession(w, r)
+	if next != "" {
+		return api.Logout200JSONResponse{RedirectUrl: next}, nil
+	}
 	return api.Logout204Response{}, nil
 }
 
@@ -95,7 +99,7 @@ func (s *Server) CreateMyToken(ctx context.Context, req api.CreateMyTokenRequest
 	if err != nil {
 		return nil, err
 	}
-	if a.TokenID != nil {
+	if a.ViaToken() {
 		return nil, apperr.Forbidden("tokens cannot create other tokens")
 	}
 	b := req.Body

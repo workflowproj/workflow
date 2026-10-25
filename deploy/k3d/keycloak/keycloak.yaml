@@ -1,0 +1,154 @@
+# Keycloak for the local k3d cluster and the CI e2e job: development mode (in-memory H2, so the
+# realm is re-imported from realm-wfm.json at every start), reachable at the same URL from
+# browsers and from pods:
+#
+#   browser -> http://keycloak.localhost:8081 -> k3d load balancer -> Traefik -> this Service
+#   pod     -> http://keycloak.localhost:8081 -> CoreDNS rewrite (coredns-custom.yaml) -> this Service
+#
+# so the issuer the app discovers is the one in the browser's tokens. The admin console is at
+# http://keycloak.localhost:8081/admin (admin / admin). Not for production.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: keycloak
+  labels:
+    app.kubernetes.io/part-of: wfm-dev
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: keycloak-bootstrap-admin
+  namespace: keycloak
+  labels:
+    app.kubernetes.io/name: keycloak
+    app.kubernetes.io/part-of: wfm-dev
+type: Opaque
+stringData:
+  KC_BOOTSTRAP_ADMIN_USERNAME: admin
+  KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+  namespace: keycloak
+  labels:
+    app.kubernetes.io/name: keycloak
+    app.kubernetes.io/part-of: wfm-dev
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: keycloak
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: keycloak
+        app.kubernetes.io/part-of: wfm-dev
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: keycloak
+          image: quay.io/keycloak/keycloak:26.4.7
+          imagePullPolicy: IfNotPresent
+          args: ["start-dev", "--import-realm"]
+          envFrom:
+            - secretRef:
+                name: keycloak-bootstrap-admin
+          env:
+            # Tokens and discovery always name this issuer; requests from inside the cluster
+            # (directory sync on keycloak.keycloak.svc) still work through the dynamic backchannel.
+            - name: KC_HOSTNAME
+              value: "http://keycloak.localhost:8081"
+            - name: KC_HOSTNAME_BACKCHANNEL_DYNAMIC
+              value: "true"
+            - name: KC_PROXY_HEADERS
+              value: xforwarded
+            - name: KC_HEALTH_ENABLED
+              value: "true"
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: management
+              containerPort: 9000
+          startupProbe:
+            httpGet:
+              path: /health/started
+              port: management
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: management
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: management
+            periodSeconds: 20
+            failureThreshold: 6
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              memory: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: realm
+              mountPath: /opt/keycloak/data/import
+              readOnly: true
+      volumes:
+        - name: realm
+          configMap:
+            name: keycloak-realm
+---
+# Port 8081 matches the issuer URL, which pods reach through the CoreDNS rewrite.
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak
+  namespace: keycloak
+  labels:
+    app.kubernetes.io/name: keycloak
+    app.kubernetes.io/part-of: wfm-dev
+spec:
+  selector:
+    app.kubernetes.io/name: keycloak
+  ports:
+    - name: http
+      port: 8081
+      targetPort: http
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: keycloak
+  namespace: keycloak
+  labels:
+    app.kubernetes.io/name: keycloak
+    app.kubernetes.io/part-of: wfm-dev
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: keycloak.localhost
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: keycloak
+                port:
+                  name: http

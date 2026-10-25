@@ -302,7 +302,7 @@ func Audit(ctx context.Context, q *dbq.Queries, actor *authz.Actor, action, targ
 	at := "system"
 	switch {
 	case actor == nil:
-	case actor.TokenID != nil:
+	case actor.ViaToken():
 		at = "token"
 	case actor.User != nil:
 		at = "user"

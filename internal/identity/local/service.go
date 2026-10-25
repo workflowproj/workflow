@@ -158,10 +158,12 @@ func ClientIP(r *http.Request) string {
 func normEmail(e string) string { return strings.ToLower(strings.TrimSpace(e)) }
 
 // Managed reports whether an identity provider owns the person's sign-in (no passwords).
-func Managed(source string) bool { return source == "scim" || source == "google" }
+func Managed(source string) bool {
+	return source == "scim" || source == "google" || source == "keycloak"
+}
 
 func sourceName(source string) string {
-	return map[string]string{"scim": "SCIM", "google": "Google directory sync"}[source]
+	return map[string]string{"scim": "SCIM", "google": "Google directory sync", "keycloak": "Keycloak directory sync"}[source]
 }
 
 func (s *Service) issuer() string {
@@ -195,7 +197,7 @@ func (s *Service) audit(ctx context.Context, q *dbq.Queries, actor *authz.Actor,
 	p := dbq.InsertAuditParams{ActorType: "system", Action: action, Data: raw}
 	if actor != nil && actor.User != nil {
 		p.ActorType = "user"
-		if actor.TokenID != nil {
+		if actor.ViaToken() {
 			p.ActorType = "token"
 		}
 		p.ActorID = &actor.User.ID

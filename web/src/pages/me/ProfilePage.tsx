@@ -14,7 +14,7 @@ import { ConnectedAppsSection } from "@/features/settings/connected-apps/Connect
 import { SourceBadge, sourceLabel } from "@/features/admin/badges";
 import { securityKey, SignInSecurity } from "@/features/auth/SignInSecurity";
 
-const managed = new Set(["scim", "google"]);
+const managed = new Set(["scim", "google", "keycloak"]);
 
 export function ProfilePage() {
   const { data: me } = useMe();

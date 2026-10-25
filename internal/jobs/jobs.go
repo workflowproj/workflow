@@ -180,7 +180,7 @@ func (DeliverChat) InsertOpts() river.InsertOpts {
 	return river.InsertOpts{Queue: QueueOutbound, MaxAttempts: 6}
 }
 
-// DirectorySync reads the Google Workspace directory and reconciles users and groups.
+// DirectorySync reads the configured directory (Google Workspace or Keycloak) and reconciles users and groups.
 type DirectorySync struct {
 	Trigger string `json:"trigger"`
 }
