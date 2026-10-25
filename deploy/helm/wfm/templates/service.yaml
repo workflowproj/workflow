@@ -1,0 +1,34 @@
+{{- range $component := list "web" "hooks" "worker" }}
+{{- $c := index $.Values $component }}
+{{- if $c.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "wfm.fullname" $ }}-{{ $component }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "wfm.componentLabels" (dict "root" $ "component" $component) | nindent 4 }}
+  {{- with $c.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ $c.service.type | default "ClusterIP" }}
+  selector:
+    {{- include "wfm.componentSelectorLabels" (dict "root" $ "component" $component) | nindent 4 }}
+  ports:
+    {{- if ne $component "worker" }}
+    - name: http
+      port: {{ $c.service.port }}
+      targetPort: http
+      protocol: TCP
+      appProtocol: http
+    {{- end }}
+    - name: metrics
+      port: {{ $.Values.ports.metrics }}
+      targetPort: metrics
+      protocol: TCP
+      appProtocol: http
+{{- end }}
+{{- end }}

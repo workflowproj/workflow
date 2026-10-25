@@ -1,0 +1,54 @@
+{{- $fullname := include "wfm.fullname" . -}}
+wfm {{ include "wfm.imageTag" . }} is deployed as release "{{ .Release.Name }}" in namespace "{{ .Release.Namespace }}".
+
+Components
+{{- range $component := list "web" "hooks" "worker" }}
+{{- if (index $.Values $component).enabled }}
+  - {{ $fullname }}-{{ $component }}
+{{- end }}
+{{- end }}
+
+Entry points
+{{- if and .Values.ingress.web.enabled .Values.web.enabled }}
+  UI / API (internal):  {{ if .Values.ingress.web.tls.enabled }}https{{ else }}http{{ end }}://{{ first (.Values.ingress.web.hosts | default (list "<ingress address>")) }}/
+{{- end }}
+{{- if and .Values.ingress.hooks.enabled .Values.hooks.enabled }}
+  Webhooks (public):    {{ if .Values.ingress.hooks.tls.enabled }}https{{ else }}http{{ end }}://{{ first (.Values.ingress.hooks.hosts | default (list "<ingress address>")) }}/hooks/{provider}/{connectionId}
+  SCIM 2.0 (public):    {{ if .Values.ingress.hooks.tls.enabled }}https{{ else }}http{{ end }}://{{ first (.Values.ingress.hooks.hosts | default (list "<ingress address>")) }}/scim/v2
+{{- end }}
+{{- if or .Values.gatewayAPI.web.enabled .Values.gatewayAPI.hooks.enabled }}
+  Gateway API HTTPRoutes are enabled; see `kubectl get httproute -n {{ .Release.Namespace }}`.
+{{- end }}
+
+  Without an ingress:
+    kubectl -n {{ .Release.Namespace }} port-forward svc/{{ $fullname }}-web 8080:{{ .Values.web.service.port }}
+    open http://localhost:8080
+
+Check the rollout
+  kubectl -n {{ .Release.Namespace }} get pods -l app.kubernetes.io/instance={{ .Release.Name }}
+{{- if .Values.migrations.enabled }}
+  kubectl -n {{ .Release.Namespace }} logs job/{{ $fullname }}-migrate
+{{- end }}
+{{- if .Values.database.cnpg.enabled }}
+  kubectl -n {{ .Release.Namespace }} get cluster.postgresql.cnpg.io {{ include "wfm.cnpgName" . }}
+{{- end }}
+{{- if and .Values.worker.enabled .Values.worker.keda.enabled }}
+  kubectl -n {{ .Release.Namespace }} get scaledobject {{ $fullname }}-worker
+{{- end }}
+
+{{- if eq (toString (index .Values.config "WFM_ENV")) "production" }}
+{{- if not (include "wfm.secretName" .) }}
+
+WARNING: no Secret is configured (secrets.existingSecret / secrets.create / secrets.externalSecret).
+         WFM_SECRET_KEY is required when WFM_ENV=production; pods will fail to start without it.
+{{- end }}
+{{- end }}
+{{- if eq (toString (index .Values.config "WFM_DEV_LOGIN")) "true" }}
+
+WARNING: WFM_DEV_LOGIN is enabled. Anyone who can reach the UI can sign in as any user.
+         Never use this outside development (the binary refuses it when WFM_ENV=production).
+{{- end }}
+{{- if not .Values.networkPolicy.enabled }}
+
+NOTE: NetworkPolicies are disabled. Make sure only the hooks Service is reachable from the internet.
+{{- end }}

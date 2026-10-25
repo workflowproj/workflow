@@ -1,0 +1,58 @@
+{{- if .Values.prometheusRule.enabled }}
+{{- $ns := .Release.Namespace }}
+{{- $r := .Values.prometheusRule }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "wfm.fullname" . }}
+  namespace: {{ $ns }}
+  labels:
+    {{- include "wfm.labels" . | nindent 4 }}
+    {{- with $r.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  groups:
+    - name: wfm
+      rules:
+        - alert: WfmHighErrorRate
+          expr: |
+            sum(rate(wfm_http_requests_total{namespace="{{ $ns }}", status=~"5.."}[10m]))
+              / clamp_min(sum(rate(wfm_http_requests_total{namespace="{{ $ns }}"}[10m])), 1e-9) > {{ $r.errorRatio }}
+          for: 10m
+          labels: { severity: critical }
+          annotations:
+            summary: More than {{ mulf $r.errorRatio 100 }}% of Workflow responses are server errors
+            description: Check the web pods' logs and the "Server errors by route" panel.
+        - alert: WfmSlowRequests
+          expr: |
+            histogram_quantile(0.95, sum by (le) (rate(wfm_http_request_duration_seconds_bucket{namespace="{{ $ns }}", route!="/api/v1/events"}[15m]))) > {{ $r.latencyP95Seconds }}
+          for: 15m
+          labels: { severity: warning }
+          annotations:
+            summary: Workflow p95 request latency is above {{ $r.latencyP95Seconds }}s
+            description: See "Slowest routes"; database load or a large search are the usual causes.
+        - alert: WfmJobsFailing
+          expr: |
+            sum(rate(wfm_jobs_total{namespace="{{ $ns }}", outcome="error"}[15m])) * 60 > {{ $r.jobErrorsPerMinute }}
+          for: 15m
+          labels: { severity: warning }
+          annotations:
+            summary: Workflow background jobs are failing ({{ "{{" }} $value | printf "%.1f" {{ "}}" }} per minute)
+            description: Failed jobs retry with backoff; see "Job errors by kind" and the worker logs.
+        - alert: WfmWebhooksFailing
+          expr: |
+            sum(rate(wfm_scm_webhooks_received_total{namespace="{{ $ns }}", result="error"}[15m])) > 0.05
+          for: 15m
+          labels: { severity: warning }
+          annotations:
+            summary: Workflow is failing to process GitHub/GitLab webhooks
+            description: Deliveries are stored and can be reprocessed from Administration → GitHub & GitLab.
+        - alert: WfmComponentDown
+          expr: |
+            sum by (component) (up{namespace="{{ $ns }}", component=~"web|hooks|worker"}) == 0
+          for: 5m
+          labels: { severity: critical }
+          annotations:
+            summary: No healthy Workflow {{ "{{" }} $labels.component {{ "}}" }} pods are being scraped
+{{- end }}

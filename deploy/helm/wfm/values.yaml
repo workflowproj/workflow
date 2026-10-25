@@ -1,0 +1,635 @@
+# Default values for the wfm chart.
+#
+# One image runs as three Deployments:
+#   web     UI + REST API + OIDC redirects + server-sent events      (internal ingress)
+#   hooks   GitHub/GitLab webhooks (/hooks) and SCIM 2.0 (/scim)       (the ONLY public ingress)
+#   worker  River job workers                                          (no ingress, metrics only)
+# Example overlays: values-k3s.yaml (single node, Traefik) and values-eks.yaml (HA, ALB, ESO, S3 backups).
+
+nameOverride: ""
+fullnameOverride: ""
+# Extra labels added to every object.
+commonLabels: {}
+
+image:
+  repository: ghcr.io/geoffo-dev/workflow-management
+  # Defaults to the chart appVersion.
+  tag: ""
+  # sha256:... ; when set it wins over the tag (recommended with Cosign-verified releases).
+  digest: ""
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+
+serviceAccount:
+  create: true
+  name: ""
+  # e.g. eks.amazonaws.com/role-arn for IRSA.
+  annotations: {}
+  # The app never talks to the Kubernetes API.
+  automountToken: false
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+  fsGroup: 65532
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  privileged: false
+  runAsNonRoot: true
+  capabilities:
+    drop: ["ALL"]
+
+# -----------------------------------------------------------------------------
+# Configuration
+# -----------------------------------------------------------------------------
+
+# Non-secret environment, rendered into a ConfigMap loaded by every pod (envFrom).
+# Any WFM_* or OTEL_* variable can be added here; see internal/config/config.go.
+config:
+  WFM_ENV: production
+  # Where people reach the UI/API (internal ingress).
+  WFM_PUBLIC_URL: "https://wfm.example.internal"
+  # Internet-facing base for /hooks and /scim (public ingress).
+  WFM_HOOKS_PUBLIC_URL: "https://hooks.example.com"
+  WFM_LOG_LEVEL: info
+  WFM_LOG_FORMAT: json
+  WFM_JIT_PROVISIONING: auto
+  WFM_WORKER_CONCURRENCY: "10"
+  # WFM_OIDC_PROVIDERS: google
+  # WFM_GOOGLE_CLIENT_ID: "1234.apps.googleusercontent.com"
+  # WFM_ALLOWED_DOMAINS: example.com
+  # WFM_BOOTSTRAP_ADMINS: alice@example.com
+  # WFM_GOOGLE_DIRECTORY_ENABLED: "true"
+  # WFM_GOOGLE_ADMIN_SUBJECT: admin@example.com
+  # WFM_S3_ENDPOINT: s3.eu-west-1.amazonaws.com
+  # WFM_S3_BUCKET: wfm-attachments
+  # WFM_S3_REGION: eu-west-1
+  # OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector.observability:4318
+  # Hosts that may resolve to private addresses for outbound calls, e.g. a self-hosted Mattermost
+  # (everything else private stays blocked). If it listens on 8065, also add an egress extraRule.
+  # WFM_OUTBOUND_ALLOWED_HOSTS: mattermost.corp.example
+  # Projects the /wfm chat command may read (default: every open project).
+  # WFM_CHAT_COMMAND_PROJECTS: PLAT,OPS
+
+# Extra env (list of EnvVar) and envFrom sources for every app pod and the migration job.
+extraEnv: []
+extraEnvFrom: []
+
+# Add k8s.* attributes to OTEL_RESOURCE_ATTRIBUTES (pod, namespace, node, deployment).
+otelKubernetesAttributes: true
+# Set GOMEMLIMIT from the container memory limit (only when a memory limit is set).
+goMemLimitFromResources: true
+
+# Secret environment (WFM_SECRET_KEY, WFM_GOOGLE_CLIENT_SECRET, WFM_OIDC_<ID>_CLIENT_SECRET,
+# WFM_GOOGLE_SERVICE_ACCOUNT_KEY, WFM_S3_ACCESS_KEY/SECRET_KEY, ...). Every key in the Secret is
+# loaded as an environment variable. Pick ONE source:
+secrets:
+  # 1. A Secret managed outside the chart (Sealed Secrets, SOPS via KSOPS, Vault agent, kubectl).
+  existingSecret: ""
+  # 2. A chart-managed Secret from values (development, or SOPS-encrypted values via helm-secrets).
+  create: false
+  values: {}
+    # WFM_SECRET_KEY: "change-me-to-32-or-more-random-characters"
+    # Enable the /wfm slash command (see docs/chat.md):
+    # WFM_SLACK_SIGNING_SECRET: "from the Slack app's Basic Information page"
+    # WFM_MATTERMOST_COMMAND_TOKENS: "token of the Mattermost slash command"
+  # 3. An External Secrets Operator ExternalSecret (production). The generated Secret is named
+  #    <fullname> unless externalSecret.targetName is set.
+  externalSecret:
+    enabled: false
+    apiVersion: external-secrets.io/v1
+    refreshInterval: 1h
+    targetName: ""
+    secretStoreRef:
+      kind: ClusterSecretStore
+      name: ""
+    # Explicit keys: [{secretKey: WFM_SECRET_KEY, remoteRef: {key: prod/wfm, property: secret_key}}]
+    data: []
+    # Whole documents: [{extract: {key: prod/wfm}}]  (each JSON property becomes an env var)
+    dataFrom: []
+    annotations: {}
+
+# -----------------------------------------------------------------------------
+# Database (PostgreSQL 17)
+# -----------------------------------------------------------------------------
+database:
+  # CloudNativePG Cluster managed by this release (needs the CNPG operator and CRDs).
+  # The app reads WFM_DATABASE_URL from the operator-generated <cluster>-app Secret (key "uri").
+  cnpg:
+    enabled: true
+    # Defaults to <fullname>-db.
+    name: ""
+    instances: 1
+    # "system" images include barman-cloud, needed by the in-tree barmanObjectStore backups.
+    imageName: ghcr.io/cloudnative-pg/postgresql:17.11-system-bookworm
+    imagePullPolicy: IfNotPresent
+    database: wfm
+    owner: wfm
+    # Replaces the default `initdb` bootstrap, e.g. to restore from a backup:
+    #   bootstrap: {recovery: {source: origin, recoveryTarget: {targetTime: "2026-01-02T03:04:05Z"}}}
+    # (CNPG only reads bootstrap when it creates the cluster; restore into a NEW name.)
+    bootstrap: {}
+    # externalClusters entries, e.g. the object store a recovery bootstrap reads from.
+    externalClusters: []
+    storage:
+      size: 10Gi
+      storageClass: ""
+    walStorage:
+      enabled: false
+      size: 5Gi
+      storageClass: ""
+    resources: {}
+    postgresql:
+      parameters:
+        # Each app pod keeps a pool of up to 10 connections; size this for your replica count.
+        max_connections: "200"
+        shared_buffers: 256MB
+    primaryUpdateStrategy: unsupervised
+    enableSuperuserAccess: false
+    # CNPG affinity block: enablePodAntiAffinity, topologyKey, nodeSelector, tolerations, ...
+    affinity:
+      enablePodAntiAffinity: true
+      topologyKey: kubernetes.io/hostname
+      podAntiAffinityType: preferred
+    # Create a PodMonitor for the instances (needs the Prometheus Operator CRDs).
+    enablePodMonitor: false
+    annotations: {}
+    # Annotations for the instances' ServiceAccount, e.g. eks.amazonaws.com/role-arn for S3 backups.
+    serviceAccountAnnotations: {}
+    backup:
+      enabled: false
+      # barmanObjectStore: in-tree Barman Cloud (deprecated upstream since CNPG 1.26 but still served).
+      # plugin: the Barman Cloud Plugin (barmancloud.cnpg.io ObjectStore; install the plugin first).
+      method: barmanObjectStore
+      pluginName: barman-cloud.cloudnative-pg.io
+      # s3://bucket/prefix
+      destinationPath: ""
+      # Only for S3-compatible stores (MinIO, Garage, SeaweedFS); leave empty for AWS S3.
+      endpointURL: ""
+      s3Credentials:
+        # IRSA / EKS Pod Identity: annotate serviceAccountAnnotations instead of using keys.
+        inheritFromIAMRole: false
+        # Or an existing Secret holding static keys.
+        secretName: ""
+        accessKeyIdKey: ACCESS_KEY_ID
+        secretAccessKeyKey: ACCESS_SECRET_KEY
+        regionKey: ""
+      wal:
+        compression: gzip
+        maxParallel: 2
+      data:
+        compression: gzip
+        jobs: 2
+      retentionPolicy: "30d"
+      scheduledBackup:
+        enabled: true
+        # Six-field cron (seconds first), as used by CNPG.
+        schedule: "0 0 3 * * *"
+        immediate: true
+
+  # Any other PostgreSQL 17 (RDS, Aurora, a managed service, a plain StatefulSet).
+  # Used when cnpg.enabled=false. Precedence: existingSecret > url > secrets.* (key WFM_DATABASE_URL).
+  external:
+    existingSecret: ""
+    existingSecretKey: uri
+    # Plain URL (rendered into a chart-managed Secret). Development only.
+    url: ""
+
+# -----------------------------------------------------------------------------
+# Schema migrations: `wfm migrate` in a Job, before new pods roll out.
+# -----------------------------------------------------------------------------
+# Migrations are expand-then-contract (old pods keep working on the new schema), so the job can run
+# while the previous version is still serving.
+#
+# Argo CD: the Job is a Sync-phase hook in sync wave -1. Waves -3 (ServiceAccount, ConfigMap,
+#   Secrets, ExternalSecret, NetworkPolicies) and -2 (CNPG Cluster, which Argo CD waits on until
+#   Healthy) are applied first, then the migration, then the Deployments (wave 0). This is a
+#   "pre-sync" in effect and, unlike PreSync, also works on the first install when the database and
+#   Secrets are created by this same release. Set argocd.hook=PreSync only when the database and
+#   the Secret already exist outside this release.
+# Plain Helm: post-install (the CNPG Cluster and Secrets must exist first) and pre-upgrade.
+#   Argo CD ignores the helm.sh/hook annotations because the argocd.argoproj.io/hook ones are set.
+migrations:
+  enabled: true
+  argocd:
+    hook: Sync
+    syncWave: "-1"
+    deletePolicy: BeforeHookCreation
+  helm:
+    hook: post-install,pre-upgrade
+    weight: "-1"
+    deletePolicy: before-hook-creation
+  # `wfm migrate` retries the connection for ~60s per attempt; the Job retries the pod after that.
+  backoffLimit: 10
+  activeDeadlineSeconds: 1800
+  ttlSecondsAfterFinished: null
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 256Mi
+  podAnnotations: {}
+  podLabels: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# Argo CD sync waves for resources the migration job depends on.
+argocd:
+  syncWaves:
+    config: "-3"
+    database: "-2"
+
+# -----------------------------------------------------------------------------
+# Components
+# -----------------------------------------------------------------------------
+ports:
+  http: 8080
+  metrics: 9090
+
+# Fallbacks for components that leave these empty.
+nodeSelector: {}
+tolerations: []
+affinity: {}
+priorityClassName: ""
+
+web:
+  enabled: true
+  replicas: 2
+  # Appended to `serve --mode=web`.
+  extraArgs: []
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 512Mi
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: null
+    behavior: {}
+  pdb:
+    enabled: true
+    maxUnavailable: 1
+    minAvailable: null
+  topologySpread:
+    enabled: true
+    whenUnsatisfiable: ScheduleAnyway
+    # Full override; labelSelector is filled in when omitted.
+    constraints: []
+  service:
+    type: ClusterIP
+    port: 80
+    annotations: {}
+  # Seconds to keep serving after the pod is marked terminating, so load balancers deregister it
+  # first (ALB target groups especially). 0 disables the preStop hook.
+  preStopSleepSeconds: 5
+  # preStop + up to 25s graceful shutdown in the binary (open SSE streams hold it that long) + margin.
+  terminationGracePeriodSeconds: 40
+  probes:
+    startup:
+      httpGet: {path: /healthz, port: http}
+      periodSeconds: 2
+      failureThreshold: 30
+    liveness:
+      httpGet: {path: /healthz, port: http}
+      periodSeconds: 10
+      timeoutSeconds: 2
+      failureThreshold: 3
+    readiness:
+      httpGet: {path: /readyz, port: http}
+      periodSeconds: 5
+      timeoutSeconds: 3
+      failureThreshold: 2
+  podAnnotations: {}
+  podLabels: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  priorityClassName: ""
+  extraEnv: []
+  extraEnvFrom: []
+  extraVolumes: []
+  extraVolumeMounts: []
+  # Scratch space for multipart uploads (the root filesystem is read-only).
+  tmpSizeLimit: 512Mi
+
+hooks:
+  enabled: true
+  replicas: 2
+  extraArgs: []
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 256Mi
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: null
+    behavior: {}
+  pdb:
+    enabled: true
+    maxUnavailable: 1
+    minAvailable: null
+  topologySpread:
+    enabled: true
+    whenUnsatisfiable: ScheduleAnyway
+    constraints: []
+  service:
+    type: ClusterIP
+    port: 80
+    annotations: {}
+  preStopSleepSeconds: 5
+  terminationGracePeriodSeconds: 40
+  probes:
+    startup:
+      httpGet: {path: /healthz, port: http}
+      periodSeconds: 2
+      failureThreshold: 30
+    liveness:
+      httpGet: {path: /healthz, port: http}
+      periodSeconds: 10
+      timeoutSeconds: 2
+      failureThreshold: 3
+    readiness:
+      httpGet: {path: /readyz, port: http}
+      periodSeconds: 5
+      timeoutSeconds: 3
+      failureThreshold: 2
+  podAnnotations: {}
+  podLabels: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  priorityClassName: ""
+  extraEnv: []
+  extraEnvFrom: []
+  extraVolumes: []
+  extraVolumeMounts: []
+  tmpSizeLimit: 128Mi
+
+worker:
+  enabled: true
+  replicas: 1
+  extraArgs: []
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 512Mi
+  # Scale on queue depth with KEDA's PostgreSQL scaler (needs KEDA). Never scales below 1: a running
+  # worker elects the leader that enqueues periodic jobs, so zero workers would never wake up.
+  keda:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 10
+    pollingInterval: 15
+    cooldownPeriod: 300
+    # Runnable jobs per worker replica (roughly WFM_WORKER_CONCURRENCY).
+    targetQueryValue: "10"
+    activationTargetQueryValue: "0"
+    query: "SELECT count(*) FROM river_job WHERE state = 'available' AND scheduled_at <= now()"
+    # Replica count KEDA holds if the query keeps failing. Cannot be combined with cpuTrigger.
+    fallback:
+      enabled: true
+      failureThreshold: 3
+      replicas: 2
+    # Also scale on CPU (disables fallback; KEDA rejects fallback with cpu triggers).
+    cpuTrigger:
+      enabled: false
+      targetUtilization: "80"
+    # spec.advanced.horizontalPodAutoscalerConfig.behavior
+    behavior: {}
+  # Plain CPU HPA, used only when keda.enabled=false (e.g. clusters without KEDA).
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 75
+    targetMemoryUtilizationPercentage: null
+    behavior: {}
+  pdb:
+    enabled: true
+    maxUnavailable: 1
+    minAvailable: null
+  topologySpread:
+    enabled: true
+    whenUnsatisfiable: ScheduleAnyway
+    constraints: []
+  service:
+    annotations: {}
+  preStopSleepSeconds: 0
+  # River stops fetching and waits for running jobs (up to 25s) before exiting.
+  terminationGracePeriodSeconds: 60
+  probes:
+    startup:
+      httpGet: {path: /healthz, port: metrics}
+      periodSeconds: 2
+      failureThreshold: 30
+    liveness:
+      httpGet: {path: /healthz, port: metrics}
+      periodSeconds: 10
+      timeoutSeconds: 2
+      failureThreshold: 3
+    readiness:
+      httpGet: {path: /readyz, port: metrics}
+      periodSeconds: 10
+      timeoutSeconds: 3
+      failureThreshold: 3
+  podAnnotations: {}
+  podLabels: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  priorityClassName: ""
+  extraEnv: []
+  extraEnvFrom: []
+  extraVolumes: []
+  extraVolumeMounts: []
+  tmpSizeLimit: 512Mi
+
+# -----------------------------------------------------------------------------
+# Traffic: two entry points. web is internal; hooks is the only internet-facing one.
+# -----------------------------------------------------------------------------
+ingress:
+  web:
+    enabled: true
+    # An internal class (internal ALB, a private Traefik/Envoy, ...).
+    className: ""
+    annotations: {}
+    hosts:
+      - wfm.example.internal
+    path: /
+    pathType: Prefix
+    tls:
+      enabled: false
+      # Defaults to <fullname>-web-tls.
+      secretName: ""
+    # Adds cert-manager.io/cluster-issuer (or issuer) so cert-manager issues the TLS secret.
+    certManager:
+      clusterIssuer: ""
+      issuer: ""
+  hooks:
+    enabled: true
+    # The public class (internet-facing ALB, public Traefik entry point, ...).
+    className: ""
+    annotations: {}
+    hosts:
+      - hooks.example.com
+    paths:
+      - /hooks
+      - /scim
+    pathType: Prefix
+    tls:
+      enabled: false
+      secretName: ""
+    certManager:
+      clusterIssuer: ""
+      issuer: ""
+
+# Gateway API alternative (Envoy Gateway, Traefik, Cilium, AWS Gateway controller, ...).
+# TLS and cert-manager certificates live on the Gateway listeners, which the platform team owns.
+gatewayAPI:
+  web:
+    enabled: false
+    annotations: {}
+    parentRefs: []
+      # - name: internal
+      #   namespace: gateway-system
+      #   sectionName: https
+    hostnames: []
+    # Timeout for the SSE stream at /api/v1/events. "0s" disables it (Envoy's default route
+    # timeout of 15s would otherwise cut live updates). Empty omits the field.
+    streamTimeout: "0s"
+  hooks:
+    enabled: false
+    annotations: {}
+    parentRefs: []
+      # - name: public
+      #   namespace: gateway-system
+      #   sectionName: https
+    hostnames: []
+    paths:
+      - /hooks
+      - /scim
+
+# -----------------------------------------------------------------------------
+# NetworkPolicies
+# -----------------------------------------------------------------------------
+# k3s enforces NetworkPolicies out of the box; on EKS enable network policy in the VPC CNI add-on
+# (or run Cilium/Calico).
+networkPolicy:
+  enabled: true
+  # Deny all ingress to every pod in the namespace that no other policy allows.
+  defaultDenyIngress: true
+  web:
+    # Peers allowed to reach the web pods on the http port: the internal ingress controller.
+    ingressFrom:
+      - namespaceSelector:
+          matchLabels:
+            kubernetes.io/metadata.name: ingress
+    # Outbound HTTPS: OIDC discovery/token exchange, SCM APIs, S3.
+    internetEgress: true
+  hooks:
+    # Peers allowed to reach the hooks pods: the PUBLIC ingress controller only.
+    ingressFrom:
+      - namespaceSelector:
+          matchLabels:
+            kubernetes.io/metadata.name: ingress-public
+    # Webhooks and SCIM only write to the database.
+    internetEgress: false
+  worker:
+    # SCM APIs, outbound automation webhooks, Google directory, S3.
+    internetEgress: true
+  metrics:
+    # Peers allowed to scrape :9090 (all components).
+    from:
+      - namespaceSelector:
+          matchLabels:
+            kubernetes.io/metadata.name: monitoring
+  egress:
+    # Restrict egress of app pods (DNS, database, internet as configured above, extraRules).
+    enabled: true
+    dns:
+      to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - {port: 53, protocol: UDP}
+        - {port: 53, protocol: TCP}
+    database:
+      # For an external database: peers (e.g. ipBlock of the RDS subnets). Empty = any destination.
+      # Ignored with CNPG (the cluster's pods are selected automatically).
+      to: []
+      port: 5432
+    internet:
+      cidrs:
+        - 0.0.0.0/0
+      # Cloud metadata endpoints are never needed by the app.
+      except:
+        - 169.254.169.254/32
+      ports:
+        - 443
+    # Extra egress rules (NetworkPolicyEgressRule) for every app pod, e.g. an OTLP collector.
+    extraRules: []
+  # Ingress to the CNPG instances (rendered when database.cnpg.enabled).
+  database:
+    # Namespace of the CloudNativePG operator.
+    operatorNamespace: cnpg-system
+    # Namespace of the KEDA operator (queue-depth query).
+    kedaNamespace: keda
+    extraFrom: []
+
+# -----------------------------------------------------------------------------
+# Observability
+# -----------------------------------------------------------------------------
+serviceMonitor:
+  enabled: false
+  # e.g. {release: kube-prometheus-stack}
+  labels: {}
+  interval: 30s
+  scrapeTimeout: 10s
+
+# A Grafana dashboard (HTTP, request limits, background jobs, webhooks, live streams, processes)
+# as a ConfigMap for the Grafana sidecar of kube-prometheus-stack, which loads ConfigMaps
+# labelled grafana_dashboard="1". Needs serviceMonitor (its `component` label drives the filter).
+grafanaDashboard:
+  enabled: false
+  labels:
+    grafana_dashboard: "1"
+  # e.g. {grafana_folder: Workflow} when the sidecar sorts dashboards into folders
+  annotations: {}
+  # Where Grafana's sidecar looks; empty = the release namespace.
+  namespace: ""
+
+# Alerts (a PrometheusRule for the Prometheus Operator): many server errors, slow requests,
+# failing background jobs, failing Git webhooks, or a component with no healthy target.
+prometheusRule:
+  enabled: false
+  # e.g. {release: kube-prometheus-stack}
+  labels: {}
+  errorRatio: 0.05          # share of responses that are 5xx, over 10 minutes
+  latencyP95Seconds: 2      # p95 request latency, over 15 minutes
+  jobErrorsPerMinute: 5     # failed background job attempts, over 15 minutes
+
+# Extra manifests rendered with the release (strings or objects; templated with tpl), e.g. a Traefik
+# Middleware restricting the internal host, a SecretStore, or a Barman Cloud ObjectStore.
+extraObjects: []

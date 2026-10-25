@@ -1,0 +1,65 @@
+{{- $k := .Values.worker.keda }}
+{{- if and .Values.worker.enabled $k.enabled }}
+{{- if and $k.fallback.enabled $k.cpuTrigger.enabled }}
+{{- fail "worker.keda: fallback cannot be combined with cpuTrigger (KEDA only supports fallback for AverageValue triggers)" }}
+{{- end }}
+{{- $name := printf "%s-worker" (include "wfm.fullname" .) }}
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: {{ $name }}-postgres
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "wfm.componentLabels" (dict "root" . "component" "worker") | nindent 4 }}
+spec:
+  secretTargetRef:
+    # Full connection string (postgres://...) from the same Secret the app uses.
+    - parameter: connection
+      name: {{ include "wfm.databaseSecretName" . }}
+      key: {{ include "wfm.databaseSecretKey" . }}
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: {{ $name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "wfm.componentLabels" (dict "root" . "component" "worker") | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ $name }}
+  # Never zero: the elected River leader schedules periodic jobs, so an idle queue must keep a worker.
+  minReplicaCount: {{ max 1 (int $k.minReplicas) }}
+  maxReplicaCount: {{ $k.maxReplicas }}
+  pollingInterval: {{ $k.pollingInterval }}
+  cooldownPeriod: {{ $k.cooldownPeriod }}
+  {{- if and $k.fallback.enabled (not $k.cpuTrigger.enabled) }}
+  fallback:
+    failureThreshold: {{ $k.fallback.failureThreshold }}
+    replicas: {{ $k.fallback.replicas }}
+  {{- end }}
+  {{- with $k.behavior }}
+  advanced:
+    horizontalPodAutoscalerConfig:
+      behavior:
+        {{- toYaml . | nindent 8 }}
+  {{- end }}
+  triggers:
+    # Runnable River jobs: available and due.
+    - type: postgresql
+      name: river-queue-depth
+      metadata:
+        query: {{ $k.query | quote }}
+        targetQueryValue: {{ $k.targetQueryValue | quote }}
+        activationTargetQueryValue: {{ $k.activationTargetQueryValue | quote }}
+      authenticationRef:
+        name: {{ $name }}-postgres
+    {{- if $k.cpuTrigger.enabled }}
+    - type: cpu
+      metricType: Utilization
+      metadata:
+        value: {{ $k.cpuTrigger.targetUtilization | quote }}
+    {{- end }}
+{{- end }}

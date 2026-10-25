@@ -1,0 +1,19 @@
+# Layer on top of values-dev.yaml to use a single-instance CloudNativePG cluster instead of the
+# throwaway PostgreSQL (needs the CNPG operator: see .github/workflows/ci.yml for the manifest).
+database:
+  cnpg:
+    enabled: true
+    instances: 1
+    storage:
+      size: 1Gi
+      storageClass: local-path
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+    postgresql:
+      parameters:
+        max_connections: "100"
+        shared_buffers: 64MB
+    affinity:
+      enablePodAntiAffinity: false

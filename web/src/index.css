@@ -1,0 +1,145 @@
+@import "tailwindcss";
+
+/* Semantic colour tokens. Components use these (bg-surface, text-muted, border-line, ...) so
+   dark mode is a token swap rather than per-component variants. */
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --color-canvas: #f6f7f9;
+  --color-surface: #ffffff;
+  --color-surface-2: #f1f3f6;
+  --color-surface-3: #e7eaf0;
+  --color-line: #e2e5eb;
+  --color-line-strong: #cdd2db;
+  --color-ink: #171a21;
+  --color-muted: #525a68;
+  --color-faint: #646b78;
+  --color-accent: #2563eb;
+  --color-accent-hover: #1d4ed8;
+  --color-accent-soft: #edf2ff;
+  --color-accent-ink: #ffffff;
+  --color-danger: #c81e1e;
+  --color-danger-soft: #fdecec;
+  --color-danger-ink: #ffffff;
+  --color-success: #15803d;
+  --color-success-soft: #eaf7ee;
+  --color-warning: #b45309;
+  --color-warning-soft: #fdf3e2;
+
+  /* Status categories */
+  --color-todo: #5d6573;
+  --color-todo-soft: #eceef2;
+  --color-progress: #2563eb;
+  --color-progress-soft: #ebf1fe;
+  --color-done: #15803d;
+  --color-done-soft: #eaf7ee;
+
+  /* Chart colours, validated as sets with the dataviz palette checks: adjacent slots stay
+     apart under colour-blindness in both themes and sit in the lightness band. Categorical
+     slots are assigned in this fixed order, never cycled; past eight, fold into "Other".
+     The category trio is the status categories stepped for chart fills. Light slots 3-5 are
+     under 3:1 on the surface, so charts using them ship a legend and a table view. */
+  --color-chart-1: #2a78d6;
+  --color-chart-2: #eb6834;
+  --color-chart-3: #1baf7a;
+  --color-chart-4: #eda100;
+  --color-chart-5: #e87ba4;
+  --color-chart-6: #008300;
+  --color-chart-7: #6250d6;
+  --color-chart-8: #e34948;
+  --color-chart-todo: #5d6573;
+  --color-chart-progress: #2563eb;
+  --color-chart-done: #15803d;
+}
+
+:root {
+  color-scheme: light;
+}
+
+/* Dark theme. public/theme-init.js sets data-theme before first paint from the saved choice
+   (System, Light or Dark; see src/lib/theme.ts), so there is no flash of the wrong theme. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-canvas: #0f1115;
+  --color-surface: #171a20;
+  --color-surface-2: #1e222a;
+  --color-surface-3: #272c36;
+  --color-line: #2a2f39;
+  --color-line-strong: #3a404c;
+  --color-ink: #e8eaee;
+  --color-muted: #a3aab6;
+  --color-faint: #868e9c;
+  --color-accent: #4c8dff;
+  --color-accent-hover: #6aa0ff;
+  --color-accent-soft: #172440;
+  --color-accent-ink: #0b1020;
+  --color-danger: #f26d6d;
+  --color-danger-soft: #3a1d1f;
+  --color-danger-ink: #1b0b0b;
+  --color-success: #4ccb7a;
+  --color-success-soft: #173323;
+  --color-warning: #f0a83a;
+  --color-warning-soft: #3a2c15;
+  --color-todo: #a3aab6;
+  --color-todo-soft: #262b34;
+  --color-progress: #6aa0ff;
+  --color-progress-soft: #1b2a47;
+  --color-done: #4ccb7a;
+  --color-done-soft: #173323;
+  --color-chart-1: #3987e5;
+  --color-chart-2: #d95926;
+  --color-chart-3: #199e70;
+  --color-chart-4: #c98500;
+  --color-chart-5: #d55181;
+  --color-chart-6: #008300;
+  --color-chart-7: #9085e9;
+  --color-chart-8: #e66767;
+  --color-chart-todo: #6b7280;
+  --color-chart-progress: #4c8dff;
+  --color-chart-done: #2f9e5c;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Markdown and rich-text content */
+.prose-wfm {
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.prose-wfm > * + * {
+  margin-top: 0.6em;
+}
+.prose-wfm h1 { font-size: 1.35em; font-weight: 600; }
+.prose-wfm h2 { font-size: 1.2em; font-weight: 600; }
+.prose-wfm h3 { font-size: 1.05em; font-weight: 600; }
+.prose-wfm ul { list-style: disc; padding-left: 1.4em; }
+.prose-wfm ol { list-style: decimal; padding-left: 1.4em; }
+.prose-wfm a { color: var(--color-accent); text-decoration: underline; text-underline-offset: 2px; }
+.prose-wfm code { font-family: var(--font-mono); font-size: 0.9em; background: var(--color-surface-2); padding: 0.1em 0.35em; border-radius: 4px; }
+.prose-wfm pre { background: var(--color-surface-2); padding: 0.75em 1em; border-radius: 6px; overflow-x: auto; }
+.prose-wfm pre code { background: none; padding: 0; }
+.prose-wfm blockquote { border-left: 3px solid var(--color-line-strong); padding-left: 0.8em; color: var(--color-muted); }
+.prose-wfm table { border-collapse: collapse; }
+.prose-wfm th, .prose-wfm td { border: 1px solid var(--color-line); padding: 0.3em 0.6em; }
+.prose-wfm input[type="checkbox"] { margin-right: 0.4em; }
+
+.tiptap:focus { outline: none; }
+.tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--color-faint);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}

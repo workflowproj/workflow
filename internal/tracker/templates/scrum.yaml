@@ -1,0 +1,51 @@
+id: scrum
+name: Scrum
+description: Plan work in sprints from a ranked backlog. Stories go through code review; epics group related work.
+boardType: scrum
+workflows:
+  - name: Software development
+    description: To Do → In Progress → In Review → Done, with rework and reopen paths.
+    statuses:
+      - { name: To Do, category: todo }
+      - { name: In Progress, category: in_progress }
+      - { name: In Review, category: in_progress }
+      - { name: Done, category: done }
+    transitions:
+      - name: Start work
+        from: [To Do]
+        to: In Progress
+        postFunctions: [{ assignTo: actor }]
+      - { name: Stop work, from: [In Progress], to: To Do }
+      - { name: Submit for review, from: [In Progress], to: In Review }
+      - { name: Request changes, from: [In Review], to: In Progress }
+      - name: Done
+        from: [In Progress, In Review]
+        to: Done
+        validators:
+          - expr: 'issue.subtasks.all(s, s.category == "done")'
+            message: Finish every sub-task first.
+      - { name: Reopen, from: [Done], to: To Do }
+    layout:
+      To Do: { x: 0, y: 120 }
+      In Progress: { x: 260, y: 120 }
+      In Review: { x: 520, y: 120 }
+      Done: { x: 780, y: 120 }
+  - name: Simple
+    description: To Do, In Progress, Done; move freely.
+    statuses:
+      - { name: To Do, category: todo }
+      - { name: In Progress, category: in_progress }
+      - { name: Done, category: done }
+    transitions:
+      - { name: To Do, to: To Do }
+      - { name: In Progress, to: In Progress }
+      - { name: Done, to: Done }
+issueTypes:
+  - { key: epic, name: Epic, level: 1, icon: epic, color: '#8b5cf6', workflow: Simple }
+  - { key: story, name: Story, level: 0, icon: story, color: '#22a06b', workflow: Software development }
+  - { key: task, name: Task, level: 0, icon: task, color: '#1d7afc', workflow: Software development }
+  - { key: bug, name: Bug, level: 0, icon: bug, color: '#e2483d', workflow: Software development }
+  - { key: subtask, name: Sub-task, level: -1, icon: subtask, color: '#5e8fff', workflow: Simple }
+boards:
+  - name: Sprint board
+    type: scrum

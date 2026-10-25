@@ -1,0 +1,54 @@
+# A software workflow with code review, QA and guard rails, ready for `wfm workflow apply`.
+kind: Workflow
+name: Code review
+description: Backlog → In Progress → In Review → QA → Done, with checks on estimates, PRs and sub-tasks.
+statuses:
+  - { name: Backlog, category: todo }
+  - { name: Selected for Development, category: todo }
+  - { name: In Progress, category: in_progress }
+  - { name: In Review, category: in_progress }
+  - { name: QA, category: in_progress }
+  - { name: Done, category: done }
+transitions:
+  - name: Select
+    from: Backlog
+    to: Selected for Development
+    validators:
+      - expr: issue.type == "bug" || issue.storyPoints > 0
+        message: Estimate the story before selecting it.
+  - name: Start work
+    from: [Backlog, Selected for Development]
+    to: In Progress
+    postFunctions: [{ assignTo: actor }]
+  - name: Submit for review
+    from: In Progress
+    to: In Review
+    validators:
+      - expr: issue.devLinks.exists(d, d.kind == "pr")
+        message: Link a pull request first (put the issue key in its title or branch).
+  - { name: Request changes, from: [In Review, QA], to: In Progress, screen: [{ field: comment, required: true }] }
+  - name: Ready for QA
+    from: In Review
+    to: QA
+    postFunctions: [{ notify: watchers }]
+  - name: Done
+    from: [QA, In Review]
+    to: Done
+    condition: actor.hasRole("admin") || actor.hasRole("member")
+    validators:
+      - expr: issue.subtasks.all(s, s.category == "done")
+        message: Finish every sub-task first.
+      - expr: '!issue.links.exists(l, l.type == "blocks" && l.direction == "inward" && l.category != "done")'
+        message: An issue blocking this one is still open.
+    screen: [resolution]
+  - { name: Reopen, from: Done, to: Backlog }
+  - name: Won't do
+    to: Done
+    screen: [{ field: resolution, required: true }, { field: comment, required: true }]
+layout:
+  Backlog: { x: 0, y: 160 }
+  Selected for Development: { x: 240, y: 40 }
+  In Progress: { x: 480, y: 160 }
+  In Review: { x: 720, y: 160 }
+  QA: { x: 960, y: 160 }
+  Done: { x: 1200, y: 160 }

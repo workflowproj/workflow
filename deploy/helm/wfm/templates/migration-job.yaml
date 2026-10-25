@@ -1,0 +1,101 @@
+{{- if .Values.migrations.enabled }}
+{{- $m := .Values.migrations }}
+# `wfm migrate`: goose application migrations, then River's queue schema. See values.yaml
+# (migrations) and docs/deployment.md for the ordering with Argo CD and plain Helm.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "wfm.fullname" . }}-migrate
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "wfm.componentLabels" (dict "root" . "component" "migrate") | nindent 4 }}
+  annotations:
+    # Argo CD: takes precedence over the Helm hook annotations below.
+    argocd.argoproj.io/hook: {{ $m.argocd.hook }}
+    argocd.argoproj.io/hook-delete-policy: {{ $m.argocd.deletePolicy }}
+    argocd.argoproj.io/sync-wave: {{ $m.argocd.syncWave | quote }}
+    # Plain Helm (helm install/upgrade, the k3s helm-controller).
+    helm.sh/hook: {{ $m.helm.hook }}
+    helm.sh/hook-weight: {{ $m.helm.weight | quote }}
+    helm.sh/hook-delete-policy: {{ $m.helm.deletePolicy }}
+spec:
+  backoffLimit: {{ $m.backoffLimit }}
+  activeDeadlineSeconds: {{ $m.activeDeadlineSeconds }}
+  {{- if not (kindIs "invalid" $m.ttlSecondsAfterFinished) }}
+  ttlSecondsAfterFinished: {{ $m.ttlSecondsAfterFinished }}
+  {{- end }}
+  template:
+    metadata:
+      labels:
+        {{- include "wfm.componentLabels" (dict "root" . "component" "migrate") | nindent 8 }}
+        {{- with $m.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with $m.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ include "wfm.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automountToken }}
+      enableServiceLinks: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: migrate
+          image: {{ include "wfm.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["migrate"]
+          # Config is inlined (not the ConfigMap) so a pre-upgrade hook sees the new values even
+          # though the ConfigMap is only updated after the hook.
+          env:
+            {{- range $k, $v := .Values.config }}
+            {{- if not (kindIs "invalid" $v) }}
+            - name: {{ $k }}
+              value: {{ $v | toString | quote }}
+            {{- end }}
+            {{- end }}
+            {{- include "wfm.commonEnv" . | nindent 12 }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- $secret := include "wfm.secretName" . }}
+          {{- if or $secret .Values.extraEnvFrom }}
+          envFrom:
+            {{- with $secret }}
+            - secretRef:
+                name: {{ . }}
+            {{- end }}
+            {{- with .Values.extraEnvFrom }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- end }}
+          resources:
+            {{- toYaml $m.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+      {{- with ($m.nodeSelector | default .Values.nodeSelector) }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with ($m.tolerations | default .Values.tolerations) }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with ($m.affinity | default .Values.affinity) }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

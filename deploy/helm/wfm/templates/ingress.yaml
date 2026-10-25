@@ -1,0 +1,51 @@
+{{- range $component := list "web" "hooks" }}
+{{- $i := index $.Values.ingress $component }}
+{{- if and $i.enabled (index $.Values $component).enabled }}
+{{- $svc := printf "%s-%s" (include "wfm.fullname" $) $component }}
+{{- $paths := ternary (list $i.path) $i.paths (eq $component "web") }}
+---
+# {{ ternary "Internal entry point: UI, API, OIDC redirects and SSE." "PUBLIC entry point: only /hooks and /scim are routed." (eq $component "web") }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $svc }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "wfm.componentLabels" (dict "root" $ "component" $component) | nindent 4 }}
+  {{- $ann := merge (include "wfm.certManagerAnnotations" $i | fromYaml) ($i.annotations | default dict) }}
+  {{- with $ann }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- with $i.className }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  {{- $hosts := compact ($i.hosts | default list) }}
+  {{- if $i.tls.enabled }}
+  tls:
+    - secretName: {{ $i.tls.secretName | default (printf "%s-tls" $svc) }}
+      {{- with $hosts }}
+      hosts:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  {{- end }}
+  rules:
+    {{- range $host := ($hosts | default (list "")) }}
+    - http:
+        paths:
+          {{- range $p := $paths }}
+          - path: {{ $p }}
+            pathType: {{ $i.pathType }}
+            backend:
+              service:
+                name: {{ $svc }}
+                port:
+                  name: http
+          {{- end }}
+      {{- if $host }}
+      host: {{ $host | quote }}
+      {{- end }}
+    {{- end }}
+{{- end }}
+{{- end }}

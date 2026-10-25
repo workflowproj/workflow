@@ -1,0 +1,34 @@
+# Local / CI cluster for wfm: k3s in Docker with a local registry and Traefik on localhost.
+#
+#   k3d cluster create --config deploy/k3d/cluster.yaml
+#   tilt up                         # inner loop (see the Tiltfile)
+#   k3d cluster delete wfm
+#
+# UI:    http://wfm.localhost:8081      (Traefik ingress; *.localhost resolves to 127.0.0.1)
+# Hooks: http://hooks.localhost:8081/hooks/...
+apiVersion: k3d.io/v1alpha5
+kind: Simple
+metadata:
+  name: wfm
+servers: 1
+agents: 0
+# Keep in step with the Kubernetes versions you run in production (chart needs >= 1.30).
+image: rancher/k3s:v1.33.5-k3s1
+ports:
+  - port: 8081:80
+    nodeFilters: [loadbalancer]
+  - port: 8443:443
+    nodeFilters: [loadbalancer]
+registries:
+  # Tilt discovers this registry through the local-registry-hosting ConfigMap k3d creates.
+  create:
+    name: wfm-registry.localhost
+    host: "0.0.0.0"
+    hostPort: "5005"
+options:
+  k3d:
+    wait: true
+    timeout: "180s"
+  kubeconfig:
+    updateDefaultKubeconfig: true
+    switchCurrentContext: true

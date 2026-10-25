@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "wfm.fullname" . }}-config
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "wfm.labels" . | nindent 4 }}
+  annotations:
+    {{- include "wfm.syncWave" .Values.argocd.syncWaves.config | nindent 4 }}
+data:
+  {{- range $k, $v := .Values.config }}
+  {{- if not (kindIs "invalid" $v) }}
+  {{ $k }}: {{ $v | toString | quote }}
+  {{- end }}
+  {{- end }}
