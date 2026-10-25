@@ -219,7 +219,8 @@ With NetworkPolicies on, list the database's addresses in `networkPolicy.egress.
 All keys of the app Secret become environment variables (`envFrom`). It must contain
 `WFM_SECRET_KEY` (32+ characters; keep it stable, it encrypts stored SCM keys and webhook secrets)
 and whatever else is secret: `WFM_GOOGLE_CLIENT_SECRET`, `WFM_OIDC_<ID>_CLIENT_SECRET`,
-`WFM_GOOGLE_SERVICE_ACCOUNT_KEY`, `WFM_S3_ACCESS_KEY`/`WFM_S3_SECRET_KEY` (omit with IRSA).
+`WFM_GOOGLE_SERVICE_ACCOUNT_KEY`, `WFM_KEYCLOAK_CLIENT_SECRET`, `WFM_S3_ACCESS_KEY`/`WFM_S3_SECRET_KEY`
+(omit with IRSA).
 
 - **Production (EKS): External Secrets.** `secrets.externalSecret.enabled=true` with a
   `ClusterSecretStore` (AWS Secrets Manager, Vault, ...). `dataFrom.extract` maps a JSON document
@@ -486,12 +487,14 @@ tilt down && k3d cluster delete wfm
 ```
 
 Tilt deploys the same chart with `deploy/k3d/values-dev.yaml` (development sign-in, one replica
-each, NetworkPolicies on). For UI work trigger the `vite` resource: Vite on :5173 proxies `/api` to
+each, NetworkPolicies on) and Keycloak from `deploy/k3d/keycloak` (sign-in, directory sync and API
+tokens against the `wfm` realm; see [identity.md](identity.md#development-realm-k3d)). For UI work trigger the `vite` resource: Vite on :5173 proxies `/api` to
 the port-forwarded web pod.
 
 CI (`.github/workflows/ci.yml`) runs on every pull request: Go vet, generated-code drift and tests
 against a `postgres:17` service; web typecheck, tests and build; `helm lint` + `kubeconform` of
 every overlay (CRDs validated against the datree catalog); the image build; and an end-to-end job
-that creates an ephemeral k3d cluster, installs CloudNativePG, installs and upgrades the chart
-with development sign-in, checks the ingress split through Traefik, and runs the Playwright suite
-against a port-forward of the web Service.
+that creates an ephemeral k3d cluster, deploys Keycloak, installs CloudNativePG, installs and
+upgrades the chart with development sign-in and Keycloak, checks the ingress split through
+Traefik, that sign-in redirects to Keycloak and that a Keycloak directory sync provisions the
+realm's access group, and runs the Playwright suite against a port-forward of the web Service.

@@ -44,6 +44,7 @@ Pick one source of truth:
 |---|---|---|---|
 | **SCIM** | Okta, Entra ID, OneLogin, JumpCloud, Google (via a SCIM connector) | by the IdP when people are assigned to the app | unassigned / `active=false` / deleted in the IdP |
 | **Google directory sync** | Google Workspace without a SCIM connector | every `WFM_GOOGLE_SYNC_INTERVAL` (15 min) for members of the access group or org unit | suspended, archived or removed from the group/OU; deleted |
+| **Keycloak directory sync** | Keycloak (its SCIM support only receives users) | every `WFM_KEYCLOAK_SYNC_INTERVAL` (15 min) for members of the access group and its subgroups | disabled or removed from the access group; deleted |
 | **Just-in-time** | small teams | on first sign-in | an admin deactivates them |
 
 `WFM_JIT_PROVISIONING=auto` (default) enables just-in-time accounts only while no SCIM
@@ -99,6 +100,127 @@ With neither a group nor an org unit, every user in the domain gets an account. 
 keep their membership in sync and can be used in project roles. Runs are listed under
 Administration → Sign-in & provisioning, with a *Run now* button.
 
+## Keycloak
+
+People sign in through Keycloak as an OpenID Connect provider (`WFM_OIDC_PROVIDERS=keycloak`,
+issuer `https://<keycloak>/realms/<realm>`, redirect URI `https://<host>/auth/keycloak/callback`),
+and Workflow can provision them from the realm with directory sync. Only one directory sync
+(Google Workspace or Keycloak) can be on at a time.
+
+### Keycloak directory sync
+
+Keycloak's SCIM support only receives users from elsewhere, so Workflow pulls people and groups
+through the Keycloak Admin REST API instead, with a service account of its own:
+
+1. In the realm, create a client (e.g. `workflow-sync`): *Client authentication* on, *Service
+   accounts roles* on, every other flow off. Note its secret (Credentials tab).
+2. On its *Service accounts roles* tab, *Assign role* → filter by clients → `realm-management`
+   → `view-users` and `query-groups` (read-only; `view-users` includes `query-users`).
+3. Configure:
+
+```sh
+WFM_KEYCLOAK_ENABLED=true
+WFM_KEYCLOAK_URL=https://sso.example.com          # Keycloak's base URL (no /realms/…)
+WFM_KEYCLOAK_REALM=acme
+WFM_KEYCLOAK_CLIENT_ID=workflow-sync
+WFM_KEYCLOAK_CLIENT_SECRET=…
+WFM_KEYCLOAK_PROVIDER=keycloak                    # the WFM_OIDC_PROVIDERS entry for this realm
+WFM_KEYCLOAK_SYNC_GROUP=/workflow-users           # who gets an account (a group path)
+WFM_KEYCLOAK_SYNC_GROUPS=true                     # also mirror groups
+WFM_KEYCLOAK_GROUP_PREFIX=wfm-                    # only groups whose name starts with this
+```
+
+`WFM_KEYCLOAK_URL` is configured by an administrator, so it may be a private address inside the
+cluster (`http://keycloak.keycloak.svc:8080`); the outbound guard that protects user-supplied URLs
+does not apply to it. Each request times out after two minutes.
+
+**How a run works.** Workflow gets a client-credentials token
+(`POST {URL}/realms/{realm}/protocol/openid-connect/token`, renewed shortly before it expires and
+once more if Keycloak answers 401), then pages through `GET /admin/realms/{realm}/users` 100 at a
+time. With `WFM_KEYCLOAK_SYNC_GROUP` set, only direct members of that group (found with
+`group-by-path`) and of its subgroups are in scope; without it, everyone in the realm is. Service
+accounts are never provisioned.
+
+- **Matching.** Each person is linked to the sign-in provider by their Keycloak user id, which is
+  the `sub` of their tokens (`user_identities`: provider `WFM_KEYCLOAK_PROVIDER`, subject = user
+  id). A Keycloak user is matched to an existing account by that link first, then by email
+  (case-insensitive) — but only by a *verified* email, so that nobody can claim an account by
+  editing their own address. People without a verified email are not provisioned (they could not
+  sign in either); they and the accounts left alone (below) are counted as `usersSkipped`.
+- **Accounts** get source `keycloak`; email, display name (first and last name, else the username)
+  and given/family names follow Keycloak, and the profile is read-only here. Taking over an
+  existing local, just-in-time or development account removes its password and two-factor
+  settings, as with SCIM. Bootstrap admins are made organisation admins.
+- **Left alone:** accounts managed by SCIM (even with the same email), service accounts, and
+  accounts linked to another live Keycloak user.
+- **Disabled in Keycloak, or no longer in the access group:** deactivated at the next run —
+  sessions deleted and API tokens revoked at once — and reactivated when enabled or back in scope.
+  Disabled people are never created.
+- **Deleted in Keycloak:** marked deleted (deactivated, anonymised after
+  `WFM_DELETED_USER_RETENTION`); re-created within that time with the same email, they get the same
+  account back.
+- **Groups** (`WFM_KEYCLOAK_SYNC_GROUPS`, on by default): every group in the realm is walked,
+  including subgroups (`/groups/{id}/children`, Keycloak 23+; older versions nest them in the
+  listing), and kept when its *name* starts with `WFM_KEYCLOAK_GROUP_PREFIX` (case-insensitive;
+  a subgroup is judged by its own name, not its parent's). A synced group's name in Workflow is its
+  path without the leading `/` (`engineering/platform`): paths are unique in a realm and match a
+  `groups` claim with full paths. Members are the group's direct members that have an account
+  here, added and removed to match at each run; groups deleted upstream (or no longer matching the
+  prefix) are deleted here. Synced groups are read-only, but can be mapped to an organisation role
+  and granted project roles like any group.
+- **Failures** — Keycloak unreachable, a rejected client secret, a 403 (the error names the
+  missing `realm-management` roles), an access group that does not exist — fail the run with that
+  message. Nobody is deactivated or deleted unless the user list and the access group were read in
+  full.
+
+Each run is recorded with source `keycloak` and its counts (`usersCreated`, `usersUpdated`,
+`usersReactivated`, `usersDeactivated`, `usersDeleted`, `usersSkipped`, `groupsCreated`,
+`groupsUpdated`, `groupsDeleted`, `membershipsAdded`, `membershipsRemoved`, and the totals
+`users`, `groups`, `memberships`) under Administration → Sign-in & provisioning, which also shows
+the realm, URL, sign-in provider and access group and has a *Run now* button. The first run starts
+shortly after the worker starts. Just-in-time accounts are off while Keycloak sync is on
+(`WFM_JIT_PROVISIONING=auto`).
+
+### Development realm (k3d)
+
+`deploy/k3d/keycloak` runs Keycloak 26.4 in development mode for the local k3d cluster (Tilt) and
+the CI end-to-end job, importing the realm `wfm` from `realm-wfm.json` at every start. The admin
+console is `http://keycloak.localhost:8081/admin` (`admin` / `admin`). The issuer is
+`http://keycloak.localhost:8081/realms/wfm` for browsers (through Traefik) and for pods alike:
+a CoreDNS rewrite (`coredns-custom.yaml`) resolves `keycloak.localhost` to the Keycloak Service,
+which listens on 8081. `deploy/k3d/values-dev.yaml` configures the app for it; development sign-in
+stays on.
+
+| Client | Type | Settings | Used by |
+|---|---|---|---|
+| `workflow` | confidential, standard flow only | secret `workflow-dev-client-secret`; PKCE S256 required; redirect URIs `http://wfm.localhost:8081/auth/keycloak/callback`, `http://localhost:8080/auth/keycloak/callback`; post-logout redirects to the same hosts; back-channel logout URL `http://wfm-web.wfm.svc.cluster.local/auth/keycloak/backchannel-logout` with *session required*; front-channel logout off; mapper `groups` (group membership, full path, in ID, access and userinfo tokens) | sign-in (`WFM_OIDC_KEYCLOAK_*`) |
+| `workflow-sync` | confidential, service account only | secret `workflow-sync-dev-secret`; service account roles `realm-management` `view-users`, `query-groups` | directory sync (`WFM_KEYCLOAK_*`) |
+| `workflow-api` | confidential, no flows | none (it names the audience) | `WFM_OIDC_KEYCLOAK_API_AUDIENCE=workflow-api` |
+| `workflow-ci` | confidential, service account only | secret `workflow-ci-dev-secret`; audience mapper adding `workflow-api` to access tokens; tokens carry `azp` and `client_id` = `workflow-ci` | API tokens as the `ci-bot` service account (`WFM_OIDC_KEYCLOAK_API_CLIENTS=workflow-ci=ci-bot`) |
+| `workflow-cli` | public, password grant and device flow | audience mapper `workflow-api`, `groups` mapper; the password grant is for tests only | people's own API tokens |
+
+| User | Password | Email | Groups | Synced? |
+|---|---|---|---|---|
+| `alice` | `alice-dev-password` | alice@example.com (verified) | `/workflow-users`, `/wfm-admins` | yes; bootstrap admin |
+| `bob` | `bob-dev-password` | bob@example.com (verified) | `/workflow-users`, `/wfm-engineering/wfm-platform` | yes |
+| `carol` | `carol-dev-password` | carol@example.com (verified) | `/wfm-engineering` | no: not in the access group |
+| `dave` | `dave-dev-password` | dave@example.com (verified) | `/workflow-users` | no: disabled |
+
+The app syncs members of `/workflow-users` every 5 minutes and mirrors the `wfm-*` groups
+(`wfm-admins`, `wfm-engineering`, `wfm-engineering/wfm-platform`). Realm settings: SSL required
+for external requests only, no self-registration, unique emails, login with email allowed.
+
+To run the sync against a real Keycloak outside the cluster, start one with this realm and run the
+opt-in integration test:
+
+```sh
+docker run -d --name kc -p 127.0.0.1:8180:8080 -e KC_BOOTSTRAP_ADMIN_USERNAME=admin \
+  -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin \
+  -v $PWD/deploy/k3d/keycloak/realm-wfm.json:/opt/keycloak/data/import/realm-wfm.json:ro \
+  quay.io/keycloak/keycloak:26.4.7 start-dev --import-realm
+WFM_TEST_KEYCLOAK_URL=http://127.0.0.1:8180 go test ./internal/integration -run TestKeycloakRealm
+```
+
 ## Local accounts
 
 Local accounts sign in with an email address and a password: contractors and others outside
@@ -123,7 +245,7 @@ people an admin added, people created just in time by single sign-on, and develo
 accounts. *Send invitation* or *Set temporary password* in a person's actions menu makes them a
 local account; they then sign in either way, since single sign-on keeps matching their verified
 email. *Remove password* makes them single sign-on only again (and signs them out). People
-provisioned by SCIM or Google directory sync can never get a password, and when directory sync
+provisioned by SCIM or by Google or Keycloak directory sync can never get a password, and when directory sync
 takes over an existing local account (by matching its email) the account's password,
 two-factor settings, recovery codes and open links are deleted.
 

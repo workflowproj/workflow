@@ -28,8 +28,8 @@ search and live updates all run on Postgres.
   commits (`PLAT-12 #start-work #comment ready`) that go through the workflow engine; a comment
   on each new PR/MR; create branches from issues; periodic reconciliation for missed deliveries.
 - **Identity.** Google (or any OIDC provider) sign-in with domain restriction; SCIM 2.0 for Okta,
-  Entra ID and others; Google Workspace directory sync; just-in-time provisioning when neither is
-  used. Organisation roles, project roles, custom roles, groups mapped to roles, personal access
+  Entra ID and others; Google Workspace or Keycloak directory sync; just-in-time provisioning
+  when neither is used. Organisation roles, project roles, custom roles, groups mapped to roles, personal access
   tokens and service accounts with scopes and expiry, and an audit log.
 - **Local accounts.** People outside your identity provider (or a whole team without SSO) sign in
   with email and password: email invitations or temporary passwords, argon2id hashing with a
@@ -88,7 +88,7 @@ To run the production build locally: `make web embed-web build` then
 | [Architecture](docs/architecture.md) | Components, modes, data flow, the job queue and live updates |
 | [Configuration](docs/configuration.md) | Every `WFM_*` environment variable |
 | [Deployment](docs/deployment.md) | Kubernetes with Helm, upgrades, backups, air-gapped installs |
-| [Sign-in and provisioning](docs/identity.md) | Google / OIDC, SCIM, Google directory sync, local accounts, roles and tokens |
+| [Sign-in and provisioning](docs/identity.md) | Google / OIDC, SCIM, Google and Keycloak directory sync, local accounts, roles and tokens |
 | [GitHub and GitLab](docs/scm.md) | Connecting a GitHub App or GitLab, smart commits, write-back |
 | [Workflows as code](docs/workflows.md) | The YAML format, CEL reference, versioning and migration |
 | [JQL](docs/jql.md) | Query language reference |

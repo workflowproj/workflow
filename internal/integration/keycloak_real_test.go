@@ -17,7 +17,8 @@ import (
 // (deploy/k3d/keycloak/realm-wfm.json). It is skipped unless WFM_TEST_KEYCLOAK_URL is set:
 //
 //	docker run -d --name kc -p 127.0.0.1:8180:8080 -e KC_BOOTSTRAP_ADMIN_USERNAME=admin \
-//	  -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin -v $PWD/deploy/k3d/keycloak:/opt/keycloak/data/import:ro \
+//	  -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin \
+//	  -v $PWD/deploy/k3d/keycloak/realm-wfm.json:/opt/keycloak/data/import/realm-wfm.json:ro \
 //	  quay.io/keycloak/keycloak:26.4.7 start-dev --import-realm
 //	WFM_TEST_KEYCLOAK_URL=http://127.0.0.1:8180 go test ./internal/integration -run TestKeycloakRealm
 //

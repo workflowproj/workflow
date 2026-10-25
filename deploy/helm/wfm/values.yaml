@@ -86,7 +86,7 @@ otelKubernetesAttributes: true
 goMemLimitFromResources: true
 
 # Secret environment (WFM_SECRET_KEY, WFM_GOOGLE_CLIENT_SECRET, WFM_OIDC_<ID>_CLIENT_SECRET,
-# WFM_GOOGLE_SERVICE_ACCOUNT_KEY, WFM_S3_ACCESS_KEY/SECRET_KEY, ...). Every key in the Secret is
+# WFM_GOOGLE_SERVICE_ACCOUNT_KEY, WFM_KEYCLOAK_CLIENT_SECRET, WFM_S3_ACCESS_KEY/SECRET_KEY, ...). Every key in the Secret is
 # loaded as an environment variable. Pick ONE source:
 secrets:
   # 1. A Secret managed outside the chart (Sealed Secrets, SOPS via KSOPS, Vault agent, kubectl).
