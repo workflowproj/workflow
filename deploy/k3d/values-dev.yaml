@@ -3,7 +3,7 @@
 # *.localhost, NetworkPolicies on (k3s enforces them).
 # Database: the throwaway PostgreSQL in postgres.yaml. Add values-cnpg.yaml to use CloudNativePG.
 image:
-  repository: ghcr.io/geoffo-dev/workflow-management
+  repository: ghcr.io/workflowproj/workflow
   tag: dev
   pullPolicy: IfNotPresent
 

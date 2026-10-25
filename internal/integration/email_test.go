@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/geoffo-dev/workflow-management/internal/mail"
+	"github.com/workflowproj/workflow/internal/mail"
 )
 
 // mailbox returns the emails the in-memory sender holds for an address.

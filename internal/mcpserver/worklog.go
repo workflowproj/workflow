@@ -8,8 +8,8 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/geoffo-dev/workflow-management/internal/api"
-	"github.com/geoffo-dev/workflow-management/internal/timetrack"
+	"github.com/workflowproj/workflow/internal/api"
+	"github.com/workflowproj/workflow/internal/timetrack"
 )
 
 // units is the server's working day and week, which durations such as "1d" use.

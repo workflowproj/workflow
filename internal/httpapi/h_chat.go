@@ -3,9 +3,9 @@ package httpapi
 import (
 	"context"
 
-	"github.com/geoffo-dev/workflow-management/internal/api"
-	"github.com/geoffo-dev/workflow-management/internal/automation"
-	"github.com/geoffo-dev/workflow-management/internal/db/dbq"
+	"github.com/workflowproj/workflow/internal/api"
+	"github.com/workflowproj/workflow/internal/automation"
+	"github.com/workflowproj/workflow/internal/db/dbq"
 )
 
 func chatChannelView(c dbq.ChatChannel) api.ChatChannel {

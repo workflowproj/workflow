@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/geoffo-dev/workflow-management/internal/identity/local"
-	"github.com/geoffo-dev/workflow-management/internal/mail"
+	"github.com/workflowproj/workflow/internal/identity/local"
+	"github.com/workflowproj/workflow/internal/mail"
 )
 
 // ---------------------------------------------------------------------------

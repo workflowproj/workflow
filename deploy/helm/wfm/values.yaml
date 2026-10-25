@@ -12,7 +12,7 @@ fullnameOverride: ""
 commonLabels: {}
 
 image:
-  repository: ghcr.io/geoffo-dev/workflow-management
+  repository: ghcr.io/workflowproj/workflow
   # Defaults to the chart appVersion.
   tag: ""
   # sha256:... ; when set it wins over the tag (recommended with Cosign-verified releases).

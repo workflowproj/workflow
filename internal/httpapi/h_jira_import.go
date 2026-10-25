@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/geoffo-dev/workflow-management/internal/api"
-	"github.com/geoffo-dev/workflow-management/internal/db/dbq"
-	"github.com/geoffo-dev/workflow-management/internal/jiraimport"
+	"github.com/workflowproj/workflow/internal/api"
+	"github.com/workflowproj/workflow/internal/db/dbq"
+	"github.com/workflowproj/workflow/internal/jiraimport"
 )
 
 // Import from Jira: the wizard's API. The import service's views serialise to the same JSON as

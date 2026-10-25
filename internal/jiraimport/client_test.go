@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/geoffo-dev/workflow-management/internal/jiraimport/jiratest"
+	"github.com/workflowproj/workflow/internal/jiraimport/jiratest"
 )
 
 func TestClientPaginationAndRateLimits(t *testing.T) {

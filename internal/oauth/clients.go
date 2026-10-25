@@ -19,8 +19,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/geoffo-dev/workflow-management/internal/db/dbq"
-	"github.com/geoffo-dev/workflow-management/internal/secure"
+	"github.com/workflowproj/workflow/internal/db/dbq"
+	"github.com/workflowproj/workflow/internal/secure"
 )
 
 const (

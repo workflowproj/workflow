@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/geoffo-dev/workflow-management/internal/jobs"
-	"github.com/geoffo-dev/workflow-management/internal/mail"
+	"github.com/workflowproj/workflow/internal/jobs"
+	"github.com/workflowproj/workflow/internal/mail"
 )
 
 // devMessages lists the development mailbox: what this process's in-memory sender holds plus

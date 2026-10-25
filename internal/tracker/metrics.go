@@ -12,9 +12,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/geoffo-dev/workflow-management/internal/apperr"
-	"github.com/geoffo-dev/workflow-management/internal/authz"
-	"github.com/geoffo-dev/workflow-management/internal/db/dbq"
+	"github.com/workflowproj/workflow/internal/apperr"
+	"github.com/workflowproj/workflow/internal/authz"
+	"github.com/workflowproj/workflow/internal/db/dbq"
 )
 
 /*

@@ -4,10 +4,10 @@ import (
 	"context"
 	"strings"
 
-	"github.com/geoffo-dev/workflow-management/internal/authz"
-	"github.com/geoffo-dev/workflow-management/internal/db"
-	"github.com/geoffo-dev/workflow-management/internal/db/dbq"
-	"github.com/geoffo-dev/workflow-management/internal/tracker"
+	"github.com/workflowproj/workflow/internal/authz"
+	"github.com/workflowproj/workflow/internal/db"
+	"github.com/workflowproj/workflow/internal/db/dbq"
+	"github.com/workflowproj/workflow/internal/tracker"
 )
 
 // claimPlaceholder hands a placeholder account (a person known only from an import, see

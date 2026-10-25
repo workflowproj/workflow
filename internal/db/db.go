@@ -17,7 +17,7 @@ import (
 	"github.com/riverqueue/river/riverdriver/riverpgxv5"
 	"github.com/riverqueue/river/rivermigrate"
 
-	"github.com/geoffo-dev/workflow-management/internal/db/dbq"
+	"github.com/workflowproj/workflow/internal/db/dbq"
 )
 
 //go:embed migrations/*.sql

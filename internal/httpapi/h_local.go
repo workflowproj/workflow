@@ -10,12 +10,12 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/geoffo-dev/workflow-management/internal/api"
-	"github.com/geoffo-dev/workflow-management/internal/apperr"
-	"github.com/geoffo-dev/workflow-management/internal/db/dbq"
-	"github.com/geoffo-dev/workflow-management/internal/identity"
-	"github.com/geoffo-dev/workflow-management/internal/identity/local"
-	"github.com/geoffo-dev/workflow-management/internal/secure"
+	"github.com/workflowproj/workflow/internal/api"
+	"github.com/workflowproj/workflow/internal/apperr"
+	"github.com/workflowproj/workflow/internal/db/dbq"
+	"github.com/workflowproj/workflow/internal/identity"
+	"github.com/workflowproj/workflow/internal/identity/local"
+	"github.com/workflowproj/workflow/internal/secure"
 )
 
 // Local accounts: password sign-in, two-factor, invitation and reset links (see identity/local).

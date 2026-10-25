@@ -15,7 +15,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/geoffo-dev/workflow-management/internal/jiraimport/jiratest"
+	"github.com/workflowproj/workflow/internal/jiraimport/jiratest"
 )
 
 func main() {

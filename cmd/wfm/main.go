@@ -26,9 +26,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/geoffo-dev/workflow-management/internal/app"
-	"github.com/geoffo-dev/workflow-management/internal/config"
-	"github.com/geoffo-dev/workflow-management/internal/telemetry"
+	"github.com/workflowproj/workflow/internal/app"
+	"github.com/workflowproj/workflow/internal/config"
+	"github.com/workflowproj/workflow/internal/telemetry"
 )
 
 func main() {

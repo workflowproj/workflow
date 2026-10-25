@@ -9,9 +9,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/geoffo-dev/workflow-management/internal/db"
-	"github.com/geoffo-dev/workflow-management/internal/db/dbq"
-	"github.com/geoffo-dev/workflow-management/internal/events"
+	"github.com/workflowproj/workflow/internal/db"
+	"github.com/workflowproj/workflow/internal/db/dbq"
+	"github.com/workflowproj/workflow/internal/events"
 )
 
 // TestPooledDatabase runs the app as it runs behind a transaction-mode pooler: live events

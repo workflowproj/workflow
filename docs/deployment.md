@@ -43,20 +43,20 @@ Each `vX.Y.Z` tag runs `.github/workflows/release.yml`:
 
 | Artifact | Where |
 |---|---|
-| Image (linux/amd64 + linux/arm64, distroless `static-debian12:nonroot`, UID 65532) | `ghcr.io/geoffo-dev/workflow-management:X.Y.Z` |
+| Image (linux/amd64 + linux/arm64, distroless `static-debian12:nonroot`, UID 65532) | `ghcr.io/workflowproj/workflow:X.Y.Z` |
 | Keyless Cosign signature, SPDX SBOM attestation (Syft), SLSA provenance (BuildKit) | same repository |
-| Helm chart (OCI, Cosign-signed) | `oci://ghcr.io/geoffo-dev/charts/wfm` version `X.Y.Z` |
+| Helm chart (OCI, Cosign-signed) | `oci://ghcr.io/workflowproj/charts/wfm` version `X.Y.Z` |
 | Offline bundles (amd64, arm64), SBOM, checksums | GitHub release assets |
 
 Verify before deploying (or enforce it with Kyverno / the Sigstore policy-controller):
 
 ```sh
-IMG=ghcr.io/geoffo-dev/workflow-management@sha256:...
+IMG=ghcr.io/workflowproj/workflow@sha256:...
 cosign verify "$IMG" \
-  --certificate-identity-regexp '^https://github.com/geoffo-dev/workflow-management/' \
+  --certificate-identity-regexp '^https://github.com/workflowproj/workflow/' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 cosign verify-attestation "$IMG" --type spdxjson \
-  --certificate-identity-regexp '^https://github.com/geoffo-dev/workflow-management/' \
+  --certificate-identity-regexp '^https://github.com/workflowproj/workflow/' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
 
@@ -367,7 +367,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/geoffo-dev/workflow-management
+    repoURL: https://github.com/workflowproj/workflow
     targetRevision: v1.2.3
     path: deploy/helm/wfm
     helm:
@@ -382,7 +382,7 @@ spec:
     syncOptions: [CreateNamespace=true]
 ```
 
-EKS, signed OCI chart plus values from a GitOps repository (register `ghcr.io/geoffo-dev/charts`
+EKS, signed OCI chart plus values from a GitOps repository (register `ghcr.io/workflowproj/charts`
 as a Helm repository with `enableOCI: "true"`):
 
 ```yaml
@@ -394,7 +394,7 @@ metadata:
 spec:
   project: platform
   sources:
-    - repoURL: ghcr.io/geoffo-dev/charts
+    - repoURL: ghcr.io/workflowproj/charts
       chart: wfm
       targetRevision: 1.2.3
       helm:
@@ -452,7 +452,7 @@ Build one yourself (from a machine with registry access):
 
 ```sh
 scripts/bundle.sh --version 1.2.3 --arch arm64 --out dist
-scripts/bundle.sh --version dev --no-pull --image ghcr.io/geoffo-dev/workflow-management:dev   # a local build
+scripts/bundle.sh --version dev --no-pull --image ghcr.io/workflowproj/workflow:dev   # a local build
 EXTRA_IMAGES="ghcr.io/kedacore/keda:2.18.0" scripts/bundle.sh --version 1.2.3                    # extra images
 ```
 

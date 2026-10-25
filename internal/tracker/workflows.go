@@ -12,12 +12,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/geoffo-dev/workflow-management/internal/apperr"
-	"github.com/geoffo-dev/workflow-management/internal/authz"
-	"github.com/geoffo-dev/workflow-management/internal/db"
-	"github.com/geoffo-dev/workflow-management/internal/db/dbq"
-	"github.com/geoffo-dev/workflow-management/internal/jobs"
-	"github.com/geoffo-dev/workflow-management/internal/workflow"
+	"github.com/workflowproj/workflow/internal/apperr"
+	"github.com/workflowproj/workflow/internal/authz"
+	"github.com/workflowproj/workflow/internal/db"
+	"github.com/workflowproj/workflow/internal/db/dbq"
+	"github.com/workflowproj/workflow/internal/jobs"
+	"github.com/workflowproj/workflow/internal/workflow"
 )
 
 // problemsError converts workflow validation problems into a 422 with field errors.

@@ -6,10 +6,10 @@ import (
 	"github.com/google/uuid"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 
-	"github.com/geoffo-dev/workflow-management/internal/api"
-	"github.com/geoffo-dev/workflow-management/internal/authz"
-	"github.com/geoffo-dev/workflow-management/internal/db/dbq"
-	"github.com/geoffo-dev/workflow-management/internal/tracker"
+	"github.com/workflowproj/workflow/internal/api"
+	"github.com/workflowproj/workflow/internal/authz"
+	"github.com/workflowproj/workflow/internal/db/dbq"
+	"github.com/workflowproj/workflow/internal/tracker"
 )
 
 // ---------------------------------------------------------------------------

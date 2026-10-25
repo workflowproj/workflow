@@ -21,7 +21,7 @@ allow_k8s_contexts(["k3d-wfm"])
 update_settings(k8s_upsert_timeout_secs=120)
 
 NAMESPACE = "wfm"
-IMAGE = "ghcr.io/geoffo-dev/workflow-management"
+IMAGE = "ghcr.io/workflowproj/workflow"
 
 k8s_yaml(blob("""
 apiVersion: v1

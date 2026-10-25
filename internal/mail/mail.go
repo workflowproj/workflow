@@ -26,8 +26,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/geoffo-dev/workflow-management/internal/config"
-	"github.com/geoffo-dev/workflow-management/internal/jobs"
+	"github.com/workflowproj/workflow/internal/config"
+	"github.com/workflowproj/workflow/internal/jobs"
 )
 
 // Message is one email. Text is required; HTML is optional (sent as an alternative).

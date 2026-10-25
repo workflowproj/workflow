@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/geoffo-dev/workflow-management/internal/config"
-	"github.com/geoffo-dev/workflow-management/internal/identity/directory"
-	"github.com/geoffo-dev/workflow-management/internal/identity/directory/keycloaktest"
+	"github.com/workflowproj/workflow/internal/config"
+	"github.com/workflowproj/workflow/internal/identity/directory"
+	"github.com/workflowproj/workflow/internal/identity/directory/keycloaktest"
 )
 
 // clock is a settable time shared by the fake and the client.

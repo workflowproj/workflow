@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/geoffo-dev/workflow-management/internal/timetrack"
+	"github.com/workflowproj/workflow/internal/timetrack"
 )
 
 func mustCompile(t *testing.T, src string, env Env) *Compiled {

@@ -9,8 +9,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/geoffo-dev/workflow-management/internal/tracker"
-	"github.com/geoffo-dev/workflow-management/internal/workflow"
+	"github.com/workflowproj/workflow/internal/tracker"
+	"github.com/workflowproj/workflow/internal/workflow"
 )
 
 // Config is what the admin chose in the wizard: projects and their targets, and how Jira

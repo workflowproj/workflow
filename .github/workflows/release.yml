@@ -14,8 +14,8 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  IMAGE: ghcr.io/geoffo-dev/workflow-management
-  CHART_REGISTRY: oci://ghcr.io/geoffo-dev/charts
+  IMAGE: ghcr.io/workflowproj/workflow
+  CHART_REGISTRY: oci://ghcr.io/workflowproj/charts
   HELM_VERSION: v3.19.0
 
 jobs:

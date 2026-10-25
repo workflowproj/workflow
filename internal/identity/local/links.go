@@ -10,10 +10,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/geoffo-dev/workflow-management/internal/apperr"
-	"github.com/geoffo-dev/workflow-management/internal/db"
-	"github.com/geoffo-dev/workflow-management/internal/db/dbq"
-	"github.com/geoffo-dev/workflow-management/internal/secure"
+	"github.com/workflowproj/workflow/internal/apperr"
+	"github.com/workflowproj/workflow/internal/db"
+	"github.com/workflowproj/workflow/internal/db/dbq"
+	"github.com/workflowproj/workflow/internal/secure"
 )
 
 // newLink makes a single-use link token: a random value (stored hashed) plus a signature that

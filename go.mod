@@ -1,4 +1,4 @@
-module github.com/geoffo-dev/workflow-management
+module github.com/workflowproj/workflow
 
 go 1.26.0
 

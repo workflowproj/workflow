@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/geoffo-dev/workflow-management/internal/identity/directory"
-	"github.com/geoffo-dev/workflow-management/internal/identity/directory/keycloaktest"
+	"github.com/workflowproj/workflow/internal/identity/directory"
+	"github.com/workflowproj/workflow/internal/identity/directory/keycloaktest"
 )
 
 // ---------------------------------------------------------------------------

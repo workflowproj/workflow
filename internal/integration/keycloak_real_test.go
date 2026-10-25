@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/geoffo-dev/workflow-management/internal/identity/directory"
+	"github.com/workflowproj/workflow/internal/identity/directory"
 )
 
 // TestKeycloakRealm syncs from a real Keycloak running the development realm of the k3d setup

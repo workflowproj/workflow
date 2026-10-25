@@ -9,9 +9,9 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/geoffo-dev/workflow-management/internal/config"
-	"github.com/geoffo-dev/workflow-management/internal/db/dbq"
-	"github.com/geoffo-dev/workflow-management/internal/secure"
+	"github.com/workflowproj/workflow/internal/config"
+	"github.com/workflowproj/workflow/internal/db/dbq"
+	"github.com/workflowproj/workflow/internal/secure"
 )
 
 func ptr[T any](v T) *T { return &v }

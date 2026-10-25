@@ -12,7 +12,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 
-	"github.com/geoffo-dev/workflow-management/internal/jiraimport/jiratest"
+	"github.com/workflowproj/workflow/internal/jiraimport/jiratest"
 )
 
 // importJira walks the wizard's API: connect, choose projects, scan, dry-run and import.

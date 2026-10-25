@@ -14,7 +14,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/geoffo-dev/workflow-management/internal/authz"
+	"github.com/workflowproj/workflow/internal/authz"
 )
 
 // ---------------------------------------------------------------------------

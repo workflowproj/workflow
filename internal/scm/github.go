@@ -18,7 +18,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 
-	"github.com/geoffo-dev/workflow-management/internal/secure"
+	"github.com/workflowproj/workflow/internal/secure"
 )
 
 // GitHub implements Provider for a GitHub App (github.com or GitHub Enterprise Server).

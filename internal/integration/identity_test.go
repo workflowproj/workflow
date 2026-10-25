@@ -19,7 +19,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 
-	"github.com/geoffo-dev/workflow-management/internal/identity/directory"
+	"github.com/workflowproj/workflow/internal/identity/directory"
 )
 
 // ---------------------------------------------------------------------------

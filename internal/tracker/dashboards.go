@@ -8,10 +8,10 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/geoffo-dev/workflow-management/internal/api"
-	"github.com/geoffo-dev/workflow-management/internal/apperr"
-	"github.com/geoffo-dev/workflow-management/internal/authz"
-	"github.com/geoffo-dev/workflow-management/internal/db/dbq"
+	"github.com/workflowproj/workflow/internal/api"
+	"github.com/workflowproj/workflow/internal/apperr"
+	"github.com/workflowproj/workflow/internal/authz"
+	"github.com/workflowproj/workflow/internal/db/dbq"
 )
 
 // Dashboards are personal pages of gadgets (charts, counts, issue lists), optionally shared

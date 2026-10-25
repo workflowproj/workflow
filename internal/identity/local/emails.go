@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/geoffo-dev/workflow-management/internal/mail"
+	"github.com/workflowproj/workflow/internal/mail"
 )
 
 // email is the content of one account email; message renders it as text and HTML.

@@ -3,7 +3,7 @@ package httpapi
 import (
 	"context"
 
-	"github.com/geoffo-dev/workflow-management/internal/api"
+	"github.com/workflowproj/workflow/internal/api"
 )
 
 // ---------------------------------------------------------------------------

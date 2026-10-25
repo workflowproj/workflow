@@ -23,14 +23,14 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/geoffo-dev/workflow-management/internal/apperr"
-	"github.com/geoffo-dev/workflow-management/internal/authz"
-	"github.com/geoffo-dev/workflow-management/internal/config"
-	"github.com/geoffo-dev/workflow-management/internal/db/dbq"
-	"github.com/geoffo-dev/workflow-management/internal/jobs"
-	"github.com/geoffo-dev/workflow-management/internal/mail"
-	"github.com/geoffo-dev/workflow-management/internal/ratelimit"
-	"github.com/geoffo-dev/workflow-management/internal/secure"
+	"github.com/workflowproj/workflow/internal/apperr"
+	"github.com/workflowproj/workflow/internal/authz"
+	"github.com/workflowproj/workflow/internal/config"
+	"github.com/workflowproj/workflow/internal/db/dbq"
+	"github.com/workflowproj/workflow/internal/jobs"
+	"github.com/workflowproj/workflow/internal/mail"
+	"github.com/workflowproj/workflow/internal/ratelimit"
+	"github.com/workflowproj/workflow/internal/secure"
 )
 
 // Sign-in stages after the password.

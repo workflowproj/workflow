@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/geoffo-dev/workflow-management/internal/timetrack"
+	"github.com/workflowproj/workflow/internal/timetrack"
 )
 
 // Service desk fields: SLA clocks, request types, approvals and participants.

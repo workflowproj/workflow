@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/geoffo-dev/workflow-management/internal/secure"
+	"github.com/workflowproj/workflow/internal/secure"
 )
 
 // GitLab implements Provider for gitlab.com and self-managed GitLab, authenticated with a

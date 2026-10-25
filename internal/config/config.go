@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/geoffo-dev/workflow-management/internal/ratelimit"
+	"github.com/workflowproj/workflow/internal/ratelimit"
 )
 
 type Mode string
