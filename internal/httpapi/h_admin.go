@@ -476,7 +476,7 @@ func (s *Server) AdminGetProvisioning(ctx context.Context, _ api.AdminGetProvisi
 	for _, r := range runs {
 		stats := map[string]int{}
 		_ = json.Unmarshal(r.Stats, &stats)
-		dir.Runs = append(dir.Runs, api.DirectorySyncRun{Id: r.ID, Trigger: r.Trigger, Status: api.DirectorySyncRunStatus(r.Status), Stats: stats, Error: r.Error, StartedAt: r.StartedAt, FinishedAt: r.FinishedAt})
+		dir.Runs = append(dir.Runs, api.DirectorySyncRun{Id: r.ID, Trigger: r.Trigger, Source: api.DirectorySyncRunSource(r.Source), Status: api.DirectorySyncRunStatus(r.Status), Stats: stats, Error: r.Error, StartedAt: r.StartedAt, FinishedAt: r.FinishedAt})
 	}
 	bootstrap := s.Cfg.BootstrapAdmins
 	if bootstrap == nil {

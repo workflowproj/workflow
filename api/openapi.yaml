@@ -3155,7 +3155,7 @@ components:
         name: { type: string }
         loginUrl: { type: string }
     UserKind: { type: string, enum: [human, service] }
-    UserSource: { type: string, enum: [jit, scim, google, admin, dev, system] }
+    UserSource: { type: string, enum: [jit, scim, google, keycloak, admin, dev, system] }
 
     User:
       type: object
@@ -3290,7 +3290,10 @@ components:
         email: { type: string }
         orgRole: { $ref: '#/components/schemas/OrgRole' }
         memberCount: { type: integer }
-    GroupSource: { type: string, enum: [local, scim, google] }
+    GroupSource:
+      type: string
+      description: 'local: managed here. scim, google, keycloak: synced from that directory. oidc: from a sign-in token''s groups claim.'
+      enum: [local, scim, google, keycloak, oidc]
     GroupDetail:
       allOf:
         - $ref: '#/components/schemas/Group'
@@ -3387,10 +3390,11 @@ components:
             baseUrl: { type: string }
     DirectorySyncRun:
       type: object
-      required: [id, trigger, status, stats, startedAt]
+      required: [id, trigger, source, status, stats, startedAt]
       properties:
         id: { type: string, format: uuid }
         trigger: { type: string }
+        source: { type: string, enum: [google, keycloak], description: The directory that was synced }
         status: { type: string, enum: [running, succeeded, failed] }
         stats: { type: object, additionalProperties: { type: integer } }
         error: { type: string }

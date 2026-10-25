@@ -2549,7 +2549,7 @@ export interface components {
         /** @enum {string} */
         UserKind: "human" | "service";
         /** @enum {string} */
-        UserSource: "jit" | "scim" | "google" | "admin" | "dev" | "system";
+        UserSource: "jit" | "scim" | "google" | "keycloak" | "admin" | "dev" | "system";
         User: {
             /** Format: uuid */
             id: string;
@@ -2676,8 +2676,11 @@ export interface components {
             orgRole?: components["schemas"]["OrgRole"];
             memberCount: number;
         };
-        /** @enum {string} */
-        GroupSource: "local" | "scim" | "google";
+        /**
+         * @description local: managed here. scim, google, keycloak: synced from that directory. oidc: from a sign-in token's groups claim.
+         * @enum {string}
+         */
+        GroupSource: "local" | "scim" | "google" | "keycloak" | "oidc";
         GroupDetail: components["schemas"]["Group"] & {
             members: components["schemas"]["User"][];
         };
@@ -2759,6 +2762,11 @@ export interface components {
             /** Format: uuid */
             id: string;
             trigger: string;
+            /**
+             * @description The directory that was synced
+             * @enum {string}
+             */
+            source: "google" | "keycloak";
             /** @enum {string} */
             status: "running" | "succeeded" | "failed";
             stats: {
