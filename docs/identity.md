@@ -164,10 +164,11 @@ accounts are never provisioned.
   listing), and kept when its *name* starts with `WFM_KEYCLOAK_GROUP_PREFIX` (case-insensitive;
   a subgroup is judged by its own name, not its parent's). A synced group's name in Workflow is its
   path without the leading `/` (`engineering/platform`): paths are unique in a realm and match a
-  `groups` claim with full paths. Members are the group's direct members that have an account
-  here, added and removed to match at each run; groups deleted upstream (or no longer matching the
-  prefix) are deleted here. Synced groups are read-only, but can be mapped to an organisation role
-  and granted project roles like any group.
+  `groups` claim with full paths. A group renamed or moved in Keycloak keeps its identity here
+  (matched by Keycloak id), with its role mappings. Members are the group's direct members that
+  have an account here, added and removed to match at each run; groups deleted upstream (or no
+  longer matching the prefix) are deleted here. Synced groups are read-only, but can be mapped to
+  an organisation role and granted project roles like any group.
 - **Failures** — Keycloak unreachable, a rejected client secret, a 403 (the error names the
   missing `realm-management` roles), an access group that does not exist — fail the run with that
   message. Nobody is deactivated or deleted unless the user list and the access group were read in

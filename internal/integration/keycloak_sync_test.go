@@ -356,6 +356,49 @@ func TestKeycloakSyncConfirmsRemovals(t *testing.T) {
 	}
 }
 
+// Renamed groups keep their identity (role mappings, project roles), also when two swap paths.
+func TestKeycloakGroupRenames(t *testing.T) {
+	kc := keycloaktest.New()
+	t.Cleanup(kc.Close)
+	e := keycloakEnv(t, kc)
+	admin := e.login("admin@example.com", "Admin")
+	eng := kc.AddGroup("", "eng")
+	web := kc.AddGroup(eng, "web")
+	red := kc.AddGroup("", "red")
+	blue := kc.AddGroup("", "blue")
+	ann := kc.AddUser(kcUser{Username: "ann", Email: "ann@example.com"})
+	kc.AddMembers(web, ann)
+	kc.AddMembers(red, ann)
+	wantStats(t, syncNow(admin), map[string]int{"usersCreated": 1, "users": 1, "groupsCreated": 4, "groups": 4, "membershipsAdded": 2, "memberships": 2})
+	ids := func() map[string]string {
+		out := map[string]string{}
+		rows, err := e.Pool.Query(context.Background(), `SELECT external_id, display_name FROM groups WHERE source = 'keycloak'`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var ext, name string
+			_ = rows.Scan(&ext, &name)
+			out[ext] = name
+		}
+		return out
+	}
+
+	kc.RenameGroup(eng, "engineering") // the subgroup's path changes too
+	kc.RenameGroup(red, "tmp")
+	kc.RenameGroup(blue, "red")
+	kc.RenameGroup(red, "blue")
+	wantStats(t, syncNow(admin), map[string]int{"users": 1, "groupsUpdated": 4, "groups": 4, "memberships": 2})
+	got := ids()
+	if got[eng] != "engineering" || got[web] != "engineering/web" || got[red] != "blue" || got[blue] != "red" {
+		t.Fatalf("groups = %v", got)
+	}
+	if fmt.Sprint(e.keycloakGroups()) != fmt.Sprint(map[string][]string{"blue": {"ann@example.com"}, "engineering": {}, "engineering/web": {"ann@example.com"}, "red": {}}) {
+		t.Fatalf("memberships = %v", e.keycloakGroups())
+	}
+}
+
 // Failures are recorded on the run with a message an admin can act on, and never deactivate anyone.
 func TestKeycloakSyncFailures(t *testing.T) {
 	kc := keycloaktest.New()

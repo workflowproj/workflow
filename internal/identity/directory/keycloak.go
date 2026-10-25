@@ -406,13 +406,44 @@ func (s *KeycloakSyncer) syncGroups(ctx context.Context, local map[string]uuid.U
 	if err != nil {
 		return err
 	}
+	byExternal := map[string]dbq.Group{}
 	for _, g := range existing {
 		if g.ExternalID == nil || !want[*g.ExternalID] {
 			if err := s.Q.DeleteGroup(ctx, g.ID); err != nil {
 				return err
 			}
 			stats["groupsDeleted"]++
+			continue
 		}
+		byExternal[*g.ExternalID] = g
+	}
+	// Renamed groups (a parent renamed, two paths swapped) take their new names together, through
+	// temporary names, so that they never collide on the unique group name.
+	var renames []KeycloakGroup
+	for _, kg := range groups {
+		if g, ok := byExternal[kg.ID]; ok && g.DisplayName != keycloakGroupName(kg) {
+			renames = append(renames, kg)
+		}
+	}
+	if len(renames) > 0 {
+		err := db.Tx(ctx, s.Pool, func(_ pgx.Tx, q *dbq.Queries) error {
+			for _, kg := range renames {
+				g := byExternal[kg.ID]
+				if _, err := q.UpdateGroup(ctx, dbq.UpdateGroupParams{ID: g.ID, DisplayName: "~renaming " + g.ID.String(), Description: g.Description, ExternalID: g.ExternalID}); err != nil {
+					return err
+				}
+			}
+			for _, kg := range renames {
+				if _, err := q.UpdateGroup(ctx, dbq.UpdateGroupParams{ID: byExternal[kg.ID].ID, DisplayName: keycloakGroupName(kg), Description: kg.Description, ExternalID: &kg.ID}); err != nil {
+					return fmt.Errorf("rename group %s: %w", kg.Path, err)
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+		stats["groupsUpdated"] += len(renames)
 	}
 	for _, kg := range groups {
 		ids, err := s.Client.ListMemberIDs(ctx, kg.ID)

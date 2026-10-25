@@ -164,6 +164,30 @@ func (s *Server) SetGroupDescription(id, description string) {
 	}
 }
 
+// RenameGroup renames a group; its subgroups' paths follow.
+func (s *Server) RenameGroup(id, name string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	g := s.groups[id]
+	if g == nil {
+		return
+	}
+	g.Name = name
+	s.repath(g)
+}
+
+func (s *Server) repath(g *Group) {
+	g.Path = "/" + g.Name
+	if p := s.groups[g.ParentID]; p != nil {
+		g.Path = p.Path + "/" + g.Name
+	}
+	for _, c := range s.groups {
+		if c.ParentID == g.ID {
+			s.repath(c)
+		}
+	}
+}
+
 // DeleteGroup removes a group and its subgroups.
 func (s *Server) DeleteGroup(id string) {
 	s.mu.Lock()
