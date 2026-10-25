@@ -27,10 +27,11 @@ search and live updates all run on Postgres.
   webhooks; branches, commits, pull/merge requests and pipelines linked to issues by key; smart
   commits (`PLAT-12 #start-work #comment ready`) that go through the workflow engine; a comment
   on each new PR/MR; create branches from issues; periodic reconciliation for missed deliveries.
-- **Identity.** Google (or any OIDC provider) sign-in with domain restriction; SCIM 2.0 for Okta,
-  Entra ID and others; Google Workspace directory sync; just-in-time provisioning when neither is
-  used. Organisation roles, project roles, custom roles, groups mapped to roles, personal access
-  tokens and service accounts with scopes and expiry, and an audit log.
+- **Identity.** Google (or any OIDC provider) sign-in with domain restriction, groups taken from
+  sign-in tokens, single logout and back-channel logout; SCIM 2.0 for Okta, Entra ID and others;
+  Google Workspace directory sync; just-in-time provisioning when neither is used. Organisation
+  roles, project roles, custom roles, groups mapped to roles, personal access tokens, your identity
+  provider's access tokens and service accounts with scopes and expiry, and an audit log.
 - **Local accounts.** People outside your identity provider (or a whole team without SSO) sign in
   with email and password: email invitations or temporary passwords, argon2id hashing with a
   common-password check, TOTP two-factor with recovery codes, self-service password reset,

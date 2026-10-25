@@ -48,6 +48,11 @@ See [identity.md](identity.md).
 | `WFM_OIDC_PROVIDERS` | `google` if a Google client id is set | provider ids, e.g. `google,okta` |
 | `WFM_OIDC_<ID>_ISSUER`, `_CLIENT_ID`, `_CLIENT_SECRET` | — | per provider (Google's issuer is preset) |
 | `WFM_OIDC_<ID>_DISPLAY_NAME`, `_SCOPES`, `_ALLOWED_DOMAINS` | | optional per provider |
+| `WFM_OIDC_<ID>_GROUPS_CLAIM` | — | claim paths whose values are the person's groups at each sign-in, e.g. `groups,realm_access.roles` ([identity.md](identity.md#groups-from-the-sign-in-token)) |
+| `WFM_OIDC_<ID>_GROUPS_PREFIX` | — | only claim groups starting with this |
+| `WFM_OIDC_<ID>_SINGLE_LOGOUT` | `false` | signing out also signs out of the provider (RP-initiated logout) |
+| `WFM_OIDC_<ID>_API_AUDIENCE` | — | accept the provider's access tokens with this audience as API tokens; must differ from `_CLIENT_ID` |
+| `WFM_OIDC_<ID>_API_CLIENTS` | — | `clientid=serviceaccount,…`: client-credentials tokens act as that service account |
 | `WFM_ALLOWED_DOMAINS` | — | default allowed domains for every provider |
 | `WFM_JIT_PROVISIONING` | `auto` | `auto`, `true`, `false` |
 | `WFM_BOOTSTRAP_ADMINS` | — | emails that are always organisation admins |

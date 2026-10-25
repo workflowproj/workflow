@@ -36,6 +36,43 @@ check uses the email's domain, and the provider must assert `email_verified`.
 A person is matched to an existing account by provider subject, then (Google) Google id, then
 verified email. Deactivated and deleted accounts cannot sign in.
 
+### Groups from the sign-in token
+
+With `WFM_OIDC_<ID>_GROUPS_CLAIM` set, each sign-in reads groups from the ID token and makes them
+the person's groups from that provider, so [group → role mappings](#roles-and-permissions) apply
+without a directory sync:
+
+```sh
+WFM_OIDC_KEYCLOAK_GROUPS_CLAIM=groups,realm_access.roles   # dotted claim paths, comma-separated
+WFM_OIDC_KEYCLOAK_GROUPS_PREFIX=wfm-                       # optional: only groups starting with it
+```
+
+- Every string (or list of strings) at those paths counts; a leading `/` (Keycloak group paths)
+  is trimmed, and the prefix is matched after that.
+- The groups appear under Administration → Groups as `<provider>/<group>` with source *Sign-in*;
+  give them an organisation role there. Their names belong to the provider.
+- The token is authoritative: a group missing from the next sign-in's token is left, and so is
+  its role. Groups from other providers, directory sync, SCIM or made here are untouched.
+- The claim must be in the **ID token** (in Keycloak: the group or role mapper's *Add to ID
+  token*). At most 200 groups are taken from one token.
+
+### Signing out at the provider
+
+Sessions remember which provider session they came from (its `sid` and subject, and the ID token,
+sealed), so sign-out can work both ways:
+
+- **Back-channel logout** — when someone signs out at the provider, or an admin ends their session
+  there, the provider calls `POST https://<host>/auth/<id>/backchannel-logout` and Workflow ends
+  that session (by `sid`; by subject when the token has no `sid`). Register that URL as the
+  client's back-channel logout URL (Keycloak: *Backchannel logout URL*, with *session required*
+  on). The logout token must be signed by the provider for this client, be unexpired, carry the
+  back-channel logout event and no nonce; anything else gets `400`.
+- **Single logout** — with `WFM_OIDC_<ID>_SINGLE_LOGOUT=true`, signing out of Workflow also signs
+  out of the provider (RP-initiated logout): the browser goes to the provider's
+  `end_session_endpoint` with the ID token as hint and comes back to `/login`. Register
+  `https://<host>/login` as a valid post-logout redirect URI. Providers without an end-session
+  endpoint are signed out of Workflow only.
+
 ## Who gets an account
 
 Pick one source of truth:
@@ -228,6 +265,31 @@ org admins only). Tokens expire after 1–366 days and are stored hashed.
 Service accounts (Administration → Users → *New service account*) are non-human users for CI and
 scripts: give them project roles like people, and issue tokens for them. They cannot sign in
 interactively.
+
+### Access tokens from your identity provider
+
+Scripts and services that already get tokens from your identity provider can call the API with
+them instead of a personal access token. Give the provider an API audience, different from its
+sign-in client id so that sign-in ID tokens can never be replayed against the API:
+
+```sh
+WFM_OIDC_KEYCLOAK_API_AUDIENCE=workflow-api
+WFM_OIDC_KEYCLOAK_API_CLIENTS=ci-pipeline=ci-bot@service.example   # optional: client id=service account
+```
+
+- The token must be signed by that provider, have the API audience, be unexpired, and not be an
+  ID or logout token (`typ` `ID` or `Logout`).
+- Its `scope` claim sets what it may do: `wfm:read`, `wfm:write` and `wfm:admin` work like the
+  `read`, `write` and `admin` token scopes; a token with none of them is refused.
+- A token for a client listed in `API_CLIENTS` (client-credentials) acts as that service account
+  (its username, which is the email it was created with). Any other token acts as the person
+  whose subject (`sub`) has signed in with that provider before; deactivated people are refused.
+- Like personal access tokens, these never count as a browser session: no CSRF header is needed,
+  and they cannot create tokens, change sign-in settings or approve connected apps. They do not
+  work for `/mcp`, which takes personal access tokens or its own OAuth sign-in.
+
+In Keycloak, add an *Audience* mapper for `workflow-api` to the calling client (or a client
+scope) and client scopes named `wfm:read`, `wfm:write` and `wfm:admin`.
 
 Every security-relevant action — sign-ins, provisioning, role and membership changes, tokens,
 workflow publishes, connections — is recorded in the audit log (Administration → Audit log,
