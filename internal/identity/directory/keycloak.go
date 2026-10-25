@@ -114,7 +114,7 @@ func (s *KeycloakSyncer) sync(ctx context.Context) (Stats, error) {
 		if !l.active && slices.ContainsFunc(l.subjects, func(sub string) bool { return upstream[sub] }) {
 			continue // already deactivated, and still in Keycloak: nothing to do
 		}
-		exists, inScope, err := s.confirm(ctx, l.subjects, upstream)
+		subject, exists, inScope, err := s.confirm(ctx, l.subjects, upstream)
 		if err != nil {
 			return stats, err
 		}
@@ -123,6 +123,7 @@ func (s *KeycloakSyncer) sync(ctx context.Context) (Stats, error) {
 			// removed. The next run sees them again.
 			s.Log.Warn("keycloak user missing from the listing but still in scope; left as is", "user_id", id)
 			stats["users"]++
+			local[subject] = id
 			continue
 		}
 		err = db.Tx(ctx, s.Pool, func(_ pgx.Tx, q *dbq.Queries) error {
@@ -191,7 +192,7 @@ func (s *KeycloakSyncer) scope(ctx context.Context, all []KeycloakUser) (map[str
 // user ids): whether the person still exists, and whether they are in scope. Offset paging can
 // skip someone while users or members are deleted mid-run, so a removal is never taken from a
 // listing alone.
-func (s *KeycloakSyncer) confirm(ctx context.Context, subjects []string, upstream map[string]bool) (exists, inScope bool, err error) {
+func (s *KeycloakSyncer) confirm(ctx context.Context, subjects []string, upstream map[string]bool) (subject string, exists, inScope bool, err error) {
 	for _, sub := range subjects {
 		if !upstream[sub] {
 			u, err := s.Client.GetUser(ctx, sub)
@@ -199,7 +200,7 @@ func (s *KeycloakSyncer) confirm(ctx context.Context, subjects []string, upstrea
 				continue
 			}
 			if err != nil {
-				return false, false, err
+				return "", false, false, err
 			}
 			if u.ServiceAccountClientID != "" {
 				continue
@@ -207,19 +208,19 @@ func (s *KeycloakSyncer) confirm(ctx context.Context, subjects []string, upstrea
 		}
 		exists = true
 		if s.Cfg.SyncGroup == "" {
-			return true, true, nil
+			return sub, true, true, nil
 		}
 		paths, err := s.Client.UserGroupPaths(ctx, sub)
 		if err != nil {
-			return false, false, err
+			return "", false, false, err
 		}
 		for _, p := range paths {
 			if p == s.Cfg.SyncGroup || strings.HasPrefix(p, s.Cfg.SyncGroup+"/") {
-				return true, true, nil
+				return sub, true, true, nil
 			}
 		}
 	}
-	return exists, false, nil
+	return "", exists, false, nil
 }
 
 // errSkipUser rolls back one person's changes; they are counted in usersSkipped.
