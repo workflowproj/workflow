@@ -38,6 +38,18 @@ type OIDCProvider struct {
 	Scopes       []string
 	// AllowedDomains restricts sign-in. For Google the `hd` claim is checked; otherwise the email domain.
 	AllowedDomains []string
+	// GroupsClaim lists claim paths ("groups", "realm_access.roles") whose values are kept as
+	// the person's groups from this provider at each sign-in, for group -> role mappings.
+	GroupsClaim []string
+	// GroupsPrefix keeps only claim values starting with it (e.g. "wfm-"), matched before any
+	// leading "/" is trimmed from a Keycloak group path.
+	GroupsPrefix string
+	// SingleLogout signs people out of the IdP too (RP-initiated logout) when they sign out.
+	SingleLogout bool
+	// APIAudience accepts the IdP's access tokens for the API when their audience is this value.
+	APIAudience string
+	// APIClients maps an IdP client id (client-credentials tokens) to a Workflow service account username.
+	APIClients map[string]string
 }
 
 func (p OIDCProvider) IsGoogle() bool { return p.Issuer == GoogleIssuer }
@@ -105,6 +117,8 @@ type Config struct {
 	BootstrapAdmins []string
 
 	GoogleDirectory GoogleDirectory
+	// Keycloak directory sync through the Keycloak Admin REST API.
+	Keycloak Keycloak
 	// Anonymise users deleted upstream after this long. 0 disables anonymisation.
 	DeletedUserRetention time.Duration
 
@@ -366,7 +380,9 @@ func LoadFrom(get func(string) string) (*Config, error) {
 		e.errs = append(e.errs, fmt.Errorf("WFM_TIME_DAYS_PER_WEEK: must be more than 0 and at most 7, got %v", d))
 	}
 	c.OIDCProviders = loadOIDC(e)
+	c.Keycloak = loadKeycloak(e)
 	e.errs = append(e.errs, validateDatabase(c)...)
+	e.errs = append(e.errs, validateDirectory(c)...)
 
 	switch c.SMTP.TLS {
 	case "starttls", "tls", "none":
@@ -459,6 +475,18 @@ func loadOIDC(e *env) []OIDCProvider {
 		p.AllowedDomains = e.list(prefix + "ALLOWED_DOMAINS")
 		if len(p.AllowedDomains) == 0 {
 			p.AllowedDomains = globalDomains
+		}
+		p.GroupsClaim = e.list(prefix + "GROUPS_CLAIM")
+		p.GroupsPrefix = e.str(prefix+"GROUPS_PREFIX", "")
+		p.SingleLogout = e.boolean(prefix+"SINGLE_LOGOUT", false)
+		p.APIAudience = e.str(prefix+"API_AUDIENCE", "")
+		p.APIClients = e.pairs(prefix + "API_CLIENTS")
+		if p.APIAudience != "" && p.APIAudience == p.ClientID {
+			// Sign-in ID tokens carry the client id as audience; they must not work as API tokens.
+			e.errs = append(e.errs, fmt.Errorf("%sAPI_AUDIENCE must differ from %sCLIENT_ID", prefix, prefix))
+		}
+		if len(p.APIClients) > 0 && p.APIAudience == "" {
+			e.errs = append(e.errs, fmt.Errorf("%sAPI_CLIENTS needs %sAPI_AUDIENCE", prefix, prefix))
 		}
 		if p.Issuer == "" || p.ClientID == "" || p.ClientSecret == "" {
 			e.errs = append(e.errs, fmt.Errorf("OIDC provider %q needs %sISSUER, %sCLIENT_ID and %sCLIENT_SECRET", id, prefix, prefix, prefix))

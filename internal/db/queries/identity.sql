@@ -99,7 +99,17 @@ VALUES (@user_id, @provider, @subject, @email, now())
 ON CONFLICT (provider, subject) DO UPDATE SET email = excluded.email, last_used_at = now();
 
 -- name: CreateSession :exec
-INSERT INTO sessions (id, user_id, expires_at, ip, user_agent) VALUES ($1, $2, $3, $4, $5);
+INSERT INTO sessions (id, user_id, expires_at, ip, user_agent, idp_provider, idp_subject, idp_sid, idp_id_token)
+VALUES (@id, @user_id, @expires_at, @ip, @user_agent, sqlc.narg(idp_provider), sqlc.narg(idp_subject), sqlc.narg(idp_sid), sqlc.narg(idp_id_token));
+
+-- name: GetSessionIDP :one
+SELECT idp_provider, idp_id_token FROM sessions WHERE id = $1;
+
+-- name: DeleteSessionsByIDPSid :execrows
+DELETE FROM sessions WHERE idp_provider = @provider AND idp_sid = @sid;
+
+-- name: DeleteSessionsByIDPSubject :execrows
+DELETE FROM sessions WHERE idp_provider = @provider AND idp_subject = @subject;
 
 -- name: GetSessionUser :one
 SELECT sqlc.embed(users), sessions.last_seen_at AS session_last_seen
@@ -202,6 +212,25 @@ WHERE source = @source AND coalesce(scim_connection_id, '00000000-0000-0000-0000
 -- name: ListGroupsBySource :many
 SELECT * FROM groups WHERE source = $1;
 
+-- name: UserGroupsBySourcePrefix :many
+-- A person's groups from one source whose external id starts with the prefix (one OIDC provider).
+SELECT g.* FROM groups g JOIN group_members gm ON gm.group_id = g.id
+WHERE gm.user_id = @user_id AND g.source = @source AND g.external_id LIKE @prefix::text || '%';
+
+-- name: ListUsersBySourceWithIdentity :many
+-- Users a directory provisioned, with their subject at that directory's sign-in provider.
+SELECT u.id, u.active, ui.subject
+FROM users u
+LEFT JOIN user_identities ui ON ui.user_id = u.id AND ui.provider = @provider
+WHERE u.source = @source AND u.deleted_at IS NULL;
+
+-- name: GetUserByIdentity :one
+SELECT u.* FROM users u JOIN user_identities ui ON ui.user_id = u.id
+WHERE ui.provider = @provider AND ui.subject = @subject;
+
+-- name: GetServiceAccountByUsername :one
+SELECT * FROM users WHERE kind = 'service' AND lower(username) = lower(@username::text) AND active AND deleted_at IS NULL;
+
 -- ---------------------------------------------------------------------------
 -- Roles
 
@@ -255,7 +284,7 @@ SELECT count(*) FROM scim_connections WHERE revoked_at IS NULL;
 -- Directory sync & audit
 
 -- name: CreateDirectorySyncRun :one
-INSERT INTO directory_sync_runs (trigger) VALUES ($1) RETURNING *;
+INSERT INTO directory_sync_runs (trigger, source) VALUES (@trigger, @source) RETURNING *;
 
 -- name: FinishDirectorySyncRun :exec
 UPDATE directory_sync_runs SET status = @status, stats = @stats, error = @error, finished_at = now() WHERE id = @id;

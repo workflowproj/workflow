@@ -191,6 +191,7 @@ type DirectorySyncRun struct {
 	Error      *string
 	StartedAt  time.Time
 	FinishedAt *time.Time
+	Source     string
 }
 
 type EmailNotificationSetting struct {
@@ -559,13 +560,17 @@ type ScmRepository struct {
 }
 
 type Session struct {
-	ID         string
-	UserID     uuid.UUID
-	ExpiresAt  time.Time
-	Ip         *string
-	UserAgent  *string
-	CreatedAt  time.Time
-	LastSeenAt time.Time
+	ID          string
+	UserID      uuid.UUID
+	ExpiresAt   time.Time
+	Ip          *string
+	UserAgent   *string
+	CreatedAt   time.Time
+	LastSeenAt  time.Time
+	IdpProvider *string
+	IdpSubject  *string
+	IdpSid      *string
+	IdpIDToken  *string
 }
 
 type Sprint struct {
