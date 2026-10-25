@@ -1,0 +1,71 @@
+name: Feature request
+description: Suggest something Workflow should do, or do better.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the suggestion. Describing the problem you're trying to solve matters more than the exact solution; there may be a way to do it already, or a simpler one.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: What you or your team are trying to do, and what gets in the way today.
+      placeholder: Our support team answers the same few questions every day, and copies the replies from a document by hand.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like to happen?
+      description: How you imagine it working. Sketches and examples from other tools are welcome.
+      placeholder: Saved replies in the service desk that agents can insert into a reply to the customer.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What have you tried instead?
+      description: Workarounds you use now, such as automation rules, the API or another tool.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Boards, backlog and sprints
+        - Issues, fields and comments
+        - Workflows and transitions
+        - Search and filters
+        - Reports, dashboards and time tracking
+        - Timeline
+        - Automation and webhooks
+        - Service desk and help centre
+        - GitHub and GitLab
+        - Sign-in, provisioning and permissions
+        - Notifications, email and chat
+        - API and AI assistants (MCP)
+        - Import
+        - Installation, Helm chart and upgrades
+        - Accessibility or layout
+        - Something else
+    validations:
+      required: true
+
+  - type: textarea
+    id: more
+    attributes:
+      label: Anything else?
+      description: Who would use it and how often, constraints such as air-gapped networks, or links to related issues.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before you submit
+      options:
+        - label: I searched the existing issues and the documentation, and this isn't there yet.
+          required: true
+        - label: I'd like to help build this.
