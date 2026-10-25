@@ -217,6 +217,8 @@ func (s *Server) WebHandler(ui http.Handler) http.Handler {
 	})
 	mux.HandleFunc("GET /auth/{provider}/login", s.Auth.HandleLogin)
 	mux.HandleFunc("GET /auth/{provider}/callback", s.Auth.HandleCallback)
+	// The IdP's server calls this (OpenID Connect Back-Channel Logout); no cookies, no CSRF header.
+	mux.HandleFunc("POST /auth/{provider}/backchannel-logout", s.Auth.HandleBackchannelLogout)
 	mux.HandleFunc("GET /healthz", s.health)
 	mux.HandleFunc("GET /readyz", s.ready)
 	if ui != nil {
@@ -387,7 +389,7 @@ func (s *Server) authenticate(next http.Handler) http.Handler {
 			return
 		}
 		// Cookie sessions must send a header a cross-site form cannot (CSRF); tokens are exempt.
-		if !safeMethods[r.Method] && (a == nil || a.TokenID == nil) && r.Header.Get("X-Requested-With") == "" {
+		if !safeMethods[r.Method] && !a.ViaToken() && r.Header.Get("X-Requested-With") == "" {
 			WriteProblem(s.Log, w, r, apperr.Forbidden("missing X-Requested-With header"))
 			return
 		}

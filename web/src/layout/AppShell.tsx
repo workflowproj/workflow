@@ -201,9 +201,11 @@ function UserMenu() {
   const navigate = useNavigate();
   const logout = useMutation({
     mutationFn: () => unwrap(api.POST("/auth/logout")),
-    onSettled: () => {
+    onSettled: (data) => {
       qc.clear();
-      navigate({ to: "/login" });
+      // With single logout the sign-in provider ends its session too, then returns to /login.
+      if (data?.redirectUrl) window.location.assign(data.redirectUrl);
+      else navigate({ to: "/login" });
     },
   });
   if (!me) return null;

@@ -280,7 +280,20 @@ paths:
     post:
       operationId: logout
       tags: [auth]
+      description: >-
+        Ends the session. When it came from a sign-in provider with single logout on
+        (WFM_OIDC_<ID>_SINGLE_LOGOUT), the response is the provider's end-session URL to send the
+        browser to, so the person is signed out there too and comes back to /login.
       responses:
+        "200":
+          description: Signed out here; finish at the sign-in provider
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [redirectUrl]
+                properties:
+                  redirectUrl: { type: string, format: uri }
         "204": { description: Signed out }
         default: { $ref: '#/components/responses/Problem' }
   /me:

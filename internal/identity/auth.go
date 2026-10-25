@@ -209,7 +209,8 @@ func (a *Auth) HandleCallback(w http.ResponseWriter, r *http.Request) {
 		Picture       string `json:"picture"`
 		HD            string `json:"hd"`
 	}
-	if err := idTok.Claims(&claims); err != nil {
+	var all map[string]any
+	if err := idTok.Claims(&claims); err != nil || idTok.Claims(&all) != nil {
 		fail("invalid_token", err)
 		return
 	}
@@ -228,7 +229,15 @@ func (a *Auth) HandleCallback(w http.ResponseWriter, r *http.Request) {
 		fail("server_error", err)
 		return
 	}
-	if err := a.StartSession(w, r, user); err != nil {
+	if len(p.cfg.GroupsClaim) > 0 {
+		groups := claimGroups(all, p.cfg.GroupsClaim, p.cfg.GroupsPrefix)
+		if err := a.Prov.SyncClaimGroups(r.Context(), user.ID, id, groups); err != nil {
+			fail("server_error", err)
+			return
+		}
+	}
+	sid, _ := all["sid"].(string)
+	if err := a.StartSessionIDP(w, r, user, idpSession{Provider: id, Subject: idTok.Subject, SID: sid, IDToken: rawID}); err != nil {
 		fail("server_error", err)
 		return
 	}
@@ -239,6 +248,11 @@ func (a *Auth) HandleCallback(w http.ResponseWriter, r *http.Request) {
 
 // StartSession creates a server-side session and sets the cookie.
 func (a *Auth) StartSession(w http.ResponseWriter, r *http.Request, user dbq.User) error {
+	return a.startSession(w, r, user, dbq.CreateSessionParams{})
+}
+
+// startSession creates the session row (with any IdP details in p) and sets the cookie.
+func (a *Auth) startSession(w http.ResponseWriter, r *http.Request, user dbq.User, p dbq.CreateSessionParams) error {
 	token := secure.Token("", 32)
 	expires := time.Now().Add(a.Cfg.SessionTTL)
 	ua := r.UserAgent()
@@ -246,7 +260,8 @@ func (a *Auth) StartSession(w http.ResponseWriter, r *http.Request, user dbq.Use
 		ua = ua[:400]
 	}
 	ip := clientIP(r)
-	if err := a.Q.CreateSession(r.Context(), dbq.CreateSessionParams{ID: secure.Hash(token), UserID: user.ID, ExpiresAt: expires, Ip: &ip, UserAgent: &ua}); err != nil {
+	p.ID, p.UserID, p.ExpiresAt, p.Ip, p.UserAgent = secure.Hash(token), user.ID, expires, &ip, &ua
+	if err := a.Q.CreateSession(r.Context(), p); err != nil {
 		return err
 	}
 	if err := a.Q.TouchUserLogin(r.Context(), user.ID); err != nil {
@@ -292,10 +307,15 @@ func WithActor(ctx context.Context, a *authz.Actor) context.Context {
 }
 
 // Authenticate resolves a bearer token or session cookie into an actor (nil if anonymous).
+// Bearer tokens are personal access tokens, or access tokens from an OIDC provider that has an
+// API audience configured (authenticateJWT).
 func (a *Auth) Authenticate(r *http.Request) (*authz.Actor, error) {
 	ctx := r.Context()
 	if h := r.Header.Get("Authorization"); strings.HasPrefix(h, "Bearer ") {
 		token := strings.TrimSpace(strings.TrimPrefix(h, "Bearer "))
+		if !strings.HasPrefix(token, TokenPrefix) && looksLikeJWT(token) {
+			return a.authenticateJWT(ctx, token)
+		}
 		row, err := a.Q.GetAPITokenUser(ctx, secure.Hash(token))
 		if err != nil {
 			return nil, apperr.Unauthorized()
@@ -335,7 +355,7 @@ func (a *Auth) Authenticate(r *http.Request) (*authz.Actor, error) {
 // CheckScope enforces token scopes: read = safe methods, write = everything except
 // administration, admin = everything (still subject to the owner's own role).
 func CheckScope(actor *authz.Actor, method, path string) error {
-	if actor == nil || actor.TokenID == nil {
+	if !actor.ViaToken() {
 		return nil
 	}
 	has := func(s string) bool { return slices.Contains(actor.Scopes, s) }

@@ -189,7 +189,7 @@ func sessionActor(ctx context.Context) (dbq.User, error) {
 	if err != nil {
 		return dbq.User{}, err
 	}
-	if a.TokenID != nil {
+	if a.ViaToken() {
 		return dbq.User{}, apperr.Forbidden("tokens cannot change sign-in settings; use the web app")
 	}
 	return *a.User, nil

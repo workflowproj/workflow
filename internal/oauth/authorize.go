@@ -237,7 +237,7 @@ func sessionOnly(a *authz.Actor) error {
 	if a == nil || a.User == nil {
 		return apperr.Unauthorized()
 	}
-	if a.TokenID != nil {
+	if a.ViaToken() {
 		return apperr.Forbidden("connected apps can only be approved in the browser")
 	}
 	return nil

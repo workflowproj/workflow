@@ -214,6 +214,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** @description Ends the session. When it came from a sign-in provider with single logout on (WFM_OIDC_<ID>_SINGLE_LOGOUT), the response is the provider's end-session URL to send the browser to, so the person is signed out there too and comes back to /login. */
         post: operations["logout"];
         delete?: never;
         options?: never;
@@ -4901,6 +4902,18 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description Signed out here; finish at the sign-in provider */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uri */
+                        redirectUrl: string;
+                    };
+                };
+            };
             /** @description Signed out */
             204: {
                 headers: {
