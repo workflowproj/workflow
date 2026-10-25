@@ -7,9 +7,9 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/geoffo-dev/workflow-management/internal/apperr"
-	"github.com/geoffo-dev/workflow-management/internal/db"
-	"github.com/geoffo-dev/workflow-management/internal/db/dbq"
+	"github.com/workflowproj/workflow/internal/apperr"
+	"github.com/workflowproj/workflow/internal/db"
+	"github.com/workflowproj/workflow/internal/db/dbq"
 )
 
 // Security summarises how a person signs in.

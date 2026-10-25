@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/geoffo-dev/workflow-management/internal/config"
-	"github.com/geoffo-dev/workflow-management/internal/netguard"
-	"github.com/geoffo-dev/workflow-management/internal/secure"
+	"github.com/workflowproj/workflow/internal/config"
+	"github.com/workflowproj/workflow/internal/netguard"
+	"github.com/workflowproj/workflow/internal/secure"
 )
 
 func testServer(t *testing.T, public string) *Server {

@@ -9,8 +9,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	filter "github.com/scim2/filter-parser/v2"
 
-	"github.com/geoffo-dev/workflow-management/internal/db"
-	"github.com/geoffo-dev/workflow-management/internal/db/dbq"
+	"github.com/workflowproj/workflow/internal/db"
+	"github.com/workflowproj/workflow/internal/db/dbq"
 )
 
 type userAttrs struct {

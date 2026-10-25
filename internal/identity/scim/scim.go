@@ -18,12 +18,12 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/geoffo-dev/workflow-management/internal/authz"
-	"github.com/geoffo-dev/workflow-management/internal/db"
-	"github.com/geoffo-dev/workflow-management/internal/db/dbq"
-	"github.com/geoffo-dev/workflow-management/internal/identity"
-	"github.com/geoffo-dev/workflow-management/internal/secure"
-	"github.com/geoffo-dev/workflow-management/internal/tracker"
+	"github.com/workflowproj/workflow/internal/authz"
+	"github.com/workflowproj/workflow/internal/db"
+	"github.com/workflowproj/workflow/internal/db/dbq"
+	"github.com/workflowproj/workflow/internal/identity"
+	"github.com/workflowproj/workflow/internal/secure"
+	"github.com/workflowproj/workflow/internal/tracker"
 )
 
 const (

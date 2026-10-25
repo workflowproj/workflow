@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/geoffo-dev/workflow-management/internal/mail"
+	"github.com/workflowproj/workflow/internal/mail"
 )
 
 // actorName is who caused a notification; changes without a person are automation's.

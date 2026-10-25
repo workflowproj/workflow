@@ -6,11 +6,11 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/geoffo-dev/workflow-management/internal/api"
-	"github.com/geoffo-dev/workflow-management/internal/apperr"
-	"github.com/geoffo-dev/workflow-management/internal/db/dbq"
-	"github.com/geoffo-dev/workflow-management/internal/tracker"
-	"github.com/geoffo-dev/workflow-management/internal/workflow"
+	"github.com/workflowproj/workflow/internal/api"
+	"github.com/workflowproj/workflow/internal/apperr"
+	"github.com/workflowproj/workflow/internal/db/dbq"
+	"github.com/workflowproj/workflow/internal/tracker"
+	"github.com/workflowproj/workflow/internal/workflow"
 )
 
 func (s *Server) ListProjectTemplates(ctx context.Context, _ api.ListProjectTemplatesRequestObject) (api.ListProjectTemplatesResponseObject, error) {

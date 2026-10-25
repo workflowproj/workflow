@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 GOBIN ?= $(shell go env GOPATH)/bin
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
-LDFLAGS := -s -w -X github.com/geoffo-dev/workflow-management/internal/telemetry.Version=$(VERSION)
+LDFLAGS := -s -w -X github.com/workflowproj/workflow/internal/telemetry.Version=$(VERSION)
 DATABASE_URL ?= postgres://wfm:wfm@localhost:5432/wfm?sslmode=disable
 
 .PHONY: help tools generate generate-check build web web-dev embed-web test test-unit test-integration lint dev db-up db-down image
@@ -55,4 +55,4 @@ dev: ## Run the API in "all" mode with dev login (use `cd web && npm run dev` fo
 		go run ./cmd/wfm serve --mode=all --migrate
 
 image: ## Build the container image
-	docker build --build-arg VERSION=$(VERSION) -t ghcr.io/geoffo-dev/workflow-management:$(VERSION) .
+	docker build --build-arg VERSION=$(VERSION) -t ghcr.io/workflowproj/workflow:$(VERSION) .

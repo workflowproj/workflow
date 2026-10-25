@@ -19,16 +19,16 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.yaml.in/yaml/v3"
 
-	"github.com/geoffo-dev/workflow-management/internal/apperr"
-	"github.com/geoffo-dev/workflow-management/internal/authz"
-	"github.com/geoffo-dev/workflow-management/internal/config"
-	"github.com/geoffo-dev/workflow-management/internal/db"
-	"github.com/geoffo-dev/workflow-management/internal/db/dbq"
-	"github.com/geoffo-dev/workflow-management/internal/events"
-	"github.com/geoffo-dev/workflow-management/internal/jobs"
-	"github.com/geoffo-dev/workflow-management/internal/search"
-	"github.com/geoffo-dev/workflow-management/internal/storage"
-	"github.com/geoffo-dev/workflow-management/internal/workflow"
+	"github.com/workflowproj/workflow/internal/apperr"
+	"github.com/workflowproj/workflow/internal/authz"
+	"github.com/workflowproj/workflow/internal/config"
+	"github.com/workflowproj/workflow/internal/db"
+	"github.com/workflowproj/workflow/internal/db/dbq"
+	"github.com/workflowproj/workflow/internal/events"
+	"github.com/workflowproj/workflow/internal/jobs"
+	"github.com/workflowproj/workflow/internal/search"
+	"github.com/workflowproj/workflow/internal/storage"
+	"github.com/workflowproj/workflow/internal/workflow"
 )
 
 type Service struct {

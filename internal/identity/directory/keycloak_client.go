@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/geoffo-dev/workflow-management/internal/config"
+	"github.com/workflowproj/workflow/internal/config"
 )
 
 // KeycloakUser is the part of Keycloak's UserRepresentation the sync reads.

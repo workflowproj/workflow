@@ -1,6 +1,6 @@
 # One image, three modes (web, hooks, worker): the Go binary with the React UI embedded.
 #
-#   docker build --build-arg VERSION=$(git describe --tags --always) -t ghcr.io/geoffo-dev/workflow-management:dev .
+#   docker build --build-arg VERSION=$(git describe --tags --always) -t ghcr.io/workflowproj/workflow:dev .
 #
 # Stages
 #   web       Node 22: npm ci + npm run build -> /src/web/dist
@@ -58,15 +58,15 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     touch internal/webui/dist/.gitkeep && \
     GOOS=$TARGETOS GOARCH=$TARGETARCH \
     go build -trimpath -buildvcs=false \
-      -ldflags "-s -w -X github.com/geoffo-dev/workflow-management/internal/telemetry.Version=${VERSION}" \
+      -ldflags "-s -w -X github.com/workflowproj/workflow/internal/telemetry.Version=${VERSION}" \
       -o /out/wfm ./cmd/wfm
 
 # ---------------------------------------------------------------------------
 FROM ${RUNTIME_IMAGE} AS runtime
 ARG VERSION=dev
-LABEL org.opencontainers.image.title="workflow-management" \
+LABEL org.opencontainers.image.title="workflow" \
       org.opencontainers.image.description="Workflow platform: web, hooks and worker modes in one binary" \
-      org.opencontainers.image.source="https://github.com/geoffo-dev/workflow-management" \
+      org.opencontainers.image.source="https://github.com/workflowproj/workflow" \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.licenses="Apache-2.0"
 COPY --from=build /out/wfm /wfm

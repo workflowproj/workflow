@@ -13,9 +13,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
-	"github.com/geoffo-dev/workflow-management/internal/apperr"
-	"github.com/geoffo-dev/workflow-management/internal/identity"
-	"github.com/geoffo-dev/workflow-management/internal/ratelimit"
+	"github.com/workflowproj/workflow/internal/apperr"
+	"github.com/workflowproj/workflow/internal/identity"
+	"github.com/workflowproj/workflow/internal/ratelimit"
 )
 
 var rateLimited = promauto.NewCounterVec(prometheus.CounterOpts{

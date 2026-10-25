@@ -15,11 +15,11 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/geoffo-dev/workflow-management/internal/db"
-	"github.com/geoffo-dev/workflow-management/internal/db/dbq"
-	"github.com/geoffo-dev/workflow-management/internal/rank"
-	"github.com/geoffo-dev/workflow-management/internal/tracker"
-	"github.com/geoffo-dev/workflow-management/internal/workflow"
+	"github.com/workflowproj/workflow/internal/db"
+	"github.com/workflowproj/workflow/internal/db/dbq"
+	"github.com/workflowproj/workflow/internal/rank"
+	"github.com/workflowproj/workflow/internal/tracker"
+	"github.com/workflowproj/workflow/internal/workflow"
 )
 
 const (

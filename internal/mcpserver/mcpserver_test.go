@@ -7,7 +7,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/geoffo-dev/workflow-management/internal/authz"
+	"github.com/workflowproj/workflow/internal/authz"
 )
 
 // listTools lists the tools a server built for the actor offers.

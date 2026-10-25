@@ -11,10 +11,10 @@ import (
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/riverdriver/riverpgxv5"
 
-	"github.com/geoffo-dev/workflow-management/internal/app"
-	"github.com/geoffo-dev/workflow-management/internal/config"
-	"github.com/geoffo-dev/workflow-management/internal/identity/local"
-	"github.com/geoffo-dev/workflow-management/internal/secure"
+	"github.com/workflowproj/workflow/internal/app"
+	"github.com/workflowproj/workflow/internal/config"
+	"github.com/workflowproj/workflow/internal/identity/local"
+	"github.com/workflowproj/workflow/internal/secure"
 )
 
 // createAdmin makes someone an organisation admin with a local account and prints a temporary

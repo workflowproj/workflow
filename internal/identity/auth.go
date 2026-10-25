@@ -19,13 +19,13 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/oauth2"
 
-	"github.com/geoffo-dev/workflow-management/internal/apperr"
-	"github.com/geoffo-dev/workflow-management/internal/authz"
-	"github.com/geoffo-dev/workflow-management/internal/config"
-	"github.com/geoffo-dev/workflow-management/internal/db/dbq"
-	"github.com/geoffo-dev/workflow-management/internal/ratelimit"
-	"github.com/geoffo-dev/workflow-management/internal/secure"
-	"github.com/geoffo-dev/workflow-management/internal/tracker"
+	"github.com/workflowproj/workflow/internal/apperr"
+	"github.com/workflowproj/workflow/internal/authz"
+	"github.com/workflowproj/workflow/internal/config"
+	"github.com/workflowproj/workflow/internal/db/dbq"
+	"github.com/workflowproj/workflow/internal/ratelimit"
+	"github.com/workflowproj/workflow/internal/secure"
+	"github.com/workflowproj/workflow/internal/tracker"
 )
 
 const (

@@ -18,11 +18,11 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/geoffo-dev/workflow-management/internal/api"
-	"github.com/geoffo-dev/workflow-management/internal/apperr"
-	"github.com/geoffo-dev/workflow-management/internal/authz"
-	"github.com/geoffo-dev/workflow-management/internal/identity"
-	"github.com/geoffo-dev/workflow-management/internal/oauth"
+	"github.com/workflowproj/workflow/internal/api"
+	"github.com/workflowproj/workflow/internal/apperr"
+	"github.com/workflowproj/workflow/internal/authz"
+	"github.com/workflowproj/workflow/internal/identity"
+	"github.com/workflowproj/workflow/internal/oauth"
 )
 
 const instructions = `Workflow is the team's issue tracker (projects, epics, stories, tasks, bugs, sub-tasks, sprints, releases).

@@ -10,9 +10,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/riverqueue/river"
 
-	"github.com/geoffo-dev/workflow-management/internal/db/dbq"
-	"github.com/geoffo-dev/workflow-management/internal/jobs"
-	"github.com/geoffo-dev/workflow-management/internal/mail"
+	"github.com/workflowproj/workflow/internal/db/dbq"
+	"github.com/workflowproj/workflow/internal/jobs"
+	"github.com/workflowproj/workflow/internal/mail"
 )
 
 var (

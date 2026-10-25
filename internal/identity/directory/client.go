@@ -16,7 +16,7 @@ import (
 
 	"golang.org/x/oauth2/google"
 
-	"github.com/geoffo-dev/workflow-management/internal/config"
+	"github.com/workflowproj/workflow/internal/config"
 )
 
 const defaultBaseURL = "https://admin.googleapis.com/admin/directory/v1"

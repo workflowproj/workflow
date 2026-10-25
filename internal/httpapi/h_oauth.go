@@ -3,10 +3,10 @@ package httpapi
 import (
 	"context"
 
-	"github.com/geoffo-dev/workflow-management/internal/api"
-	"github.com/geoffo-dev/workflow-management/internal/db/dbq"
-	"github.com/geoffo-dev/workflow-management/internal/oauth"
-	"github.com/geoffo-dev/workflow-management/internal/tracker"
+	"github.com/workflowproj/workflow/internal/api"
+	"github.com/workflowproj/workflow/internal/db/dbq"
+	"github.com/workflowproj/workflow/internal/oauth"
+	"github.com/workflowproj/workflow/internal/tracker"
 )
 
 // AI assistants connected over OAuth: the consent page's API and the connected apps lists.

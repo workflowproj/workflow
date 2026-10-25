@@ -7,7 +7,7 @@ import (
 func (h *Handler) serviceProviderConfig(_ http.ResponseWriter, _ *http.Request) (any, int, error) {
 	return map[string]any{
 		"schemas":          []string{"urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig"},
-		"documentationUri": "https://github.com/geoffo-dev/workflow-management/blob/main/docs/provisioning.md",
+		"documentationUri": "https://docs.workflowproj.io/integrations/identity/#scim-20",
 		"patch":            map[string]any{"supported": true},
 		"bulk":             map[string]any{"supported": false, "maxOperations": 0, "maxPayloadSize": 0},
 		"filter":           map[string]any{"supported": true, "maxResults": maxCount},

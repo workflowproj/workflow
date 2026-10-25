@@ -14,7 +14,7 @@ import (
 	"github.com/oapi-codegen/nullable"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 
-	"github.com/geoffo-dev/workflow-management/internal/api"
+	"github.com/workflowproj/workflow/internal/api"
 )
 
 const jqlHelp = `Query examples (a JQL-like language):

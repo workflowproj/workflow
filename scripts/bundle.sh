@@ -14,7 +14,7 @@
 #   scripts/bundle.sh [--version 1.2.3] [--arch amd64|arm64] [--image REF] [--chart FILE.tgz]
 #                     [--out DIR] [--no-pull] [--extra-image REF]...
 #
-#   --image      image to bundle (default ghcr.io/geoffo-dev/workflow-management:VERSION); a digest
+#   --image      image to bundle (default ghcr.io/workflowproj/workflow:VERSION); a digest
 #                reference is fine, it is re-tagged to what the chart expects
 #   --chart      packaged chart (default: package deploy/helm/wfm with VERSION)
 #   --no-pull    use images already in the local Docker daemon (e.g. a fresh `make image`)
@@ -25,7 +25,7 @@
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-REPO=ghcr.io/geoffo-dev/workflow-management
+REPO=ghcr.io/workflowproj/workflow
 VERSION=""
 ARCH=amd64
 IMAGE=""
@@ -180,7 +180,7 @@ or import them into the running containerd:
 \`\`\`sh
 $( [[ "$IMAGES_ARCHIVE" == *.zst ]] && echo "zstd -d images/${IMAGES_ARCHIVE} -o /tmp/wfm-images.tar" || echo "gunzip -c images/${IMAGES_ARCHIVE} > /tmp/wfm-images.tar" )
 sudo k3s ctr images import /tmp/wfm-images.tar
-sudo k3s crictl images | grep -E 'workflow-management|cloudnative-pg'
+sudo k3s crictl images | grep -E 'workflowproj/workflow|cloudnative-pg'
 \`\`\`
 
 k3s itself needs its own air-gap images (k3s-airgap-images-${ARCH}.tar.zst from the k3s release)

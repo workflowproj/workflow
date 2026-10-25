@@ -31,7 +31,7 @@ helm.sh/chart: {{ include "wfm.chart" . }}
 {{ include "wfm.selectorLabels" . }}
 app.kubernetes.io/version: {{ include "wfm.imageTag" . | trunc 63 | quote }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
-app.kubernetes.io/part-of: workflow-management
+app.kubernetes.io/part-of: workflow
 {{- with .Values.commonLabels }}
 {{ toYaml . }}
 {{- end }}

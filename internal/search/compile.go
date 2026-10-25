@@ -10,7 +10,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/geoffo-dev/workflow-management/internal/timetrack"
+	"github.com/workflowproj/workflow/internal/timetrack"
 )
 
 // CustomField describes a custom field the compiler may reference by key or name.
