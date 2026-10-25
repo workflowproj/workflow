@@ -126,10 +126,47 @@ so deleting the release or the Argo CD Application never deletes the database.
 - k3s: `instances: 1` on `local-path`. Single-node means no failover; enable backups.
 - EKS: `instances: 3` with required zone anti-affinity, separate WAL volumes, synchronous
   failover handled by CNPG; PodDisruptionBudgets come from the operator.
-- Connections: each app pod opens up to 10 connections (more on large nodes). Size
-  `max_connections` for `(web + hooks + worker max replicas) × 10 + 20`. The web pods hold a
-  `LISTEN` connection for live events, so do not put a transaction-mode PgBouncer (CNPG `Pooler`)
-  in front of them.
+- Connections: each app pod opens up to 10 connections (more on large nodes). Without a pooler,
+  size `max_connections` for `(web + hooks + worker max replicas) × 10 + 20`. Once replica
+  counts make that large, turn on the pooler below.
+
+### Connection pooling
+
+`database.cnpg.pooler.enabled: true` puts PgBouncer in front of the primary (a CNPG `Pooler`
+named `<cluster>-pooler-rw`, transaction mode), so adding app pods adds client connections to
+PgBouncer rather than PostgreSQL sessions.
+
+```yaml
+database:
+  cnpg:
+    pooler:
+      enabled: true
+      instances: 2
+      parameters:
+        default_pool_size: "40"        # server connections per database/user
+        max_client_conn: "1000"
+        max_prepared_statements: "200" # pgx prepared statements in transaction mode
+```
+
+What changes when it is on:
+
+| Connection | Goes to | Why |
+|---|---|---|
+| App queries (web, hooks, worker) | the pooler (`WFM_DATABASE_POOLER_HOST`) | transaction pooling keeps PostgreSQL sessions flat as pods scale |
+| Live events on each web pod | the primary, one session per pod | `LISTEN` needs a session of its own, which transaction pooling cannot give |
+| River (worker) | the pooler, in poll-only mode | workers look for jobs every `worker.pollInterval` (default `1s`) instead of `LISTEN`ing; leader election also polls |
+| Migration job, KEDA scaler | the primary | schema changes and the queue-depth query use the direct address in `<cluster>-app` |
+
+Size `default_pool_size` for the busiest moment: roughly the jobs and requests that run at
+once, not the number of pods. PostgreSQL then needs `max_connections` of about
+`default_pool_size × pooler instances + web replicas + 20`. Prepared statements need PgBouncer
+1.21 or later with `max_prepared_statements` above zero (the CNPG pooler images qualify). The
+app uses no session state (`SET`, advisory locks, temporary tables), so transaction mode is
+safe. With network policies on, the chart allows app pods to reach the pooler, the pooler to
+reach the primary, and Prometheus to scrape the pooler.
+
+For an external PostgreSQL behind your own PgBouncer, set `WFM_DATABASE_URL` to the pooler and
+`WFM_DATABASE_DIRECT_URL` to the server itself (through `secrets.*` or `extraEnv`).
 
 ### Backups and restore
 

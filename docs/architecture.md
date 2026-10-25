@@ -73,6 +73,10 @@ Every change writes a domain event inside its transaction in two forms:
    notifications and outbound webhooks run if and only if the change committed;
 2. a `pg_notify` on commit, which the web process fans out to subscribed browsers over SSE.
 
+Each web pod holds one `LISTEN` session for those notifications. Behind a transaction-mode
+connection pooler that session is a dedicated direct connection, and River runs poll-only, so
+everything else can go through the pooler (see [deployment.md](deployment.md#connection-pooling)).
+
 Job kinds: `domain_event`, `scm_webhook`, `scm_writeback`, `scm_reconcile`, `scm_ensure_hook`,
 `workflow_migrate`, `post_function`, `webhook_deliver`, `directory_sync`,
 `automation_schedule`, `maintenance`. Failed jobs retry with backoff. Periodic jobs: scheduled

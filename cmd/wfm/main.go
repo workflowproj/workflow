@@ -107,28 +107,38 @@ func serve(args []string) error {
 	}
 	defer func() { _ = shutdownTracing(context.Background()) }()
 
-	pool, err := app.OpenWithRetry(ctx, cfg.DatabaseURL, 2*time.Minute, log)
+	if *doMigrate {
+		// Migrations need a direct session, never a transaction-mode pooler.
+		direct, err := app.OpenWithRetry(ctx, cfg.DirectDatabaseURL(), 2*time.Minute, log)
+		if err != nil {
+			return err
+		}
+		err = app.Migrate(ctx, direct, log)
+		direct.Close()
+		if err != nil {
+			return err
+		}
+	}
+	pool, err := app.OpenWithRetry(ctx, cfg.AppDatabaseURL(), 2*time.Minute, log)
 	if err != nil {
 		return err
 	}
 	defer pool.Close()
-	if *doMigrate {
-		if err := app.Migrate(ctx, pool, log); err != nil {
-			return err
-		}
-	}
 	a, err := app.New(ctx, cfg, log, pool, app.Options{})
 	if err != nil {
 		return err
 	}
-	log.Info("starting", "version", telemetry.Version, "mode", cfg.Mode, "public_url", cfg.PublicURL)
+	log.Info("starting", "version", telemetry.Version, "mode", cfg.Mode, "public_url", cfg.PublicURL, "database_pooled", cfg.DatabasePooled())
 	return a.Run(ctx)
 }
 
 // migrate only needs the database: it runs as a Kubernetes job (or Argo CD hook) that should
 // not depend on the rest of the configuration being valid.
 func migrate() error {
-	url := os.Getenv("WFM_DATABASE_URL")
+	url := os.Getenv("WFM_DATABASE_DIRECT_URL") // set when WFM_DATABASE_URL points at a pooler
+	if url == "" {
+		url = os.Getenv("WFM_DATABASE_URL")
+	}
 	if url == "" {
 		url = config.DefaultDatabaseURL
 	}

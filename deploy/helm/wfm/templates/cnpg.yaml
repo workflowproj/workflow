@@ -96,6 +96,57 @@ spec:
         barmanObjectName: {{ $name }}-backup
   {{- end }}
   {{- end }}
+{{- with $db.pooler }}
+{{- if .enabled }}
+{{- if not (has .poolMode (list "transaction" "session")) }}
+{{- fail "database.cnpg.pooler.poolMode must be transaction or session" }}
+{{- end }}
+---
+# PgBouncer in front of the primary. App pods send queries here (WFM_DATABASE_POOLER_HOST);
+# live-event listeners, migrations and KEDA connect to the cluster directly.
+apiVersion: postgresql.cnpg.io/v1
+kind: Pooler
+metadata:
+  name: {{ include "wfm.cnpgPoolerName" $ }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "wfm.componentLabels" (dict "root" $ "component" "database-pooler") | nindent 4 }}
+  annotations:
+    {{- include "wfm.syncWave" $.Values.argocd.syncWaves.database | nindent 4 }}
+spec:
+  cluster:
+    name: {{ $name }}
+  instances: {{ .instances }}
+  type: rw
+  pgbouncer:
+    poolMode: {{ .poolMode }}
+    {{- with .parameters }}
+    parameters:
+      {{- range $k, $v := . }}
+      {{ $k }}: {{ $v | toString | quote }}
+      {{- end }}
+    {{- end }}
+  {{- if or .podSpec .resources }}
+  template:
+    metadata:
+      labels:
+        {{- include "wfm.selectorLabels" $ | nindent 8 }}
+        app.kubernetes.io/component: database-pooler
+    spec:
+      {{- with .podSpec }}
+      {{- toYaml (omit . "containers") | nindent 6 }}
+      {{- end }}
+      containers:
+        - name: pgbouncer
+          {{- with .resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+  {{- end }}
+  monitoring:
+    enablePodMonitor: {{ .monitoring.enablePodMonitor }}
+{{- end }}
+{{- end }}
 {{- if and $b.enabled (eq $b.method "plugin") }}
 ---
 apiVersion: barmancloud.cnpg.io/v1

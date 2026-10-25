@@ -87,6 +87,14 @@ app.kubernetes.io/component: {{ .component }}
 {{- default (printf "%s-db" (include "wfm.fullname" .)) .Values.database.cnpg.name | trunc 50 | trimSuffix "-" }}
 {{- end }}
 
+{{- define "wfm.cnpgPoolerName" -}}
+{{- printf "%s-pooler-rw" (include "wfm.cnpgName" .) | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{- define "wfm.poolerEnabled" -}}
+{{- if and .Values.database.cnpg.enabled .Values.database.cnpg.pooler.enabled }}true{{ end }}
+{{- end }}
+
 {{/* Secret name holding the database URL. */}}
 {{- define "wfm.databaseSecretName" -}}
 {{- if .Values.database.cnpg.enabled }}
@@ -240,6 +248,11 @@ data:
     - podSelector:
         matchLabels:
           cnpg.io/cluster: {{ include "wfm.cnpgName" .root }}
+    {{- if include "wfm.poolerEnabled" .root }}
+    - podSelector:
+        matchLabels:
+          cnpg.io/poolerName: {{ include "wfm.cnpgPoolerName" .root }}
+    {{- end }}
   ports:
     - port: 5432
       protocol: TCP

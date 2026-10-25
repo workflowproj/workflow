@@ -85,6 +85,10 @@ type Config struct {
 	HTTPAddr    string
 	MetricsAddr string
 	DatabaseURL string
+	// DatabasePoolerHost sends queries to a transaction-mode pooler; see database.go.
+	DatabasePoolerHost string
+	// DatabaseDirectURL is the direct address when DatabaseURL points at a pooler.
+	DatabaseDirectURL string
 	// PublicURL is where people reach the web UI and API.
 	PublicURL string
 	// HooksPublicURL is the internet-facing base for /hooks and /scim (defaults to PublicURL).
@@ -107,7 +111,10 @@ type Config struct {
 	S3                 S3
 	AttachmentMaxBytes int64
 
-	WorkerConcurrency    int
+	WorkerConcurrency int
+	// WorkerPollInterval is how often workers look for new jobs. Behind a pooler, workers
+	// cannot LISTEN for new-job notifications, so this is the pickup latency.
+	WorkerPollInterval   time.Duration
 	SCMReconcileInterval time.Duration
 	// Maximum depth of automation rules triggering other rules.
 	AutomationMaxDepth int
@@ -259,19 +266,21 @@ func Load() (*Config, error) { return LoadFrom(os.Getenv) }
 func LoadFrom(get func(string) string) (*Config, error) {
 	e := &env{get: get}
 	c := &Config{
-		Mode:            Mode(e.str("WFM_MODE", string(ModeAll))),
-		HTTPAddr:        e.str("WFM_HTTP_ADDR", ":8080"),
-		MetricsAddr:     e.str("WFM_METRICS_ADDR", ":9090"),
-		DatabaseURL:     e.str("WFM_DATABASE_URL", DefaultDatabaseURL),
-		PublicURL:       strings.TrimRight(e.str("WFM_PUBLIC_URL", "http://localhost:8080"), "/"),
-		SecretKey:       e.str("WFM_SECRET_KEY", ""),
-		SessionTTL:      e.duration("WFM_SESSION_TTL", 7*24*time.Hour),
-		LogLevel:        e.str("WFM_LOG_LEVEL", "info"),
-		LogFormat:       e.str("WFM_LOG_FORMAT", "json"),
-		DevLogin:        e.boolean("WFM_DEV_LOGIN", false),
-		Production:      e.str("WFM_ENV", "production") == "production",
-		JITProvisioning: JITMode(e.str("WFM_JIT_PROVISIONING", string(JITAuto))),
-		BootstrapAdmins: e.list("WFM_BOOTSTRAP_ADMINS"),
+		Mode:               Mode(e.str("WFM_MODE", string(ModeAll))),
+		HTTPAddr:           e.str("WFM_HTTP_ADDR", ":8080"),
+		MetricsAddr:        e.str("WFM_METRICS_ADDR", ":9090"),
+		DatabaseURL:        e.str("WFM_DATABASE_URL", DefaultDatabaseURL),
+		DatabasePoolerHost: e.str("WFM_DATABASE_POOLER_HOST", ""),
+		DatabaseDirectURL:  e.str("WFM_DATABASE_DIRECT_URL", ""),
+		PublicURL:          strings.TrimRight(e.str("WFM_PUBLIC_URL", "http://localhost:8080"), "/"),
+		SecretKey:          e.str("WFM_SECRET_KEY", ""),
+		SessionTTL:         e.duration("WFM_SESSION_TTL", 7*24*time.Hour),
+		LogLevel:           e.str("WFM_LOG_LEVEL", "info"),
+		LogFormat:          e.str("WFM_LOG_FORMAT", "json"),
+		DevLogin:           e.boolean("WFM_DEV_LOGIN", false),
+		Production:         e.str("WFM_ENV", "production") == "production",
+		JITProvisioning:    JITMode(e.str("WFM_JIT_PROVISIONING", string(JITAuto))),
+		BootstrapAdmins:    e.list("WFM_BOOTSTRAP_ADMINS"),
 		GoogleDirectory: GoogleDirectory{
 			Enabled:           e.boolean("WFM_GOOGLE_DIRECTORY_ENABLED", false),
 			ServiceAccountKey: e.str("WFM_GOOGLE_SERVICE_ACCOUNT_KEY", ""),
@@ -294,6 +303,7 @@ func LoadFrom(get func(string) string) (*Config, error) {
 		},
 		AttachmentMaxBytes:      int64(e.integer("WFM_ATTACHMENT_MAX_MB", 25)) * 1024 * 1024,
 		WorkerConcurrency:       e.integer("WFM_WORKER_CONCURRENCY", 10),
+		WorkerPollInterval:      e.duration("WFM_WORKER_POLL_INTERVAL", time.Second),
 		SCMReconcileInterval:    e.duration("WFM_SCM_RECONCILE_INTERVAL", 30*time.Minute),
 		AutomationMaxDepth:      e.integer("WFM_AUTOMATION_MAX_DEPTH", 5),
 		OutboundAllowedHosts:    e.list("WFM_OUTBOUND_ALLOWED_HOSTS"),
@@ -356,6 +366,7 @@ func LoadFrom(get func(string) string) (*Config, error) {
 		e.errs = append(e.errs, fmt.Errorf("WFM_TIME_DAYS_PER_WEEK: must be more than 0 and at most 7, got %v", d))
 	}
 	c.OIDCProviders = loadOIDC(e)
+	e.errs = append(e.errs, validateDatabase(c)...)
 
 	switch c.SMTP.TLS {
 	case "starttls", "tls", "none":

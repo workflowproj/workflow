@@ -10,6 +10,8 @@ are comma-separated. Invalid configuration stops the process at startup with eve
 | `WFM_MODE` | `all` | `web`, `hooks`, `worker` or `all` (also `wfm serve --mode=`) |
 | `WFM_ENV` | `production` | anything else enables development conveniences and relaxes `WFM_SECRET_KEY` |
 | `WFM_DATABASE_URL` | `postgres://wfm:wfm@localhost:5432/wfm?sslmode=disable` | PostgreSQL 16+ (17 recommended) |
+| `WFM_DATABASE_POOLER_HOST` | — | `host[:port]` of a transaction-mode PgBouncer (such as a CNPG `Pooler`). Queries go there with the credentials and database of `WFM_DATABASE_URL`, which stays the direct address for live-event listeners and migrations. See [deployment.md](deployment.md#connection-pooling) |
+| `WFM_DATABASE_DIRECT_URL` | — | the other way round: set when `WFM_DATABASE_URL` already points at the pooler, to give the direct address. Set one of the two, not both |
 | `WFM_PUBLIC_URL` | `http://localhost:8080` | external URL of the UI; used for OIDC redirects and links |
 | `WFM_HOOKS_PUBLIC_URL` | `WFM_PUBLIC_URL` | external URL where `/hooks` and `/scim` are reachable |
 | `WFM_SECRET_KEY` | — | **required in production**; 32+ random bytes; encrypts stored secrets (SCM keys, webhook secrets) and signs cookies. Keep it stable — changing it makes stored secrets unreadable |
@@ -105,6 +107,7 @@ Durations such as `1w 2d 3h` count working days and weeks; see [time-tracking.md
 | Variable | Default | |
 |---|---|---|
 | `WFM_WORKER_CONCURRENCY` | `10` | jobs per queue per worker process |
+| `WFM_WORKER_POLL_INTERVAL` | `1s` | how often workers look for new jobs. Without a pooler they are also woken by `NOTIFY`; behind one they only poll, so this is the pickup delay (minimum `100ms`) |
 | `WFM_SCM_RECONCILE_INTERVAL` | `30m` | `0` disables |
 | `WFM_AUTOMATION_MAX_DEPTH` | `5` | maximum chain of rules triggering rules |
 | `WFM_WEBHOOK_ALLOW_PRIVATE` | `false` | allow outbound calls to any private address (prefer the allowlist below) |
