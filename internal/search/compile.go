@@ -488,7 +488,7 @@ func inEpics(epics string) string {
 
 const allEpics = "SELECT e.id FROM issues e JOIN issue_types et ON et.id = e.type_id WHERE et.level >= 1"
 
-// linkDescription is one side of a link type, as Jira words it: "blocks" is the source's side
+// linkDescription is one side of a link type, as people word it: "blocks" is the source's side
 // of a blocks link, "is blocked by" the target's.
 type linkDescription struct {
 	typ  string

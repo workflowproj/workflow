@@ -1857,7 +1857,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Fields, operators and functions for JQL autocompletion */
+        /** Fields, operators and functions for query autocompletion */
         get: operations["getSearchMetadata"];
         put?: never;
         post?: never;
@@ -2929,7 +2929,7 @@ export interface components {
             /** @description Machine-readable error code, e.g. transition_not_allowed */
             code?: string;
             errors?: components["schemas"]["FieldError"][];
-            /** @description Character offset of a JQL syntax error */
+            /** @description Character offset of a query syntax error */
             position?: number;
         };
         FieldError: {
@@ -5183,7 +5183,7 @@ export interface components {
             priorities?: components["schemas"]["Priority"][];
             /** @description Only requests of these types (empty = any) */
             requestTypeIds?: string[];
-            /** @description Only requests matching this JQL (empty = any) */
+            /** @description Only requests matching this query (empty = any) */
             jql?: string;
             targetMinutes: number;
             /** @description Calendar name; omitted = around the clock */
@@ -5391,7 +5391,7 @@ export interface components {
         DashboardId: string;
         /** @description Comma-separated project keys; omit for every project you can browse */
         MetricProjects: string;
-        /** @description Optional JQL the issues must also match */
+        /** @description Optional query the issues must also match */
         MetricJql: string;
         /** @description Window in days */
         MetricDays: number;
@@ -8731,7 +8731,7 @@ export interface operations {
             query?: {
                 /** @description Comma-separated project keys; omit for every project you can browse */
                 projects?: string;
-                /** @description Optional extra JQL filter (e.g. assignee = currentUser()) */
+                /** @description Optional extra query filter (e.g. assignee = currentUser()) */
                 jql?: string;
                 /** @description Include issues resolved within this many days (default 90) */
                 doneDays?: number;
@@ -8876,7 +8876,7 @@ export interface operations {
             query?: {
                 /** @description Comma-separated project keys; omit for every project you can browse */
                 projects?: components["parameters"]["MetricProjects"];
-                /** @description Optional JQL the issues must also match */
+                /** @description Optional query the issues must also match */
                 jql?: components["parameters"]["MetricJql"];
                 /** @description Window in days */
                 days?: components["parameters"]["MetricDays"];
@@ -8904,7 +8904,7 @@ export interface operations {
             query?: {
                 /** @description Comma-separated project keys; omit for every project you can browse */
                 projects?: components["parameters"]["MetricProjects"];
-                /** @description Optional JQL the issues must also match */
+                /** @description Optional query the issues must also match */
                 jql?: components["parameters"]["MetricJql"];
                 /** @description Window in days */
                 days?: components["parameters"]["MetricDays"];
@@ -8933,7 +8933,7 @@ export interface operations {
             query?: {
                 /** @description Comma-separated project keys; omit for every project you can browse */
                 projects?: components["parameters"]["MetricProjects"];
-                /** @description Optional JQL the issues must also match */
+                /** @description Optional query the issues must also match */
                 jql?: components["parameters"]["MetricJql"];
                 /** @description Window in days */
                 days?: components["parameters"]["MetricDays"];
@@ -8962,7 +8962,7 @@ export interface operations {
             query: {
                 /** @description Comma-separated project keys; omit for every project you can browse */
                 projects?: components["parameters"]["MetricProjects"];
-                /** @description Optional JQL the issues must also match */
+                /** @description Optional query the issues must also match */
                 jql?: components["parameters"]["MetricJql"];
                 by: components["schemas"]["BreakdownBy"];
             };
@@ -8989,7 +8989,7 @@ export interface operations {
             query?: {
                 /** @description Comma-separated project keys; omit for every project you can browse */
                 projects?: components["parameters"]["MetricProjects"];
-                /** @description Optional JQL the issues must also match */
+                /** @description Optional query the issues must also match */
                 jql?: components["parameters"]["MetricJql"];
                 /** @description Window in days */
                 days?: components["parameters"]["MetricDays"];
@@ -9046,7 +9046,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description JQL metadata */
+            /** @description Query language metadata */
             200: {
                 headers: {
                     [name: string]: unknown;

@@ -481,7 +481,7 @@ function GoalEditor({
           </div>
         </fieldset>
         <label className="flex flex-col gap-1 md:col-span-2">
-          <span className="text-xs font-medium text-muted">And matching JQL (optional)</span>
+          <span className="text-xs font-medium text-muted">And matching a query (optional)</span>
           <Input
             value={g.jql ?? ""}
             placeholder='e.g. labels = vip OR "Request type" = "Report a problem"'

@@ -2,7 +2,7 @@
 
 Issues carry an **original estimate** and a **remaining estimate**, and people **log work**
 against them. **Time spent** is the sum of an issue's worklogs. Estimates and time show in the
-issue view, on board cards, in JQL, in the sprint report (in hours) and on the timesheet.
+issue view, on board cards, in searches, in the sprint report (in hours) and on the timesheet.
 
 ## Durations
 
@@ -63,7 +63,7 @@ boards and open issue views refresh live and automation rules on field changes c
 - **Board cards**: add the *Time tracking* card field (board settings, or *Configure board* on
   the board). Cards show time logged of the original estimate (`3h / 1d`, red once over), else
   the remaining estimate (`5h left`) or the time logged.
-- **JQL** ([jql.md](jql.md)): `originalEstimate`, `remainingEstimate` and `timeSpent` compare with
+- **Search** ([search.md](search.md)): `originalEstimate`, `remainingEstimate` and `timeSpent` compare with
   durations (`remainingEstimate > 4h`, `timeSpent >= "1d 2h"`, `originalEstimate is EMPTY`) and can
   be ordered by; `worklogAuthor = currentUser()` and `worklogDate >= startOfWeek()` find issues by
   their worklogs.

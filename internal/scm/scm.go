@@ -165,7 +165,7 @@ type SmartCommand struct {
 
 var commandPattern = regexp.MustCompile(`#([A-Za-z][A-Za-z0-9_-]*)`)
 
-// ParseSmartCommits reads Jira-style smart commits: "PLAT-12 PLAT-13 #in-review #comment ready for eyes".
+// ParseSmartCommits reads smart commits: "PLAT-12 PLAT-13 #in-review #comment ready for eyes".
 // Commands apply to the keys on the same line; #comment takes the rest of the line.
 func ParseSmartCommits(allowed map[string]bool, message string) []SmartCommand {
 	var out []SmartCommand

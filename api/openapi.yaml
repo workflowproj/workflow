@@ -4,7 +4,7 @@ info:
   version: 1.0.0
   description: |
     REST API for the workflow platform: projects, issues, configurable workflows, boards, sprints,
-    releases, JQL search, Git integration, provisioning and automation.
+    releases, search (a JQL-like query language), Git integration, provisioning and automation.
 
     Authenticate with the browser session cookie or a personal access token
     (`Authorization: Bearer wfm_pat_...`). Cookie-authenticated mutations must send
@@ -2095,7 +2095,7 @@ paths:
       summary: Epics and issues with dates, dependencies, sprints and releases across one or more projects
       parameters:
         - { name: projects, in: query, description: 'Comma-separated project keys; omit for every project you can browse', schema: { type: string } }
-        - { name: jql, in: query, description: Optional extra JQL filter (e.g. assignee = currentUser()), schema: { type: string } }
+        - { name: jql, in: query, description: Optional extra query filter (e.g. assignee = currentUser()), schema: { type: string } }
         - { name: doneDays, in: query, description: 'Include issues resolved within this many days (default 90)', schema: { type: integer, minimum: 0, maximum: 3650 } }
       responses:
         "200":
@@ -2263,10 +2263,10 @@ paths:
     get:
       operationId: getSearchMetadata
       tags: [search]
-      summary: Fields, operators and functions for JQL autocompletion
+      summary: Fields, operators and functions for query autocompletion
       responses:
         "200":
-          description: JQL metadata
+          description: Query language metadata
           content:
             application/json:
               schema: { $ref: '#/components/schemas/SearchMetadata' }
@@ -3602,7 +3602,7 @@ components:
     SprintId: { name: sprintId, in: path, required: true, schema: { type: string, format: uuid } }
     DashboardId: { name: dashboardId, in: path, required: true, schema: { type: string, format: uuid } }
     MetricProjects: { name: projects, in: query, description: 'Comma-separated project keys; omit for every project you can browse', schema: { type: string } }
-    MetricJql: { name: jql, in: query, description: 'Optional JQL the issues must also match', schema: { type: string } }
+    MetricJql: { name: jql, in: query, description: 'Optional query the issues must also match', schema: { type: string } }
     MetricDays: { name: days, in: query, description: Window in days, ending today, schema: { type: integer, default: 30, minimum: 1, maximum: 365 } }
     ReleaseId: { name: releaseId, in: path, required: true, schema: { type: string, format: uuid } }
     CommentId: { name: commentId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -3638,7 +3638,7 @@ components:
         errors:
           type: array
           items: { $ref: '#/components/schemas/FieldError' }
-        position: { type: integer, description: Character offset of a JQL syntax error }
+        position: { type: integer, description: Character offset of a query syntax error }
     FieldError:
       type: object
       required: [message]
@@ -5813,7 +5813,7 @@ components:
       properties:
         priorities: { type: array, items: { $ref: '#/components/schemas/Priority' }, description: Only requests of these priorities (empty = any) }
         requestTypeIds: { type: array, items: { type: string, format: uuid }, description: Only requests of these types (empty = any) }
-        jql: { type: string, description: Only requests matching this JQL (empty = any) }
+        jql: { type: string, description: Only requests matching this query (empty = any) }
         targetMinutes: { type: integer, minimum: 1, maximum: 5256000 }
         calendar: { type: string, description: Calendar name; omitted = around the clock }
     SlaMetricConfig:

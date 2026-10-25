@@ -17,7 +17,7 @@ import (
 	"github.com/geoffo-dev/workflow-management/internal/api"
 )
 
-const jqlHelp = `JQL examples:
+const jqlHelp = `Query examples (a JQL-like language):
   project = PLAT AND statusCategory != Done AND assignee = currentUser() ORDER BY priority DESC
   type = Bug AND priority >= High AND created >= -7d
   sprint in openSprints() AND assignee is EMPTY
@@ -41,12 +41,12 @@ func (t *tools) register(s *mcp.Server) {
 	mcp.AddTool(s, &mcp.Tool{Name: "whoami", Description: "Who you are acting as: the access token's owner, organisation role and token scopes.", Annotations: read("Who am I")}, t.whoami)
 	mcp.AddTool(s, &mcp.Tool{Name: "list_projects", Description: "Projects you can browse, with their keys.", Annotations: read("List projects")}, t.listProjects)
 	mcp.AddTool(s, &mcp.Tool{Name: "get_project", Description: "A project's issue types (keys to use when creating issues), boards, active and upcoming sprints, unreleased releases and labels.", Annotations: read("Get project")}, t.getProject)
-	mcp.AddTool(s, &mcp.Tool{Name: "search_issues", Description: "Find issues with JQL. Returns one line per issue (key, type, status, assignee, priority, points, summary) and the total.\n\n" + jqlHelp, Annotations: read("Search issues")}, t.searchIssues)
+	mcp.AddTool(s, &mcp.Tool{Name: "search_issues", Description: "Find issues with a query in Workflow's JQL-like query language. Returns one line per issue (key, type, status, assignee, priority, points, summary) and the total.\n\n" + jqlHelp, Annotations: read("Search issues")}, t.searchIssues)
 	mcp.AddTool(s, &mcp.Tool{Name: "get_issue", Description: "Everything about one issue: fields, description, parent, sub-tasks, links, pull requests, recent comments, timing metrics (lead/cycle time, time in each status) and the workflow transitions available now.", Annotations: read("Get issue")}, t.getIssue)
 	mcp.AddTool(s, &mcp.Tool{Name: "get_board", Description: "A project's board: each column with its issues (the active sprint on a Scrum board).", Annotations: read("Get board")}, t.getBoard)
 	mcp.AddTool(s, &mcp.Tool{Name: "get_sprint_report", Description: "Progress of a sprint (the active one by default): commitment, completed work, scope added or removed, and the day-by-day burndown.", Annotations: read("Sprint report")}, t.getSprintReport)
-	mcp.AddTool(s, &mcp.Tool{Name: "get_metrics", Description: "Delivery metrics over projects and/or JQL: summary (open, created, resolved, overdue, cycle time), breakdown (counts and points by a field), cycle_time, created_resolved, cumulative_flow, or velocity (one project's recent sprints).", Annotations: read("Get metrics")}, t.getMetrics)
-	mcp.AddTool(s, &mcp.Tool{Name: "find_users", Description: "Find people by name or email (to assign issues or write JQL).", Annotations: read("Find users")}, t.findUsers)
+	mcp.AddTool(s, &mcp.Tool{Name: "get_metrics", Description: "Delivery metrics over projects and/or a query: summary (open, created, resolved, overdue, cycle time), breakdown (counts and points by a field), cycle_time, created_resolved, cumulative_flow, or velocity (one project's recent sprints).", Annotations: read("Get metrics")}, t.getMetrics)
+	mcp.AddTool(s, &mcp.Tool{Name: "find_users", Description: "Find people by name or email (to assign issues or write queries).", Annotations: read("Find users")}, t.findUsers)
 
 	if t.readOnly {
 		return
@@ -183,7 +183,7 @@ func (t *tools) getProject(ctx context.Context, _ *mcp.CallToolRequest, in proje
 }
 
 type searchIn struct {
-	JQL    string `json:"jql" jsonschema:"JQL query; empty matches everything you can see (newest first)"`
+	JQL    string `json:"jql" jsonschema:"query (JQL-like); empty matches everything you can see (newest first)"`
 	Limit  int    `json:"limit,omitempty" jsonschema:"maximum issues to return (default 25, at most 100)"`
 	Offset int    `json:"offset,omitempty" jsonschema:"skip this many results (for paging)"`
 }
@@ -489,7 +489,7 @@ func (t *tools) getSprintReport(ctx context.Context, _ *mcp.CallToolRequest, in 
 type metricsIn struct {
 	Kind       string   `json:"kind" jsonschema:"summary, breakdown, cycle_time, created_resolved, cumulative_flow or velocity"`
 	Projects   []string `json:"projects,omitempty" jsonschema:"project keys (default: every project you can browse)"`
-	JQL        string   `json:"jql,omitempty" jsonschema:"extra JQL the issues must match"`
+	JQL        string   `json:"jql,omitempty" jsonschema:"an extra query the issues must match"`
 	Days       int      `json:"days,omitempty" jsonschema:"window in days ending today (default 30, at most 365)"`
 	By         string   `json:"by,omitempty" jsonschema:"breakdown field: status, statusCategory, priority, type, assignee, label, epic, sprint, release or project"`
 	Interval   string   `json:"interval,omitempty" jsonschema:"created_resolved buckets: day or week"`

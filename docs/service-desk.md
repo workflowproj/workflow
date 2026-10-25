@@ -100,7 +100,7 @@ attach are internal (labelled *agents only*).
 
 ## Queues
 
-Queues are named, ordered JQL searches within the project, with live counts, on the project's
+Queues are named, ordered searches within the project, with live counts, on the project's
 **Queues** tab — the default view of a service project. The defaults are *Unassigned*,
 *Assigned to me*, *Waiting for customer*, *SLA at risk*, *SLA breached* and *All open*;
 project admins edit them in Project settings → Queues. Every queue row shows the request's
@@ -116,7 +116,7 @@ Two clocks run on every service request that a goal applies to:
   starts a new cycle with a fresh goal.
 
 **Goals** (Project settings → SLAs) are tried in order; the first whose conditions all match
-the request applies: priorities, request types and a JQL query (each optional), a target (in
+the request applies: priorities, request types and a query (each optional), a target (in
 working minutes or hours) and a **calendar**. A request no goal matches has no clock for that
 SLA. **Pause statuses** stop a clock while the request is in them (by default *Waiting for
 customer* and *Pending approval*).
@@ -136,7 +136,7 @@ recomputes every open request in the background. The issue view's Service reques
 each clock (time left, paused, met or missed) with its goal and calendar; queues show them too.
 Times are working time, so they are written in hours (`40h` is a business week), never days.
 
-In JQL (see [jql.md](jql.md#service-desk)):
+In searches (see [search.md](search.md#service-desk)):
 
 ```
 "Time to first response" = breached()
@@ -196,7 +196,7 @@ the normal agent notifications instead; internal notes are never in a customer's
 - The integration tests in `internal/integration/servicedesk_test.go` check that customers can
   never list or read other customers' requests or see internal notes — through the portal and
   agent APIs, search, live updates, emails, attachments, history, MCP and webhook payloads —
-  and cannot use JQL search or any agent endpoint.
+  and cannot use search or any agent endpoint.
 
 ## API
 

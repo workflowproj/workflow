@@ -40,7 +40,7 @@ layout:                                       # node positions for the visual ed
 
 | Key | |
 |---|---|
-| `name` | Up to 60 characters. Statuses are shared across workflows by name, so "In Review" is the same status everywhere (boards and JQL rely on this). A name must always have the same category. |
+| `name` | Up to 60 characters. Statuses are shared across workflows by name, so "In Review" is the same status everywhere (boards and searches rely on this). A name must always have the same category. |
 | `category` | `todo`, `in_progress` or `done`. Categories drive boards, progress bars, reports and resolution: entering a `done` status sets the resolution (to `Done` unless a screen or post-function chose another), leaving one clears it. |
 | `initial` | Optional; marks the status new issues start in (otherwise the first). |
 

@@ -1,6 +1,6 @@
-# JQL
+# Search
 
-Search uses a JQL-style query language. Queries compile to parameterised SQL and are always
+Search uses a JQL-like query language. Queries compile to parameterised SQL and are always
 limited to projects you can browse. Errors report the character position they refer to, which
 the UI highlights.
 
@@ -126,7 +126,7 @@ clocks and issues without the SLA last).
 
 Save any query as a filter (Issues → Save). Shared filters are visible to everyone; only the
 owner (or an organisation admin) can change or delete them. Boards and scheduled automation
-rules also take JQL.
+rules use the same query language.
 
 ## API
 

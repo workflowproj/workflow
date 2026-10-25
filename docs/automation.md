@@ -72,7 +72,7 @@ Examples:
 - *Close when merged*: trigger `pr.merged`, actions transition → `Done`, comment `Merged in #{{event.number}}`.
 - *Triage new bugs*: trigger `issue.created`, condition `issue.type == "bug"`, actions set
   priority `high`, add label `needs-triage`, notify watchers.
-- *Weekly stale check*: trigger `schedule` `0 8 * * 1` with JQL
+- *Weekly stale check*: trigger `schedule` `0 8 * * 1` with the query
   `statusCategory = "In Progress" AND updated <= -14d`, action add label `stale`.
 
 ### Loops

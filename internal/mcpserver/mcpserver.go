@@ -26,7 +26,7 @@ import (
 )
 
 const instructions = `Workflow is the team's issue tracker (projects, epics, stories, tasks, bugs, sub-tasks, sprints, releases).
-Issues are identified by keys such as PLAT-12. Find work with search_issues (JQL), read one with get_issue (it lists the
+Issues are identified by keys such as PLAT-12. Find work with search_issues (a JQL-like query language), read one with get_issue (it lists the
 transitions available right now), and learn a project's issue types, boards and sprints with get_project.
 Status changes go through the project's workflow: use transition_issue with one of the transitions get_issue lists.
 Everything you do is recorded in the issue history as the person who owns the access token.`

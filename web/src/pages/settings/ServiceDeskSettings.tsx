@@ -297,7 +297,7 @@ function QueueForm({ projectKey, queue, nextPosition, onClose }: { projectKey: s
           {(id) => <Input id={id} value={name} maxLength={80} onChange={(e) => setName(e.target.value)} autoFocus required />}
         </Field>
         <Field
-          label="JQL"
+          label="Query"
           error={errs.jql}
           hint={
             <>
