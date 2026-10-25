@@ -3049,6 +3049,511 @@ paths:
         default: { $ref: '#/components/responses/Problem' }
 
   # ---------------------------------------------------------------------------
+  # Service desk: agents (project settings, queues, requests) and the customer portal
+  # ---------------------------------------------------------------------------
+  /projects/{projectKey}/service-desk:
+    get:
+      operationId: getServiceDesk
+      tags: [service-desk]
+      summary: A service project's portal settings
+      parameters: [{ $ref: '#/components/parameters/ProjectKey' }]
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ServiceDesk' }
+        default: { $ref: '#/components/responses/Problem' }
+    patch:
+      operationId: updateServiceDesk
+      tags: [service-desk]
+      parameters: [{ $ref: '#/components/parameters/ProjectKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ServiceDeskPatch' }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ServiceDesk' }
+        default: { $ref: '#/components/responses/Problem' }
+  /projects/{projectKey}/request-types:
+    get:
+      operationId: listRequestTypes
+      tags: [service-desk]
+      parameters: [{ $ref: '#/components/parameters/ProjectKey' }]
+      responses:
+        "200":
+          description: Request types in portal order
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/RequestType' }
+        default: { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: createRequestType
+      tags: [service-desk]
+      parameters: [{ $ref: '#/components/parameters/ProjectKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RequestTypeInput' }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RequestType' }
+        default: { $ref: '#/components/responses/Problem' }
+  /request-types/{requestTypeId}:
+    put:
+      operationId: updateRequestType
+      tags: [service-desk]
+      summary: Replace a request type (its form and approval included)
+      parameters: [{ name: requestTypeId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RequestTypeInput' }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RequestType' }
+        default: { $ref: '#/components/responses/Problem' }
+    delete:
+      operationId: deleteRequestType
+      tags: [service-desk]
+      description: Refused (409) while requests use it.
+      parameters: [{ name: requestTypeId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "204": { description: Deleted }
+        default: { $ref: '#/components/responses/Problem' }
+  /projects/{projectKey}/customers:
+    get:
+      operationId: listServiceCustomers
+      tags: [service-desk]
+      parameters:
+        - { $ref: '#/components/parameters/ProjectKey' }
+        - { name: q, in: query, schema: { type: string } }
+        - { $ref: '#/components/parameters/Limit' }
+      responses:
+        "200":
+          description: Customers
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ServiceCustomer' }
+        default: { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: addServiceCustomer
+      tags: [service-desk]
+      summary: Add a customer by email
+      description: |
+        Someone new gets a customer account and an email invitation to choose a password (local
+        accounts); an existing account (a customer of another project, an organisation member,
+        a single sign-on user) is added as it is. Needs the customer.manage permission.
+      parameters: [{ $ref: '#/components/parameters/ProjectKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ServiceCustomerInput' }
+      responses:
+        "201":
+          description: Added
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ServiceCustomerAdded' }
+        default: { $ref: '#/components/responses/Problem' }
+  /projects/{projectKey}/customers/{userId}:
+    delete:
+      operationId: removeServiceCustomer
+      tags: [service-desk]
+      parameters: [{ $ref: '#/components/parameters/ProjectKey' }, { $ref: '#/components/parameters/UserId' }]
+      responses:
+        "204": { description: Removed }
+        default: { $ref: '#/components/responses/Problem' }
+  /projects/{projectKey}/queues:
+    get:
+      operationId: listQueues
+      tags: [service-desk]
+      parameters: [{ $ref: '#/components/parameters/ProjectKey' }]
+      responses:
+        "200":
+          description: Queues in order, with the number of requests in each
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Queue' }
+        default: { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: createQueue
+      tags: [service-desk]
+      parameters: [{ $ref: '#/components/parameters/ProjectKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/QueueInput' }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Queue' }
+        default: { $ref: '#/components/responses/Problem' }
+  /queues/{queueId}:
+    patch:
+      operationId: updateQueue
+      tags: [service-desk]
+      parameters: [{ name: queueId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/QueueInput' }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Queue' }
+        default: { $ref: '#/components/responses/Problem' }
+    delete:
+      operationId: deleteQueue
+      tags: [service-desk]
+      parameters: [{ name: queueId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "204": { description: Deleted }
+        default: { $ref: '#/components/responses/Problem' }
+  /queues/{queueId}/issues:
+    get:
+      operationId: listQueueIssues
+      tags: [service-desk]
+      parameters:
+        - { name: queueId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { $ref: '#/components/parameters/Limit' }
+        - { $ref: '#/components/parameters/Offset' }
+      responses:
+        "200":
+          description: The queue's requests with their SLA clocks
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/QueueIssues' }
+        default: { $ref: '#/components/responses/Problem' }
+  /projects/{projectKey}/slas:
+    get:
+      operationId: getSlaConfig
+      tags: [service-desk]
+      parameters: [{ $ref: '#/components/parameters/ProjectKey' }]
+      responses:
+        "200":
+          description: Calendars and SLA goals
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SlaConfig' }
+        default: { $ref: '#/components/responses/Problem' }
+    put:
+      operationId: updateSlaConfig
+      tags: [service-desk]
+      summary: Replace the calendars and SLA goals
+      description: Calendars are matched by name. Open requests' clocks are recomputed in the background.
+      parameters: [{ $ref: '#/components/parameters/ProjectKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SlaConfig' }
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SlaConfig' }
+        default: { $ref: '#/components/responses/Problem' }
+  /issues/{issueKey}/request:
+    get:
+      operationId: getServiceRequest
+      tags: [service-desk]
+      summary: A service request's request type, SLA clocks, approvals and participants (agents)
+      parameters: [{ $ref: '#/components/parameters/IssueKey' }]
+      responses:
+        "200":
+          description: Request
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ServiceRequest' }
+        default: { $ref: '#/components/responses/Problem' }
+    patch:
+      operationId: updateServiceRequest
+      tags: [service-desk]
+      summary: Set the request type (the portal shows only issues that have one)
+      parameters: [{ $ref: '#/components/parameters/IssueKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ServiceRequestPatch' }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ServiceRequest' }
+        default: { $ref: '#/components/responses/Problem' }
+  /issues/{issueKey}/participants:
+    post:
+      operationId: addRequestParticipant
+      tags: [service-desk]
+      summary: Share a request with someone who may use the portal
+      parameters: [{ $ref: '#/components/parameters/IssueKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ParticipantInput' }
+      responses:
+        "200":
+          description: Shared
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ServiceRequest' }
+        default: { $ref: '#/components/responses/Problem' }
+  /issues/{issueKey}/participants/{userId}:
+    delete:
+      operationId: removeRequestParticipant
+      tags: [service-desk]
+      parameters: [{ $ref: '#/components/parameters/IssueKey' }, { $ref: '#/components/parameters/UserId' }]
+      responses:
+        "204": { description: Removed }
+        default: { $ref: '#/components/responses/Problem' }
+  /issues/{issueKey}/approvals/{approvalId}:
+    post:
+      operationId: decideApproval
+      tags: [service-desk]
+      summary: Approve or decline as one of the approvers
+      parameters: [{ $ref: '#/components/parameters/IssueKey' }, { name: approvalId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ApprovalDecision' }
+      responses:
+        "200":
+          description: Recorded
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ServiceRequest' }
+        default: { $ref: '#/components/responses/Problem' }
+  /portal/projects:
+    get:
+      operationId: listPortalDesks
+      tags: [portal]
+      summary: The help centre - service desks the caller may raise requests in
+      responses:
+        "200":
+          description: Desks
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PortalDesk' }
+        default: { $ref: '#/components/responses/Problem' }
+  /portal/projects/{projectKey}:
+    get:
+      operationId: getPortalDesk
+      tags: [portal]
+      summary: A desk's request types and their forms
+      parameters: [{ $ref: '#/components/parameters/ProjectKey' }]
+      responses:
+        "200":
+          description: Desk
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PortalDeskDetail' }
+        default: { $ref: '#/components/responses/Problem' }
+  /portal/projects/{projectKey}/requests:
+    post:
+      operationId: createPortalRequest
+      tags: [portal]
+      summary: Raise a request by filling in a request type's form
+      parameters: [{ $ref: '#/components/parameters/ProjectKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PortalRequestCreate' }
+      responses:
+        "201":
+          description: Raised
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PortalRequestDetail' }
+        default: { $ref: '#/components/responses/Problem' }
+  /portal/requests:
+    get:
+      operationId: listPortalRequests
+      tags: [portal]
+      summary: My requests - raised by the caller or shared with them
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [open, closed, all], default: all } }
+        - { name: project, in: query, description: Desk (project key), schema: { type: string } }
+        - { $ref: '#/components/parameters/Limit' }
+      responses:
+        "200":
+          description: Requests, most recently updated first
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PortalRequest' }
+        default: { $ref: '#/components/responses/Problem' }
+  /portal/requests/{issueKey}:
+    get:
+      operationId: getPortalRequest
+      tags: [portal]
+      summary: A request as its reporter, participants and approvers see it (no internal notes)
+      parameters: [{ $ref: '#/components/parameters/IssueKey' }]
+      responses:
+        "200":
+          description: Request
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PortalRequestDetail' }
+        default: { $ref: '#/components/responses/Problem' }
+  /portal/requests/{issueKey}/comments:
+    post:
+      operationId: addPortalComment
+      tags: [portal]
+      parameters: [{ $ref: '#/components/parameters/IssueKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PortalCommentInput' }
+      responses:
+        "201":
+          description: Added
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PortalComment' }
+        default: { $ref: '#/components/responses/Problem' }
+  /portal/requests/{issueKey}/attachments:
+    post:
+      operationId: uploadPortalAttachment
+      tags: [portal]
+      parameters: [{ $ref: '#/components/parameters/IssueKey' }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        "201":
+          description: Uploaded
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PortalAttachment' }
+        default: { $ref: '#/components/responses/Problem' }
+  /portal/requests/{issueKey}/approval:
+    post:
+      operationId: decidePortalApproval
+      tags: [portal]
+      summary: Approve or decline a request waiting for the caller's decision
+      parameters: [{ $ref: '#/components/parameters/IssueKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ApprovalDecision' }
+      responses:
+        "200":
+          description: Recorded
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PortalRequestDetail' }
+        default: { $ref: '#/components/responses/Problem' }
+  /portal/attachments/{attachmentId}:
+    get:
+      operationId: downloadPortalAttachment
+      tags: [portal]
+      parameters: [{ $ref: '#/components/parameters/AttachmentId' }]
+      responses:
+        "200":
+          description: File content
+          headers:
+            Content-Disposition: { schema: { type: string } }
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "302":
+          description: Redirect to a pre-signed object storage URL
+          headers:
+            Location: { schema: { type: string } }
+        default: { $ref: '#/components/responses/Problem' }
+  /portal/approvals:
+    get:
+      operationId: listPortalApprovals
+      tags: [portal]
+      summary: Requests waiting for the caller's approval
+      parameters: [{ $ref: '#/components/parameters/Limit' }]
+      responses:
+        "200":
+          description: Requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PortalRequest' }
+        default: { $ref: '#/components/responses/Problem' }
+  /portal/signup/{projectKey}:
+    get:
+      operationId: getPortalSignup
+      tags: [portal]
+      security: []
+      summary: A desk that lets people sign up (404 unless self sign-up is on)
+      parameters: [{ $ref: '#/components/parameters/ProjectKey' }]
+      responses:
+        "200":
+          description: Desk
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PortalSignupInfo' }
+        default: { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: portalSignup
+      tags: [portal]
+      security: []
+      summary: Create a customer account (confirmed by email)
+      description: |
+        Answers 202 the same way whether or not the address already has an account. A new
+        address gets a customer account and an email to choose a password; an existing one gets
+        an email saying how to sign in. Throttled like the sign-in endpoints.
+      parameters: [{ $ref: '#/components/parameters/ProjectKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PortalSignup' }
+      responses:
+        "202": { description: Check your email }
+        default: { $ref: '#/components/responses/Problem' }
+
+  # ---------------------------------------------------------------------------
   # Live updates
   # ---------------------------------------------------------------------------
   /events:
@@ -3141,7 +3646,7 @@ components:
         field: { type: string }
         message: { type: string }
 
-    OrgRole: { type: string, enum: [admin, member, guest] }
+    OrgRole: { type: string, enum: [admin, member, guest, customer] }
     StatusCategory: { type: string, enum: [todo, in_progress, done] }
     Priority: { type: string, enum: [highest, high, medium, low, lowest] }
     LinkDirection: { type: string, enum: [outward, inward] }
@@ -4203,6 +4708,7 @@ components:
         version: { type: integer }
         fields: { type: object, additionalProperties: true, description: Values for the transition screen }
         comment: { type: string }
+        commentVisibility: { $ref: '#/components/schemas/Visibility', description: 'Service projects: the comment is internal unless public' }
     MoveRequest:
       type: object
       properties:
@@ -4226,11 +4732,13 @@ components:
         createdAt: { type: string, format: date-time }
         editedAt: { type: string, format: date-time }
         canEdit: { type: boolean }
+        visibility: { $ref: '#/components/schemas/Visibility', description: Service projects only }
     CommentInput:
       type: object
       required: [body]
       properties:
         body: { type: string, minLength: 1, maxLength: 50000 }
+        visibility: { $ref: '#/components/schemas/Visibility', description: 'Service projects: public replies to the customer; internal (the default for agents) is a note' }
     HistoryEntry:
       type: object
       required: [id, actorType, field, createdAt]
@@ -4366,6 +4874,7 @@ components:
         uploader: { $ref: '#/components/schemas/User' }
         createdAt: { type: string, format: date-time }
         url: { type: string }
+        visibility: { $ref: '#/components/schemas/Visibility', description: 'Service projects: public = added by a customer in the portal (the only files the portal shows)' }
 
     Timeline:
       type: object
@@ -4498,6 +5007,7 @@ components:
         description: { type: string }
         delivery: { $ref: '#/components/schemas/EmailDelivery' }
         defaultDelivery: { $ref: '#/components/schemas/EmailDelivery' }
+        deliveries: { type: array, items: { $ref: '#/components/schemas/EmailDelivery' }, description: The choices this kind offers }
     EmailNotificationSettings:
       type: object
       required: [address, preferences, digestHour, timeZone, paused, nextDigestAt, emailConfigured]
@@ -4922,7 +5432,7 @@ components:
       properties:
         type:
           type: string
-          enum: [issue.created, issue.transitioned, issue.field_changed, pr.opened, pr.merged, commit.pushed, branch.created, pipeline.completed, schedule]
+          enum: [issue.created, issue.transitioned, issue.field_changed, pr.opened, pr.merged, commit.pushed, branch.created, pipeline.completed, schedule, sla.breached]
         toStatus: { type: string, description: 'issue.transitioned: only when entering this status (name)' }
         toCategory: { $ref: '#/components/schemas/StatusCategory', description: 'issue.transitioned: only when entering a status of this category' }
         field: { type: string, description: 'issue.field_changed: the field(s) to watch, comma-separated (e.g. "startDate, dueDate")' }
@@ -5008,7 +5518,7 @@ components:
           minItems: 1
           items:
             type: string
-            enum: ['*', issue.created, issue.updated, issue.transitioned, issue.deleted, comment.created, sprint.started, sprint.completed, release.released]
+            enum: ['*', issue.created, issue.updated, issue.transitioned, issue.deleted, comment.created, sprint.started, sprint.completed, release.released, sla.breached]
         active: { type: boolean, default: true }
     WebhookSubscriptionCreated:
       allOf:
@@ -5129,3 +5639,367 @@ components:
         updatedAt: { type: string, format: date-time }
         lastUsedAt: { type: string, format: date-time }
         user: { $ref: '#/components/schemas/User', description: The person who connected it (administration listing) }
+
+    # Service desk -------------------------------------------------------------
+    Visibility:
+      type: string
+      enum: [public, internal]
+      description: 'Service requests only: a public reply reaches the customer (portal and email); an internal note only agents see.'
+    PortalAccess:
+      type: string
+      enum: [customers, organisation]
+      description: 'Who may raise requests: customers = people on the customer list; organisation = also every organisation member (not guests)'
+    ServiceDesk:
+      type: object
+      required: [projectKey, portalName, portalDescription, portalAccess, selfSignup, portalUrl, customerCount, openProject]
+      properties:
+        projectKey: { type: string }
+        portalName: { type: string }
+        portalDescription: { type: string }
+        portalAccess: { $ref: '#/components/schemas/PortalAccess' }
+        selfSignup: { type: boolean, description: Anyone may create a customer account from the portal (confirmed by email) }
+        portalUrl: { type: string }
+        customerCount: { type: integer }
+        openProject: { type: boolean, description: 'The project is open: every organisation member can browse it as an agent, internal notes included' }
+    ServiceDeskPatch:
+      type: object
+      properties:
+        portalName: { type: string, minLength: 1, maxLength: 100 }
+        portalDescription: { type: string, maxLength: 2000 }
+        portalAccess: { $ref: '#/components/schemas/PortalAccess' }
+        selfSignup: { type: boolean }
+    FormFieldType:
+      type: string
+      enum: [text, textarea, select, multiselect, number, date, checkbox, url]
+    RequestFormField:
+      type: object
+      required: [field, label, required]
+      properties:
+        field: { type: string, description: 'summary, description, priority, dueDate or a custom field key (not user or version fields)' }
+        label: { type: string }
+        help: { type: string }
+        required: { type: boolean }
+        type: { $ref: '#/components/schemas/FormFieldType', description: Derived from the field (ignored on input) }
+        options: { type: array, items: { type: string }, description: Choices of select fields (ignored on input) }
+    RequestApprovalConfig:
+      type: object
+      required: [mode, approvedStatus, declinedStatus]
+      properties:
+        mode: { type: string, enum: [any, all], description: 'any: one approval is enough; all: every approver must approve. One decline declines.' }
+        approverIds: { type: array, items: { type: string, format: uuid } }
+        groupId: { type: string, format: uuid, description: The group's members when the request is raised are asked too }
+        approvedStatus: { type: string, description: Status the request moves to when approved }
+        declinedStatus: { type: string, description: Status the request moves to when declined }
+        approvers: { type: array, items: { $ref: '#/components/schemas/PortalPerson' }, description: The named approvers (output) }
+        groupName: { type: string, description: Output }
+    RequestTypeRef:
+      type: object
+      required: [id, name, icon]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        icon: { type: string }
+    RequestType:
+      type: object
+      required: [id, name, description, icon, issueType, group, position, fields, requestCount]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: string }
+        icon: { type: string }
+        issueType: { $ref: '#/components/schemas/IssueTypeRef' }
+        group: { type: string, description: Portal group heading ("" for none) }
+        position: { type: integer }
+        fields: { type: array, items: { $ref: '#/components/schemas/RequestFormField' } }
+        approval: { $ref: '#/components/schemas/RequestApprovalConfig' }
+        requestCount: { type: integer }
+    RequestTypeInput:
+      type: object
+      required: [name, issueTypeKey]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        description: { type: string, maxLength: 2000 }
+        icon: { type: string, description: 'help, bug, laptop, key, access, question, change or document' }
+        issueTypeKey: { type: string }
+        group: { type: string, maxLength: 60 }
+        position: { type: integer }
+        fields: { type: array, maxItems: 30, items: { $ref: '#/components/schemas/RequestFormField' } }
+        approval: { $ref: '#/components/schemas/RequestApprovalConfig' }
+    ServiceCustomer:
+      type: object
+      required: [user, addedAt, account]
+      properties:
+        user: { $ref: '#/components/schemas/User' }
+        addedAt: { type: string, format: date-time }
+        account: { type: string, enum: [customer, member], description: 'customer: a portal-only account; member: an organisation account' }
+        invited: { type: boolean, description: Has not chosen a password yet }
+        active: { type: boolean }
+    ServiceCustomerInput:
+      type: object
+      required: [email]
+      properties:
+        email: { type: string, minLength: 3, maxLength: 254 }
+        displayName: { type: string, maxLength: 120 }
+    ServiceCustomerAdded:
+      type: object
+      required: [customer, invited]
+      properties:
+        customer: { $ref: '#/components/schemas/ServiceCustomer' }
+        invited: { type: boolean, description: A new customer account was created and emailed an invitation }
+    Queue:
+      type: object
+      required: [id, name, jql, position, count]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        jql: { type: string, description: 'Within the project; e.g. assignee is EMPTY AND resolution = Unresolved ORDER BY "Time to resolution"' }
+        position: { type: integer }
+        count: { type: integer }
+    QueueInput:
+      type: object
+      required: [name, jql]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80 }
+        jql: { type: string, maxLength: 4000 }
+        position: { type: integer }
+    QueueItem:
+      type: object
+      required: [issue, slas]
+      properties:
+        issue: { $ref: '#/components/schemas/Issue' }
+        requestType: { $ref: '#/components/schemas/RequestTypeRef' }
+        slas: { type: array, items: { $ref: '#/components/schemas/Sla' } }
+    QueueIssues:
+      type: object
+      required: [queue, total, items]
+      properties:
+        queue: { $ref: '#/components/schemas/Queue' }
+        total: { type: integer }
+        items: { type: array, items: { $ref: '#/components/schemas/QueueItem' } }
+    SlaMetric: { type: string, enum: [first_response, resolution] }
+    Sla:
+      type: object
+      required: [metric, name, state, targetSeconds, elapsedSeconds, remainingSeconds, breached]
+      properties:
+        metric: { $ref: '#/components/schemas/SlaMetric' }
+        name: { type: string }
+        state: { type: string, enum: [running, paused, stopped] }
+        targetSeconds: { type: integer, format: int64 }
+        elapsedSeconds: { type: integer, format: int64, description: Working time used (in the goal's calendar) }
+        remainingSeconds: { type: integer, format: int64, description: Working time left; negative once breached }
+        breached: { type: boolean }
+        breachAt: { type: string, format: date-time, description: 'Running clocks: when the goal is (or was) missed' }
+        stoppedAt: { type: string, format: date-time }
+        calendar: { type: string, description: Calendar name; omitted = around the clock }
+    SlaHours:
+      type: object
+      required: [day, start, end]
+      properties:
+        day: { type: integer, minimum: 0, maximum: 6, description: 0 = Sunday }
+        start: { type: string, description: 'HH:MM' }
+        end: { type: string, description: 'HH:MM (24:00 for midnight)' }
+    SlaCalendar:
+      type: object
+      required: [name, timeZone, hours, holidays]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string, minLength: 1, maxLength: 80 }
+        timeZone: { type: string, description: 'IANA time zone, e.g. Europe/London' }
+        hours: { type: array, items: { $ref: '#/components/schemas/SlaHours' }, description: No hours = around the clock }
+        holidays: { type: array, items: { type: string }, description: 'Days off, YYYY-MM-DD' }
+    SlaGoal:
+      type: object
+      required: [targetMinutes]
+      properties:
+        priorities: { type: array, items: { $ref: '#/components/schemas/Priority' }, description: Only requests of these priorities (empty = any) }
+        requestTypeIds: { type: array, items: { type: string, format: uuid }, description: Only requests of these types (empty = any) }
+        jql: { type: string, description: Only requests matching this JQL (empty = any) }
+        targetMinutes: { type: integer, minimum: 1, maximum: 5256000 }
+        calendar: { type: string, description: Calendar name; omitted = around the clock }
+    SlaMetricConfig:
+      type: object
+      required: [metric, name, pauseStatuses, goals]
+      properties:
+        metric: { $ref: '#/components/schemas/SlaMetric' }
+        name: { type: string }
+        pauseStatuses: { type: array, items: { type: string }, description: Status names in which the clock pauses }
+        goals: { type: array, maxItems: 50, items: { $ref: '#/components/schemas/SlaGoal' }, description: The first goal whose conditions match a request applies }
+    SlaConfig:
+      type: object
+      required: [calendars, metrics]
+      properties:
+        calendars: { type: array, maxItems: 20, items: { $ref: '#/components/schemas/SlaCalendar' } }
+        metrics: { type: array, items: { $ref: '#/components/schemas/SlaMetricConfig' } }
+    PortalPerson:
+      type: object
+      required: [id, displayName]
+      properties:
+        id: { type: string, format: uuid }
+        displayName: { type: string }
+        avatarUrl: { type: string }
+    Approver:
+      type: object
+      required: [person]
+      properties:
+        person: { $ref: '#/components/schemas/PortalPerson' }
+        decision: { type: string, enum: [approved, declined] }
+        comment: { type: string }
+        decidedAt: { type: string, format: date-time }
+    Approval:
+      type: object
+      required: [id, status, mode, approvers, createdAt, canDecide]
+      properties:
+        id: { type: string, format: uuid }
+        status: { type: string, enum: [pending, approved, declined] }
+        mode: { type: string, enum: [any, all] }
+        approvers: { type: array, items: { $ref: '#/components/schemas/Approver' } }
+        createdAt: { type: string, format: date-time }
+        decidedAt: { type: string, format: date-time }
+        canDecide: { type: boolean, description: The caller is an approver who has not decided yet }
+    ApprovalDecision:
+      type: object
+      required: [decision]
+      properties:
+        decision: { type: string, enum: [approve, decline] }
+        comment: { type: string, maxLength: 5000 }
+    ServiceRequest:
+      type: object
+      required: [issueKey, slas, approvals, participants, portalUrl, customerVisible]
+      properties:
+        issueKey: { type: string }
+        requestType: { $ref: '#/components/schemas/RequestTypeRef' }
+        channel: { type: string, enum: [portal, agent] }
+        slas: { type: array, items: { $ref: '#/components/schemas/Sla' } }
+        approvals: { type: array, items: { $ref: '#/components/schemas/Approval' } }
+        participants: { type: array, items: { $ref: '#/components/schemas/User' } }
+        portalUrl: { type: string }
+        customerVisible: { type: boolean, description: The reporter and participants see it in the portal (it has a request type) }
+    ServiceRequestPatch:
+      type: object
+      required: [requestTypeId]
+      properties:
+        requestTypeId: { type: string, format: uuid }
+    ParticipantInput:
+      type: object
+      required: [email]
+      properties:
+        email: { type: string }
+    PortalDeskRef:
+      type: object
+      required: [projectKey, name]
+      properties:
+        projectKey: { type: string }
+        name: { type: string }
+    PortalDesk:
+      type: object
+      required: [projectKey, name, description, requestTypeCount]
+      properties:
+        projectKey: { type: string }
+        name: { type: string }
+        description: { type: string }
+        requestTypeCount: { type: integer }
+    PortalFormField:
+      type: object
+      required: [key, label, type, required]
+      properties:
+        key: { type: string }
+        label: { type: string }
+        help: { type: string }
+        type: { $ref: '#/components/schemas/FormFieldType' }
+        required: { type: boolean }
+        options: { type: array, items: { type: string } }
+    PortalRequestType:
+      type: object
+      required: [id, name, description, icon, group, fields, needsApproval]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: string }
+        icon: { type: string }
+        group: { type: string }
+        fields: { type: array, items: { $ref: '#/components/schemas/PortalFormField' } }
+        needsApproval: { type: boolean }
+    PortalDeskDetail:
+      type: object
+      required: [projectKey, name, description, requestTypes]
+      properties:
+        projectKey: { type: string }
+        name: { type: string }
+        description: { type: string }
+        requestTypes: { type: array, items: { $ref: '#/components/schemas/PortalRequestType' } }
+    PortalRequestCreate:
+      type: object
+      required: [requestTypeId, values]
+      properties:
+        requestTypeId: { type: string, format: uuid }
+        values: { type: object, additionalProperties: true, description: Form values by field key }
+    PortalRequest:
+      type: object
+      required: [key, summary, status, requestType, desk, reporter, createdAt, updatedAt, role]
+      properties:
+        key: { type: string }
+        summary: { type: string }
+        status: { $ref: '#/components/schemas/Status' }
+        requestType: { $ref: '#/components/schemas/RequestTypeRef' }
+        desk: { $ref: '#/components/schemas/PortalDeskRef' }
+        reporter: { $ref: '#/components/schemas/PortalPerson' }
+        resolution: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        role: { type: string, enum: [reporter, participant, approver], description: Why the caller sees it }
+    PortalFieldValue:
+      type: object
+      required: [label, value]
+      properties:
+        label: { type: string }
+        value: { type: string }
+        type: { $ref: '#/components/schemas/FormFieldType' }
+    PortalComment:
+      type: object
+      required: [id, author, body, createdAt, fromSupport]
+      properties:
+        id: { type: string, format: uuid }
+        author: { $ref: '#/components/schemas/PortalPerson' }
+        body: { type: string }
+        createdAt: { type: string, format: date-time }
+        fromSupport: { type: boolean, description: An agent's reply (not written in the portal) }
+    PortalAttachment:
+      type: object
+      required: [id, filename, contentType, size, createdAt, url]
+      properties:
+        id: { type: string, format: uuid }
+        filename: { type: string }
+        contentType: { type: string }
+        size: { type: integer, format: int64 }
+        createdAt: { type: string, format: date-time }
+        url: { type: string }
+    PortalRequestDetail:
+      allOf:
+        - $ref: '#/components/schemas/PortalRequest'
+        - type: object
+          required: [fields, comments, attachments, approvals, participants, canComment]
+          properties:
+            fields: { type: array, items: { $ref: '#/components/schemas/PortalFieldValue' } }
+            comments: { type: array, items: { $ref: '#/components/schemas/PortalComment' } }
+            attachments: { type: array, items: { $ref: '#/components/schemas/PortalAttachment' } }
+            approvals: { type: array, items: { $ref: '#/components/schemas/Approval' } }
+            participants: { type: array, items: { $ref: '#/components/schemas/PortalPerson' } }
+            canComment: { type: boolean }
+    PortalCommentInput:
+      type: object
+      required: [body]
+      properties:
+        body: { type: string, minLength: 1, maxLength: 50000 }
+    PortalSignupInfo:
+      type: object
+      required: [projectKey, name, description]
+      properties:
+        projectKey: { type: string }
+        name: { type: string }
+        description: { type: string }
+    PortalSignup:
+      type: object
+      required: [email, displayName]
+      properties:
+        email: { type: string, minLength: 3, maxLength: 254 }
+        displayName: { type: string, minLength: 1, maxLength: 120 }

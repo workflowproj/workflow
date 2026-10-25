@@ -365,7 +365,9 @@ Administration: `/api/v1/admin/users/{id}/invitation` (POST, DELETE), `…/tempo
 **Organisation roles**: `admin` (everything, including administration), `member` (sees open
 projects and can create projects), `guest` (only projects they are explicitly added to). A group
 can be mapped to an organisation role; a person gets the highest of their own and their
-groups' roles.
+groups' roles. `customer` is for the people a [service desk](service-desk.md#customers)
+supports: they only use the help centre, groups never raise their role, and they cannot be
+project members.
 
 **Projects** are *open* (every member gets the project's open role, `member` by default) or
 *private*. Project roles — built-in `viewer`, `member`, `admin`, plus custom roles — are granted

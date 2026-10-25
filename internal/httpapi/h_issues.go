@@ -151,9 +151,11 @@ func (s *Server) TransitionIssue(ctx context.Context, req api.TransitionIssueReq
 		return nil, err
 	}
 	b := req.Body
-	i, _, err := s.Tracker.Transition(ctx, a, req.IssueKey, tracker.TransitionInput{
-		TransitionID: b.TransitionId, Fields: deref(b.Fields), Comment: deref(b.Comment), Version: b.Version,
-	})
+	in := tracker.TransitionInput{TransitionID: b.TransitionId, Fields: deref(b.Fields), Comment: deref(b.Comment), Version: b.Version}
+	if b.CommentVisibility != nil {
+		in.CommentVisibility = string(*b.CommentVisibility)
+	}
+	i, _, err := s.Tracker.Transition(ctx, a, req.IssueKey, in)
 	if err != nil {
 		return nil, err
 	}
@@ -180,9 +182,13 @@ func (s *Server) MoveIssue(ctx context.Context, req api.MoveIssueRequestObject) 
 // ---------------------------------------------------------------------------
 // Comments, history, links, watchers
 
-func (s *Server) commentView(ctx context.Context, a *authz.Actor, access authz.Access, c dbq.Comment, users map[uuid.UUID]dbq.User) api.Comment {
+func (s *Server) commentView(ctx context.Context, a *authz.Actor, access authz.Access, p dbq.Project, c dbq.Comment, users map[uuid.UUID]dbq.User) api.Comment {
 	own := c.AuthorID != nil && a.UserID() != nil && *c.AuthorID == *a.UserID()
 	v := api.Comment{Id: c.ID, Body: c.Body, Source: c.Source, Via: c.Via, CreatedAt: c.CreatedAt, EditedAt: c.EditedAt, CanEdit: own || access.Has(authz.CommentModerate)}
+	if tracker.IsServiceProject(p) {
+		vis := api.Visibility(tracker.CommentVisibility(c))
+		v.Visibility = &vis
+	}
 	if c.AuthorID != nil {
 		u, ok := users[*c.AuthorID]
 		if !ok {
@@ -204,14 +210,14 @@ func (s *Server) ListComments(ctx context.Context, req api.ListCommentsRequestOb
 	if err != nil {
 		return nil, err
 	}
-	cs, access, err := s.Tracker.ListComments(ctx, a, req.IssueKey)
+	cs, p, access, err := s.Tracker.ListComments(ctx, a, req.IssueKey)
 	if err != nil {
 		return nil, err
 	}
 	users := map[uuid.UUID]dbq.User{}
 	out := api.ListComments200JSONResponse{}
 	for _, c := range cs {
-		out = append(out, s.commentView(ctx, a, access, c, users))
+		out = append(out, s.commentView(ctx, a, access, p, c, users))
 	}
 	return out, nil
 }
@@ -221,11 +227,15 @@ func (s *Server) AddComment(ctx context.Context, req api.AddCommentRequestObject
 	if err != nil {
 		return nil, err
 	}
-	c, err := s.Tracker.AddComment(ctx, a, req.IssueKey, req.Body.Body)
+	in := tracker.CommentInput{Body: req.Body.Body}
+	if req.Body.Visibility != nil {
+		in.Visibility = string(*req.Body.Visibility)
+	}
+	c, err := s.Tracker.AddCommentWith(ctx, a, req.IssueKey, in)
 	if err != nil {
 		return nil, err
 	}
-	return api.AddComment201JSONResponse(s.commentView(ctx, a, authz.Access{}, c, map[uuid.UUID]dbq.User{})), nil
+	return api.AddComment201JSONResponse(s.commentView(ctx, a, authz.Access{}, s.commentProject(ctx, c), c, map[uuid.UUID]dbq.User{})), nil
 }
 
 func (s *Server) UpdateComment(ctx context.Context, req api.UpdateCommentRequestObject) (api.UpdateCommentResponseObject, error) {
@@ -237,7 +247,17 @@ func (s *Server) UpdateComment(ctx context.Context, req api.UpdateCommentRequest
 	if err != nil {
 		return nil, err
 	}
-	return api.UpdateComment200JSONResponse(s.commentView(ctx, a, authz.Access{}, c, map[uuid.UUID]dbq.User{})), nil
+	return api.UpdateComment200JSONResponse(s.commentView(ctx, a, authz.Access{}, s.commentProject(ctx, c), c, map[uuid.UUID]dbq.User{})), nil
+}
+
+// commentProject is the project of a comment's issue (it says whether comments have a visibility).
+func (s *Server) commentProject(ctx context.Context, c dbq.Comment) dbq.Project {
+	if i, err := s.Q.GetIssue(ctx, c.IssueID); err == nil {
+		if p, err := s.Q.GetProject(ctx, i.ProjectID); err == nil {
+			return p
+		}
+	}
+	return dbq.Project{}
 }
 
 func (s *Server) DeleteComment(ctx context.Context, req api.DeleteCommentRequestObject) (api.DeleteCommentResponseObject, error) {
@@ -383,6 +403,10 @@ func (s *Server) UploadAttachment(ctx context.Context, req api.UploadAttachmentR
 			return nil, err
 		}
 		v := api.Attachment{Id: att.ID, Filename: att.Filename, ContentType: att.ContentType, Size: att.SizeBytes, CreatedAt: att.CreatedAt, Url: "/api/v1/attachments/" + att.ID.String()}
+		if a.Type != authz.ActorPortal && tracker.IsServiceProject(s.commentProject(ctx, dbq.Comment{IssueID: att.IssueID})) {
+			vis := api.VisibilityInternal
+			v.Visibility = &vis
+		}
 		if a.User != nil {
 			uv := tracker.UserView(*a.User)
 			v.Uploader = &uv

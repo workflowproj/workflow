@@ -97,7 +97,7 @@ SELECT * FROM issue_links WHERE source_id = $1 OR target_id = $1 ORDER BY create
 -- Comments
 
 -- name: CreateComment :one
-INSERT INTO comments (issue_id, author_id, body, source, via) VALUES ($1, $2, $3, $4, sqlc.narg(via)) RETURNING *;
+INSERT INTO comments (issue_id, author_id, body, source, via, internal) VALUES ($1, $2, $3, $4, sqlc.narg(via), @internal) RETURNING *;
 
 -- name: GetComment :one
 SELECT * FROM comments WHERE id = $1;
@@ -133,8 +133,8 @@ SELECT EXISTS (SELECT 1 FROM watchers WHERE issue_id = $1 AND user_id = $2);
 -- Attachments & blobs
 
 -- name: CreateAttachment :one
-INSERT INTO attachments (issue_id, uploader_id, filename, content_type, size_bytes, object_key)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO attachments (issue_id, uploader_id, filename, content_type, size_bytes, object_key, public)
+VALUES ($1, $2, $3, $4, $5, $6, @public)
 RETURNING *;
 
 -- name: GetAttachment :one

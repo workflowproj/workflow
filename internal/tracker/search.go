@@ -31,6 +31,9 @@ func (s *Service) searchEnv(ctx context.Context, actor *authz.Actor) (search.Env
 		return search.Env{}, err
 	}
 	env := search.Env{UserID: actor.UserID(), Now: s.Now(), Units: s.Units()}
+	if s.SLACalendars != nil {
+		env.SLACalendars = func() ([]search.SLACalendar, error) { return s.SLACalendars(ctx) }
+	}
 	for _, d := range defs {
 		env.CustomFields = append(env.CustomFields, search.CustomField{Key: d.Key, Name: d.Name, Type: d.Type})
 	}
@@ -61,6 +64,23 @@ func (s *Service) Search(ctx context.Context, actor *authz.Actor, jql string, li
 // SearchIn runs JQL over the given projects (callers decide which projects are visible).
 func (s *Service) SearchIn(ctx context.Context, actor *authz.Actor, projectIDs []uuid.UUID, jql string, limit int) ([]dbq.Issue, int, error) {
 	return s.runSearch(ctx, actor, projectIDs, SearchQuery{JQL: jql, DefaultOrder: []search.Order{{Field: "updated", Desc: true}}, Limit: limit})
+}
+
+// SearchWith runs a search over the given projects (callers decide which are visible): queues.
+func (s *Service) SearchWith(ctx context.Context, actor *authz.Actor, projectIDs []uuid.UUID, sq SearchQuery) ([]dbq.Issue, int, error) {
+	return s.runSearch(ctx, actor, projectIDs, sq)
+}
+
+// MatchesTx reports whether an issue satisfies a JQL query, reading through tx: SLA goals are
+// chosen inside the transaction that changes the request. currentUser() matches nobody.
+func (s *Service) MatchesTx(ctx context.Context, tx pgx.Tx, projectID, issueID uuid.UUID, jql string) (bool, error) {
+	where, _, args, err := s.compileWhere(ctx, authz.SystemActor(), []uuid.UUID{projectID}, jql, []any{issueID}, nil)
+	if err != nil {
+		return false, err
+	}
+	var ok bool
+	err = tx.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM issues i WHERE "+where+" AND i.id = $2::uuid)", args...).Scan(&ok)
+	return ok, err
 }
 
 // IssueMatches reports whether an issue satisfies a JQL query (chat channel filters). It runs

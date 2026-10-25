@@ -216,3 +216,39 @@ func (JiraImport) Kind() string { return "jira_import" }
 func (JiraImport) InsertOpts() river.InsertOpts {
 	return river.InsertOpts{Queue: QueueOutbound, MaxAttempts: 5, UniqueOpts: river.UniqueOpts{ByArgs: true}}
 }
+
+// ServiceDeskEvent follows up a change to a service request after it commits: emails to its
+// customers and approvers (see the servicedesk package).
+type ServiceDeskEvent struct {
+	Event     string          `json:"event"`
+	ProjectID uuid.UUID       `json:"projectId"`
+	IssueID   uuid.UUID       `json:"issueId"`
+	ActorID   *uuid.UUID      `json:"actorId,omitempty"`
+	ActorType string          `json:"actorType"`
+	Data      json.RawMessage `json:"data,omitempty"`
+}
+
+func (ServiceDeskEvent) Kind() string { return "service_desk_event" }
+
+func (ServiceDeskEvent) InsertOpts() river.InsertOpts { return river.InsertOpts{MaxAttempts: 8} }
+
+// SLACheck marks SLA clocks that went past their goal and raises sla.breached (periodic).
+type SLACheck struct{}
+
+func (SLACheck) Kind() string { return "sla_check" }
+
+func (SLACheck) InsertOpts() river.InsertOpts {
+	return river.InsertOpts{MaxAttempts: 3, UniqueOpts: river.UniqueOpts{ByState: []rivertype.JobState{rivertype.JobStateAvailable, rivertype.JobStatePending, rivertype.JobStateScheduled, rivertype.JobStateRunning}}}
+}
+
+// SLARecompute recomputes the SLA clocks of a service project's open requests after its SLA
+// configuration changed.
+type SLARecompute struct {
+	ProjectID uuid.UUID `json:"projectId"`
+}
+
+func (SLARecompute) Kind() string { return "sla_recompute" }
+
+func (SLARecompute) InsertOpts() river.InsertOpts {
+	return river.InsertOpts{MaxAttempts: 5, UniqueOpts: river.UniqueOpts{ByArgs: true, ByState: []rivertype.JobState{rivertype.JobStateAvailable, rivertype.JobStatePending, rivertype.JobStateScheduled, rivertype.JobStateRunning}}}
+}

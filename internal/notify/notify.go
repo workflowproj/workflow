@@ -40,6 +40,9 @@ type Kind struct {
 	// Noun names these emails in "Stop emails about ..." links.
 	Noun    string
 	Default string
+	// Portal kinds are about service requests followed in the customer portal; they are the only
+	// ones customers see, and they are emailed immediately or not at all (never in a digest).
+	Portal bool
 }
 
 // Kinds in display order. Notifications of a kind not listed here are emailed in the digest.
@@ -48,6 +51,17 @@ var Kinds = []Kind{
 	{Key: "commented", Label: "Comments", Description: "New comments on issues you report, are assigned to or watch.", Noun: "comments", Default: Digest},
 	{Key: "transitioned", Label: "Status changes", Description: "Issues you report, are assigned to or watch move to another status.", Noun: "status changes", Default: Digest},
 	{Key: "automation", Label: "Automation", Description: "Automation rules that notify you about an issue.", Noun: "automation updates", Default: Digest},
+	{Key: "sla", Label: "SLA breaches", Description: "A service request assigned to you misses an SLA goal.", Noun: "SLA breaches", Default: Immediate},
+	{Key: "requests", Label: "My requests", Description: "Replies and status changes on service requests you raised or that are shared with you.", Noun: "your requests", Default: Immediate, Portal: true},
+	{Key: "approvals", Label: "Approvals", Description: "Someone asks for your approval on a service request.", Noun: "approval requests", Default: Immediate, Portal: true},
+}
+
+// Deliveries lists the choices a kind offers.
+func (k Kind) Deliveries() []string {
+	if k.Portal {
+		return []string{Immediate, Off}
+	}
+	return []string{Immediate, Digest, Off}
 }
 
 // KindByKey finds a kind.
@@ -98,10 +112,14 @@ func parseDeliveries(raw []byte) map[string]string {
 
 // Delivery returns how notifications of a kind are emailed (ignoring Paused).
 func (s Settings) Delivery(kind string) string {
+	k, known := KindByKey(kind)
 	if d, ok := s.Deliveries[kind]; ok && ValidDelivery(d) {
+		if known && k.Portal && d == Digest {
+			return Immediate
+		}
 		return d
 	}
-	if k, ok := KindByKey(kind); ok {
+	if known {
 		return k.Default
 	}
 	return Digest

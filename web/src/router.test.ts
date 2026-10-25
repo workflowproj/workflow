@@ -31,6 +31,21 @@ describe("router", () => {
       "/app/admin/import/$importId",
       "/oauth/consent",
       "/oauth/consent/$request",
+      "/portal",
+      "/portal/",
+      "/portal/requests",
+      "/portal/requests/$issueKey",
+      "/portal/approvals",
+      "/portal/profile",
+      "/portal/$projectKey",
+      "/portal/$projectKey/new/$requestTypeId",
+      "/portal/signup/$projectKey",
+      "/app/projects/$projectKey/queues",
+      "/app/projects/$projectKey/customers",
+      "/app/projects/$projectKey/settings/portal",
+      "/app/projects/$projectKey/settings/request-types",
+      "/app/projects/$projectKey/settings/queues",
+      "/app/projects/$projectKey/settings/slas",
     ]) {
       expect(ids).toContain(id);
     }

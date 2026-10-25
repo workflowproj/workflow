@@ -119,7 +119,7 @@ function CreateProjectDialog({ open, onClose }: { open: boolean; onClose: () => 
     onSuccess: (p) => {
       qc.invalidateQueries({ queryKey: ["projects"] });
       onClose();
-      navigate({ to: "/projects/$projectKey/board", params: { projectKey: p.key } });
+      navigate({ to: p.template === "service" ? "/projects/$projectKey/queues" : "/projects/$projectKey/board", params: { projectKey: p.key } });
     },
   });
   const fe = create.error instanceof ApiError ? create.error.fieldErrors() : {};
@@ -184,7 +184,11 @@ function CreateProjectDialog({ open, onClose }: { open: boolean; onClose: () => 
               <button
                 type="button"
                 key={t.id}
-                onClick={() => setTemplate(t.id)}
+                onClick={() => {
+                  setTemplate(t.id);
+                  // Service desks hold customers' requests and internal notes: private unless chosen otherwise.
+                  if (t.id === "service") setAccess("private");
+                }}
                 aria-pressed={template === t.id}
                 className={cn("rounded-md border p-3 text-left transition-colors", template === t.id ? "border-accent bg-accent-soft" : "border-line hover:border-line-strong")}
               >

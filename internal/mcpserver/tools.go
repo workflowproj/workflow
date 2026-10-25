@@ -54,7 +54,7 @@ func (t *tools) register(s *mcp.Server) {
 	mcp.AddTool(s, &mcp.Tool{Name: "create_issue", Description: "Create an issue. Use get_project for the project's issue type keys. Description is Markdown.", Annotations: write("Create issue", false)}, t.createIssue)
 	mcp.AddTool(s, &mcp.Tool{Name: "update_issue", Description: "Change an issue's fields; only the fields you pass change. Use `clear` to empty fields. Status changes use transition_issue instead.", Annotations: write("Update issue", true)}, t.updateIssue)
 	mcp.AddTool(s, &mcp.Tool{Name: "transition_issue", Description: "Move an issue through its workflow, by transition id, name or target status (get_issue lists the available ones). Some transitions ask for screen fields such as a resolution.", Annotations: write("Transition issue", false)}, t.transitionIssue)
-	mcp.AddTool(s, &mcp.Tool{Name: "add_comment", Description: "Comment on an issue (Markdown).", Annotations: write("Add comment", false)}, t.addComment)
+	mcp.AddTool(s, &mcp.Tool{Name: "add_comment", Description: "Comment on an issue (Markdown). On service requests a comment is an internal note unless visibility is public (a reply the customer is emailed).", Annotations: write("Add comment", false)}, t.addComment)
 	mcp.AddTool(s, &mcp.Tool{Name: "log_work", Description: "Log time spent on an issue, e.g. 2h or 1d 4h (a day is the team's working day). The remaining estimate goes down by the time logged unless you set it or leave it.", Annotations: write("Log work", false)}, t.logWork)
 	mcp.AddTool(s, &mcp.Tool{Name: "link_issues", Description: "Link two issues: key <type> targetKey, e.g. PLAT-3 blocks PLAT-7.", Annotations: write("Link issues", true)}, t.linkIssues)
 }
@@ -285,6 +285,9 @@ func (t *tools) getIssue(ctx context.Context, _ *mcp.CallToolRequest, in issueIn
 	}
 	fmt.Fprintf(&b, "Project: %s · Created %s · Updated %s · Version %d\n", i.Project.Key, day(i.CreatedAt), day(i.UpdatedAt), i.Version)
 	fmt.Fprintf(&b, "URL: %s/browse/%s\n", t.publicURL, i.Key)
+	if sr, err := as[api.GetServiceRequest200JSONResponse](t.api.GetServiceRequest(ctx, api.GetServiceRequestRequestObject{IssueKey: in.Key})); err == nil {
+		b.WriteString(serviceRequestText(api.ServiceRequest(sr)))
+	}
 
 	if m, err := as[api.GetIssueMetrics200JSONResponse](t.api.GetIssueMetrics(ctx, api.GetIssueMetricsRequestObject{IssueKey: in.Key})); err == nil {
 		var parts []string
@@ -367,7 +370,12 @@ func (t *tools) getIssue(ctx context.Context, _ *mcp.CallToolRequest, in issueIn
 			from := max(len(cs)-n, 0)
 			fmt.Fprintf(&b, "\nComments (%d of %d, oldest first):\n", len(cs)-from, len(cs))
 			for _, c := range cs[from:] {
-				fmt.Fprintf(&b, "- %s, %s: %s\n", userText(c.Author), c.CreatedAt.UTC().Format("2006-01-02 15:04"), strings.TrimSpace(c.Body))
+				// Service requests: say who saw it, so an assistant never repeats a note to a customer.
+				vis := ""
+				if c.Visibility != nil {
+					vis = map[api.Visibility]string{api.VisibilityPublic: " [reply to customer]", api.VisibilityInternal: " [internal note]"}[*c.Visibility]
+				}
+				fmt.Fprintf(&b, "- %s, %s%s: %s\n", userText(c.Author), c.CreatedAt.UTC().Format("2006-01-02 15:04"), vis, strings.TrimSpace(c.Body))
 			}
 		}
 	}
@@ -849,8 +857,9 @@ func (t *tools) transitionIssue(ctx context.Context, _ *mcp.CallToolRequest, in 
 }
 
 type commentIn struct {
-	Key  string `json:"key" jsonschema:"issue key"`
-	Body string `json:"body" jsonschema:"Markdown"`
+	Key        string `json:"key" jsonschema:"issue key"`
+	Body       string `json:"body" jsonschema:"Markdown"`
+	Visibility string `json:"visibility,omitempty" jsonschema:"service requests only: public replies to the customer (they are emailed); internal (the default) is a note only agents see"`
 }
 
 func (t *tools) addComment(ctx context.Context, _ *mcp.CallToolRequest, in commentIn) (*mcp.CallToolResult, any, error) {
@@ -858,11 +867,20 @@ func (t *tools) addComment(ctx context.Context, _ *mcp.CallToolRequest, in comme
 	if err != nil {
 		return nil, nil, err
 	}
-	c, err := as[api.AddComment201JSONResponse](t.api.AddComment(ctx, api.AddCommentRequestObject{IssueKey: in.Key, Body: &api.CommentInput{Body: in.Body}}))
+	body := &api.CommentInput{Body: in.Body}
+	if in.Visibility != "" {
+		v := api.Visibility(in.Visibility)
+		body.Visibility = &v
+	}
+	c, err := as[api.AddComment201JSONResponse](t.api.AddComment(ctx, api.AddCommentRequestObject{IssueKey: in.Key, Body: body}))
 	if err != nil {
 		return nil, nil, err
 	}
-	return text(fmt.Sprintf("Commented on %s at %s.", in.Key, c.CreatedAt.UTC().Format("2006-01-02 15:04"))), nil, nil
+	what := "Commented on"
+	if c.Visibility != nil {
+		what = map[api.Visibility]string{api.VisibilityPublic: "Replied to the customer on", api.VisibilityInternal: "Added an internal note to"}[*c.Visibility]
+	}
+	return text(fmt.Sprintf("%s %s at %s.", what, in.Key, c.CreatedAt.UTC().Format("2006-01-02 15:04"))), nil, nil
 }
 
 type linkIn struct {
@@ -1000,6 +1018,54 @@ func plural(n int) string {
 func day(t time.Time) string { return t.UTC().Format("2006-01-02") }
 
 // duration renders hours the way people say them: 45m, 6h, 3.5d.
+// serviceRequestText summarises a service request: its request type, SLA clocks and approvals.
+func serviceRequestText(sr api.ServiceRequest) string {
+	var b strings.Builder
+	kind := "no request type (not shown to the customer)"
+	if sr.RequestType != nil {
+		kind = sr.RequestType.Name
+	}
+	fmt.Fprintf(&b, "Service request: %s\n", kind)
+	for _, c := range sr.Slas {
+		state := ""
+		switch {
+		case c.State == api.SlaStateStopped && c.Breached:
+			state = "missed"
+		case c.State == api.SlaStateStopped:
+			state = "met"
+		case c.Breached:
+			state = "breached " + slaTime(-c.RemainingSeconds) + " ago"
+		default:
+			state = slaTime(c.RemainingSeconds) + " left"
+		}
+		if c.State == api.SlaStatePaused {
+			state += " (paused)"
+		}
+		fmt.Fprintf(&b, "SLA %s: %s\n", c.Name, state)
+	}
+	for _, a := range sr.Approvals {
+		var who []string
+		for _, ap := range a.Approvers {
+			s := ap.Person.DisplayName
+			if ap.Decision != nil {
+				s += " " + string(*ap.Decision)
+			}
+			who = append(who, s)
+		}
+		fmt.Fprintf(&b, "Approval: %s (%s; %s)\n", a.Status, a.Mode, strings.Join(who, ", "))
+	}
+	return b.String()
+}
+
+// slaTime writes SLA working time in hours: a working day is not 24 hours.
+func slaTime(seconds int64) string {
+	h := float64(seconds) / 3600
+	if h < 1 {
+		return fmt.Sprintf("%.0fm", h*60)
+	}
+	return strconv.FormatFloat(float64(int(h*10+0.5))/10, 'f', -1, 64) + "h"
+}
+
 func duration(h float64) string {
 	switch {
 	case h < 1:

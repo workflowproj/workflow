@@ -1,5 +1,5 @@
 import { getRouteApi, Link, Outlet, useMatchRoute } from "@tanstack/react-router";
-import { Bot, FolderGit2, GitBranch, KanbanSquare, Layers, MessagesSquare, Settings, Users, Webhook } from "lucide-react";
+import { Bot, CalendarClock, FolderGit2, GitBranch, Inbox, KanbanSquare, Layers, LifeBuoy, ListFilter, MessagesSquare, Settings, Users, Webhook } from "lucide-react";
 import { hasPermission, useProject } from "@/api/queries";
 import { EmptyState } from "@/components/ui";
 
@@ -15,6 +15,14 @@ const sections = [
   { label: "Automation", to: "/projects/$projectKey/settings/automation" as const, icon: Bot },
   { label: "Chat", to: "/projects/$projectKey/settings/chat" as const, icon: MessagesSquare },
   { label: "Webhooks", to: "/projects/$projectKey/settings/webhooks" as const, icon: Webhook },
+];
+
+// Service projects also configure their help centre, request types, queues and SLAs.
+const serviceSections = [
+  { label: "Help centre", to: "/projects/$projectKey/settings/portal" as const, icon: LifeBuoy },
+  { label: "Request types", to: "/projects/$projectKey/settings/request-types" as const, icon: Inbox },
+  { label: "Queues", to: "/projects/$projectKey/settings/queues" as const, icon: ListFilter },
+  { label: "SLAs", to: "/projects/$projectKey/settings/slas" as const, icon: CalendarClock },
 ];
 
 export function SettingsLayout() {
@@ -35,12 +43,12 @@ export function SettingsLayout() {
   return (
     <div className="flex flex-col gap-6 p-6 md:flex-row">
       <nav aria-label="Project settings" className="flex shrink-0 gap-1 overflow-x-auto md:w-48 md:flex-col">
-        {sections.map((s) => (
+        {(project?.template === "service" ? [sections[0], ...serviceSections, ...sections.slice(1)] : sections).map((s) => (
           <Link
             key={s.to}
             to={s.to}
             params={{ projectKey }}
-            activeOptions={{ exact: s.exact ?? false }}
+            activeOptions={{ exact: ("exact" in s && s.exact) || false }}
             className="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm whitespace-nowrap text-muted hover:bg-surface-2 hover:text-ink"
             activeProps={{ className: "!bg-accent-soft !text-accent font-medium" }}
           >

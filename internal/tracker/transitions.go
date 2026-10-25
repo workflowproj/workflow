@@ -285,7 +285,9 @@ type TransitionInput struct {
 	TransitionID string
 	Fields       map[string]any
 	Comment      string
-	Version      *int
+	// CommentVisibility applies to the comment in service projects (see CommentInput).
+	CommentVisibility string
+	Version           *int
 }
 
 func (s *Service) Transition(ctx context.Context, actor *authz.Actor, ref string, in TransitionInput) (dbq.Issue, dbq.Project, error) {
@@ -448,7 +450,15 @@ func (s *Service) transitionTx(ctx context.Context, tx pgx.Tx, q *dbq.Queries, a
 		}
 	}
 	if comment != "" {
-		if _, err := q.CreateComment(ctx, dbq.CreateCommentParams{IssueID: i.ID, AuthorID: actor.UserID(), Body: comment, Source: commentSource(actor), Via: via(actor)}); err != nil {
+		internal, err := commentInternal(p, actor, in.CommentVisibility)
+		if err != nil {
+			return i, err
+		}
+		c, err := q.CreateComment(ctx, dbq.CreateCommentParams{IssueID: i.ID, AuthorID: actor.UserID(), Body: comment, Source: commentSource(actor), Via: via(actor), Internal: internal})
+		if err != nil {
+			return i, err
+		}
+		if err := s.commentRecorded(ctx, q, actor, p, c, map[string]any{}); err != nil {
 			return i, err
 		}
 	}
@@ -475,6 +485,8 @@ func commentSource(actor *authz.Actor) string {
 		return "automation"
 	case authz.ActorSCM:
 		return "scm"
+	case authz.ActorPortal:
+		return "portal"
 	}
 	return "user"
 }

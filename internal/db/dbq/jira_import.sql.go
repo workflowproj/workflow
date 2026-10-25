@@ -354,7 +354,7 @@ func (q *Queries) ImportDeleteHistory(ctx context.Context, issueID uuid.UUID) er
 const importInsertAttachment = `-- name: ImportInsertAttachment :one
 INSERT INTO attachments (id, issue_id, uploader_id, filename, content_type, size_bytes, object_key, created_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, issue_id, uploader_id, filename, content_type, size_bytes, object_key, created_at
+RETURNING id, issue_id, uploader_id, filename, content_type, size_bytes, object_key, created_at, public
 `
 
 type ImportInsertAttachmentParams struct {
@@ -389,6 +389,7 @@ func (q *Queries) ImportInsertAttachment(ctx context.Context, arg ImportInsertAt
 		&i.SizeBytes,
 		&i.ObjectKey,
 		&i.CreatedAt,
+		&i.Public,
 	)
 	return i, err
 }
@@ -634,7 +635,7 @@ func (q *Queries) ImportInsertSprint(ctx context.Context, arg ImportInsertSprint
 }
 
 const importIssueAttachments = `-- name: ImportIssueAttachments :many
-SELECT id, issue_id, uploader_id, filename, content_type, size_bytes, object_key, created_at FROM attachments WHERE issue_id = $1
+SELECT id, issue_id, uploader_id, filename, content_type, size_bytes, object_key, created_at, public FROM attachments WHERE issue_id = $1
 `
 
 func (q *Queries) ImportIssueAttachments(ctx context.Context, issueID uuid.UUID) ([]Attachment, error) {
@@ -655,6 +656,7 @@ func (q *Queries) ImportIssueAttachments(ctx context.Context, issueID uuid.UUID)
 			&i.SizeBytes,
 			&i.ObjectKey,
 			&i.CreatedAt,
+			&i.Public,
 		); err != nil {
 			return nil, err
 		}

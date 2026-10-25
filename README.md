@@ -43,6 +43,9 @@ search and live updates all run on Postgres.
 - **Time tracking.** Original and remaining estimates, work logged as `1w 2d 3h` against a
   configurable working day, overruns at a glance, JQL on estimates and worklogs, a sprint burndown
   in hours and a timesheet with CSV export.
+- **Service desk.** Service projects with a help centre where customers raise requests through
+  forms and follow them; replies to the customer and internal notes; agent queues; SLAs on
+  business-hours calendars with breach alerts; approvals; customer emails.
 - **Timeline.** A roadmap per project and across all projects: epics and their issues on a time
   axis, dependency arrows (with conflicts highlighted), sprints and releases; drag to reschedule.
 - **Automation.** Rules triggered by issue events, development activity or a schedule, with CEL
@@ -100,6 +103,7 @@ To run the production build locally: `make web embed-web build` then
 | [Notifications and email](docs/notifications.md) | Email preferences, immediate emails, daily digests, unsubscribe |
 | [Metrics and dashboards](docs/metrics.md) | Issue timing, sprint reports, flow metrics, dashboards |
 | [Time tracking](docs/time-tracking.md) | Estimates, logging work, the hours burndown and the timesheet |
+| [Service desk](docs/service-desk.md) | Help centre, customers, request types, queues, SLAs and approvals |
 | [AI assistants (MCP)](docs/mcp.md) | Connecting Claude and other assistants; the tools |
 | [API](docs/api.md) | REST API, authentication, errors, live events |
 

@@ -49,6 +49,9 @@ type IssueInput struct {
 	// Estimates in seconds; the remaining estimate defaults to the original one.
 	OriginalEstimate  *int64
 	RemainingEstimate *int64
+	// OnCreate runs in the creating transaction before the issue.created event (the service
+	// desk records the request, its participants and its approval).
+	OnCreate func(ctx context.Context, tx pgx.Tx, q *dbq.Queries, issue dbq.Issue) error
 }
 
 type IssuePatch struct {
@@ -270,11 +273,20 @@ func (s *Service) CreateIssue(ctx context.Context, actor *authz.Actor, in IssueI
 		if err := s.history(ctx, q, issue.ID, actor, "created", nil, strp(summary), nil, nil); err != nil {
 			return err
 		}
-		for _, w := range []*uuid.UUID{actor.UserID(), in.AssigneeID} {
+		watchers := []*uuid.UUID{actor.UserID(), in.AssigneeID}
+		if actor.Type == authz.ActorPortal {
+			watchers[0] = nil // customers follow their requests in the portal
+		}
+		for _, w := range watchers {
 			if w != nil {
 				if err := q.AddWatcher(ctx, dbq.AddWatcherParams{IssueID: issue.ID, UserID: *w}); err != nil {
 					return err
 				}
+			}
+		}
+		if in.OnCreate != nil {
+			if err := in.OnCreate(ctx, tx, q, issue); err != nil {
+				return err
 			}
 		}
 		return s.emit(ctx, tx, actor, p, &issue, "issue.created", map[string]any{"type": it.Key, "status": initial.Name})

@@ -20,7 +20,7 @@ async function audit(page: Page, name: string) {
 }
 
 test("accessibility: main pages in light and dark mode", async ({ page, browser }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(360_000);
   // The sign-in page, signed out.
   const ctx = await browser.newContext();
   const anon = await ctx.newPage();
@@ -45,6 +45,33 @@ test("accessibility: main pages in light and dark mode", async ({ page, browser 
       { id: "l", type: "issue_list", width: 2, config: { projectKeys: [key] } },
     ],
   });
+  // A service desk with a request (a reply to the customer and an internal note) and one waiting for the admin's approval.
+  const sd = projectKey("AXSD");
+  await a.post("/projects", { key: sd, name: `Help ${sd}`, template: "service" });
+  const me = await a.get("/me");
+  const types: { id: string; name: string; description: string; icon: string; issueType: { key: string }; group: string; position: number; fields: { field: string; label: string; required: boolean }[] }[] =
+    await a.get(`/projects/${sd}/request-types`);
+  const help = types.find((t) => t.name === "Get IT help")!;
+  const hardware = types.find((t) => t.name === "Request new hardware")!;
+  const request = await a.post(`/portal/projects/${sd}/requests`, { requestTypeId: help.id, values: { summary: "The printer is jammed", description: "Paper stuck in tray 2." } });
+  await a.post(`/issues/${request.key}/comments`, { body: "On my way with a screwdriver.", visibility: "public" });
+  await a.post(`/issues/${request.key}/comments`, { body: "Tray 2 roller is worn.", visibility: "internal" });
+  const put = await page.request.put(`/api/v1/request-types/${hardware.id}`, {
+    headers: { "X-Requested-With": "e2e" },
+    data: {
+      name: hardware.name,
+      description: hardware.description,
+      icon: hardware.icon,
+      issueTypeKey: hardware.issueType.key,
+      group: hardware.group,
+      position: hardware.position,
+      fields: hardware.fields.map((f) => ({ field: f.field, label: f.label, required: f.required })),
+      approval: { mode: "any", approverIds: [me.id], approvedStatus: "Waiting for support", declinedStatus: "Declined" },
+    },
+  });
+  expect(put.ok(), await put.text()).toBeTruthy();
+  const pending = await a.post(`/portal/projects/${sd}/requests`, { requestTypeId: hardware.id, values: { summary: "A standing desk" } });
+  await a.patch(`/projects/${sd}/service-desk`, { selfSignup: true });
 
   const pages: [string, string][] = [
     ["projects", "/projects"],
@@ -68,6 +95,22 @@ test("accessibility: main pages in light and dark mode", async ({ page, browser 
     ["admin email", "/admin/email"],
     ["admin connected apps", "/admin/connected-apps"],
     ["admin import", "/admin/import"],
+    ["queues", `/projects/${sd}/queues`],
+    ["queue with an open request", `/projects/${sd}/queues?issue=${request.key}`],
+    ["customers", `/projects/${sd}/customers`],
+    ["service request", `/browse/${request.key}`],
+    ["help centre settings", `/projects/${sd}/settings/portal`],
+    ["request types settings", `/projects/${sd}/settings/request-types`],
+    ["queues settings", `/projects/${sd}/settings/queues`],
+    ["SLA settings", `/projects/${sd}/settings/slas`],
+    ["portal home", "/portal"],
+    ["portal desk", `/portal/${sd}`],
+    ["portal form", `/portal/${sd}/new/${help.id}`],
+    ["portal requests", "/portal/requests"],
+    ["portal request", `/portal/requests/${request.key}?created=true`],
+    ["portal approval", `/portal/requests/${pending.key}`],
+    ["portal approvals", "/portal/approvals"],
+    ["portal profile", "/portal/profile"],
   ];
   for (const theme of ["light", "dark"] as const) {
     await page.evaluate((t) => localStorage.setItem("wfm.theme", t), theme);
@@ -75,5 +118,21 @@ test("accessibility: main pages in light and dark mode", async ({ page, browser 
       await page.goto(path);
       await audit(page, `${name} (${theme})`);
     }
+    // The request type form builder, open.
+    await page.goto(`/projects/${sd}/settings/request-types`);
+    await page.getByRole("button", { name: `Edit ${hardware.name}` }).click();
+    await expect(page.getByRole("dialog", { name: `Edit ${hardware.name}` })).toBeVisible();
+    await audit(page, `request type form builder (${theme})`);
   }
+  // The help centre's sign-up page, signed out.
+  const anonDesk = await browser.newContext();
+  const visitor = await anonDesk.newPage();
+  for (const theme of ["light", "dark"] as const) {
+    await visitor.goto("/login");
+    await visitor.evaluate((t) => localStorage.setItem("wfm.theme", t), theme);
+    await visitor.goto(`/portal/signup/${sd}`);
+    await expect(visitor.getByRole("heading", { name: /Get help from/ })).toBeVisible();
+    await audit(visitor, `portal sign-up (${theme})`);
+  }
+  await anonDesk.close();
 });

@@ -36,6 +36,14 @@ type ApiToken struct {
 	RevokedAt   *time.Time
 }
 
+type ApprovalApprover struct {
+	ApprovalID uuid.UUID
+	UserID     uuid.UUID
+	Decision   *string
+	Comment    string
+	DecidedAt  *time.Time
+}
+
 type Attachment struct {
 	ID          uuid.UUID
 	IssueID     uuid.UUID
@@ -45,6 +53,7 @@ type Attachment struct {
 	SizeBytes   int64
 	ObjectKey   string
 	CreatedAt   time.Time
+	Public      bool
 }
 
 type AuditEvent struct {
@@ -154,6 +163,7 @@ type Comment struct {
 	EditedAt  *time.Time
 	CreatedAt time.Time
 	Via       *string
+	Internal  bool
 }
 
 type Dashboard struct {
@@ -292,6 +302,24 @@ type IssueLink struct {
 type IssueRelease struct {
 	IssueID   uuid.UUID
 	ReleaseID uuid.UUID
+}
+
+type IssueSla struct {
+	IssueID          uuid.UUID
+	Metric           string
+	ProjectID        uuid.UUID
+	GoalID           *uuid.UUID
+	CalendarID       *uuid.UUID
+	TargetSeconds    int64
+	State            string
+	ElapsedSeconds   int64
+	CycleStartedAt   time.Time
+	StoppedAt        *time.Time
+	BreachAt         *time.Time
+	Breached         bool
+	BreachedAt       *time.Time
+	BreachNotifiedAt *time.Time
+	ComputedAt       time.Time
 }
 
 type IssueType struct {
@@ -496,6 +524,39 @@ type Release struct {
 	CreatedAt   time.Time
 }
 
+type RequestApproval struct {
+	ID             uuid.UUID
+	IssueID        uuid.UUID
+	Mode           string
+	Status         string
+	ApprovedStatus string
+	DeclinedStatus string
+	CreatedAt      time.Time
+	DecidedAt      *time.Time
+}
+
+type RequestParticipant struct {
+	IssueID   uuid.UUID
+	UserID    uuid.UUID
+	AddedBy   *uuid.UUID
+	CreatedAt time.Time
+}
+
+type RequestType struct {
+	ID          uuid.UUID
+	ProjectID   uuid.UUID
+	Name        string
+	Description string
+	Icon        string
+	IssueTypeID uuid.UUID
+	PortalGroup string
+	Position    int32
+	Form        json.RawMessage
+	Approval    []byte
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
 type Role struct {
 	ID          uuid.UUID
 	Key         string
@@ -559,6 +620,41 @@ type ScmRepository struct {
 	UpdatedAt      time.Time
 }
 
+type ServiceCustomer struct {
+	ProjectID uuid.UUID
+	UserID    uuid.UUID
+	AddedBy   *uuid.UUID
+	CreatedAt time.Time
+}
+
+type ServiceDesk struct {
+	ProjectID         uuid.UUID
+	PortalName        string
+	PortalDescription string
+	PortalAccess      string
+	SelfSignup        bool
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+}
+
+type ServiceQueue struct {
+	ID        uuid.UUID
+	ProjectID uuid.UUID
+	Name      string
+	Jql       string
+	Position  int32
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+type ServiceRequest struct {
+	IssueID       uuid.UUID
+	ProjectID     uuid.UUID
+	RequestTypeID *uuid.UUID
+	Channel       string
+	CreatedAt     time.Time
+}
+
 type Session struct {
 	ID          string
 	UserID      uuid.UUID
@@ -571,6 +667,36 @@ type Session struct {
 	IdpSubject  *string
 	IdpSid      *string
 	IdpIDToken  *string
+}
+
+type SlaCalendar struct {
+	ID        uuid.UUID
+	ProjectID uuid.UUID
+	Name      string
+	TimeZone  string
+	Hours     json.RawMessage
+	Holidays  []time.Time
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+type SlaGoal struct {
+	ID             uuid.UUID
+	ProjectID      uuid.UUID
+	Metric         string
+	Position       int32
+	Priorities     []string
+	RequestTypeIds []uuid.UUID
+	Jql            string
+	TargetMinutes  int32
+	CalendarID     *uuid.UUID
+}
+
+type SlaMetric struct {
+	ProjectID      uuid.UUID
+	Metric         string
+	Name           string
+	PauseStatusIds []uuid.UUID
 }
 
 type Sprint struct {

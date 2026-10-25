@@ -179,6 +179,7 @@ function AttachmentCard({ attachment: a, onPreview }: { attachment: Attachment; 
           </a>
           <p className="truncate text-xs text-muted" title={`${a.uploader?.displayName ?? "Unknown"} · ${formatDateTime(a.createdAt)}`}>
             {formatBytes(a.size)} · {relativeTime(a.createdAt)}
+            {a.visibility && <span className={a.visibility === "public" ? "text-success" : undefined}> · {a.visibility === "public" ? "from the customer" : "agents only"}</span>}
           </p>
         </div>
         {a.uploader && <UserAvatar user={a.uploader} size={18} className="mt-0.5" />}

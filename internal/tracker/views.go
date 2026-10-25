@@ -353,6 +353,13 @@ func (s *Service) IssueDetail(ctx context.Context, actor *authz.Actor, i dbq.Iss
 	}
 	for _, a := range atts {
 		av := api.Attachment{Id: a.ID, Filename: a.Filename, ContentType: a.ContentType, Size: a.SizeBytes, CreatedAt: a.CreatedAt, Url: fmt.Sprintf("/api/v1/attachments/%s", a.ID)}
+		if IsServiceProject(p) {
+			vis := api.VisibilityInternal
+			if a.Public {
+				vis = api.VisibilityPublic
+			}
+			av.Visibility = &vis
+		}
 		if a.UploaderID != nil {
 			if u, err := s.Q.GetUser(ctx, *a.UploaderID); err == nil {
 				uv := UserView(u)

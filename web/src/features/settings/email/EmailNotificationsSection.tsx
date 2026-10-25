@@ -102,16 +102,24 @@ export function EmailNotificationsSection() {
                       </td>
                       {deliveries.map((d) => (
                         <td key={d.value} className="!px-1 text-center">
-                          <input
-                            type="radio"
-                            name={`email-${p.kind}`}
-                            value={d.value}
-                            aria-label={`${p.label}: ${d.label}`}
-                            title={d.value === p.defaultDelivery ? `${d.label} (default)` : d.label}
-                            checked={p.delivery === d.value}
-                            onChange={() => save(preferencePatch(p.kind, d.value))}
-                            className="size-4 cursor-pointer accent-accent"
-                          />
+                          {p.deliveries && !p.deliveries.includes(d.value) ? (
+                            // Request updates go out immediately or not at all (never in a digest).
+                            <span className="text-faint" title={`${p.label} are not sent in the digest`}>
+                              <span aria-hidden>—</span>
+                              <span className="sr-only">{`${p.label}: ${d.label} is not available`}</span>
+                            </span>
+                          ) : (
+                            <input
+                              type="radio"
+                              name={`email-${p.kind}`}
+                              value={d.value}
+                              aria-label={`${p.label}: ${d.label}`}
+                              title={d.value === p.defaultDelivery ? `${d.label} (default)` : d.label}
+                              checked={p.delivery === d.value}
+                              onChange={() => save(preferencePatch(p.kind, d.value))}
+                              className="size-4 cursor-pointer accent-accent"
+                            />
+                          )}
                         </td>
                       ))}
                     </tr>
@@ -119,50 +127,52 @@ export function EmailNotificationsSection() {
                 </tbody>
               </table>
             </div>
-            <div className="flex flex-col gap-3 border-t border-line p-4">
-              <div className="flex flex-wrap items-end gap-3">
-                <Field label="Daily digest at" className="w-32">
-                  {(id) => (
-                    <Select id={id} value={s.digestHour} onChange={(e) => save({ digestHour: Number(e.target.value) })}>
-                      {Array.from({ length: 24 }, (_, h) => (
-                        <option key={h} value={h}>
-                          {formatHour(h)}
-                        </option>
-                      ))}
-                    </Select>
+            {s.preferences.some((p) => !p.deliveries || p.deliveries.includes("digest")) && (
+              <div className="flex flex-col gap-3 border-t border-line p-4">
+                <div className="flex flex-wrap items-end gap-3">
+                  <Field label="Daily digest at" className="w-32">
+                    {(id) => (
+                      <Select id={id} value={s.digestHour} onChange={(e) => save({ digestHour: Number(e.target.value) })}>
+                        {Array.from({ length: 24 }, (_, h) => (
+                          <option key={h} value={h}>
+                            {formatHour(h)}
+                          </option>
+                        ))}
+                      </Select>
+                    )}
+                  </Field>
+                  <Field label="Time zone" className="w-64 max-w-full">
+                    {(id) => (
+                      <Select id={id} value={s.timeZone} onChange={(e) => save({ timeZone: e.target.value })}>
+                        {zones.map((z) => (
+                          <option key={z} value={z}>
+                            {z.replace(/_/g, " ")}
+                          </option>
+                        ))}
+                      </Select>
+                    )}
+                  </Field>
+                  {here !== s.timeZone && (
+                    <Button variant="ghost" size="sm" className="mb-0.5" onClick={() => save({ timeZone: here })}>
+                      Use {here.replace(/_/g, " ")}
+                    </Button>
                   )}
-                </Field>
-                <Field label="Time zone" className="w-64 max-w-full">
-                  {(id) => (
-                    <Select id={id} value={s.timeZone} onChange={(e) => save({ timeZone: e.target.value })}>
-                      {zones.map((z) => (
-                        <option key={z} value={z}>
-                          {z.replace(/_/g, " ")}
-                        </option>
-                      ))}
-                    </Select>
-                  )}
-                </Field>
-                {here !== s.timeZone && (
-                  <Button variant="ghost" size="sm" className="mb-0.5" onClick={() => save({ timeZone: here })}>
-                    Use {here.replace(/_/g, " ")}
-                  </Button>
-                )}
+                </div>
+                <div className="flex flex-col gap-1 text-[13px] text-muted">
+                  <p>
+                    Next digest {nextDigestLabel(s.nextDigestAt, s.timeZone)} if there is anything to send
+                    {s.lastDigestAt && (
+                      <>
+                        {" "}
+                        · last one sent <When iso={s.lastDigestAt} />
+                      </>
+                    )}
+                    .
+                  </p>
+                  <p>“Immediately” waits a couple of minutes so several changes to one issue arrive as one email. Every email has a one-click unsubscribe link.</p>
+                </div>
               </div>
-              <div className="flex flex-col gap-1 text-[13px] text-muted">
-                <p>
-                  Next digest {nextDigestLabel(s.nextDigestAt, s.timeZone)} if there is anything to send
-                  {s.lastDigestAt && (
-                    <>
-                      {" "}
-                      · last one sent <When iso={s.lastDigestAt} />
-                    </>
-                  )}
-                  .
-                </p>
-                <p>“Immediately” waits a couple of minutes so several changes to one issue arrive as one email. Every email has a one-click unsubscribe link.</p>
-              </div>
-            </div>
+            )}
           </>
         )}
       </SettingsSection>

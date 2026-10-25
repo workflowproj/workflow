@@ -17,6 +17,7 @@ outcome (success, skipped, failed) and message.
 | `commit.pushed`, `branch.created` | a commit or branch mentioning the issue is first seen | |
 | `pipeline.completed` | a linked pipeline/workflow run succeeds or fails | |
 | `schedule` | on a cron schedule (UTC, 5 fields) | `cron`, `jql`: the issues to act on (up to 100 per run) |
+| `sla.breached` | a service request's SLA clock passes its goal (once per clock; see [service-desk.md](service-desk.md#slas)) | `event.sla` is the SLA's name, `event.metric` `first_response` or `resolution` |
 
 ### Conditions
 
@@ -84,7 +85,9 @@ skipped.
 
 Project settings → Webhooks (or Administration → Webhooks for all projects) sends events to
 other systems: `issue.created`, `issue.updated`, `issue.transitioned`, `issue.deleted`,
-`comment.created`, `sprint.started`, `sprint.completed`, `release.released`, or `*`.
+`comment.created`, `sprint.started`, `sprint.completed`, `release.released`, `sla.breached`, or `*`.
+In service projects, `comment.created` carries `data.visibility` (`public` for replies to the
+customer, `internal` for notes), and comments added by automation rules are internal notes.
 
 Each delivery is a `POST` with a JSON body:
 

@@ -41,6 +41,7 @@ import (
 	"github.com/geoffo-dev/workflow-management/internal/oauth"
 	"github.com/geoffo-dev/workflow-management/internal/scm"
 	"github.com/geoffo-dev/workflow-management/internal/secure"
+	"github.com/geoffo-dev/workflow-management/internal/servicedesk"
 	"github.com/geoffo-dev/workflow-management/internal/storage"
 	"github.com/geoffo-dev/workflow-management/internal/telemetry"
 	"github.com/geoffo-dev/workflow-management/internal/tracker"
@@ -76,6 +77,8 @@ type App struct {
 	OAuth *oauth.Server
 	// JiraImport imports projects from Jira Cloud or Data Center.
 	JiraImport *jiraimport.Service
+	// ServiceDesk runs service projects: the customer portal, queues, SLAs and approvals.
+	ServiceDesk *servicedesk.Service
 }
 
 // Options let tests substitute collaborators.
@@ -171,6 +174,8 @@ func New(ctx context.Context, cfg *config.Config, log *slog.Logger, pool *pgxpoo
 	a.SCM = scm.NewService(pool, box, cfg, a.Tracker, enq, log.With("module", "scm"))
 	a.Automation = automation.New(pool, a.Tracker, eval, enq, box, cfg, log.With("module", "automation"))
 	a.Notify = notify.New(pool, enq, a.Mailer, box, cfg, log.With("module", "notify"))
+	a.ServiceDesk = servicedesk.New(pool, a.Tracker, a.Notify, nil, enq, cfg, log.With("module", "service-desk"))
+	a.Tracker.AfterCreateProject, a.Tracker.OnEvent, a.Tracker.SLACalendars = a.ServiceDesk.ProjectCreated, a.ServiceDesk.OnEvent, a.ServiceDesk.Calendars
 	switch {
 	case cfg.GoogleDirectory.Enabled:
 		a.Syncer = directory.NewSyncer(pool, cfg.GoogleDirectory, a.Prov, log.With("module", "directory"))
@@ -198,10 +203,11 @@ func New(ctx context.Context, cfg *config.Config, log *slog.Logger, pool *pgxpoo
 
 	a.OAuth = oauth.New(cfg, pool, dbq.New(pool), box, a.Auth, a.Tracker, log.With("module", "oauth"))
 	a.Local = local.New(pool, cfg, box, enq, log.With("module", "local-accounts"))
+	a.ServiceDesk.Local = a.Local
 	a.Server = &httpapi.Server{
 		Cfg: cfg, Log: log.With("module", "http"), Pool: pool, Q: dbq.New(pool), Tracker: a.Tracker, Auth: a.Auth, Prov: a.Prov,
 		SCM: a.SCM, Automation: a.Automation, Jobs: enq, Hub: a.Hub, Box: box, Mailer: a.Mailer, OAuth: a.OAuth,
-		Notify: a.Notify, Local: a.Local, JiraImport: a.JiraImport,
+		Notify: a.Notify, Local: a.Local, JiraImport: a.JiraImport, ServiceDesk: a.ServiceDesk,
 	}
 	return a, nil
 }
