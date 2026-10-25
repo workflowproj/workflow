@@ -39,7 +39,7 @@ type Stats map[string]int
 
 // Run performs one sync and records it in directory_sync_runs.
 func (s *Syncer) Run(ctx context.Context, trigger string) (Stats, error) {
-	run, err := s.Q.CreateDirectorySyncRun(ctx, trigger)
+	run, err := s.Q.CreateDirectorySyncRun(ctx, dbq.CreateDirectorySyncRunParams{Trigger: trigger, Source: "google"})
 	if err != nil {
 		return nil, err
 	}

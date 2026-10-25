@@ -476,7 +476,7 @@ func loadOIDC(e *env) []OIDCProvider {
 		if len(p.AllowedDomains) == 0 {
 			p.AllowedDomains = globalDomains
 		}
-		p.GroupsClaim = e.list(prefix + "GROUPS_CLAIM")
+		p.GroupsClaim = e.rawList(prefix + "GROUPS_CLAIM")
 		p.GroupsPrefix = e.str(prefix+"GROUPS_PREFIX", "")
 		p.SingleLogout = e.boolean(prefix+"SINGLE_LOGOUT", false)
 		p.APIAudience = e.str(prefix+"API_AUDIENCE", "")
