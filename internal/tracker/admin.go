@@ -124,6 +124,31 @@ func (s *Service) DeleteField(ctx context.Context, actor *authz.Actor, id uuid.U
 // ---------------------------------------------------------------------------
 // Notifications
 
+// OnlyAgents drops, in a service project, the people who cannot browse it from notification
+// recipients: customers and other portal users follow their requests through the portal and its
+// emails, never through notifications that may quote internal notes.
+func (s *Service) OnlyAgents(ctx context.Context, projectID uuid.UUID, ids []uuid.UUID) ([]uuid.UUID, error) {
+	p, err := s.Q.GetProject(ctx, projectID)
+	if err != nil || !IsServiceProject(p) {
+		return ids, err
+	}
+	var out []uuid.UUID
+	for _, id := range ids {
+		u, err := s.Q.GetUser(ctx, id)
+		if err != nil {
+			continue
+		}
+		ok, err := s.userCanBrowse(ctx, u, p)
+		if err != nil {
+			return nil, err
+		}
+		if ok {
+			out = append(out, id)
+		}
+	}
+	return out, nil
+}
+
 // Notify creates in-app notifications for people (never for the actor, `except`) and decides
 // from each person's email settings whether and when it is emailed (see package notify).
 func (s *Service) Notify(ctx context.Context, q *dbq.Queries, userIDs []uuid.UUID, except *uuid.UUID, issueID *uuid.UUID, kind, title, body string) error {

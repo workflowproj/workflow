@@ -31,17 +31,85 @@ func publishOnly(ctx context.Context, tx pgx.Tx, actor *authz.Actor, p dbq.Proje
 // ---------------------------------------------------------------------------
 // Comments
 
-func (s *Service) ListComments(ctx context.Context, actor *authz.Actor, ref string) ([]dbq.Comment, authz.Access, error) {
-	i, _, access, err := s.IssueFor(ctx, actor, ref, authz.ProjectBrowse)
+// ListComments returns an issue's comments, internal notes included (agents see everything;
+// the portal reads only public comments, through the servicedesk package).
+func (s *Service) ListComments(ctx context.Context, actor *authz.Actor, ref string) ([]dbq.Comment, dbq.Project, authz.Access, error) {
+	i, p, access, err := s.IssueFor(ctx, actor, ref, authz.ProjectBrowse)
 	if err != nil {
-		return nil, access, err
+		return nil, p, access, err
 	}
 	cs, err := s.Q.ListComments(ctx, i.ID)
-	return cs, access, err
+	return cs, p, access, err
+}
+
+// Comment visibility on service requests.
+const (
+	// VisibilityPublic is a reply the customer sees (in the portal and by email).
+	VisibilityPublic = "public"
+	// VisibilityInternal is a note only agents see.
+	VisibilityInternal = "internal"
+)
+
+// CommentInput is a comment to add. Visibility only applies to service projects: "public"
+// replies to the customer, "internal" is a note for agents, and "" is internal for agents,
+// automation and smart commits (so nothing reaches a customer by accident) and public in the
+// portal. Software projects have no internal comments.
+type CommentInput struct {
+	Body       string
+	Visibility string
+}
+
+// commentInternal decides whether a new comment is an internal note.
+func commentInternal(p dbq.Project, actor *authz.Actor, visibility string) (bool, error) {
+	switch visibility {
+	case "", VisibilityPublic, VisibilityInternal:
+	default:
+		return false, apperr.Invalid("visibility", "visibility is public or internal")
+	}
+	if !IsServiceProject(p) {
+		if visibility == VisibilityInternal {
+			return false, apperr.Invalid("visibility", "internal notes are only for service projects")
+		}
+		return false, nil
+	}
+	if actor.Type == authz.ActorPortal {
+		return false, nil
+	}
+	return visibility != VisibilityPublic, nil
+}
+
+// commentRecorded writes what a new comment was to a service request's history (agents can tell
+// replies to the customer from internal notes) and to its domain event.
+func (s *Service) commentRecorded(ctx context.Context, q *dbq.Queries, actor *authz.Actor, p dbq.Project, c dbq.Comment, data map[string]any) error {
+	if !IsServiceProject(p) {
+		return nil
+	}
+	label := "Reply to customer"
+	switch {
+	case c.Internal:
+		label = "Internal note"
+	case c.Source == "portal":
+		label = "Reply from the portal"
+	}
+	data["visibility"] = CommentVisibility(c)
+	ref := c.ID.String()
+	return s.history(ctx, q, c.IssueID, actor, "comment", nil, &label, nil, &ref)
+}
+
+// CommentVisibility names a comment's visibility.
+func CommentVisibility(c dbq.Comment) string {
+	if c.Internal {
+		return VisibilityInternal
+	}
+	return VisibilityPublic
 }
 
 func (s *Service) AddComment(ctx context.Context, actor *authz.Actor, ref, body string) (dbq.Comment, error) {
-	body = strings.TrimSpace(body)
+	return s.AddCommentWith(ctx, actor, ref, CommentInput{Body: body})
+}
+
+func (s *Service) AddCommentWith(ctx context.Context, actor *authz.Actor, ref string, in CommentInput) (dbq.Comment, error) {
+	body := strings.TrimSpace(in.Body)
 	if body == "" {
 		return dbq.Comment{}, apperr.Invalid("body", "comment cannot be empty")
 	}
@@ -49,19 +117,28 @@ func (s *Service) AddComment(ctx context.Context, actor *authz.Actor, ref, body 
 	if err != nil {
 		return dbq.Comment{}, err
 	}
+	internal, err := commentInternal(p, actor, in.Visibility)
+	if err != nil {
+		return dbq.Comment{}, err
+	}
 	var c dbq.Comment
 	err = s.tx(ctx, func(tx pgx.Tx, q *dbq.Queries) error {
 		var err error
-		c, err = q.CreateComment(ctx, dbq.CreateCommentParams{IssueID: i.ID, AuthorID: actor.UserID(), Body: body, Source: commentSource(actor), Via: via(actor)})
+		c, err = q.CreateComment(ctx, dbq.CreateCommentParams{IssueID: i.ID, AuthorID: actor.UserID(), Body: body, Source: commentSource(actor), Via: via(actor), Internal: internal})
 		if err != nil {
 			return err
 		}
-		if uid := actor.UserID(); uid != nil {
+		// Customers follow their requests in the portal, not as watchers.
+		if uid := actor.UserID(); uid != nil && actor.Type != authz.ActorPortal {
 			if err := q.AddWatcher(ctx, dbq.AddWatcherParams{IssueID: i.ID, UserID: *uid}); err != nil {
 				return err
 			}
 		}
-		return s.emit(ctx, tx, actor, p, &i, "comment.created", map[string]any{"commentId": c.ID, "body": truncate(body, 500)})
+		data := map[string]any{"commentId": c.ID, "body": truncate(body, 500)}
+		if err := s.commentRecorded(ctx, q, actor, p, c, data); err != nil {
+			return err
+		}
+		return s.emit(ctx, tx, actor, p, &i, "comment.created", data)
 	})
 	return c, err
 }
@@ -297,6 +374,8 @@ func (s *Service) Attach(ctx context.Context, actor *authz.Actor, ref, filename,
 		var err error
 		a, err = q.CreateAttachment(ctx, dbq.CreateAttachmentParams{
 			IssueID: i.ID, UploaderID: actor.UserID(), Filename: filename, ContentType: contentType, SizeBytes: counter.n, ObjectKey: key,
+			// Only files customers add in the portal are shown there.
+			Public: actor.Type == authz.ActorPortal,
 		})
 		if err != nil {
 			return err

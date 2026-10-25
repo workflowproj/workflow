@@ -2484,6 +2484,421 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{projectKey}/service-desk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A service project's portal settings */
+        get: operations["getServiceDesk"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["updateServiceDesk"];
+        trace?: never;
+    };
+    "/projects/{projectKey}/request-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listRequestTypes"];
+        put?: never;
+        post: operations["createRequestType"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/request-types/{requestTypeId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Replace a request type (its form and approval included) */
+        put: operations["updateRequestType"];
+        post?: never;
+        /** @description Refused (409) while requests use it. */
+        delete: operations["deleteRequestType"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{projectKey}/customers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listServiceCustomers"];
+        put?: never;
+        /**
+         * Add a customer by email
+         * @description Someone new gets a customer account and an email invitation to choose a password (local
+         *     accounts); an existing account (a customer of another project, an organisation member,
+         *     a single sign-on user) is added as it is. Needs the customer.manage permission.
+         */
+        post: operations["addServiceCustomer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{projectKey}/customers/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["removeServiceCustomer"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{projectKey}/queues": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listQueues"];
+        put?: never;
+        post: operations["createQueue"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/queues/{queueId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["deleteQueue"];
+        options?: never;
+        head?: never;
+        patch: operations["updateQueue"];
+        trace?: never;
+    };
+    "/queues/{queueId}/issues": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listQueueIssues"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{projectKey}/slas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getSlaConfig"];
+        /**
+         * Replace the calendars and SLA goals
+         * @description Calendars are matched by name. Open requests' clocks are recomputed in the background.
+         */
+        put: operations["updateSlaConfig"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/issues/{issueKey}/request": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A service request's request type, SLA clocks, approvals and participants (agents) */
+        get: operations["getServiceRequest"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Set the request type (the portal shows only issues that have one) */
+        patch: operations["updateServiceRequest"];
+        trace?: never;
+    };
+    "/issues/{issueKey}/participants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Share a request with someone who may use the portal */
+        post: operations["addRequestParticipant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/issues/{issueKey}/participants/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["removeRequestParticipant"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/issues/{issueKey}/approvals/{approvalId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve or decline as one of the approvers */
+        post: operations["decideApproval"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portal/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The help centre - service desks the caller may raise requests in */
+        get: operations["listPortalDesks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portal/projects/{projectKey}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A desk's request types and their forms */
+        get: operations["getPortalDesk"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portal/projects/{projectKey}/requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Raise a request by filling in a request type's form */
+        post: operations["createPortalRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portal/requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My requests - raised by the caller or shared with them */
+        get: operations["listPortalRequests"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portal/requests/{issueKey}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A request as its reporter, participants and approvers see it (no internal notes) */
+        get: operations["getPortalRequest"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portal/requests/{issueKey}/comments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["addPortalComment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portal/requests/{issueKey}/attachments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["uploadPortalAttachment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portal/requests/{issueKey}/approval": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve or decline a request waiting for the caller's decision */
+        post: operations["decidePortalApproval"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portal/attachments/{attachmentId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["downloadPortalAttachment"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portal/approvals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Requests waiting for the caller's approval */
+        get: operations["listPortalApprovals"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portal/signup/{projectKey}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A desk that lets people sign up (404 unless self sign-up is on) */
+        get: operations["getPortalSignup"];
+        put?: never;
+        /**
+         * Create a customer account (confirmed by email)
+         * @description Answers 202 the same way whether or not the address already has an account. A new
+         *     address gets a customer account and an email to choose a password; an existing one gets
+         *     an email saying how to sign in. Throttled like the sign-in endpoints.
+         */
+        post: operations["portalSignup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/events": {
         parameters: {
             query?: never;
@@ -2521,7 +2936,7 @@ export interface components {
             message: string;
         };
         /** @enum {string} */
-        OrgRole: "admin" | "member" | "guest";
+        OrgRole: "admin" | "member" | "guest" | "customer";
         /** @enum {string} */
         StatusCategory: "todo" | "in_progress" | "done";
         /** @enum {string} */
@@ -3611,6 +4026,8 @@ export interface components {
                 [key: string]: unknown;
             };
             comment?: string;
+            /** @description Service projects: the comment is internal unless public */
+            commentVisibility?: components["schemas"]["Visibility"];
         };
         MoveRequest: {
             /** Format: uuid */
@@ -3639,9 +4056,13 @@ export interface components {
             /** Format: date-time */
             editedAt?: string;
             canEdit: boolean;
+            /** @description Service projects only */
+            visibility?: components["schemas"]["Visibility"];
         };
         CommentInput: {
             body: string;
+            /** @description Service projects: public replies to the customer; internal (the default for agents) is a note */
+            visibility?: components["schemas"]["Visibility"];
         };
         HistoryEntry: {
             /** Format: int64 */
@@ -3813,6 +4234,8 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
             url: string;
+            /** @description Service projects: public = added by a customer in the portal (the only files the portal shows) */
+            visibility?: components["schemas"]["Visibility"];
         };
         Timeline: {
             projects: components["schemas"]["ProjectRef"][];
@@ -3927,6 +4350,8 @@ export interface components {
             description: string;
             delivery: components["schemas"]["EmailDelivery"];
             defaultDelivery: components["schemas"]["EmailDelivery"];
+            /** @description The choices this kind offers */
+            deliveries?: components["schemas"]["EmailDelivery"][];
         };
         EmailNotificationSettings: {
             /** @description Where the emails go (your account's address) */
@@ -4322,7 +4747,7 @@ export interface components {
         };
         AutomationTrigger: {
             /** @enum {string} */
-            type: "issue.created" | "issue.transitioned" | "issue.field_changed" | "pr.opened" | "pr.merged" | "commit.pushed" | "branch.created" | "pipeline.completed" | "schedule";
+            type: "issue.created" | "issue.transitioned" | "issue.field_changed" | "pr.opened" | "pr.merged" | "commit.pushed" | "branch.created" | "pipeline.completed" | "schedule" | "sla.breached";
             /** @description issue.transitioned: only when entering this status (name) */
             toStatus?: string;
             /** @description issue.transitioned: only when entering a status of this category */
@@ -4418,7 +4843,7 @@ export interface components {
             name: string;
             /** Format: uri */
             url: string;
-            events: ("*" | "issue.created" | "issue.updated" | "issue.transitioned" | "issue.deleted" | "comment.created" | "sprint.started" | "sprint.completed" | "release.released")[];
+            events: ("*" | "issue.created" | "issue.updated" | "issue.transitioned" | "issue.deleted" | "comment.created" | "sprint.started" | "sprint.completed" | "release.released" | "sla.breached")[];
             /** @default true */
             active?: boolean;
         };
@@ -4546,6 +4971,376 @@ export interface components {
             lastUsedAt?: string;
             /** @description The person who connected it (administration listing) */
             user?: components["schemas"]["User"];
+        };
+        /**
+         * @description Service requests only: a public reply reaches the customer (portal and email); an internal note only agents see.
+         * @enum {string}
+         */
+        Visibility: "public" | "internal";
+        /**
+         * @description Who may raise requests: customers = people on the customer list; organisation = also every organisation member (not guests)
+         * @enum {string}
+         */
+        PortalAccess: "customers" | "organisation";
+        ServiceDesk: {
+            projectKey: string;
+            portalName: string;
+            portalDescription: string;
+            portalAccess: components["schemas"]["PortalAccess"];
+            /** @description Anyone may create a customer account from the portal (confirmed by email) */
+            selfSignup: boolean;
+            portalUrl: string;
+            customerCount: number;
+            /** @description The project is open: every organisation member can browse it as an agent, internal notes included */
+            openProject: boolean;
+        };
+        ServiceDeskPatch: {
+            portalName?: string;
+            portalDescription?: string;
+            portalAccess?: components["schemas"]["PortalAccess"];
+            selfSignup?: boolean;
+        };
+        /** @enum {string} */
+        FormFieldType: "text" | "textarea" | "select" | "multiselect" | "number" | "date" | "checkbox" | "url";
+        RequestFormField: {
+            /** @description summary, description, priority, dueDate or a custom field key (not user or version fields) */
+            field: string;
+            label: string;
+            help?: string;
+            required: boolean;
+            /** @description Derived from the field (ignored on input) */
+            type?: components["schemas"]["FormFieldType"];
+            /** @description Choices of select fields (ignored on input) */
+            options?: string[];
+        };
+        RequestApprovalConfig: {
+            /**
+             * @description any: one approval is enough; all: every approver must approve. One decline declines.
+             * @enum {string}
+             */
+            mode: "any" | "all";
+            approverIds?: string[];
+            /**
+             * Format: uuid
+             * @description The group's members when the request is raised are asked too
+             */
+            groupId?: string;
+            /** @description Status the request moves to when approved */
+            approvedStatus: string;
+            /** @description Status the request moves to when declined */
+            declinedStatus: string;
+            /** @description The named approvers (output) */
+            approvers?: components["schemas"]["PortalPerson"][];
+            /** @description Output */
+            groupName?: string;
+        };
+        RequestTypeRef: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            icon: string;
+        };
+        RequestType: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            description: string;
+            icon: string;
+            issueType: components["schemas"]["IssueTypeRef"];
+            /** @description Portal group heading ("" for none) */
+            group: string;
+            position: number;
+            fields: components["schemas"]["RequestFormField"][];
+            approval?: components["schemas"]["RequestApprovalConfig"];
+            requestCount: number;
+        };
+        RequestTypeInput: {
+            name: string;
+            description?: string;
+            /** @description help, bug, laptop, key, access, question, change or document */
+            icon?: string;
+            issueTypeKey: string;
+            group?: string;
+            position?: number;
+            fields?: components["schemas"]["RequestFormField"][];
+            approval?: components["schemas"]["RequestApprovalConfig"];
+        };
+        ServiceCustomer: {
+            user: components["schemas"]["User"];
+            /** Format: date-time */
+            addedAt: string;
+            /**
+             * @description customer: a portal-only account; member: an organisation account
+             * @enum {string}
+             */
+            account: "customer" | "member";
+            /** @description Has not chosen a password yet */
+            invited?: boolean;
+            active?: boolean;
+        };
+        ServiceCustomerInput: {
+            email: string;
+            displayName?: string;
+        };
+        ServiceCustomerAdded: {
+            customer: components["schemas"]["ServiceCustomer"];
+            /** @description A new customer account was created and emailed an invitation */
+            invited: boolean;
+        };
+        Queue: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** @description Within the project; e.g. assignee is EMPTY AND resolution = Unresolved ORDER BY "Time to resolution" */
+            jql: string;
+            position: number;
+            count: number;
+        };
+        QueueInput: {
+            name: string;
+            jql: string;
+            position?: number;
+        };
+        QueueItem: {
+            issue: components["schemas"]["Issue"];
+            requestType?: components["schemas"]["RequestTypeRef"];
+            slas: components["schemas"]["Sla"][];
+        };
+        QueueIssues: {
+            queue: components["schemas"]["Queue"];
+            total: number;
+            items: components["schemas"]["QueueItem"][];
+        };
+        /** @enum {string} */
+        SlaMetric: "first_response" | "resolution";
+        Sla: {
+            metric: components["schemas"]["SlaMetric"];
+            name: string;
+            /** @enum {string} */
+            state: "running" | "paused" | "stopped";
+            /** Format: int64 */
+            targetSeconds: number;
+            /**
+             * Format: int64
+             * @description Working time used (in the goal's calendar)
+             */
+            elapsedSeconds: number;
+            /**
+             * Format: int64
+             * @description Working time left; negative once breached
+             */
+            remainingSeconds: number;
+            breached: boolean;
+            /**
+             * Format: date-time
+             * @description Running clocks: when the goal is (or was) missed
+             */
+            breachAt?: string;
+            /** Format: date-time */
+            stoppedAt?: string;
+            /** @description Calendar name; omitted = around the clock */
+            calendar?: string;
+        };
+        SlaHours: {
+            /** @description 0 = Sunday */
+            day: number;
+            /** @description HH:MM */
+            start: string;
+            /** @description HH:MM (24:00 for midnight) */
+            end: string;
+        };
+        SlaCalendar: {
+            /** Format: uuid */
+            id?: string;
+            name: string;
+            /** @description IANA time zone, e.g. Europe/London */
+            timeZone: string;
+            /** @description No hours = around the clock */
+            hours: components["schemas"]["SlaHours"][];
+            /** @description Days off, YYYY-MM-DD */
+            holidays: string[];
+        };
+        SlaGoal: {
+            /** @description Only requests of these priorities (empty = any) */
+            priorities?: components["schemas"]["Priority"][];
+            /** @description Only requests of these types (empty = any) */
+            requestTypeIds?: string[];
+            /** @description Only requests matching this JQL (empty = any) */
+            jql?: string;
+            targetMinutes: number;
+            /** @description Calendar name; omitted = around the clock */
+            calendar?: string;
+        };
+        SlaMetricConfig: {
+            metric: components["schemas"]["SlaMetric"];
+            name: string;
+            /** @description Status names in which the clock pauses */
+            pauseStatuses: string[];
+            /** @description The first goal whose conditions match a request applies */
+            goals: components["schemas"]["SlaGoal"][];
+        };
+        SlaConfig: {
+            calendars: components["schemas"]["SlaCalendar"][];
+            metrics: components["schemas"]["SlaMetricConfig"][];
+        };
+        PortalPerson: {
+            /** Format: uuid */
+            id: string;
+            displayName: string;
+            avatarUrl?: string;
+        };
+        Approver: {
+            person: components["schemas"]["PortalPerson"];
+            /** @enum {string} */
+            decision?: "approved" | "declined";
+            comment?: string;
+            /** Format: date-time */
+            decidedAt?: string;
+        };
+        Approval: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            status: "pending" | "approved" | "declined";
+            /** @enum {string} */
+            mode: "any" | "all";
+            approvers: components["schemas"]["Approver"][];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            decidedAt?: string;
+            /** @description The caller is an approver who has not decided yet */
+            canDecide: boolean;
+        };
+        ApprovalDecision: {
+            /** @enum {string} */
+            decision: "approve" | "decline";
+            comment?: string;
+        };
+        ServiceRequest: {
+            issueKey: string;
+            requestType?: components["schemas"]["RequestTypeRef"];
+            /** @enum {string} */
+            channel?: "portal" | "agent";
+            slas: components["schemas"]["Sla"][];
+            approvals: components["schemas"]["Approval"][];
+            participants: components["schemas"]["User"][];
+            portalUrl: string;
+            /** @description The reporter and participants see it in the portal (it has a request type) */
+            customerVisible: boolean;
+        };
+        ServiceRequestPatch: {
+            /** Format: uuid */
+            requestTypeId: string;
+        };
+        ParticipantInput: {
+            email: string;
+        };
+        PortalDeskRef: {
+            projectKey: string;
+            name: string;
+        };
+        PortalDesk: {
+            projectKey: string;
+            name: string;
+            description: string;
+            requestTypeCount: number;
+        };
+        PortalFormField: {
+            key: string;
+            label: string;
+            help?: string;
+            type: components["schemas"]["FormFieldType"];
+            required: boolean;
+            options?: string[];
+        };
+        PortalRequestType: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            description: string;
+            icon: string;
+            group: string;
+            fields: components["schemas"]["PortalFormField"][];
+            needsApproval: boolean;
+        };
+        PortalDeskDetail: {
+            projectKey: string;
+            name: string;
+            description: string;
+            requestTypes: components["schemas"]["PortalRequestType"][];
+        };
+        PortalRequestCreate: {
+            /** Format: uuid */
+            requestTypeId: string;
+            /** @description Form values by field key */
+            values: {
+                [key: string]: unknown;
+            };
+        };
+        PortalRequest: {
+            key: string;
+            summary: string;
+            status: components["schemas"]["Status"];
+            requestType: components["schemas"]["RequestTypeRef"];
+            desk: components["schemas"]["PortalDeskRef"];
+            reporter: components["schemas"]["PortalPerson"];
+            resolution?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /**
+             * @description Why the caller sees it
+             * @enum {string}
+             */
+            role: "reporter" | "participant" | "approver";
+        };
+        PortalFieldValue: {
+            label: string;
+            value: string;
+            type?: components["schemas"]["FormFieldType"];
+        };
+        PortalComment: {
+            /** Format: uuid */
+            id: string;
+            author: components["schemas"]["PortalPerson"];
+            body: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** @description An agent's reply (not written in the portal) */
+            fromSupport: boolean;
+        };
+        PortalAttachment: {
+            /** Format: uuid */
+            id: string;
+            filename: string;
+            contentType: string;
+            /** Format: int64 */
+            size: number;
+            /** Format: date-time */
+            createdAt: string;
+            url: string;
+        };
+        PortalRequestDetail: components["schemas"]["PortalRequest"] & {
+            fields: components["schemas"]["PortalFieldValue"][];
+            comments: components["schemas"]["PortalComment"][];
+            attachments: components["schemas"]["PortalAttachment"][];
+            approvals: components["schemas"]["Approval"][];
+            participants: components["schemas"]["PortalPerson"][];
+            canComment: boolean;
+        };
+        PortalCommentInput: {
+            body: string;
+        };
+        PortalSignupInfo: {
+            projectKey: string;
+            name: string;
+            description: string;
+        };
+        PortalSignup: {
+            email: string;
+            displayName: string;
         };
     };
     responses: {
@@ -9603,6 +10398,861 @@ export interface operations {
         responses: {
             /** @description Disconnected */
             204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getServiceDesk: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project key (or id) */
+                projectKey: components["parameters"]["ProjectKey"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Settings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceDesk"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    updateServiceDesk: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project key (or id) */
+                projectKey: components["parameters"]["ProjectKey"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ServiceDeskPatch"];
+            };
+        };
+        responses: {
+            /** @description Updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceDesk"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listRequestTypes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project key (or id) */
+                projectKey: components["parameters"]["ProjectKey"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Request types in portal order */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequestType"][];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    createRequestType: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project key (or id) */
+                projectKey: components["parameters"]["ProjectKey"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequestTypeInput"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequestType"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    updateRequestType: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                requestTypeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequestTypeInput"];
+            };
+        };
+        responses: {
+            /** @description Updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequestType"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    deleteRequestType: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                requestTypeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listServiceCustomers: {
+        parameters: {
+            query?: {
+                q?: string;
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path: {
+                /** @description Project key (or id) */
+                projectKey: components["parameters"]["ProjectKey"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Customers */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceCustomer"][];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    addServiceCustomer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project key (or id) */
+                projectKey: components["parameters"]["ProjectKey"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ServiceCustomerInput"];
+            };
+        };
+        responses: {
+            /** @description Added */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceCustomerAdded"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    removeServiceCustomer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project key (or id) */
+                projectKey: components["parameters"]["ProjectKey"];
+                userId: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listQueues: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project key (or id) */
+                projectKey: components["parameters"]["ProjectKey"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Queues in order, with the number of requests in each */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Queue"][];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    createQueue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project key (or id) */
+                projectKey: components["parameters"]["ProjectKey"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QueueInput"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Queue"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    deleteQueue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                queueId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    updateQueue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                queueId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QueueInput"];
+            };
+        };
+        responses: {
+            /** @description Updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Queue"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listQueueIssues: {
+        parameters: {
+            query?: {
+                limit?: components["parameters"]["Limit"];
+                offset?: components["parameters"]["Offset"];
+            };
+            header?: never;
+            path: {
+                queueId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The queue's requests with their SLA clocks */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueIssues"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getSlaConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project key (or id) */
+                projectKey: components["parameters"]["ProjectKey"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Calendars and SLA goals */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SlaConfig"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    updateSlaConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project key (or id) */
+                projectKey: components["parameters"]["ProjectKey"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SlaConfig"];
+            };
+        };
+        responses: {
+            /** @description Saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SlaConfig"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getServiceRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Issue key such as PLAT-12 (or id) */
+                issueKey: components["parameters"]["IssueKey"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Request */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceRequest"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    updateServiceRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Issue key such as PLAT-12 (or id) */
+                issueKey: components["parameters"]["IssueKey"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ServiceRequestPatch"];
+            };
+        };
+        responses: {
+            /** @description Updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceRequest"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    addRequestParticipant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Issue key such as PLAT-12 (or id) */
+                issueKey: components["parameters"]["IssueKey"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ParticipantInput"];
+            };
+        };
+        responses: {
+            /** @description Shared */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceRequest"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    removeRequestParticipant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Issue key such as PLAT-12 (or id) */
+                issueKey: components["parameters"]["IssueKey"];
+                userId: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    decideApproval: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Issue key such as PLAT-12 (or id) */
+                issueKey: components["parameters"]["IssueKey"];
+                approvalId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApprovalDecision"];
+            };
+        };
+        responses: {
+            /** @description Recorded */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceRequest"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listPortalDesks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Desks */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalDesk"][];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getPortalDesk: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project key (or id) */
+                projectKey: components["parameters"]["ProjectKey"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Desk */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalDeskDetail"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    createPortalRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project key (or id) */
+                projectKey: components["parameters"]["ProjectKey"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PortalRequestCreate"];
+            };
+        };
+        responses: {
+            /** @description Raised */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalRequestDetail"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listPortalRequests: {
+        parameters: {
+            query?: {
+                status?: "open" | "closed" | "all";
+                /** @description Desk (project key) */
+                project?: string;
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Requests, most recently updated first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalRequest"][];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getPortalRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Issue key such as PLAT-12 (or id) */
+                issueKey: components["parameters"]["IssueKey"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Request */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalRequestDetail"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    addPortalComment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Issue key such as PLAT-12 (or id) */
+                issueKey: components["parameters"]["IssueKey"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PortalCommentInput"];
+            };
+        };
+        responses: {
+            /** @description Added */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalComment"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    uploadPortalAttachment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Issue key such as PLAT-12 (or id) */
+                issueKey: components["parameters"]["IssueKey"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Uploaded */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalAttachment"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    decidePortalApproval: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Issue key such as PLAT-12 (or id) */
+                issueKey: components["parameters"]["IssueKey"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApprovalDecision"];
+            };
+        };
+        responses: {
+            /** @description Recorded */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalRequestDetail"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    downloadPortalAttachment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attachmentId: components["parameters"]["AttachmentId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description File content */
+            200: {
+                headers: {
+                    "Content-Disposition"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            /** @description Redirect to a pre-signed object storage URL */
+            302: {
+                headers: {
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listPortalApprovals: {
+        parameters: {
+            query?: {
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Requests */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalRequest"][];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getPortalSignup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project key (or id) */
+                projectKey: components["parameters"]["ProjectKey"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Desk */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalSignupInfo"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    portalSignup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project key (or id) */
+                projectKey: components["parameters"]["ProjectKey"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PortalSignup"];
+            };
+        };
+        responses: {
+            /** @description Check your email */
+            202: {
                 headers: {
                     [name: string]: unknown;
                 };

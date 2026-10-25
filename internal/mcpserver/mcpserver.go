@@ -78,6 +78,11 @@ func (s *Server) Handler() http.Handler {
 			s.challenge(w, http.StatusUnauthorized, "invalid_token", "invalid or expired access token")
 			return
 		}
+		// Customers of a service desk only use its portal.
+		if a.IsCustomer() {
+			s.challenge(w, http.StatusForbidden, "access_denied", "customers use the help centre portal; assistants are for agents")
+			return
+		}
 		// Changes are recorded as "<person> via <token name>", e.g. "Ada via Claude".
 		if a.Via == "" {
 			a.Via = a.TokenName

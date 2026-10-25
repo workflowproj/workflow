@@ -1,0 +1,63 @@
+id: service
+name: Service desk
+description: A customer portal with request types and forms, agent queues, SLAs and approvals.
+boardType: kanban
+workflows:
+  - name: Service request
+    description: Waiting for support → In Progress → Waiting for customer → Resolved → Closed, with an approval step.
+    statuses:
+      - { name: Waiting for support, category: todo }
+      - { name: Pending approval, category: todo }
+      - { name: In Progress, category: in_progress }
+      - { name: Waiting for customer, category: in_progress }
+      - { name: Resolved, category: done }
+      - { name: Closed, category: done }
+      - { name: Declined, category: done }
+    transitions:
+      - name: Start progress
+        from: [Waiting for support, Waiting for customer]
+        to: In Progress
+        postFunctions: [{ assignTo: actor }]
+      - { name: Wait for customer, from: [Waiting for support, In Progress], to: Waiting for customer }
+      - { name: Back to support, from: [Waiting for customer, In Progress], to: Waiting for support }
+      - name: Resolve
+        from: [Waiting for support, In Progress, Waiting for customer]
+        to: Resolved
+        screen: [{ field: resolution, required: true }, comment]
+      - { name: Close, from: [Resolved], to: Closed }
+      - { name: Reopen, from: [Resolved, Closed, Declined], to: Waiting for support }
+      # Approvals: only the service desk runs these, when a request type needs an approval and
+      # when the approvers decide.
+      - name: Request approval
+        from: [Waiting for support]
+        to: Pending approval
+        condition: 'actor.type == "automation"'
+      - name: Approve
+        from: [Pending approval]
+        to: Waiting for support
+        condition: 'actor.type == "automation"'
+      - name: Decline
+        from: [Pending approval]
+        to: Declined
+        condition: 'actor.type == "automation"'
+        postFunctions: [{ setField: { field: resolution, value: "Won't Do" } }]
+    layout:
+      Waiting for support: { x: 0, y: 160 }
+      Pending approval: { x: 0, y: 0 }
+      In Progress: { x: 280, y: 160 }
+      Waiting for customer: { x: 280, y: 320 }
+      Resolved: { x: 560, y: 160 }
+      Closed: { x: 840, y: 160 }
+      Declined: { x: 280, y: 0 }
+issueTypes:
+  - { key: service_request, name: Service request, level: 0, icon: task, color: '#0f766e', workflow: Service request }
+  - { key: incident, name: Incident, level: 0, icon: bug, color: '#e2483d', workflow: Service request }
+  - { key: change, name: Change, level: 0, icon: story, color: '#7c3aed', workflow: Service request }
+boards:
+  - name: Service board
+    type: kanban
+    columns:
+      - { name: Waiting for support, statuses: [Waiting for support, Pending approval] }
+      - { name: In Progress, statuses: [In Progress] }
+      - { name: Waiting for customer, statuses: [Waiting for customer] }
+      - { name: Done, statuses: [Resolved, Closed, Declined] }

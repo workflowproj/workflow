@@ -76,6 +76,9 @@ func (s *Server) AdminCreateUser(ctx context.Context, req api.AdminCreateUserReq
 		if role == "admin" {
 			return nil, apperr.Invalid("orgRole", "service accounts cannot be organisation admins; grant project roles instead")
 		}
+		if role == authz.OrgCustomer {
+			return nil, apperr.Invalid("orgRole", "service accounts cannot be customers")
+		}
 		if email == "" {
 			slug := strings.Trim(serviceSlug.ReplaceAllString(strings.ToLower(b.DisplayName), "-"), "-")
 			email = fmt.Sprintf("%s.%s@service.invalid", slug, uuid.NewString()[:8])
@@ -232,6 +235,10 @@ func (s *Server) AdminRevokeToken(ctx context.Context, req api.AdminRevokeTokenR
 // ---------------------------------------------------------------------------
 // Groups
 
+// errCustomerGroup: groups raise their members' organisation role; customers are only ever
+// people whose own role is customer.
+var errCustomerGroup = apperr.Invalid("orgRole", "groups cannot make people customers; set a person's own organisation role instead")
+
 func (s *Server) AdminCreateGroup(ctx context.Context, req api.AdminCreateGroupRequestObject) (api.AdminCreateGroupResponseObject, error) {
 	a, err := orgAdmin(ctx)
 	if err != nil {
@@ -239,6 +246,9 @@ func (s *Server) AdminCreateGroup(ctx context.Context, req api.AdminCreateGroupR
 	}
 	var role *string
 	if req.Body.OrgRole != nil {
+		if *req.Body.OrgRole == api.OrgRoleCustomer {
+			return nil, errCustomerGroup
+		}
 		role = ptr(string(*req.Body.OrgRole))
 	}
 	g, err := s.Q.CreateGroup(ctx, dbq.CreateGroupParams{DisplayName: strings.TrimSpace(req.Body.DisplayName), Description: deref(req.Body.Description), Source: "local", OrgRole: role})
@@ -280,6 +290,9 @@ func (s *Server) AdminUpdateGroup(ctx context.Context, req api.AdminUpdateGroupR
 	if b.OrgRole.IsSpecified() {
 		var role *string
 		if !b.OrgRole.IsNull() {
+			if b.OrgRole.MustGet() == api.OrgRoleCustomer {
+				return nil, errCustomerGroup
+			}
 			role = ptr(string(b.OrgRole.MustGet()))
 		}
 		if g, err = s.Q.SetGroupOrgRole(ctx, dbq.SetGroupOrgRoleParams{ID: g.ID, OrgRole: role}); err != nil {
