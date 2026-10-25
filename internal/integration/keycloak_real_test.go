@@ -78,6 +78,31 @@ func TestKeycloakRealm(t *testing.T) {
 	wantStats(t, syncNow(admin), map[string]int{"usersReactivated": 1, "users": 2, "groups": 3, "memberships": 2})
 	e.login("bob@example.com", "").must("GET", "/api/v1/me", nil, 200, nil)
 
+	// Out of the access group: deactivated (confirmed through his own groups), then back.
+	var access obj
+	kcAdmin("GET", "/admin/realms/wfm/group-by-path/workflow-users", nil, &access)
+	membership := "/admin/realms/wfm/users/" + bobID + "/groups/" + str(access, "id")
+	kcAdmin("DELETE", membership, nil, nil)
+	t.Cleanup(func() { kcAdmin("PUT", membership, nil, nil) })
+	wantStats(t, syncNow(admin), map[string]int{"usersDeactivated": 1, "users": 1, "groups": 3, "membershipsRemoved": 1, "memberships": 1})
+	kcAdmin("PUT", membership, nil, nil)
+	wantStats(t, syncNow(admin), map[string]int{"usersReactivated": 1, "users": 2, "groups": 3, "membershipsAdded": 1, "memberships": 2})
+
+	// Created in Keycloak, then deleted there: marked deleted here.
+	kcAdmin("POST", "/admin/realms/wfm/users", obj{
+		"username": "erin", "email": "erin@example.com", "emailVerified": true, "enabled": true,
+		"firstName": "Erin", "lastName": "Evans", "groups": []string{"/workflow-users"},
+	}, nil)
+	kcAdmin("GET", "/admin/realms/wfm/users?exact=true&username=erin", nil, &found)
+	erinID := str(found[0], "id")
+	t.Cleanup(func() { kcAdmin("DELETE", "/admin/realms/wfm/users/"+erinID, nil, nil) })
+	wantStats(t, syncNow(admin), map[string]int{"usersCreated": 1, "users": 3, "groups": 3, "memberships": 2})
+	kcAdmin("DELETE", "/admin/realms/wfm/users/"+erinID, nil, nil)
+	wantStats(t, syncNow(admin), map[string]int{"usersDeleted": 1, "users": 2, "groups": 3, "memberships": 2})
+	if erin := e.accountByEmail("erin@example.com"); erin == nil || !erin.Deleted {
+		t.Fatalf("erin = %+v, want deleted", erin)
+	}
+
 	// A client without the realm-management roles (workflow-ci only calls Workflow's API).
 	sync := e.keycloakSyncer()
 	cfg := sync.Cfg
@@ -128,7 +153,7 @@ func keycloakAdmin(t *testing.T, base string) func(method, path string, body, ou
 			t.Fatal(err)
 		}
 		defer res.Body.Close()
-		if res.StatusCode >= 300 {
+		if res.StatusCode >= 300 && (method != "DELETE" || res.StatusCode != http.StatusNotFound) {
 			t.Fatalf("keycloak admin %s %s: HTTP %d", method, path, res.StatusCode)
 		}
 		if out != nil {

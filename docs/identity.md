@@ -171,7 +171,9 @@ accounts are never provisioned.
 - **Failures** — Keycloak unreachable, a rejected client secret, a 403 (the error names the
   missing `realm-management` roles), an access group that does not exist — fail the run with that
   message. Nobody is deactivated or deleted unless the user list and the access group were read in
-  full.
+  full, and never on the strength of a listing alone: Keycloak pages by offset, which can skip
+  someone while others are deleted mid-run, so each removal is confirmed with
+  `GET /users/{id}` (deleted?) and `GET /users/{id}/groups` (still in the access group?).
 
 Each run is recorded with source `keycloak` and its counts (`usersCreated`, `usersUpdated`,
 `usersReactivated`, `usersDeactivated`, `usersDeleted`, `usersSkipped`, `groupsCreated`,

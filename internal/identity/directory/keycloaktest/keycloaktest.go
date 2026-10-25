@@ -79,6 +79,10 @@ type Server struct {
 	LegacyGroups bool
 	// IncludeServiceAccounts lists service-account users in /users.
 	IncludeServiceAccounts bool
+	// Unlisted user ids are left out of the /users and /members listings but still served by
+	// /users/{id} and /users/{id}/groups, as when offset paging skips someone because users were
+	// deleted between two pages.
+	Unlisted map[string]bool
 	// Now is the fake's clock for token expiry (default time.Now).
 	Now func() time.Time
 
@@ -297,7 +301,7 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 		}
 		var members []*User
 		for _, id := range g.members {
-			if u := s.users[id]; u != nil {
+			if u := s.users[id]; u != nil && !s.Unlisted[id] {
 				members = append(members, u)
 			}
 		}
@@ -306,6 +310,31 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 		out := []map[string]any{}
 		for _, u := range window(members, first, size) {
 			out = append(out, userRep(u))
+		}
+		writeJSON(w, http.StatusOK, out)
+	case len(parts) == 2 && parts[0] == "users":
+		u := s.users[parts[1]]
+		if u == nil {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "User not found"})
+			return
+		}
+		writeJSON(w, http.StatusOK, userRep(u))
+	case len(parts) == 3 && parts[0] == "users" && parts[2] == "groups":
+		if s.users[parts[1]] == nil {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "User not found"})
+			return
+		}
+		var mine []*Group
+		for _, g := range s.groups {
+			if slices.Contains(g.members, parts[1]) {
+				mine = append(mine, g)
+			}
+		}
+		slices.SortFunc(mine, func(a, b *Group) int { return strings.Compare(a.Path, b.Path) })
+		first, size := paging(q)
+		out := []map[string]any{}
+		for _, g := range window(mine, first, size) {
+			out = append(out, map[string]any{"id": g.ID, "name": g.Name, "path": g.Path})
 		}
 		writeJSON(w, http.StatusOK, out)
 	default:
@@ -356,7 +385,7 @@ func (s *Server) authorized(r *http.Request) bool {
 func (s *Server) listUsers(w http.ResponseWriter, q url.Values) {
 	var all []*User
 	for _, u := range s.users {
-		if u.ServiceAccountClientID == "" || s.IncludeServiceAccounts {
+		if (u.ServiceAccountClientID == "" || s.IncludeServiceAccounts) && !s.Unlisted[u.ID] {
 			all = append(all, u)
 		}
 	}

@@ -328,6 +328,34 @@ func TestKeycloakDirectorySync(t *testing.T) {
 	}
 }
 
+// Offset paging can skip people while others are deleted mid-run: nobody is deactivated or
+// deleted on the strength of a listing alone.
+func TestKeycloakSyncConfirmsRemovals(t *testing.T) {
+	kc := keycloaktest.New()
+	t.Cleanup(kc.Close)
+	e := keycloakEnv(t, kc, withEnv("WFM_KEYCLOAK_SYNC_GROUP", "/staff"), withEnv("WFM_KEYCLOAK_SYNC_GROUPS", "false"))
+	admin := e.login("admin@example.com", "Admin")
+	staff := kc.AddGroup("", "staff")
+	ann := kc.AddUser(kcUser{Username: "ann", Email: "ann@example.com"})
+	ben := kc.AddUser(kcUser{Username: "ben", Email: "ben@example.com"})
+	kc.AddMembers(staff, ann, ben)
+	wantStats(t, syncNow(admin), map[string]int{"usersCreated": 2, "users": 2})
+
+	// Missing from the listings, but Keycloak still has them in the access group: left as is.
+	kc.Unlisted = map[string]bool{ann: true, ben: true}
+	wantStats(t, syncNow(admin), map[string]int{"users": 2})
+	if !e.accountByEmail("ann@example.com").Active || !e.accountByEmail("ben@example.com").Active {
+		t.Fatal("people skipped by a listing were deactivated")
+	}
+	// Really out of the access group, or really deleted: acted on.
+	kc.RemoveMember(staff, ann)
+	kc.DeleteUser(ben)
+	wantStats(t, syncNow(admin), map[string]int{"usersDeactivated": 1, "usersDeleted": 1, "users": 0})
+	if a, b := e.accountByEmail("ann@example.com"), e.accountByEmail("ben@example.com"); a.Active || a.Deleted || !b.Deleted {
+		t.Fatalf("ann = %+v, ben = %+v", a, b)
+	}
+}
+
 // Failures are recorded on the run with a message an admin can act on, and never deactivate anyone.
 func TestKeycloakSyncFailures(t *testing.T) {
 	kc := keycloaktest.New()

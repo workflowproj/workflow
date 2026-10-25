@@ -230,6 +230,11 @@ func pageAll[T any](ctx context.Context, c *KeycloakClient, path string, params 
 		if err := c.get(ctx, path, p, &items); err != nil {
 			return nil, err
 		}
+		if len(items) > size {
+			// Paging ignored: continuing could repeat or skip entries, and a skipped person would
+			// look deleted.
+			return nil, fmt.Errorf("keycloak %s: %d entries for max=%d; the server does not page", path, len(items), size)
+		}
 		all = append(all, items...)
 		if len(items) < size {
 			return all, nil
@@ -238,9 +243,43 @@ func pageAll[T any](ctx context.Context, c *KeycloakClient, path string, params 
 	return nil, fmt.Errorf("keycloak %s: more than %d pages", path, maxPages)
 }
 
-// ListUsers returns every user in the realm (Keycloak leaves service accounts out).
+// ListUsers returns every user in the realm (Keycloak leaves service accounts out). Offset paging
+// can return someone twice when users are added during the listing (kept once) or skip someone
+// when users are deleted, which is why the sync confirms removals with GetUser / UserGroupPaths.
 func (c *KeycloakClient) ListUsers(ctx context.Context) ([]KeycloakUser, error) {
-	return pageAll[KeycloakUser](ctx, c, "/users", url.Values{"briefRepresentation": {"false"}})
+	all, err := pageAll[KeycloakUser](ctx, c, "/users", url.Values{"briefRepresentation": {"false"}})
+	if err != nil {
+		return nil, err
+	}
+	seen := map[string]bool{}
+	out := all[:0]
+	for _, u := range all {
+		if !seen[u.ID] {
+			seen[u.ID] = true
+			out = append(out, u)
+		}
+	}
+	return out, nil
+}
+
+// GetUser reads one user; errKeycloakNotFound when it does not exist.
+func (c *KeycloakClient) GetUser(ctx context.Context, id string) (KeycloakUser, error) {
+	var u KeycloakUser
+	err := c.get(ctx, "/users/"+url.PathEscape(id), nil, &u)
+	return u, err
+}
+
+// UserGroupPaths returns the paths of the groups a user is a direct member of.
+func (c *KeycloakClient) UserGroupPaths(ctx context.Context, id string) ([]string, error) {
+	groups, err := pageAll[KeycloakGroup](ctx, c, "/users/"+url.PathEscape(id)+"/groups", url.Values{"briefRepresentation": {"true"}})
+	if err != nil {
+		return nil, err
+	}
+	paths := make([]string, 0, len(groups))
+	for _, g := range groups {
+		paths = append(paths, g.Path)
+	}
+	return paths, nil
 }
 
 // GroupByPath finds a group by its path ("/parent/child").
