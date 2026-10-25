@@ -49,7 +49,7 @@ type Service struct {
 	// event is queued (the service desk recomputes SLA clocks and queues customer emails).
 	OnEvent func(ctx context.Context, tx pgx.Tx, actor *authz.Actor, p dbq.Project, issue *dbq.Issue, event string, data map[string]any) error
 	// SLACalendars lists the calendars JQL's remaining() measures SLA clocks in.
-	SLACalendars func(ctx context.Context) ([]search.SLACalendar, error)
+	SLACalendars func(ctx context.Context, q *dbq.Queries) ([]search.SLACalendar, error)
 }
 
 func New(pool *pgxpool.Pool, eval *workflow.Evaluator, enq jobs.Enqueuer, store storage.Store, cfg *config.Config, log *slog.Logger) *Service {

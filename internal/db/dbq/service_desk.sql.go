@@ -1185,6 +1185,7 @@ SELECT DISTINCT ON (i.updated_at, i.id) i.id, i.project_id, i.number, i.type_id,
 FROM approval_approvers aa
 JOIN request_approvals ra ON ra.id = aa.approval_id AND ra.status = 'pending'
 JOIN issues i ON i.id = ra.issue_id
+JOIN statuses st ON st.id = i.status_id AND lower(st.name) = 'pending approval'
 JOIN service_requests sr ON sr.issue_id = i.id
 WHERE aa.user_id = $1 AND aa.decision IS NULL AND sr.request_type_id IS NOT NULL
 ORDER BY i.updated_at DESC, i.id
@@ -1201,7 +1202,8 @@ type PendingApprovalRequestsRow struct {
 	RequestTypeID *uuid.UUID
 }
 
-// Requests waiting for a person's decision.
+// Requests waiting for a person's decision (still in Pending approval: one that has moved on no
+// longer waits for it).
 func (q *Queries) PendingApprovalRequests(ctx context.Context, arg PendingApprovalRequestsParams) ([]PendingApprovalRequestsRow, error) {
 	rows, err := q.db.Query(ctx, pendingApprovalRequests, arg.UserID, arg.Lim)
 	if err != nil {

@@ -101,11 +101,13 @@ ORDER BY i.updated_at DESC
 LIMIT @lim;
 
 -- name: PendingApprovalRequests :many
--- Requests waiting for a person's decision.
+-- Requests waiting for a person's decision (still in Pending approval: one that has moved on no
+-- longer waits for it).
 SELECT DISTINCT ON (i.updated_at, i.id) sqlc.embed(i), sr.request_type_id
 FROM approval_approvers aa
 JOIN request_approvals ra ON ra.id = aa.approval_id AND ra.status = 'pending'
 JOIN issues i ON i.id = ra.issue_id
+JOIN statuses st ON st.id = i.status_id AND lower(st.name) = 'pending approval'
 JOIN service_requests sr ON sr.issue_id = i.id
 WHERE aa.user_id = @user_id AND aa.decision IS NULL AND sr.request_type_id IS NOT NULL
 ORDER BY i.updated_at DESC, i.id

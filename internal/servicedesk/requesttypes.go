@@ -253,6 +253,9 @@ func (s *Service) validateApproval(ctx context.Context, q *dbq.Queries, it dbq.I
 	if !ok {
 		return a, apperr.Invalid("approval", "requests wait for approval in a %q status, which the %s workflow does not have", statusPendingApproval, def.Name)
 	}
+	if initial := def.Initial(); !slices.ContainsFunc(def.Outgoing(initial.ID), func(t workflow.Transition) bool { return t.To == pending.ID }) {
+		return a, apperr.Invalid("approval", "the %s workflow has no transition from %s to %s, so new requests could not wait for approval", def.Name, initial.Name, pending.Name)
+	}
 	for _, f := range []struct{ field, name string }{{"approval.approvedStatus", a.ApprovedStatus}, {"approval.declinedStatus", a.DeclinedStatus}} {
 		st, ok := def.StatusByName(f.name)
 		if !ok {

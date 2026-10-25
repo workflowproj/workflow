@@ -127,6 +127,35 @@ func (c *Calendar) Add(from time.Time, d time.Duration) time.Time {
 	return time.Time{}
 }
 
+// Sub is the instant d of working time before from: Add, backwards. It is from itself for d <= 0.
+func (c *Calendar) Sub(from time.Time, d time.Duration) time.Time {
+	if c.Always() {
+		return from.Add(-max(d, 0))
+	}
+	if d <= 0 {
+		return from
+	}
+	left := d
+	lf := from.In(c.loc())
+	for i := 1; i >= -maxDays; i-- {
+		y, m, dd := lf.Date()
+		day := time.Date(y, m, dd+i, 0, 0, 0, 0, c.loc())
+		ivs := c.intervals(day.Date())
+		for k := len(ivs) - 1; k >= 0; k-- {
+			end := minTime(ivs[k][1], from)
+			if !end.After(ivs[k][0]) {
+				continue
+			}
+			if avail := end.Sub(ivs[k][0]); avail >= left {
+				return end.Add(-left)
+			} else {
+				left -= avail
+			}
+		}
+	}
+	return time.Time{}
+}
+
 // Contains reports whether t is working time.
 func (c *Calendar) Contains(t time.Time) bool {
 	if c.Always() {

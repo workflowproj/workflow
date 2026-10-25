@@ -25,14 +25,16 @@ func jqlError(err error) error {
 	return err
 }
 
-func (s *Service) searchEnv(ctx context.Context, actor *authz.Actor) (search.Env, error) {
-	defs, err := s.Q.ListFieldDefinitions(ctx)
+// searchEnv describes the fields and calendars a query can use, read through q (the caller's
+// transaction, when it has one, so a search inside it does not take a second connection).
+func (s *Service) searchEnv(ctx context.Context, q *dbq.Queries, actor *authz.Actor) (search.Env, error) {
+	defs, err := q.ListFieldDefinitions(ctx)
 	if err != nil {
 		return search.Env{}, err
 	}
 	env := search.Env{UserID: actor.UserID(), Now: s.Now(), Units: s.Units()}
 	if s.SLACalendars != nil {
-		env.SLACalendars = func() ([]search.SLACalendar, error) { return s.SLACalendars(ctx) }
+		env.SLACalendars = func() ([]search.SLACalendar, error) { return s.SLACalendars(ctx, q) }
 	}
 	for _, d := range defs {
 		env.CustomFields = append(env.CustomFields, search.CustomField{Key: d.Key, Name: d.Name, Type: d.Type})
@@ -74,7 +76,7 @@ func (s *Service) SearchWith(ctx context.Context, actor *authz.Actor, projectIDs
 // MatchesTx reports whether an issue satisfies a JQL query, reading through tx: SLA goals are
 // chosen inside the transaction that changes the request. currentUser() matches nobody.
 func (s *Service) MatchesTx(ctx context.Context, tx pgx.Tx, projectID, issueID uuid.UUID, jql string) (bool, error) {
-	where, _, args, err := s.compileWhere(ctx, authz.SystemActor(), []uuid.UUID{projectID}, jql, []any{issueID}, nil)
+	where, _, args, err := s.compileWhere(ctx, dbq.New(tx), authz.SystemActor(), []uuid.UUID{projectID}, jql, []any{issueID}, nil)
 	if err != nil {
 		return false, err
 	}
@@ -94,7 +96,7 @@ func (s *Service) IssueMatches(ctx context.Context, projectID, issueID uuid.UUID
 
 // ValidateJQL checks a query compiles (used when saving filters and boards).
 func (s *Service) ValidateJQL(ctx context.Context, actor *authz.Actor, jql string) error {
-	env, err := s.searchEnv(ctx, actor)
+	env, err := s.searchEnv(ctx, s.Q, actor)
 	if err != nil {
 		return err
 	}
@@ -104,8 +106,8 @@ func (s *Service) ValidateJQL(ctx context.Context, actor *authz.Actor, jql strin
 
 // compileWhere turns JQL into a SQL condition over issues aliased i, limited to projectIDs ($1);
 // extraArgs take $2 onwards, ahead of the query's own arguments.
-func (s *Service) compileWhere(ctx context.Context, actor *authz.Actor, projectIDs []uuid.UUID, jql string, extraArgs []any, order []search.Order) (where, orderBy string, args []any, err error) {
-	env, err := s.searchEnv(ctx, actor)
+func (s *Service) compileWhere(ctx context.Context, q *dbq.Queries, actor *authz.Actor, projectIDs []uuid.UUID, jql string, extraArgs []any, order []search.Order) (where, orderBy string, args []any, err error) {
+	env, err := s.searchEnv(ctx, q, actor)
 	if err != nil {
 		return "", "", nil, err
 	}
@@ -121,7 +123,7 @@ func (s *Service) runSearch(ctx context.Context, actor *authz.Actor, projectIDs 
 	if len(projectIDs) == 0 {
 		return []dbq.Issue{}, 0, nil
 	}
-	where, orderBy, args, err := s.compileWhere(ctx, actor, projectIDs, sq.JQL, sq.ExtraArgs, sq.DefaultOrder)
+	where, orderBy, args, err := s.compileWhere(ctx, s.Q, actor, projectIDs, sq.JQL, sq.ExtraArgs, sq.DefaultOrder)
 	if err != nil {
 		return nil, 0, err
 	}

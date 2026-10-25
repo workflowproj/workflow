@@ -406,6 +406,60 @@ func TestResolutionCycles(t *testing.T) {
 	}
 }
 
+func TestBreachedClockResumesAfterAPause(t *testing.T) {
+	// A 4-hour goal breaches on Monday at 13:00, waits for the customer from 14:00 to Tuesday
+	// 09:00, then runs again: on Tuesday at 10:00 it is 2 working hours over (6 used), not 5.
+	const zone = "Europe/London"
+	cal := mustCal(t, zone, weekdays9to5())
+	created := at(t, zone, "2026-06-08 09:00")
+	tl := Timeline{Created: created, Initial: st(waitingSupport, created), Changes: []StatusChange{
+		st(waitingCustomer, at(t, zone, "2026-06-08 14:00")),
+		st(waitingSupport, at(t, zone, "2026-06-09 09:00")),
+	}}
+	g := Goal{Target: 4 * time.Hour, Calendar: cal, Pause: pause}
+	now := at(t, zone, "2026-06-09 10:00")
+	c := Compute(Resolution, tl, g, now)
+	if c.State != Running || !c.Breached(now) || !c.BreachedAt.Equal(at(t, zone, "2026-06-08 13:00")) {
+		t.Fatalf("clock: %+v", c)
+	}
+	if r := c.Remaining(now, cal); r != -2*time.Hour {
+		t.Fatalf("remaining = %s, want -2h", r)
+	}
+	if e := c.ElapsedAt(now, cal); e != 6*time.Hour {
+		t.Fatalf("elapsed = %s, want 6h", e)
+	}
+	// Later the same day the overrun keeps growing in working time only.
+	if r := c.Remaining(at(t, zone, "2026-06-09 20:00"), cal); r != -9*time.Hour {
+		t.Fatalf("evening remaining = %s, want -9h", r)
+	}
+	// Around the clock, the same story: 4h goal, 5h used before the pause, 1h after it.
+	t0 := time.Date(2026, 6, 1, 10, 0, 0, 0, time.UTC)
+	tl = Timeline{Created: t0, Initial: st(waitingSupport, t0), Changes: []StatusChange{
+		st(waitingCustomer, t0.Add(5*time.Hour)),
+		st(waitingSupport, t0.Add(20*time.Hour)),
+	}}
+	c = Compute(Resolution, tl, Goal{Target: 4 * time.Hour, Pause: pause}, t0.Add(21*time.Hour))
+	if r := c.Remaining(t0.Add(21*time.Hour), nil); r != -2*time.Hour {
+		t.Fatalf("around the clock: remaining = %s, want -2h", r)
+	}
+}
+
+func TestSubUndoesAdd(t *testing.T) {
+	for _, zone := range []string{"Europe/London", "America/New_York", "UTC"} {
+		c := mustCal(t, zone, weekdays9to5(), "2026-12-25")
+		rng := rand.New(rand.NewPCG(7, uint64(len(zone))))
+		base := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+		for range 300 {
+			from := base.Add(time.Duration(rng.Int64N(int64(365 * 24 * time.Hour))))
+			d := time.Duration(rng.Int64N(int64(60*time.Hour))) / time.Minute * time.Minute
+			back := c.Sub(from, d)
+			if got := c.Working(back, from); got != d {
+				t.Fatalf("%s: Working(Sub(%s, %s) = %s, from) = %s", zone, from, d, back, got)
+			}
+		}
+	}
+}
+
 func TestClockInBusinessHours(t *testing.T) {
 	const zone = "Europe/London"
 	cal := mustCal(t, zone, weekdays9to5())

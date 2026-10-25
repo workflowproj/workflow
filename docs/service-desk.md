@@ -40,7 +40,10 @@ Project settings → Help centre → *Who can raise requests*:
 (`/portal/signup/KEY`) create a customer account. They choose a password from a link emailed
 to them, so the address is confirmed before the account can be used; an address that already
 has an account gets an email saying so instead (the page answers the same either way, so it
-does not reveal who has an account). Sign-ups are throttled like password resets.
+does not reveal who has an account), and only customer accounts are added to the desk that way.
+Addresses in the organisation's sign-in domains (`WFM_ALLOWED_DOMAINS` or a provider's own) can't
+sign up: those people get their account from the identity provider. Sign-ups are throttled like
+password resets.
 
 ## Customers
 
@@ -148,14 +151,18 @@ In searches (see [search.md](search.md#service-desk)):
 
 A request type can ask for approval before the team starts work: named people and/or the
 members of a group (as of when the request is raised), approved when **any one** or **all** of
-them approve; one decline declines. The request waits in **Pending approval** (its SLA clocks
+them approve; one decline declines. Whoever raised the request is never one of its approvers, so
+nobody approves their own request (a request whose only approver is its reporter goes ahead
+without one). The request waits in **Pending approval** (its SLA clocks
 paused), approvers are emailed, and they decide — with an optional comment — from the help
 centre (**Approvals**, also for approvers who are not customers) or the issue's Service request
 panel. The decision moves the request to the request type's *approved* status (default
 *Waiting for support*) or *declined* status (default *Declined*, resolution *Won't Do*), and each
 decision is recorded in the history. People cannot run the workflow's approval transitions
 (*Request approval*, *Approve*, *Decline*): their condition reserves them for the service desk
-(and automation rules), so nobody skips an approval by changing the status.
+(and automation rules), so nobody skips an approval by changing the status. A request that has
+left *Pending approval* (an agent or a rule moved it on) no longer waits for its approval: it
+drops off the approvers' lists, and a late decision is refused rather than moving it again.
 
 ## The help centre
 
@@ -232,3 +239,7 @@ Not included yet:
   features off for the desk.
 - Recomputing an SLA applies the current goal and calendar to the whole history of a request;
   clocks do not remember the goal that applied at the time.
+- `sla.breached` is raised by a check that runs every minute. A clock that goes over its goal and
+  is then stopped (the request resolved, or the first reply sent) before the check sees it, for
+  example while the workers are down, raises no event; the breach still shows on the request. A
+  clock that was paused meanwhile raises it when it runs again.

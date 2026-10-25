@@ -13,6 +13,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/geoffo-dev/workflow-management/internal/authz"
 )
 
 // ---------------------------------------------------------------------------
@@ -872,4 +874,75 @@ func TestParticipantsAndSelfSignup(t *testing.T) {
 	c.get("/api/v1/me", &me)
 	eq(t, str(me, "orgRole"), "customer", "a customer account")
 	_ = time.Now
+}
+
+func TestApprovalsAfterTheRequestMovesOn(t *testing.T) {
+	e := newEnv(t)
+	admin, agent := serviceDesk(t, e, "HELP")
+	carol := admin.addCustomer("HELP", "carol@customer.test", "Carol Customer")
+	dave := admin.addCustomer("HELP", "dave@customer.test", "Dave Manager")
+	rt := admin.requestType("HELP", "Request new hardware")
+	admin.must("PUT", "/api/v1/request-types/"+str(rt, "id"), obj{
+		"name": "Request new hardware", "issueTypeKey": "service_request",
+		"fields":   []obj{{"field": "summary", "label": "What do you need?", "required": true}},
+		"approval": obj{"mode": "any", "approverIds": []string{dave.id(), carol.id()}, "approvedStatus": "Waiting for support", "declinedStatus": "Declined"},
+	}, 200, nil)
+
+	// Carol is a named approver, but nobody approves their own request.
+	key := str(carol.raise("HELP", str(rt, "id"), obj{"summary": "A laptop"}), "key")
+	approvers := agent.serviceRequest(key)["approvals"].([]any)[0].(map[string]any)["approvers"].([]any)
+	eq(t, len(approvers), 1, "Dave only")
+	eq(t, str(approvers[0].(map[string]any), "person", "displayName"), "Dave Manager", "approver")
+	carol.must("POST", "/api/v1/portal/requests/"+key+"/approval", obj{"decision": "approve"}, 403, nil)
+
+	// A rule declines it while Dave has not decided (say, after a week).
+	id := uuid.MustParse(str(agent.issue(key), "id"))
+	moved, err := e.App.Tracker.TransitionToStatus(context.Background(), authz.AutomationActor(uuid.New(), 0), id, "Declined", "")
+	if err != nil || !moved {
+		t.Fatalf("rule did not decline: moved=%v err=%v", moved, err)
+	}
+	var pending []obj
+	dave.get("/api/v1/portal/approvals", &pending)
+	eq(t, len(pending), 0, "no longer waiting for Dave")
+	// Dave's late approval is refused, and does not reopen the declined request.
+	eq(t, dave.do("POST", "/api/v1/portal/requests/"+key+"/approval", obj{"decision": "approve"}).Status, 409, "late decision")
+	eq(t, str(agent.issue(key), "status", "name"), "Declined", "still declined")
+}
+
+func TestTransitionRepliesReachTheCustomer(t *testing.T) {
+	e := newEnv(t)
+	admin, agent := serviceDesk(t, e, "HELP")
+	carol := admin.addCustomer("HELP", "carol@customer.test", "Carol Customer")
+	key := str(carol.raise("HELP", str(admin.requestType("HELP", "Get IT help"), "id"), obj{"summary": "Printer jam"}), "key")
+	agent.transitionTo(key, "resolve", obj{"fields": obj{"resolution": "Done"}, "comment": "Cleared the jam in tray 2", "commentVisibility": "public"})
+	mail := e.mailText("carol@customer.test")
+	if !strings.Contains(mail, key+" is resolved") || !strings.Contains(mail, "Cleared the jam in tray 2") {
+		t.Fatalf("the resolution email should carry the reply:\n%s", mail)
+	}
+	// Moving the request without a special email still sends the reply on its own.
+	agent.transitionTo(key, "reopen", nil)
+	agent.transitionTo(key, "start-progress", obj{"comment": "Ordering a new roller", "commentVisibility": "public"})
+	if mail := e.mailText("carol@customer.test"); !strings.Contains(mail, "Ordering a new roller") {
+		t.Fatalf("reply on a plain move not emailed:\n%s", mail)
+	}
+}
+
+func TestSelfSignupLeavesStaffAndSignInDomainsAlone(t *testing.T) {
+	e := oidcEnv(t, newFakeIdP(t)) // signs in example.com through the identity provider
+	admin, agent := serviceDesk(t, e, "HELP")
+	admin.must("PATCH", "/api/v1/projects/HELP/service-desk", obj{"selfSignup": true}, 200, nil)
+	anon := e.anon()
+	// Someone at the organisation's own domain must not claim the address as a customer first.
+	eq(t, anon.do("POST", "/api/v1/portal/signup/HELP", obj{"email": "newhire@example.com", "displayName": "New Hire"}).Status, 400, "sign-in domain")
+	eq(t, len(e.mailTo("newhire@example.com")), 0, "no account was made")
+	// A staff account elsewhere is told it has an account, and is not listed as a customer.
+	e.login("sam@partner.test", "Sam Staff")
+	eq(t, anon.do("POST", "/api/v1/portal/signup/HELP", obj{"email": "sam@partner.test", "displayName": "Sam"}).Status, 202, "same answer")
+	var customers []obj
+	agent.get("/api/v1/projects/HELP/customers", &customers)
+	for _, c := range customers {
+		if strings.Contains(fmt.Sprint(c), "sam@partner.test") {
+			t.Fatal("a staff account was added to the desk's customers")
+		}
+	}
 }

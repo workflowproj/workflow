@@ -73,6 +73,11 @@ func (s *Service) SignUpCustomer(ctx context.Context, email, name string, portal
 	if name == "" || len(name) > 120 {
 		return apperr.Invalid("displayName", "your name is required (at most 120 characters)")
 	}
+	// People in the organisation's own sign-in domains get their account from the identity
+	// provider; a sign-up must not claim their address first (as a portal-only customer).
+	if domain := email[at+1:]; s.ssoDomain(domain) {
+		return apperr.Invalid("email", "addresses at %s sign in with single sign-on: use Sign in instead", domain)
+	}
 	if ok, _ := s.forgotEmail.Allow(email); !ok {
 		return nil
 	}
@@ -98,9 +103,26 @@ func (s *Service) SignUpCustomer(ctx context.Context, email, name string, portal
 			if err := s.email(ctx, tx, existingAccountEmail(u.Email, u.DisplayName, portal, s.Cfg.PublicURL)); err != nil {
 				return err
 			}
+			// Only customers are added to the desk this way; staff accounts already reach it.
+			if u.OrgRole != authz.OrgCustomer {
+				return nil
+			}
 		}
 		return add(tx, q, u)
 	})
+}
+
+// ssoDomain reports whether a domain is one the organisation signs in with through an identity
+// provider (WFM_ALLOWED_DOMAINS or a provider's own).
+func (s *Service) ssoDomain(domain string) bool {
+	for _, p := range s.Cfg.OIDCProviders {
+		for _, d := range p.AllowedDomains {
+			if strings.EqualFold(d, domain) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func customerInviteEmail(to, name string, by *authz.Actor, portal Portal, link string, expires time.Time) email {

@@ -34,8 +34,9 @@ func history(ctx context.Context, q *dbq.Queries, issueID uuid.UUID, by *dbq.Use
 }
 
 // startApproval asks a request type's approvers to approve a new request, in its creating
-// transaction. Approvers are the named people and the group's members as of now; with nobody
-// to ask (an emptied group) the request goes ahead without an approval.
+// transaction. Approvers are the named people and the group's members as of now, except the
+// person who raised it (nobody approves their own request); with nobody to ask (an emptied
+// group, or only the reporter) the request goes ahead without an approval.
 func (s *Service) startApproval(ctx context.Context, tx pgx.Tx, q *dbq.Queries, p dbq.Project, issue dbq.Issue, cfg ApprovalConfig) (bool, error) {
 	ids := slices.Clone(cfg.UserIDs)
 	if cfg.GroupID != nil {
@@ -53,7 +54,7 @@ func (s *Service) startApproval(ctx context.Context, tx pgx.Tx, q *dbq.Queries, 
 	}
 	var approvers []dbq.User
 	for _, u := range users {
-		if u.Active && u.DeletedAt == nil && u.Kind == "human" {
+		if u.Active && u.DeletedAt == nil && u.Kind == "human" && (issue.ReporterID == nil || u.ID != *issue.ReporterID) {
 			approvers = append(approvers, u)
 		}
 	}
@@ -104,6 +105,13 @@ func (s *Service) decide(ctx context.Context, u dbq.User, issueID, approvalID uu
 		}
 		if a.Status != "pending" {
 			return apperr.Conflict("approval_decided", "this approval was already %s", a.Status)
+		}
+		// A request that has left Pending approval (moved on by an agent or a rule) no longer
+		// waits for this approval, so a late decision must not move it again.
+		if waiting, err := awaitingApproval(ctx, q, issueID); err != nil {
+			return err
+		} else if !waiting {
+			return apperr.Conflict("not_awaiting_approval", "this request is no longer waiting for approval")
 		}
 		n, err := q.SetApproverDecision(ctx, dbq.SetApproverDecisionParams{ApprovalID: a.ID, UserID: u.ID, Decision: &decision, Comment: comment})
 		if err != nil {
@@ -159,13 +167,26 @@ func (s *Service) decide(ctx context.Context, u dbq.User, issueID, approvalID uu
 	if settled.Status == "declined" {
 		target = settled.DeclinedStatus
 	}
-	moved, err := s.Tracker.TransitionToStatus(ctx, deskActor(u, "approval"), issueID, target, "")
+	moved, err := s.Tracker.TransitionFromStatus(ctx, deskActor(u, "approval"), issueID, statusPendingApproval, target)
 	if err != nil {
 		s.Log.Warn("approval decided but the request did not move", "issue", issueID, "to", target, "error", err)
 	} else if !moved {
 		s.Log.Info("approval decided; the request is no longer waiting for it, so it stays where it is", "issue", issueID, "to", target)
 	}
 	return nil
+}
+
+// awaitingApproval reports whether a request is in the Pending approval status.
+func awaitingApproval(ctx context.Context, q *dbq.Queries, issueID uuid.UUID) (bool, error) {
+	i, err := q.GetIssue(ctx, issueID)
+	if err != nil {
+		return false, err
+	}
+	st, err := q.GetStatusesByIDs(ctx, []uuid.UUID{i.StatusID})
+	if err != nil || len(st) != 1 {
+		return false, err
+	}
+	return strings.EqualFold(st[0].Name, statusPendingApproval), nil
 }
 
 // approvalsView renders a request's approvals for a viewer (who may be an approver).

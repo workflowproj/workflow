@@ -79,7 +79,9 @@ type Clock struct {
 	CycleStart time.Time
 	// StoppedAt is when a stopped clock stopped.
 	StoppedAt *time.Time
-	// BreachAt is when a running clock reaches (or reached) its target; nil unless running.
+	// BreachAt is when a running clock reaches its target; nil unless running. For a clock that
+	// went over its target, paused and resumed, it is the moment it would have reached the target
+	// had it not paused, so that the time over it (Remaining) leaves out the pause.
 	BreachAt *time.Time
 	// BreachedAt is when the current cycle went over its target, if it has.
 	BreachedAt *time.Time
@@ -204,7 +206,9 @@ func Compute(m Metric, t Timeline, g Goal, now time.Time) Clock {
 		start := segStart
 		accrue(now)
 		if c.BreachedAt != nil && !c.BreachedAt.After(start) {
-			c.BreachAt = c.BreachedAt
+			// Already over the target when this stretch began: count the overrun back from it.
+			at := cal.Sub(start, before-c.Target)
+			c.BreachAt = &at
 		} else {
 			at := cal.Add(start, c.Target-before)
 			c.BreachAt = &at

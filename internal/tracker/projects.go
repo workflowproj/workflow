@@ -414,11 +414,16 @@ func (s *Service) userCanBrowse(ctx context.Context, u dbq.User, p dbq.Project) 
 // EffectiveOrgRole combines a user's own role with roles mapped from their groups. Customers
 // stay customers: only changing their own role gives them more.
 func (s *Service) EffectiveOrgRole(ctx context.Context, u dbq.User) (string, error) {
+	return EffectiveOrgRoleWith(ctx, s.Q, u)
+}
+
+// EffectiveOrgRoleWith is EffectiveOrgRole read through q (a caller's transaction).
+func EffectiveOrgRoleWith(ctx context.Context, q *dbq.Queries, u dbq.User) (string, error) {
 	role := u.OrgRole
 	if role == authz.OrgCustomer {
 		return role, nil
 	}
-	roles, err := s.Q.EffectiveOrgRoles(ctx, u.ID)
+	roles, err := q.EffectiveOrgRoles(ctx, u.ID)
 	if err != nil {
 		return role, err
 	}

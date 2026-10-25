@@ -99,8 +99,8 @@ func (c *slaConfig) calendar(id *uuid.UUID) *sla.Calendar {
 }
 
 // Calendars lists every SLA calendar for JQL's remaining() (tracker.SLACalendars).
-func (s *Service) Calendars(ctx context.Context) ([]search.SLACalendar, error) {
-	rows, err := s.Q.AllSLACalendars(ctx)
+func (s *Service) Calendars(ctx context.Context, q *dbq.Queries) ([]search.SLACalendar, error) {
+	rows, err := q.AllSLACalendars(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -326,7 +326,11 @@ func (s *Service) CheckBreaches(ctx context.Context) error {
 					}
 				}
 			}
-			return s.Tracker.Emit(ctx, tx, authz.SystemActor(), p, &i, "sla.breached", map[string]any{"metric": r.Metric, "sla": name, "breachedAt": r.BreachAt})
+			breachedAt := r.BreachAt
+			if r.BreachedAt != nil {
+				breachedAt = r.BreachedAt // a clock that resumed over its target measures from a later moment
+			}
+			return s.Tracker.Emit(ctx, tx, authz.SystemActor(), p, &i, "sla.breached", map[string]any{"metric": r.Metric, "sla": name, "breachedAt": breachedAt})
 		})
 		if err != nil {
 			return err

@@ -449,6 +449,10 @@ func (s *Service) transitionTx(ctx context.Context, tx pgx.Tx, q *dbq.Queries, a
 			return i, err
 		}
 	}
+	event := map[string]any{
+		"transition": t.Name, "transitionId": t.ID, "from": fromSt.Name, "to": toSt.Name,
+		"fromCategory": fromSt.Category, "toCategory": toSt.Category,
+	}
 	if comment != "" {
 		internal, err := commentInternal(p, actor, in.CommentVisibility)
 		if err != nil {
@@ -461,6 +465,9 @@ func (s *Service) transitionTx(ctx context.Context, tx pgx.Tx, q *dbq.Queries, a
 		if err := s.commentRecorded(ctx, q, actor, p, c, map[string]any{}); err != nil {
 			return i, err
 		}
+		// The comment travels with the transition (one event, one notification), so the service
+		// desk can include a reply to the customer in its email.
+		event["commentId"] = c.ID
 	}
 	if s.Jobs != nil {
 		for _, pf := range t.PostFunctions {
@@ -473,10 +480,7 @@ func (s *Service) transitionTx(ctx context.Context, tx pgx.Tx, q *dbq.Queries, a
 			}
 		}
 	}
-	return out, s.emit(ctx, tx, actor, p, &out, "issue.transitioned", map[string]any{
-		"transition": t.Name, "transitionId": t.ID, "from": fromSt.Name, "to": toSt.Name,
-		"fromCategory": fromSt.Category, "toCategory": toSt.Category,
-	})
+	return out, s.emit(ctx, tx, actor, p, &out, "issue.transitioned", event)
 }
 
 func commentSource(actor *authz.Actor) string {
@@ -684,9 +688,18 @@ func (s *Service) setSystemOrCustom(ctx context.Context, q *dbq.Queries, p dbq.P
 // TransitionToStatus runs the first available transition into a status. Used by automation and
 // Git events; the workflow engine still applies conditions and validators.
 func (s *Service) TransitionToStatus(ctx context.Context, actor *authz.Actor, issueID uuid.UUID, statusName string, comment string) (bool, error) {
-	return s.runNamedTransition(ctx, actor, issueID, func(at AvailableTransition) bool {
+	return s.runNamedTransition(ctx, actor, issueID, "", func(at AvailableTransition) bool {
 		return strings.EqualFold(at.To.Name, statusName)
 	}, comment)
+}
+
+// TransitionFromStatus is TransitionToStatus for an issue that must still be in status from
+// (checked under the issue's row lock): it does nothing, and reports false, once the issue has
+// moved on.
+func (s *Service) TransitionFromStatus(ctx context.Context, actor *authz.Actor, issueID uuid.UUID, from, statusName string) (bool, error) {
+	return s.runNamedTransition(ctx, actor, issueID, from, func(at AvailableTransition) bool {
+		return strings.EqualFold(at.To.Name, statusName)
+	}, "")
 }
 
 // TransitionToCategory runs the first available transition into a status of the category,
@@ -700,7 +713,7 @@ func (s *Service) TransitionToCategory(ctx context.Context, actor *authz.Actor, 
 		return "", err
 	}
 	var entered string
-	ran, err := s.runNamedTransition(ctx, actor, issueID, func(at AvailableTransition) bool {
+	ran, err := s.runNamedTransition(ctx, actor, issueID, "", func(at AvailableTransition) bool {
 		if at.To.Category == category {
 			entered = at.To.Name
 			return true
@@ -717,17 +730,28 @@ func (s *Service) TransitionToCategory(ctx context.Context, actor *authz.Actor, 
 // name or of its target status ("#in-review", "#done", "#start-work").
 func (s *Service) TransitionByName(ctx context.Context, actor *authz.Actor, issueID uuid.UUID, name string) (bool, error) {
 	slug := workflow.Slug(name)
-	return s.runNamedTransition(ctx, actor, issueID, func(at AvailableTransition) bool {
+	return s.runNamedTransition(ctx, actor, issueID, "", func(at AvailableTransition) bool {
 		return workflow.Slug(at.Transition.Name) == slug || workflow.Slug(at.To.Name) == slug || at.Transition.ID == slug
 	}, "")
 }
 
-func (s *Service) runNamedTransition(ctx context.Context, actor *authz.Actor, issueID uuid.UUID, match func(AvailableTransition) bool, comment string) (bool, error) {
+// runNamedTransition runs the first available transition that match accepts. With from set, it
+// runs only while the issue is in that status.
+func (s *Service) runNamedTransition(ctx context.Context, actor *authz.Actor, issueID uuid.UUID, from string, match func(AvailableTransition) bool, comment string) (bool, error) {
 	ran := false
 	err := s.tx(ctx, func(tx pgx.Tx, q *dbq.Queries) error {
 		i, err := q.GetIssueForUpdate(ctx, issueID)
 		if err != nil {
 			return err
+		}
+		if from != "" {
+			cur, err := statusInfo(ctx, q, i.StatusID)
+			if err != nil {
+				return err
+			}
+			if !strings.EqualFold(cur.Name, from) {
+				return nil
+			}
 		}
 		p, err := q.GetProject(ctx, i.ProjectID)
 		if err != nil {

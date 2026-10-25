@@ -98,19 +98,9 @@ func (s *Service) HandleEvent(ctx context.Context, ev jobs.ServiceDeskEvent) err
 			u.Reason = "You're receiving this because you raised " + key + "."
 			return m.send(ctx, []uuid.UUID{*i.ReporterID}, nil, u)
 		case "comment.created":
-			id, err := uuid.Parse(fmt.Sprint(data["commentId"]))
-			if err != nil {
-				return nil
-			}
-			c, err := q.GetComment(ctx, id)
-			if err != nil || c.Internal || c.IssueID != i.ID {
+			c, who, ok := publicComment(ctx, q, i, data)
+			if !ok {
 				return nil // internal notes never leave the agent view
-			}
-			who := "Support"
-			if c.AuthorID != nil {
-				if a, err := q.GetUser(ctx, *c.AuthorID); err == nil {
-					who = a.DisplayName
-				}
 			}
 			u := m.base
 			u.Headline = who + " replied on " + key
@@ -121,6 +111,11 @@ func (s *Service) HandleEvent(ctx context.Context, ev jobs.ServiceDeskEvent) err
 		case "issue.transitioned":
 			to := fmt.Sprint(data["to"])
 			u := m.base
+			// A reply sent to the customer from the transition's screen goes in this email.
+			c, who, replied := publicComment(ctx, q, i, data)
+			if replied {
+				u.Excerpt = c.Body
+			}
 			switch {
 			case strings.EqualFold(to, statusWaitingForCustomer):
 				u.Headline = key + " needs your reply"
@@ -133,6 +128,9 @@ func (s *Service) HandleEvent(ctx context.Context, ev jobs.ServiceDeskEvent) err
 				} else {
 					u.Intro = []string{"We think this is sorted. If it isn't, reply in the help centre."}
 				}
+			case replied:
+				u.Headline = who + " replied on " + key
+				u.Button = "Reply"
 			default:
 				return nil // other moves are agents' business
 			}
@@ -199,6 +197,26 @@ type mailer struct {
 }
 
 // followers are the request's reporter and the people it is shared with.
+// publicComment reads the comment an event names (data["commentId"]) when customers may see it:
+// a reply on this request, not an internal note. who is its author's name.
+func publicComment(ctx context.Context, q *dbq.Queries, i dbq.Issue, data map[string]any) (c dbq.Comment, who string, ok bool) {
+	id, err := uuid.Parse(fmt.Sprint(data["commentId"]))
+	if err != nil {
+		return c, "", false
+	}
+	c, err = q.GetComment(ctx, id)
+	if err != nil || c.Internal || c.IssueID != i.ID {
+		return c, "", false
+	}
+	who = "Support"
+	if c.AuthorID != nil {
+		if a, err := q.GetUser(ctx, *c.AuthorID); err == nil {
+			who = a.DisplayName
+		}
+	}
+	return c, who, true
+}
+
 func (m mailer) followers(ctx context.Context) []uuid.UUID {
 	var ids []uuid.UUID
 	if m.issue.ReporterID != nil {
@@ -225,7 +243,7 @@ func (m mailer) send(ctx context.Context, ids []uuid.UUID, except *uuid.UUID, u 
 		if err != nil {
 			continue
 		}
-		role, err := m.s.Tracker.EffectiveOrgRole(ctx, user)
+		role, err := tracker.EffectiveOrgRoleWith(ctx, m.q, user)
 		if err != nil {
 			return err
 		}
