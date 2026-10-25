@@ -179,6 +179,15 @@ pull request as the behaviour. The documentation site
 ([workflowproj/workflow-docs](https://github.com/workflowproj/workflow-docs)) copies these pages
 with its `scripts/sync_app_docs.py`, so edit them here rather than there.
 
+## Issues
+
+Report bugs, suggest features and point out problems in the docs through the forms under
+[New issue](https://github.com/workflowproj/workflow/issues/new/choose): they ask for what's needed
+to act on it (the version, the steps, the area). Report security vulnerabilities privately, through
+the link on that page, rather than in a public issue.
+
+For a large change, open an issue to discuss it before starting on a pull request.
+
 ## Pull requests
 
 - Keep each pull request to one change, with its tests and documentation.

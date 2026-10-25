@@ -1,0 +1,110 @@
+name: Bug report
+description: Something in Workflow doesn't work the way it should.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. The more of this you can fill in, the quicker it can be fixed.
+        Found a security vulnerability? Please don't open an issue; report it privately instead (see the link on the previous page).
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What went wrong, and what you expected to happen instead.
+      placeholder: Dragging a card to Done shows "screen_required", but the transition has no required fields.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The smallest set of steps that shows the problem, starting from a fresh page if you can.
+      placeholder: |
+        1. Open a Scrum board
+        2. Drag an issue from In Review to Done
+        3. See the error
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Where in Workflow is the problem? Pick the closest.
+      options:
+        - Boards, backlog and sprints
+        - Issues, fields and comments
+        - Workflows and transitions
+        - Search and filters
+        - Reports, dashboards and time tracking
+        - Timeline
+        - Automation and webhooks
+        - Service desk and help centre
+        - GitHub and GitLab
+        - Sign-in, provisioning and permissions
+        - Notifications, email and chat
+        - API and AI assistants (MCP)
+        - Import
+        - Installation, Helm chart and upgrades
+        - Accessibility or layout
+        - Something else
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The image tag you run, or the output of `wfm version` (for example `kubectl -n wfm exec deploy/wfm-web -- /wfm version`). From source, the commit.
+      placeholder: 0.4.2
+    validations:
+      required: true
+
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: How do you run it?
+      options:
+        - Helm chart on k3s
+        - Helm chart on EKS
+        - Helm chart on another Kubernetes
+        - Container image without Kubernetes
+        - From source (make dev)
+        - Something else
+    validations:
+      required: true
+
+  - type: input
+    id: browser
+    attributes:
+      label: Browser
+      description: For problems in the web interface.
+      placeholder: Firefox 144 on macOS
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs and error messages
+      description: |
+        Server logs around the time it happened, the error shown in the UI, or the browser console.
+        Remove secrets, tokens and personal data first.
+      render: shell
+
+  - type: textarea
+    id: more
+    attributes:
+      label: Anything else?
+      description: Screenshots, relevant settings (with secrets removed), or how often it happens.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before you submit
+      options:
+        - label: I searched the existing issues and this hasn't been reported yet.
+          required: true
+        - label: This isn't a security vulnerability.
+          required: true

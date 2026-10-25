@@ -1,0 +1,39 @@
+name: Documentation problem
+description: Something in the docs is wrong, missing or hard to follow.
+labels: ["documentation"]
+body:
+  - type: input
+    id: page
+    attributes:
+      label: Page
+      description: The address of the page on docs.workflowproj.io, or the file in docs/.
+      placeholder: https://docs.workflowproj.io/getting-started/k3s/
+    validations:
+      required: true
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What's the problem?
+      options:
+        - It's wrong or out of date
+        - Something is missing
+        - It's hard to follow
+        - A link or example doesn't work
+        - Something else
+    validations:
+      required: true
+
+  - type: textarea
+    id: details
+    attributes:
+      label: Details
+      description: What the page says, what's actually true or missing, and the version you run if it matters.
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested wording
+      description: Optional. If you know what it should say, write it here, or send a pull request against docs/ (see CONTRIBUTING.md).

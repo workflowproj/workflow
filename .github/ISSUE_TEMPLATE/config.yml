@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation
+    url: https://docs.workflowproj.io/
+    about: Installation, configuration and every feature, explained.
+  - name: Report a security vulnerability
+    url: https://github.com/workflowproj/workflow/security/advisories/new
+    about: Please report vulnerabilities privately here rather than in a public issue.
