@@ -1,0 +1,16 @@
+# k3s's CoreDNS imports *.override from this ConfigMap into its main server block. Inside the
+# cluster keycloak.localhost then resolves to the Keycloak Service, so pods reach the issuer
+# http://keycloak.localhost:8081/realms/wfm under the same name and port as browsers (which
+# resolve *.localhost to 127.0.0.1 and go through the k3d load balancer and Traefik).
+# CoreDNS reloads it within a minute or two; `kubectl -n kube-system rollout restart
+# deployment/coredns` applies it at once.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: coredns-custom
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/part-of: wfm-dev
+data:
+  keycloak.override: |
+    rewrite name exact keycloak.localhost keycloak.keycloak.svc.cluster.local

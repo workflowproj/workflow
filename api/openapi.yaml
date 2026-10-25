@@ -3378,9 +3378,15 @@ components:
       required: [configured, intervalMinutes, runs]
       properties:
         configured: { type: boolean }
-        intervalMinutes: { type: integer }
-        group: { type: string }
+        source: { type: string, enum: [google, keycloak], description: The configured directory (absent when none is) }
+        intervalMinutes: { type: integer, description: Minutes between scheduled runs; 0 means manual runs only }
+        group: { type: string, description: 'Access group: a Google group email, or a Keycloak group path' }
         orgUnit: { type: string }
+        syncGroups: { type: boolean, description: Groups are mirrored too }
+        groupPrefix: { type: string, description: Only groups whose email (Google) or name (Keycloak) starts with this are mirrored }
+        url: { type: string, description: Keycloak base URL }
+        realm: { type: string, description: Keycloak realm }
+        provider: { type: string, description: 'Sign-in provider (WFM_OIDC_PROVIDERS id) whose subjects are the Keycloak user ids' }
         runs: { type: array, items: { $ref: '#/components/schemas/DirectorySyncRun' } }
     ScimConnection:
       type: object

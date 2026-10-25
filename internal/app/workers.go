@@ -99,11 +99,11 @@ func (a *App) handlers() []handler {
 			return a.Automation.DeliverChat(ctx, j.DeliveryID)
 		}),
 		reg(30*time.Minute, func(ctx context.Context, j jobs.DirectorySync) error {
-			if a.Syncer == nil {
+			if a.Directory == nil {
 				return nil
 			}
-			stats, err := a.Syncer.Run(ctx, j.Trigger)
-			a.Log.Info("directory sync", "trigger", j.Trigger, "stats", stats, "error", err)
+			stats, err := a.Directory.Run(ctx, j.Trigger)
+			a.Log.Info("directory sync", "source", a.Directory.Source(), "trigger", j.Trigger, "stats", stats, "error", err)
 			return err
 		}),
 		reg(5*time.Minute, func(ctx context.Context, _ jobs.AutomationSchedule) error { return a.Automation.RunScheduled(ctx) }),
@@ -142,8 +142,10 @@ func (a *App) periodicJobs() []*river.PeriodicJob {
 	if a.Cfg.SCMReconcileInterval > 0 {
 		out = append(out, every(a.Cfg.SCMReconcileInterval, jobs.SCMReconcile{}))
 	}
-	if a.Cfg.GoogleDirectory.Enabled && a.Cfg.GoogleDirectory.Interval > 0 {
-		out = append(out, every(a.Cfg.GoogleDirectory.Interval, jobs.DirectorySync{Trigger: "scheduled"}))
+	if gd, kc := a.Cfg.GoogleDirectory, a.Cfg.Keycloak; gd.Enabled && gd.Interval > 0 {
+		out = append(out, every(gd.Interval, jobs.DirectorySync{Trigger: "scheduled"}))
+	} else if kc.Enabled && kc.Interval > 0 {
+		out = append(out, every(kc.Interval, jobs.DirectorySync{Trigger: "scheduled"}))
 	}
 	return out
 }

@@ -800,3 +800,21 @@ func TestOIDCAccessTokensForTheAPI(t *testing.T) {
 	admin.must("PATCH", "/api/v1/admin/users/"+meID(bob), obj{"active": false}, 200, nil)
 	token(nil).must("GET", "/api/v1/me", nil, 401, nil)
 }
+
+func TestOIDCGroupsClaimDefersToKeycloakSync(t *testing.T) {
+	// With Keycloak directory sync bringing this provider's groups, the claim adds no copies.
+	idp := newFakeIdP(t)
+	e := oidcEnv(t, idp, withEnv("WFM_OIDC_CORP_GROUPS_CLAIM", "groups"),
+		withEnv("WFM_KEYCLOAK_ENABLED", "true"), withEnv("WFM_KEYCLOAK_PROVIDER", "corp"), withEnv("WFM_KEYCLOAK_URL", idp.URL),
+		withEnv("WFM_KEYCLOAK_REALM", "acme"), withEnv("WFM_KEYCLOAK_CLIENT_ID", "sync"), withEnv("WFM_KEYCLOAK_CLIENT_SECRET", "s"),
+		withEnv("WFM_KEYCLOAK_SYNC_INTERVAL", "0"), withEnv("WFM_JIT_PROVISIONING", "true"))
+	c := e.anon()
+	idp.signIn(t, c, "corp", jwt.MapClaims{"sub": "u-1", "email": "ada@example.com", "email_verified": true, "groups": []any{"/wfm-admins"}})
+	var groups []obj
+	c.get("/api/v1/groups", &groups)
+	for _, g := range groups {
+		if str(g, "source") == "oidc" {
+			t.Fatalf("claim group created alongside Keycloak sync: %v", g)
+		}
+	}
+}

@@ -134,6 +134,11 @@ jobs:
               "rendered/$name.yaml"
             echo "::endgroup::"
           done
+          echo "::group::k3d Keycloak"
+          jq empty deploy/k3d/keycloak/realm-wfm.json
+          kubectl kustomize deploy/k3d/keycloak > rendered/k3d-keycloak.yaml
+          kubeconform -strict -summary -kubernetes-version 1.33.0 rendered/k3d-keycloak.yaml
+          echo "::endgroup::"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -200,11 +205,26 @@ jobs:
           k3d cluster create --config deploy/k3d/cluster.yaml
           k3d image import --cluster wfm "${IMAGE}:ci"
           kubectl wait --for=condition=Ready nodes --all --timeout=120s
+      - name: Deploy Keycloak (sign-in, directory sync, API tokens)
+        # Starts while the operator installs; the app is installed once it is ready. The CoreDNS
+        # rewrite lets pods reach keycloak.localhost (the issuer) like browsers do.
+        run: |
+          kubectl apply -k deploy/k3d/keycloak
+          kubectl -n kube-system rollout restart deployment/coredns
       - name: Install the CloudNativePG operator
         run: |
           kubectl apply --server-side -f "${CNPG_MANIFEST}"
           kubectl -n cnpg-system rollout status deployment/cnpg-controller-manager --timeout=180s
-      - name: Install the chart (development sign-in, single-instance CNPG)
+      - name: Wait for Keycloak
+        run: |
+          kubectl -n keycloak rollout status deployment/keycloak --timeout=5m
+          kubectl -n kube-system rollout status deployment/coredns --timeout=2m
+          for i in $(seq 1 30); do
+            curl -sf -H 'Host: keycloak.localhost:8081' http://localhost:8081/realms/wfm/.well-known/openid-configuration | jq -e '.issuer == "http://keycloak.localhost:8081/realms/wfm"' && exit 0
+            sleep 2
+          done
+          exit 1
+      - name: Install the chart (development sign-in and Keycloak, single-instance CNPG)
         # No --wait: the migration runs as a post-install hook once the release's objects exist,
         # and helm waits for that Job. The rollout checks below wait for the pods.
         run: |
@@ -228,6 +248,29 @@ jobs:
           # ... but neither the UI nor the API
           test "$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: hooks.localhost' http://localhost:8081/api/v1/projects)" = 404
           test "$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: hooks.localhost' http://localhost:8081/)" = 404
+      - name: Check Keycloak sign-in and directory sync
+        run: |
+          set -euo pipefail
+          # The web pod discovers the issuer through the CoreDNS rewrite: sign-in redirects to Keycloak.
+          loc=$(curl -s -o /dev/null -w '%{redirect_url}' -H 'Host: wfm.localhost' http://localhost:8081/auth/keycloak/login)
+          echo "sign-in redirects to: $loc"
+          case "$loc" in http://keycloak.localhost:8081/realms/wfm/protocol/openid-connect/auth\?*) ;; *) exit 1 ;; esac
+          # Directory sync (on start, and now on request) provisions the access group's members.
+          jar=$(mktemp)
+          api() { curl -sf -H 'Host: wfm.localhost' -H 'X-Requested-With: ci' -b "$jar" -c "$jar" "$@"; }
+          api -H 'Content-Type: application/json' -d '{"email":"e2e-admin@example.com","displayName":"E2E Admin"}' \
+            http://localhost:8081/api/v1/auth/dev-login > /dev/null
+          api -X POST http://localhost:8081/api/v1/admin/directory-sync/run > /dev/null
+          for i in $(seq 1 30); do
+            run=$(api http://localhost:8081/api/v1/admin/provisioning | jq -c '.directorySync.runs[0] // {}' || echo '{}')
+            case "$(jq -r '.status // ""' <<<"$run")" in succeeded) break ;; failed) echo "$run"; exit 1 ;; esac
+            sleep 2
+          done
+          echo "last run: $run"
+          test "$(jq -r '.source + "/" + .status' <<<"$run")" = keycloak/succeeded
+          users=$(api 'http://localhost:8081/api/v1/admin/users?q=example.com' | jq -r '[.[] | select(.source == "keycloak") | .email] | sort | join(",")')
+          echo "people from Keycloak: $users"
+          test "$users" = "alice@example.com,bob@example.com"
       - name: Port-forward the web service
         run: |
           kubectl -n wfm port-forward svc/wfm-web 8080:80 > "${{ runner.temp }}/port-forward.log" 2>&1 &
@@ -251,6 +294,7 @@ jobs:
           for c in web hooks worker; do echo "== $c"; kubectl -n wfm logs "deployment/wfm-$c" --all-containers --tail=200 || true; done
           kubectl -n wfm logs job/wfm-migrate --tail=200 || true
           kubectl -n cnpg-system logs deployment/cnpg-controller-manager --tail=100 || true
+          kubectl -n keycloak logs deployment/keycloak --tail=200 || true
           kubectl get events -A --sort-by=.lastTimestamp | tail -80 || true
       - uses: actions/upload-artifact@v4
         if: failure()

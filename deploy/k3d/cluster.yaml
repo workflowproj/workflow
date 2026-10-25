@@ -6,6 +6,7 @@
 #
 # UI:    http://wfm.localhost:8081      (Traefik ingress; *.localhost resolves to 127.0.0.1)
 # Hooks: http://hooks.localhost:8081/hooks/...
+# Keycloak: http://keycloak.localhost:8081 (deploy/k3d/keycloak; Tilt and the CI e2e job deploy it)
 apiVersion: k3d.io/v1alpha5
 kind: Simple
 metadata:

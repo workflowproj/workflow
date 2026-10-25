@@ -1,0 +1,23 @@
+# Keycloak for the k3d cluster (sign-in, directory sync, external API tokens):
+#
+#   kubectl apply -k deploy/k3d/keycloak
+#   kubectl -n kube-system rollout restart deployment/coredns   # pick up the rewrite now
+#   kubectl -n keycloak rollout status deployment/keycloak --timeout=5m
+#
+# The realm, its clients and test users are described in docs/identity.md (Keycloak →
+# Development realm). Changing realm-wfm.json rolls the Deployment (the ConfigMap name hash
+# changes), which re-imports the realm.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - keycloak.yaml
+  - coredns-custom.yaml
+configMapGenerator:
+  - name: keycloak-realm
+    namespace: keycloak
+    files:
+      - realm-wfm.json
+    options:
+      labels:
+        app.kubernetes.io/name: keycloak
+        app.kubernetes.io/part-of: wfm-dev

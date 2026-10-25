@@ -229,7 +229,10 @@ func (a *Auth) HandleCallback(w http.ResponseWriter, r *http.Request) {
 		fail("server_error", err)
 		return
 	}
-	if len(p.cfg.GroupsClaim) > 0 {
+	// Groups come from the token's claim, unless Keycloak directory sync already brings this
+	// provider's groups (one source of truth, and no duplicate of every group).
+	kc := a.Cfg.Keycloak
+	if len(p.cfg.GroupsClaim) > 0 && !(kc.Enabled && kc.SyncGroups && kc.Provider == id) {
 		groups := claimGroups(all, p.cfg.GroupsClaim, p.cfg.GroupsPrefix)
 		if err := a.Prov.SyncClaimGroups(r.Context(), user.ID, id, groups); err != nil {
 			fail("server_error", err)

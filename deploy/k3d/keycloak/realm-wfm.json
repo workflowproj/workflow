@@ -1,0 +1,219 @@
+{
+  "realm": "wfm",
+  "displayName": "Workflow (development)",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": false,
+  "editUsernameAllowed": false,
+  "accessTokenLifespan": 300,
+  "groups": [
+    { "name": "workflow-users", "path": "/workflow-users" },
+    { "name": "wfm-admins", "path": "/wfm-admins" },
+    {
+      "name": "wfm-engineering",
+      "path": "/wfm-engineering",
+      "subGroups": [{ "name": "wfm-platform", "path": "/wfm-engineering/wfm-platform" }]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "workflow",
+      "name": "Workflow",
+      "description": "Sign-in client for Workflow (WFM_OIDC_KEYCLOAK_CLIENT_ID)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "workflow-dev-client-secret",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "frontchannelLogout": false,
+      "rootUrl": "http://wfm.localhost:8081",
+      "baseUrl": "/",
+      "redirectUris": ["http://wfm.localhost:8081/auth/keycloak/callback", "http://localhost:8080/auth/keycloak/callback"],
+      "webOrigins": ["+"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://wfm.localhost:8081/*##http://localhost:8080/*",
+        "backchannel.logout.url": "http://wfm-web.wfm.svc.cluster.local/auth/keycloak/backchannel-logout",
+        "backchannel.logout.session.required": "true",
+        "backchannel.logout.revoke.offline.tokens": "false"
+      },
+      "protocolMappers": [
+        {
+          "name": "groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "groups",
+            "full.path": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "workflow-sync",
+      "name": "Workflow directory sync",
+      "description": "Service account that reads users and groups for Workflow's directory sync (WFM_KEYCLOAK_CLIENT_ID)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "workflow-sync-dev-secret",
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "defaultClientScopes": ["web-origins", "acr", "roles", "profile", "basic", "email", "service_account"]
+    },
+    {
+      "clientId": "workflow-api",
+      "name": "Workflow API",
+      "description": "The audience of access tokens Workflow accepts for its API (WFM_OIDC_KEYCLOAK_API_AUDIENCE); no flows of its own",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "workflow-api-unused-secret",
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false
+    },
+    {
+      "clientId": "workflow-ci",
+      "name": "CI pipeline",
+      "description": "Machine client whose client-credentials tokens call the Workflow API as the ci-bot service account (WFM_OIDC_KEYCLOAK_API_CLIENTS)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "workflow-ci-dev-secret",
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "defaultClientScopes": ["web-origins", "acr", "roles", "profile", "basic", "email", "service_account"],
+      "protocolMappers": [
+        {
+          "name": "workflow-api audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "workflow-api",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "workflow-cli",
+      "name": "Workflow CLI (development)",
+      "description": "Public client for people's own API tokens (audience workflow-api); the password grant is on for tests only",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "attributes": {
+        "oauth2.device.authorization.grant.enabled": "true"
+      },
+      "protocolMappers": [
+        {
+          "name": "workflow-api audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "workflow-api",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        },
+        {
+          "name": "groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "groups",
+            "full.path": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "service-account-workflow-sync",
+      "enabled": true,
+      "serviceAccountClientId": "workflow-sync",
+      "clientRoles": { "realm-management": ["view-users", "query-groups"] }
+    },
+    {
+      "username": "service-account-workflow-ci",
+      "enabled": true,
+      "serviceAccountClientId": "workflow-ci"
+    },
+    {
+      "username": "alice",
+      "email": "alice@example.com",
+      "emailVerified": true,
+      "firstName": "Alice",
+      "lastName": "Anders",
+      "enabled": true,
+      "credentials": [{ "type": "password", "value": "alice-dev-password", "temporary": false }],
+      "groups": ["/workflow-users", "/wfm-admins"]
+    },
+    {
+      "username": "bob",
+      "email": "bob@example.com",
+      "emailVerified": true,
+      "firstName": "Bob",
+      "lastName": "Baker",
+      "enabled": true,
+      "credentials": [{ "type": "password", "value": "bob-dev-password", "temporary": false }],
+      "groups": ["/workflow-users", "/wfm-engineering/wfm-platform"]
+    },
+    {
+      "username": "carol",
+      "email": "carol@example.com",
+      "emailVerified": true,
+      "firstName": "Carol",
+      "lastName": "Chen",
+      "enabled": true,
+      "credentials": [{ "type": "password", "value": "carol-dev-password", "temporary": false }],
+      "groups": ["/wfm-engineering"]
+    },
+    {
+      "username": "dave",
+      "email": "dave@example.com",
+      "emailVerified": true,
+      "firstName": "Dave",
+      "lastName": "Dunn",
+      "enabled": false,
+      "credentials": [{ "type": "password", "value": "dave-dev-password", "temporary": false }],
+      "groups": ["/workflow-users"]
+    }
+  ]
+}

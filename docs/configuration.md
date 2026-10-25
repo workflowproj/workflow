@@ -70,6 +70,15 @@ See [identity.md](identity.md).
 | `WFM_GOOGLE_SYNC_INTERVAL` | `15m` | |
 | `WFM_GOOGLE_SYNC_GROUPS` | `true` | mirror groups |
 | `WFM_GOOGLE_GROUP_PREFIX` | — | only mirror groups whose email starts with this |
+| `WFM_KEYCLOAK_ENABLED` | `false` | Keycloak directory sync ([identity.md](identity.md#keycloak-directory-sync)); not together with Google's |
+| `WFM_KEYCLOAK_URL` | — | Keycloak's base URL, e.g. `https://sso.example.com` (may be a private, in-cluster address) |
+| `WFM_KEYCLOAK_REALM` | — | the realm to sync |
+| `WFM_KEYCLOAK_CLIENT_ID`, `WFM_KEYCLOAK_CLIENT_SECRET` | — | a confidential client whose service account has the `realm-management` roles `view-users` and `query-groups` |
+| `WFM_KEYCLOAK_PROVIDER` | `keycloak` | the `WFM_OIDC_PROVIDERS` id people sign in with; their Keycloak user id is the subject there |
+| `WFM_KEYCLOAK_SYNC_GROUP` | — (everyone) | access group path, e.g. `/workflow-users`; its subgroups' members count too |
+| `WFM_KEYCLOAK_SYNC_GROUPS` | `true` | mirror groups (named by path) and their direct members |
+| `WFM_KEYCLOAK_GROUP_PREFIX` | — | only mirror groups whose name starts with this (case-insensitive) |
+| `WFM_KEYCLOAK_SYNC_INTERVAL` | `15m` | `0` runs only on *Run now* |
 
 ## AI assistants (OAuth)
 

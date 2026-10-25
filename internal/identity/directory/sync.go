@@ -2,7 +2,6 @@ package directory
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -11,12 +10,10 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/geoffo-dev/workflow-management/internal/authz"
 	"github.com/geoffo-dev/workflow-management/internal/config"
 	"github.com/geoffo-dev/workflow-management/internal/db"
 	"github.com/geoffo-dev/workflow-management/internal/db/dbq"
 	"github.com/geoffo-dev/workflow-management/internal/identity"
-	"github.com/geoffo-dev/workflow-management/internal/tracker"
 )
 
 type Syncer struct {
@@ -35,32 +32,12 @@ func NewSyncer(pool *pgxpool.Pool, cfg config.GoogleDirectory, prov *identity.Pr
 	return s
 }
 
-type Stats map[string]int
+// Source names this directory in directory_sync_runs.
+func (s *Syncer) Source() string { return "google" }
 
 // Run performs one sync and records it in directory_sync_runs.
 func (s *Syncer) Run(ctx context.Context, trigger string) (Stats, error) {
-	run, err := s.Q.CreateDirectorySyncRun(ctx, dbq.CreateDirectorySyncRunParams{Trigger: trigger, Source: "google"})
-	if err != nil {
-		return nil, err
-	}
-	stats, runErr := s.sync(ctx)
-	status := "succeeded"
-	var errMsg *string
-	if runErr != nil {
-		status = "failed"
-		m := runErr.Error()
-		errMsg = &m
-	}
-	b, _ := json.Marshal(stats)
-	if err := s.Q.FinishDirectorySyncRun(context.WithoutCancel(ctx), dbq.FinishDirectorySyncRunParams{ID: run.ID, Status: status, Stats: b, Error: errMsg}); err != nil {
-		return stats, err
-	}
-	data := map[string]any{"trigger": trigger, "status": status}
-	for k, v := range stats {
-		data[k] = v
-	}
-	tracker.Audit(ctx, s.Q, authz.SystemActor(), "directory.sync", "directory", run.ID.String(), nil, data)
-	return stats, runErr
+	return recordRun(ctx, s.Q, s.Source(), trigger, s.sync)
 }
 
 func (s *Syncer) sync(ctx context.Context) (Stats, error) {
