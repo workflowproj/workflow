@@ -465,14 +465,7 @@ func (s *Server) AdminGetProvisioning(ctx context.Context, _ api.AdminGetProvisi
 	if err != nil {
 		return nil, err
 	}
-	gd := s.Cfg.GoogleDirectory
-	dir := api.DirectorySyncStatus{Configured: gd.Enabled, IntervalMinutes: int(gd.Interval.Minutes()), Runs: []api.DirectorySyncRun{}}
-	if gd.Group != "" {
-		dir.Group = &gd.Group
-	}
-	if gd.OrgUnit != "" {
-		dir.OrgUnit = &gd.OrgUnit
-	}
+	dir := s.directoryStatus()
 	for _, r := range runs {
 		stats := map[string]int{}
 		_ = json.Unmarshal(r.Stats, &stats)
@@ -487,6 +480,30 @@ func (s *Server) AdminGetProvisioning(ctx context.Context, _ api.AdminGetProvisi
 		Scim:          scim,
 		DirectorySync: dir,
 	}, nil
+}
+
+// directoryStatus describes the configured directory sync (Google Workspace or Keycloak), without runs.
+func (s *Server) directoryStatus() api.DirectorySyncStatus {
+	dir := api.DirectorySyncStatus{Runs: []api.DirectorySyncRun{}}
+	opt := func(v string) *string {
+		if v == "" {
+			return nil
+		}
+		return &v
+	}
+	switch gd, kc := s.Cfg.GoogleDirectory, s.Cfg.Keycloak; {
+	case gd.Enabled:
+		src := api.DirectorySyncStatusSourceGoogle
+		dir = api.DirectorySyncStatus{Configured: true, Source: &src, IntervalMinutes: int(gd.Interval.Minutes()), Group: opt(gd.Group),
+			OrgUnit: opt(gd.OrgUnit), SyncGroups: &gd.SyncGroups, GroupPrefix: opt(gd.GroupPrefix), Runs: dir.Runs}
+	case kc.Enabled:
+		src := api.DirectorySyncStatusSourceKeycloak
+		dir = api.DirectorySyncStatus{Configured: true, Source: &src, IntervalMinutes: int(kc.Interval.Minutes()), Group: opt(kc.SyncGroup),
+			SyncGroups: &kc.SyncGroups, GroupPrefix: opt(kc.GroupPrefix), Url: opt(kc.URL), Realm: opt(kc.Realm), Provider: opt(kc.Provider), Runs: dir.Runs}
+	default:
+		dir.IntervalMinutes = int(gd.Interval.Minutes())
+	}
+	return dir
 }
 
 func (s *Server) AdminCreateScimConnection(ctx context.Context, req api.AdminCreateScimConnectionRequestObject) (api.AdminCreateScimConnectionResponseObject, error) {
@@ -536,14 +553,15 @@ func (s *Server) AdminRunDirectorySync(ctx context.Context, _ api.AdminRunDirect
 	if err != nil {
 		return nil, err
 	}
-	if !s.Cfg.GoogleDirectory.Enabled {
-		return nil, apperr.Invalid("directory", "Google directory sync is not configured (WFM_GOOGLE_DIRECTORY_ENABLED)")
+	dir := s.directoryStatus()
+	if !dir.Configured {
+		return nil, apperr.Invalid("directory", "directory sync is not configured (WFM_GOOGLE_DIRECTORY_ENABLED or WFM_KEYCLOAK_ENABLED)")
 	}
 	res, err := s.Jobs.Insert(ctx, jobs.DirectorySync{Trigger: "manual"}, nil)
 	if err != nil {
 		return nil, err
 	}
-	tracker.Audit(ctx, s.Q, a, "directory.sync_requested", "directory", "", nil, nil)
+	tracker.Audit(ctx, s.Q, a, "directory.sync_requested", "directory", "", nil, map[string]any{"source": *dir.Source})
 	return api.AdminRunDirectorySync202JSONResponse{JobId: res.Job.ID}, nil
 }
 

@@ -1,5 +1,6 @@
-// Package directory syncs people and groups from Google Workspace through the Admin SDK
-// Directory API, using a service account with domain-wide delegation and read-only scopes.
+// Package directory syncs people and groups from a directory: Google Workspace through the
+// Admin SDK Directory API (a service account with domain-wide delegation and read-only scopes),
+// or a Keycloak realm through its Admin REST API (keycloak.go).
 package directory
 
 import (

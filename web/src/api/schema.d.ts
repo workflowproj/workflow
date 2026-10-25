@@ -2737,9 +2737,26 @@ export interface components {
         };
         DirectorySyncStatus: {
             configured: boolean;
+            /**
+             * @description The configured directory (absent when none is)
+             * @enum {string}
+             */
+            source?: "google" | "keycloak";
+            /** @description Minutes between scheduled runs; 0 means manual runs only */
             intervalMinutes: number;
+            /** @description Access group: a Google group email, or a Keycloak group path */
             group?: string;
             orgUnit?: string;
+            /** @description Groups are mirrored too */
+            syncGroups?: boolean;
+            /** @description Only groups whose email (Google) or name (Keycloak) starts with this are mirrored */
+            groupPrefix?: string;
+            /** @description Keycloak base URL */
+            url?: string;
+            /** @description Keycloak realm */
+            realm?: string;
+            /** @description Sign-in provider (WFM_OIDC_PROVIDERS id) whose subjects are the Keycloak user ids */
+            provider?: string;
             runs: components["schemas"]["DirectorySyncRun"][];
         };
         ScimConnection: {
