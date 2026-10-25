@@ -476,25 +476,7 @@ services, and use an internal OIDC provider and S3-compatible store.
   `k8s.namespace.name`, `k8s.pod.name`, `k8s.node.name` and `k8s.deployment.name` to
   `OTEL_RESOURCE_ATTRIBUTES`; allow egress to the collector in `networkPolicy.egress.extraRules`.
 
-## Local cluster, inner loop and CI
+## Development
 
-```sh
-k3d cluster create --config deploy/k3d/cluster.yaml   # k3s + local registry, Traefik on :8081
-tilt up                                               # builds the image, deploys the chart, port-forwards
-open http://localhost:8080                            # or http://wfm.localhost:8081 through Traefik
-tilt up -- --cnpg                                     # CloudNativePG instead of the throwaway PostgreSQL
-tilt down && k3d cluster delete wfm
-```
-
-Tilt deploys the same chart with `deploy/k3d/values-dev.yaml` (development sign-in, one replica
-each, NetworkPolicies on) and Keycloak from `deploy/k3d/keycloak` (sign-in, directory sync and API
-tokens against the `wfm` realm; see [identity.md](identity.md#development-realm-k3d)). For UI work trigger the `vite` resource: Vite on :5173 proxies `/api` to
-the port-forwarded web pod.
-
-CI (`.github/workflows/ci.yml`) runs on every pull request: Go vet, generated-code drift and tests
-against a `postgres:17` service; web typecheck, tests and build; `helm lint` + `kubeconform` of
-every overlay (CRDs validated against the datree catalog); the image build; and an end-to-end job
-that creates an ephemeral k3d cluster, deploys Keycloak, installs CloudNativePG, installs and
-upgrades the chart with development sign-in and Keycloak, checks the ingress split through
-Traefik, that sign-in redirects to Keycloak and that a Keycloak directory sync provisions the
-realm's access group, and runs the Playwright suite against a port-forward of the web Service.
+To work on Workflow itself (a local k3d cluster with Tilt, the development Keycloak realm, the
+tests and CI), see [CONTRIBUTING.md](../CONTRIBUTING.md).
