@@ -25,8 +25,17 @@ func TestProjectAccessAndRoles(t *testing.T) {
 	member.get("/api/v1/projects", &list)
 	sameStrings(t, keys(list), []string{"OPEN"}, "member project list")
 	member.must("GET", "/api/v1/projects/SECRET", nil, 404, nil)
-	member.createIssue("OPEN", "task", "Members can create in open projects", nil)
+	open := member.createIssue("OPEN", "task", "Members can create in open projects", nil)
 	member.must("POST", "/api/v1/issues", obj{"projectKey": "SECRET", "typeKey": "task", "summary": "x"}, 404, nil)
+	// A link to an issue in a project they can't browse doesn't show it on the issue they can.
+	hidden := admin.createIssue("SECRET", "task", "Acquire the competitor", nil)
+	admin.must("POST", "/api/v1/issues/"+str(open, "key")+"/links", obj{"type": "relates", "targetKey": str(hidden, "key")}, 201, nil)
+	if links := admin.issue(str(open, "key"))["links"].([]any); len(links) != 1 {
+		t.Fatalf("admin sees %d links, want 1", len(links))
+	}
+	if links := member.issue(str(open, "key"))["links"].([]any); len(links) != 0 {
+		t.Fatalf("a member sees a link into a private project: %v", links)
+	}
 
 	// Grant access through a group mapped to a custom role.
 	var role obj

@@ -14,6 +14,7 @@ import (
 
 	"github.com/workflowproj/workflow/internal/api"
 	"github.com/workflowproj/workflow/internal/authz"
+	"github.com/workflowproj/workflow/internal/db"
 	"github.com/workflowproj/workflow/internal/db/dbq"
 )
 
@@ -293,6 +294,11 @@ func (s *Service) IssueDetail(ctx context.Context, actor *authz.Actor, i dbq.Iss
 	if err != nil {
 		return api.IssueDetail{}, err
 	}
+	// A link to an issue in a project the viewer can't browse is left out, so its key, summary,
+	// status and assignee don't leak.
+	if others, err = s.browsableIssues(ctx, actor, p.ID, others); err != nil {
+		return api.IssueDetail{}, err
+	}
 	all := append(append([]dbq.Issue{i}, children...), others...)
 	l, err := s.loadLookups(ctx, all)
 	if err != nil {
@@ -421,4 +427,32 @@ func (s *Service) IssueDetail(ctx context.Context, actor *authz.Actor, i dbq.Iss
 		Comment: access.Has(authz.IssueComment), Assign: access.Has(authz.IssueAssign),
 	}
 	return d, nil
+}
+
+// browsableIssues keeps the issues in projects the actor can browse (home is the project already
+// checked).
+func (s *Service) browsableIssues(ctx context.Context, actor *authz.Actor, home uuid.UUID, issues []dbq.Issue) ([]dbq.Issue, error) {
+	can := map[uuid.UUID]bool{home: true}
+	out := make([]dbq.Issue, 0, len(issues))
+	for _, o := range issues {
+		ok, seen := can[o.ProjectID]
+		if !seen {
+			op, err := s.Q.GetProject(ctx, o.ProjectID)
+			if err != nil && !db.IsNoRows(err) {
+				return nil, err
+			}
+			if err == nil {
+				access, err := s.Authz.Access(ctx, actor, op)
+				if err != nil {
+					return nil, err
+				}
+				ok = access.CanBrowse()
+			}
+			can[o.ProjectID] = ok
+		}
+		if ok {
+			out = append(out, o)
+		}
+	}
+	return out, nil
 }
