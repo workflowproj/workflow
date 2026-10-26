@@ -175,9 +175,28 @@ drops off the approvers' lists, and a late decision is refused rather than movin
   box, files (attach yours), approvals, and who it is shared with.
 - **Approvals**: requests waiting for your decision.
 - **Profile**: your account, password and two-factor authentication, and request emails.
+- **What's new**: a desk's page of release notes, linked from the desk (below).
 
 It works on phones, follows the light/dark theme, and its pages are part of the accessibility
 checks in the end-to-end tests.
+
+### What's new
+
+A help centre can tell its customers what changed in the products behind it. In Project settings
+→ Help centre → *What's new*, a project admin of the desk chooses the software projects whose
+release notes it shows; they can only choose projects they can browse, and not service projects.
+In those projects, people with `release.manage` publish a release's notes from the release page
+(*Show on the help centres' What's new*, see [releases.md](releases.md#release-notes)).
+
+Everyone who may raise requests in the desk then finds **What's new** on the desk's page
+(`/portal/KEY/whats-new`): the published notes of the chosen projects, newest first, each with
+the product's and the release's names, its date (when it was released, else its planned date)
+and the notes rendered as Markdown (raw HTML is not rendered, and issue keys are not links).
+Nothing else about the releases reaches the help centre: no issues, no statuses, no people.
+Unpublishing the notes, or removing the project from the desk, takes them off at once. Someone who
+may not raise requests in the desk gets `404`, like every other portal page; the integration tests
+check that customers cannot read unpublished notes, notes of projects the desk did not choose, or
+another desk's notes.
 
 ## Emails
 
@@ -207,13 +226,14 @@ the normal agent notifications instead; internal notes are never in a customer's
 
 ## API
 
-Agents: `GET`/`PATCH /projects/{key}/service-desk`, `…/request-types`,
+Agents: `GET`/`PATCH /projects/{key}/service-desk` (`releaseNotesProjectKeys` chooses What's
+new's projects), `…/request-types`,
 `…/customers`, `…/queues` (and `/queues/{id}/issues`), `GET`/`PUT /projects/{key}/slas`,
 `GET`/`PATCH /issues/{key}/request` (request type, SLAs, approvals, participants),
 `POST /issues/{key}/participants`, `POST /issues/{key}/approvals/{id}`.
 
 Help centre: `GET /portal/projects`, `GET /portal/projects/{key}`,
-`POST /portal/projects/{key}/requests`, `GET /portal/requests`, `GET /portal/requests/{key}`,
+`GET /portal/projects/{key}/whats-new`, `POST /portal/projects/{key}/requests`, `GET /portal/requests`, `GET /portal/requests/{key}`,
 `POST …/comments`, `POST …/attachments`, `POST …/approval`, `GET /portal/approvals`,
 `GET /portal/attachments/{id}`, and `GET`/`POST /portal/signup/{key}` (signed out).
 [`api/openapi.yaml`](../api/openapi.yaml) has the details.
@@ -222,7 +242,7 @@ Help centre: `GET /portal/projects`, `GET /portal/projects/{key}`,
 
 Included in this first cut: service projects, request types with forms, customers (invited,
 SSO or self-signed-up), the help centre, replies and internal notes, queues, SLAs with
-calendars and breach events, approvals, and customer and approver emails.
+calendars and breach events, approvals, customer and approver emails, and What's new.
 
 Not included yet:
 

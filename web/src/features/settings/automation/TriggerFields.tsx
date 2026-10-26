@@ -108,6 +108,31 @@ export function TriggerFields({
         </fieldset>
       )}
 
+      {trigger.type === "deployment.completed" && (
+        <>
+          <Field label="Environment" hint="Any case. Leave empty for every environment." error={errors["trigger.environment"]}>
+            {(id) => (
+              <Input
+                id={id}
+                value={trigger.environment ?? ""}
+                onChange={(e) => onChange({ ...trigger, environment: e.target.value })}
+                placeholder="production"
+                className="font-mono text-[13px]"
+              />
+            )}
+          </Field>
+          <Field label="Outcome" error={errors["trigger.status"]}>
+            {(id) => (
+              <Select id={id} value={trigger.status ?? ""} onChange={(e) => onChange({ ...trigger, status: (e.target.value || undefined) as Trigger["status"] })}>
+                <option value="">Succeeded or failed</option>
+                <option value="success">Succeeded</option>
+                <option value="failed">Failed</option>
+              </Select>
+            )}
+          </Field>
+        </>
+      )}
+
       {trigger.type === "schedule" && (
         <>
           <Field label="Cron (UTC)" error={errors["trigger.cron"]} hint="minute hour day month weekday, or @daily / @hourly">

@@ -125,7 +125,7 @@ Durations such as `1w 2d 3h` count working days and weeks; see [time-tracking.md
 | `WFM_SCM_RECONCILE_INTERVAL` | `30m` | `0` disables |
 | `WFM_AUTOMATION_MAX_DEPTH` | `5` | maximum chain of rules triggering rules |
 | `WFM_WEBHOOK_ALLOW_PRIVATE` | `false` | allow outbound calls to any private address (prefer the allowlist below) |
-| `WFM_OUTBOUND_ALLOWED_HOSTS` | — | host names (or `.domain` suffixes) that may resolve to private addresses, e.g. a self-hosted Mattermost |
+| `WFM_OUTBOUND_ALLOWED_HOSTS` | — | host names (or `.domain` suffixes) that may resolve to private addresses, e.g. a self-hosted Mattermost. A GitHub or GitLab connection's own API host is allowed for its deployment lookups without being listed |
 
 ## Email
 

@@ -1674,7 +1674,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** A release with its progress, notes, Git tag and the environments it reached */
+        get: operations["getRelease"];
         put?: never;
         post?: never;
         delete: operations["deleteRelease"];
@@ -1697,6 +1698,84 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/releases/{releaseId}/readiness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What stands in the way of shipping the release
+         * @description Warnings, each with the issues concerned: issues that are not done, issues with open
+         *     (unmerged) pull or merge requests, issues whose latest pipeline failed, and a release date
+         *     that has passed. Shipping stays possible whatever they say.
+         */
+        get: operations["getReleaseReadiness"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/releases/{releaseId}/burnup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Done work against the release's scope, day by day */
+        get: operations["getReleaseBurnup"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/releases/{releaseId}/notes/generated": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Release notes generated from the release's done issues (not saved)
+         * @description Markdown with a section per issue type (Features from stories, Bug fixes from bugs,
+         *     Improvements from tasks, else the type's plural name) and a line "summary (KEY)" per done
+         *     issue, sub-tasks left out. Save it with `PATCH /releases/{releaseId}` (`notes`).
+         */
+        get: operations["generateReleaseNotes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{projectKey}/release-settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What new Git tags do to the project's releases */
+        get: operations["getReleaseSettings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["updateReleaseSettings"];
         trace?: never;
     };
     "/timeline": {
@@ -2736,6 +2815,27 @@ export interface paths {
         };
         /** A desk's request types and their forms */
         get: operations["getPortalDesk"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portal/projects/{projectKey}/whats-new": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What's new - the published release notes of the software projects the desk shows
+         * @description Only the notes themselves, with the product's and the release's names and dates: never
+         *     issues. Answers 404 to anyone who may not raise requests in the desk.
+         */
+        get: operations["listPortalReleaseNotes"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3837,6 +3937,14 @@ export interface components {
             position: number;
             issueCount: number;
             doneCount: number;
+            /** @description The release notes are shown on the What's new page of the help centres that chose this project */
+            notesPublished: boolean;
+            /** Format: date-time */
+            notesPublishedAt?: string;
+            /** @description The Git tag the release ships as */
+            tagName?: string;
+            /** Format: uuid */
+            tagRepositoryId?: string;
         };
         /** @enum {string} */
         ReleaseState: "unreleased" | "released" | "archived";
@@ -3848,6 +3956,134 @@ export interface components {
             /** Format: date */
             releaseDate?: string | null;
             state?: components["schemas"]["ReleaseState"];
+            /** @description Release notes (Markdown) */
+            notes?: string;
+            /** @description Publish the notes to the What's new page of the help centres that chose this project */
+            notesPublished?: boolean;
+            /**
+             * Format: uuid
+             * @description The repository of the release's Git tag (one connected to the project); null, with tagName null, unlinks the tag
+             */
+            tagRepositoryId?: string | null;
+            /** @description The Git tag the release ships as */
+            tagName?: string | null;
+        };
+        ReleaseDetail: components["schemas"]["Release"] & {
+            projectKey: string;
+            /** @description Release notes (Markdown) */
+            notes: string;
+            tag?: components["schemas"]["ReleaseTag"];
+            progress: components["schemas"]["ReleaseProgress"];
+            environments: components["schemas"]["ReleaseEnvironment"][];
+            /** @description The caller holds release.manage in the project */
+            canManage: boolean;
+        };
+        ReleaseTag: {
+            name: string;
+            sha?: string;
+            repository: components["schemas"]["RepositoryRef"];
+            /** @description The tag's page at the provider */
+            url: string;
+            /** @description The tag of the previous release with one in the same repository */
+            previousTag?: string;
+            /** @description The changes between the previous release's tag and this one */
+            compareUrl?: string;
+            /** Format: date-time */
+            linkedAt?: string;
+        };
+        ReleaseProgress: {
+            issues: components["schemas"]["CategoryCounts"];
+            points: components["schemas"]["CategoryCounts"];
+            /** @description Issues without story points */
+            unestimated: number;
+        };
+        CategoryCounts: {
+            /** Format: double */
+            todo: number;
+            /** Format: double */
+            inProgress: number;
+            /** Format: double */
+            done: number;
+            /** Format: double */
+            total: number;
+        };
+        ReleaseEnvironment: {
+            environment: string;
+            /** Format: date-time */
+            reachedAt: string;
+            /**
+             * @description tag: the release's tag was deployed there; issues: every done issue of the release was
+             * @enum {string}
+             */
+            via: "tag" | "issues";
+            /** @description The deployment (tag only) */
+            url?: string;
+        };
+        ReleaseBurnup: {
+            /** Format: date */
+            from: string;
+            /**
+             * Format: date
+             * @description Today
+             */
+            to: string;
+            /** Format: date */
+            releaseDate?: string;
+            /**
+             * @description history: scope follows the fix version changes recorded in issue history; current: there are none, so scope is the release's current issues, each from its creation
+             * @enum {string}
+             */
+            scopeSource: "history" | "current";
+            days: components["schemas"]["ReleaseBurnupDay"][];
+        };
+        /** @description The release at the end of a day. */
+        ReleaseBurnupDay: {
+            /** Format: date */
+            date: string;
+            scopeIssues: number;
+            doneIssues: number;
+            /** Format: double */
+            scopePoints: number;
+            /** Format: double */
+            donePoints: number;
+        };
+        ReleaseReadiness: {
+            /** @description There are no warnings */
+            ready: boolean;
+            warnings: components["schemas"]["ReadinessWarning"][];
+        };
+        ReadinessWarning: {
+            /** @enum {string} */
+            kind: "not_done" | "open_pull_requests" | "failed_pipelines" | "overdue";
+            message: string;
+            issues: components["schemas"]["ReadinessIssue"][];
+        };
+        ReadinessIssue: {
+            issue: components["schemas"]["IssueRef"];
+            /** @description The open pull requests or the failed pipeline */
+            links: components["schemas"]["ReadinessLink"][];
+        };
+        ReadinessLink: {
+            title: string;
+            url: string;
+            state: string;
+            repository: string;
+        };
+        GeneratedReleaseNotes: {
+            /** @description Markdown */
+            notes: string;
+            /** @description The done issues listed */
+            issueCount: number;
+        };
+        ReleaseSettings: {
+            /** @description A new tag in a connected repository without a release of its name creates one */
+            createFromTags: boolean;
+            /** @description Pushing a release's tag marks the release released */
+            releaseOnTag: boolean;
+        };
+        ReleaseSettingsPatch: {
+            createFromTags?: boolean;
+            releaseOnTag?: boolean;
         };
         IssueTypeRef: {
             /** Format: uuid */
@@ -3873,6 +4109,8 @@ export interface components {
             openPullRequests: number;
             mergedPullRequests: number;
             pipelineState?: string;
+            /** @description Environments a successful deployment containing the issue reached */
+            deployedTo?: string[];
         };
         Issue: {
             /** Format: uuid */
@@ -3925,6 +4163,8 @@ export interface components {
             progress?: components["schemas"]["IssueProgress"];
             links: components["schemas"]["IssueLink"][];
             development: components["schemas"]["DevLink"][];
+            /** @description One per environment the issue was deployed to - the latest successful deployment containing it, else the latest one that failed */
+            deployments: components["schemas"]["IssueDeployment"][];
             attachments: components["schemas"]["Attachment"][];
             watching: boolean;
             watcherCount: number;
@@ -4232,6 +4472,24 @@ export interface components {
         };
         /** @enum {string} */
         DevLinkKind: "branch" | "commit" | "pull_request" | "pipeline";
+        IssueDeployment: {
+            /** Format: uuid */
+            id: string;
+            environment: string;
+            status: components["schemas"]["DeploymentStatus"];
+            /**
+             * Format: date-time
+             * @description When the provider reported the status
+             */
+            deployedAt: string;
+            url: string;
+            ref: string;
+            sha: string;
+            deployer: string;
+            repository: components["schemas"]["RepositoryRef"];
+        };
+        /** @enum {string} */
+        DeploymentStatus: "pending" | "running" | "success" | "failed" | "canceled";
         /** @enum {string} */
         ScmProvider: "github" | "gitlab";
         RepositoryRef: {
@@ -4765,7 +5023,7 @@ export interface components {
         };
         AutomationTrigger: {
             /** @enum {string} */
-            type: "issue.created" | "issue.transitioned" | "issue.field_changed" | "pr.opened" | "pr.merged" | "commit.pushed" | "branch.created" | "pipeline.completed" | "schedule" | "sla.breached";
+            type: "issue.created" | "issue.transitioned" | "issue.field_changed" | "pr.opened" | "pr.merged" | "commit.pushed" | "branch.created" | "pipeline.completed" | "deployment.completed" | "schedule" | "sla.breached";
             /** @description issue.transitioned: only when entering this status (name) */
             toStatus?: string;
             /** @description issue.transitioned: only when entering a status of this category */
@@ -4776,6 +5034,13 @@ export interface components {
             cron?: string;
             /** @description schedule: issues to run the actions against */
             jql?: string;
+            /** @description deployment.completed: only deployments to this environment (case-insensitive) */
+            environment?: string;
+            /**
+             * @description deployment.completed: only deployments that succeeded, or that failed
+             * @enum {string}
+             */
+            status?: "success" | "failed";
         };
         AutomationAction: {
             /**
@@ -4861,7 +5126,7 @@ export interface components {
             name: string;
             /** Format: uri */
             url: string;
-            events: ("*" | "issue.created" | "issue.updated" | "issue.transitioned" | "issue.deleted" | "comment.created" | "sprint.started" | "sprint.completed" | "release.released" | "sla.breached")[];
+            events: ("*" | "issue.created" | "issue.updated" | "issue.transitioned" | "issue.deleted" | "comment.created" | "sprint.started" | "sprint.completed" | "release.released" | "sla.breached" | "deployment.completed")[];
             /** @default true */
             active?: boolean;
         };
@@ -5011,12 +5276,16 @@ export interface components {
             customerCount: number;
             /** @description The project is open: every organisation member can browse it as an agent, internal notes included */
             openProject: boolean;
+            /** @description Software projects whose published release notes the help centre shows on its What's new page */
+            releaseNotesProjects: components["schemas"]["ProjectRef"][];
         };
         ServiceDeskPatch: {
             portalName?: string;
             portalDescription?: string;
             portalAccess?: components["schemas"]["PortalAccess"];
             selfSignup?: boolean;
+            /** @description Software projects (ones you can browse) whose published release notes the help centre shows; replaces the list */
+            releaseNotesProjectKeys?: string[];
         };
         /** @enum {string} */
         FormFieldType: "text" | "textarea" | "select" | "multiselect" | "number" | "date" | "checkbox" | "url";
@@ -5287,6 +5556,23 @@ export interface components {
             name: string;
             description: string;
             requestTypes: components["schemas"]["PortalRequestType"][];
+            /** @description The desk's What's new page has release notes */
+            whatsNew: boolean;
+        };
+        PortalReleaseNote: {
+            /** Format: uuid */
+            id: string;
+            /** @description The software project's name */
+            product: string;
+            /** @description The release's name */
+            name: string;
+            /**
+             * Format: date
+             * @description When it was released
+             */
+            date?: string;
+            /** @description Markdown */
+            notes: string;
         };
         PortalRequestCreate: {
             /** Format: uuid */
@@ -8645,6 +8931,29 @@ export interface operations {
             default: components["responses"]["Problem"];
         };
     };
+    getRelease: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                releaseId: components["parameters"]["ReleaseId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Release */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReleaseDetail"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
     deleteRelease: {
         parameters: {
             query?: never;
@@ -8721,6 +9030,127 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Release"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getReleaseReadiness: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                releaseId: components["parameters"]["ReleaseId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Readiness */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReleaseReadiness"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getReleaseBurnup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                releaseId: components["parameters"]["ReleaseId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Burnup */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReleaseBurnup"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    generateReleaseNotes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                releaseId: components["parameters"]["ReleaseId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Generated notes */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GeneratedReleaseNotes"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getReleaseSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project key (or id) */
+                projectKey: components["parameters"]["ProjectKey"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Settings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReleaseSettings"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    updateReleaseSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project key (or id) */
+                projectKey: components["parameters"]["ProjectKey"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReleaseSettingsPatch"];
+            };
+        };
+        responses: {
+            /** @description Updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReleaseSettings"];
                 };
             };
             default: components["responses"]["Problem"];
@@ -11016,6 +11446,30 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PortalDeskDetail"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listPortalReleaseNotes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project key (or id) */
+                projectKey: components["parameters"]["ProjectKey"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Release notes, newest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalReleaseNote"][];
                 };
             };
             default: components["responses"]["Problem"];

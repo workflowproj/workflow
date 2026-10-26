@@ -19,6 +19,10 @@ describe("describeRule", () => {
     expect(describeRule(template("stale-monday")).when).toBe('Every Monday at 08:00 UTC, for issues matching “statusCategory = "In Progress" AND updated <= -14d”');
     expect(sentence(describeRule(template("urgent-bugs")))).toBe("When a bug is created and its priority is highest → notify the watchers, add label “needs-triage”");
     expect(describeRule(template("pipeline-failed")).when).toBe("When a pipeline for an issue completes and it failed");
+    expect(sentence(describeRule(template("deployed-production-done")))).toBe("When an issue is deployed to production → move to Done, comment");
+    expect(describeRule({ trigger: { type: "deployment.completed", status: "failed" }, condition: "", actions: [{ type: "add_label", label: "x" }] }).when).toBe(
+      "When a deployment of an issue fails",
+    );
   });
 
   it("treats a parent guard as implied by parent clauses", () => {
@@ -64,6 +68,8 @@ describe("cleaning", () => {
     expect(cleanTrigger({ type: "issue.transitioned", toStatus: "Done", toCategory: "done" })).toEqual({ type: "issue.transitioned", toCategory: "done" });
     expect(cleanTrigger({ type: "issue.field_changed", field: " startDate ,dueDate,, " })).toEqual({ type: "issue.field_changed", field: "startDate, dueDate" });
     expect(cleanTrigger({ type: "pr.merged", toStatus: "x" })).toEqual({ type: "pr.merged" });
+    expect(cleanTrigger({ type: "deployment.completed", environment: " production ", toStatus: "x" })).toEqual({ type: "deployment.completed", environment: "production" });
+    expect(cleanTrigger({ type: "deployment.completed", environment: "", status: "failed" })).toEqual({ type: "deployment.completed", status: "failed" });
     expect(splitFields(undefined)).toEqual([]);
   });
 });
@@ -78,6 +84,11 @@ describe("templates", () => {
       expect(cleanTrigger(r.trigger), t.id).toEqual(r.trigger);
       expect(r.actions.map(cleanAction), t.id).toEqual(r.actions);
     }
+  });
+
+  it("leave the production deployment rule off until it is checked", () => {
+    expect(template("deployed-production-done").enabled).toBe(false);
+    expect(template("deployed-production-done").trigger).toEqual({ type: "deployment.completed", environment: "production", status: "success" });
   });
 
   it("report the statuses they name", () => {

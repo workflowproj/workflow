@@ -78,7 +78,7 @@ connection pooler that session is a dedicated direct connection, and River runs 
 everything else can go through the pooler (see [deployment.md](deployment.md#connection-pooling)).
 
 Job kinds: `domain_event`, `scm_webhook`, `scm_writeback`, `scm_reconcile`, `scm_ensure_hook`,
-`workflow_migrate`, `post_function`, `webhook_deliver`, `directory_sync`,
+`scm_deployment` (the issues a completed deployment contains), `workflow_migrate`, `post_function`, `webhook_deliver`, `directory_sync`,
 `automation_schedule`, `maintenance`. Failed jobs retry with backoff. Periodic jobs: scheduled
 automation (every minute), maintenance (hourly: expired sessions, anonymising users deleted
 upstream after the retention period, pruning webhook payloads), SCM reconcile and directory

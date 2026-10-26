@@ -1,4 +1,4 @@
-import { CalendarRange, CircleCheckBig, GitMerge, GitPullRequestArrow, ListChecks, Megaphone, OctagonAlert, Play, Siren, Timer, type LucideIcon } from "lucide-react";
+import { CalendarRange, CircleCheckBig, GitMerge, GitPullRequestArrow, ListChecks, Megaphone, OctagonAlert, Play, Rocket, Siren, Timer, type LucideIcon } from "lucide-react";
 import type { RuleInput } from "./meta";
 
 export interface RuleTemplate {
@@ -150,6 +150,24 @@ export const RULE_TEMPLATES: RuleTemplate[] = [
       actions: [
         { type: "notify", recipients: "watchers" },
         { type: "add_label", label: "needs-triage" },
+      ],
+    },
+  },
+  {
+    id: "deployed-production-done",
+    title: "Move issues to Done when they reach production",
+    description: "A successful deployment to production that contains the issue finishes it. Created turned off: check the environment's name first.",
+    group: "Development",
+    icon: Rocket,
+    rule: {
+      name: "Move issues to Done when they reach production",
+      description: "Issues are done once they are live.",
+      enabled: false,
+      trigger: { type: "deployment.completed", environment: "production", status: "success" },
+      condition: "",
+      actions: [
+        { type: "transition", category: "done" },
+        { type: "comment", body: "Deployed to {{event.environment}}: {{event.url}}" },
       ],
     },
   },

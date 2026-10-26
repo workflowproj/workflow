@@ -2,6 +2,7 @@ package scm
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"crypto/x509"
 	"encoding/json"
@@ -107,9 +108,13 @@ func (GitHub) Parse(eventType string, payload []byte) ([]any, error) {
 	switch eventType {
 	case "push":
 		var p struct {
-			Ref     string `json:"ref"`
-			Created bool   `json:"created"`
-			Deleted bool   `json:"deleted"`
+			Ref        string `json:"ref"`
+			After      string `json:"after"`
+			Created    bool   `json:"created"`
+			Deleted    bool   `json:"deleted"`
+			HeadCommit *struct {
+				ID string `json:"id"`
+			} `json:"head_commit"`
 			Commits []struct {
 				ID        string    `json:"id"`
 				Message   string    `json:"message"`
@@ -125,9 +130,20 @@ func (GitHub) Parse(eventType string, payload []byte) ([]any, error) {
 		if err := json.Unmarshal(payload, &p); err != nil {
 			return nil, err
 		}
+		if tag, isTag := strings.CutPrefix(p.Ref, "refs/tags/"); isTag {
+			if !p.Created || p.Deleted {
+				return nil, nil
+			}
+			// The head commit is what the tag points at (after is the tag object for annotated tags).
+			sha := p.After
+			if p.HeadCommit != nil && p.HeadCommit.ID != "" {
+				sha = p.HeadCommit.ID
+			}
+			return []any{TagEvent{Repo: repo, Name: tag, SHA: sha}}, nil
+		}
 		branch, isBranch := strings.CutPrefix(p.Ref, "refs/heads/")
 		if !isBranch {
-			return nil, nil // tags
+			return nil, nil
 		}
 		ev := PushEvent{Repo: repo, Branch: branch, Created: p.Created, Deleted: p.Deleted}
 		for _, c := range p.Commits {
@@ -145,7 +161,10 @@ func (GitHub) Parse(eventType string, payload []byte) ([]any, error) {
 		if err := json.Unmarshal(payload, &p); err != nil {
 			return nil, err
 		}
-		if p.RefType != "branch" {
+		switch {
+		case p.RefType == "tag" && eventType == "create":
+			return []any{TagEvent{Repo: repo, Name: p.Ref}}, nil
+		case p.RefType != "branch":
 			return nil, nil
 		}
 		return []any{BranchEvent{Repo: repo, Branch: p.Ref, Deleted: eventType == "delete"}}, nil
@@ -216,6 +235,43 @@ func (GitHub) Parse(eventType string, payload []byte) ([]any, error) {
 		}
 		return []any{PipelineEvent{Repo: repo, ID: strconv.FormatInt(wr.ID, 10), Name: wr.Name, Status: status, URL: wr.HTMLURL,
 			Branch: wr.HeadBranch, SHA: wr.HeadSHA, CommitMessage: wr.HeadCommit.Message, UpdatedAt: wr.UpdatedAt}}, nil
+	case "deployment_status":
+		var p struct {
+			DeploymentStatus struct {
+				State          string    `json:"state"`
+				Environment    string    `json:"environment"`
+				EnvironmentURL string    `json:"environment_url"`
+				TargetURL      string    `json:"target_url"`
+				LogURL         string    `json:"log_url"`
+				CreatedAt      time.Time `json:"created_at"`
+			} `json:"deployment_status"`
+			Deployment struct {
+				ID          int64  `json:"id"`
+				SHA         string `json:"sha"`
+				Ref         string `json:"ref"`
+				Environment string `json:"environment"`
+				Creator     ghUser `json:"creator"`
+			} `json:"deployment"`
+		}
+		if err := json.Unmarshal(payload, &p); err != nil {
+			return nil, err
+		}
+		st, dep := p.DeploymentStatus, p.Deployment
+		// "inactive" means a newer deployment superseded this one: it is not an outcome.
+		status := map[string]string{
+			"queued": "pending", "pending": "pending", "waiting": "pending", "in_progress": "running",
+			"success": "success", "failure": "failed", "error": "failed",
+		}[st.State]
+		if status == "" {
+			return nil, nil
+		}
+		env := cmp.Or(st.Environment, dep.Environment)
+		link := cmp.Or(st.LogURL, st.TargetURL, st.EnvironmentURL)
+		if link == "" && repo.WebURL != "" {
+			link = repo.WebURL + "/deployments"
+		}
+		return []any{DeploymentEvent{Repo: repo, ID: strconv.FormatInt(dep.ID, 10), Environment: env, Ref: dep.Ref, SHA: dep.SHA,
+			Status: status, URL: link, Deployer: dep.Creator.Login, At: st.CreatedAt}}, nil
 	case "installation", "installation_repositories":
 		var p struct {
 			Repositories        []ghRepo `json:"repositories"`
@@ -248,11 +304,17 @@ func (GitHub) Parse(eventType string, payload []byte) ([]any, error) {
 // API client (GitHub App authentication)
 
 type githubClient struct {
-	conn Connection
-	http *http.Client
-	// installation tokens are cached per installation until shortly before expiry
-	mu     sync.Mutex
-	tokens map[int64]cachedToken
+	conn  Connection
+	http  *http.Client
+	cache *tokenCache
+}
+
+// tokenCache keeps a connection's installation tokens until shortly before they expire. Clients
+// for the same connection share it, whichever HTTP client they use.
+type tokenCache struct {
+	privateKey string
+	mu         sync.Mutex
+	tokens     map[int64]cachedToken
 }
 
 type cachedToken struct {
@@ -260,22 +322,18 @@ type cachedToken struct {
 	expires time.Time
 }
 
-var ghClients sync.Map // connection id -> *githubClient (token cache)
+var ghTokens sync.Map // connection id -> *tokenCache
 
 func (GitHub) Client(_ context.Context, conn Connection, httpClient *http.Client) (Client, error) {
 	if conn.AppID == 0 || conn.PrivateKey == "" {
 		return nil, errors.New("the GitHub connection needs an App id and private key")
 	}
-	if c, ok := ghClients.Load(conn.ID); ok {
-		gc := c.(*githubClient)
-		if gc.conn.PrivateKey == conn.PrivateKey {
-			gc.http = httpClient
-			return gc, nil
-		}
+	tc, ok := ghTokens.Load(conn.ID)
+	if !ok || tc.(*tokenCache).privateKey != conn.PrivateKey {
+		tc = &tokenCache{privateKey: conn.PrivateKey, tokens: map[int64]cachedToken{}}
+		ghTokens.Store(conn.ID, tc)
 	}
-	gc := &githubClient{conn: conn, http: httpClient, tokens: map[int64]cachedToken{}}
-	ghClients.Store(conn.ID, gc)
-	return gc, nil
+	return &githubClient{conn: conn, http: httpClient, cache: tc.(*tokenCache)}, nil
 }
 
 func (c *githubClient) appJWT() (string, error) {
@@ -304,12 +362,12 @@ func (c *githubClient) claims() jwt.RegisteredClaims {
 }
 
 func (c *githubClient) installationToken(ctx context.Context, installation int64) (string, error) {
-	c.mu.Lock()
-	if t, ok := c.tokens[installation]; ok && time.Until(t.expires) > 5*time.Minute {
-		c.mu.Unlock()
+	c.cache.mu.Lock()
+	if t, ok := c.cache.tokens[installation]; ok && time.Until(t.expires) > 5*time.Minute {
+		c.cache.mu.Unlock()
 		return t.token, nil
 	}
-	c.mu.Unlock()
+	c.cache.mu.Unlock()
 	appToken, err := c.appJWT()
 	if err != nil {
 		return "", err
@@ -321,9 +379,9 @@ func (c *githubClient) installationToken(ctx context.Context, installation int64
 	if err := c.do(ctx, appToken, http.MethodPost, fmt.Sprintf("/app/installations/%d/access_tokens", installation), nil, &out); err != nil {
 		return "", err
 	}
-	c.mu.Lock()
-	c.tokens[installation] = cachedToken{out.Token, out.ExpiresAt}
-	c.mu.Unlock()
+	c.cache.mu.Lock()
+	c.cache.tokens[installation] = cachedToken{out.Token, out.ExpiresAt}
+	c.cache.mu.Unlock()
 	return out.Token, nil
 }
 
@@ -357,7 +415,7 @@ func (c *githubClient) do(ctx context.Context, token, method, path string, body,
 	defer res.Body.Close()
 	raw, _ := io.ReadAll(io.LimitReader(res.Body, 16<<20))
 	if res.StatusCode >= 300 {
-		return fmt.Errorf("github %s %s: HTTP %d: %s", method, path, res.StatusCode, strings.TrimSpace(string(raw[:min(len(raw), 300)])))
+		return apiError("github", method, path, res.StatusCode, raw)
 	}
 	if out != nil && len(raw) > 0 {
 		return json.Unmarshal(raw, out)
@@ -460,4 +518,61 @@ func (c *githubClient) CreateBranch(ctx context.Context, repo RepoRef, name, fro
 
 func (c *githubClient) EnsureHook(context.Context, RepoRef, string, string) (string, error) {
 	return "", nil // GitHub Apps deliver every installation's events to the app-level webhook
+}
+
+type ghCommit struct {
+	SHA     string `json:"sha"`
+	HTMLURL string `json:"html_url"`
+	Commit  struct {
+		Message string `json:"message"`
+		Author  struct {
+			Name  string    `json:"name"`
+			Email string    `json:"email"`
+			Date  time.Time `json:"date"`
+		} `json:"author"`
+	} `json:"commit"`
+}
+
+func (g ghCommit) commit() Commit {
+	return Commit{SHA: g.SHA, Message: g.Commit.Message, URL: g.HTMLURL, AuthorName: g.Commit.Author.Name,
+		AuthorEmail: strings.ToLower(g.Commit.Author.Email), Timestamp: g.Commit.Author.Date}
+}
+
+// CommitsBetween uses the compare API. It answers with the first 250 commits, oldest first; for a
+// longer range the newest are read from its last pages instead.
+func (c *githubClient) CommitsBetween(ctx context.Context, repo RepoRef, base, head string, limit int) ([]Commit, bool, error) {
+	if base == "" {
+		var one ghCommit
+		if err := c.repoCall(ctx, repo, http.MethodGet, repoPath(repo)+"/commits/"+url.PathEscape(head), nil, &one); err != nil {
+			return nil, false, err
+		}
+		return []Commit{one.commit()}, false, nil
+	}
+	type compare struct {
+		TotalCommits int        `json:"total_commits"`
+		Commits      []ghCommit `json:"commits"`
+	}
+	path := repoPath(repo) + "/compare/" + url.PathEscape(base) + "..." + url.PathEscape(head)
+	var res compare
+	if err := c.repoCall(ctx, repo, http.MethodGet, path, nil, &res); err != nil {
+		return nil, false, err
+	}
+	commits := res.Commits
+	if res.TotalCommits > len(commits) && limit > 0 {
+		const perPage = 100
+		commits = nil
+		for page := (res.TotalCommits + perPage - 1) / perPage; page >= 1 && len(commits) < limit; page-- {
+			var p compare
+			if err := c.repoCall(ctx, repo, http.MethodGet, fmt.Sprintf("%s?per_page=%d&page=%d", path, perPage, page), nil, &p); err != nil {
+				return nil, false, err
+			}
+			commits = append(p.Commits, commits...)
+		}
+	}
+	out := make([]Commit, len(commits))
+	for i, g := range commits {
+		out[i] = g.commit()
+	}
+	out, truncated := newest(out, limit)
+	return out, truncated || res.TotalCommits > len(out), nil
 }

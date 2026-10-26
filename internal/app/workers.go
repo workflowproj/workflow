@@ -84,6 +84,9 @@ func (a *App) handlers() []handler {
 		reg(time.Minute, func(ctx context.Context, j jobs.SCMWriteBack) error { return a.SCM.WriteBack(ctx, j.DevLinkID) }),
 		reg(15*time.Minute, func(ctx context.Context, j jobs.SCMReconcile) error { return a.SCM.Reconcile(ctx, j.ConnectionID) }),
 		reg(time.Minute, func(ctx context.Context, j jobs.SCMEnsureHook) error { return a.SCM.EnsureHook(ctx, j.RepositoryID) }),
+		reg(2*time.Minute, func(ctx context.Context, j jobs.SCMDeployment) error {
+			return a.SCM.ResolveDeployment(ctx, j.DeploymentID)
+		}),
 		reg(30*time.Minute, func(ctx context.Context, j jobs.WorkflowMigrate) error {
 			n, err := a.Tracker.MigrateWorkflowIssues(ctx, j.WorkflowID, j.Mapping)
 			a.Log.Info("workflow migration", "workflow", j.WorkflowID, "issues", n, "error", err)

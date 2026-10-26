@@ -115,6 +115,12 @@ function describeWhen(t: Trigger, s: string): string {
       return `When a branch is created for ${s}`;
     case "pipeline.completed":
       return `When a pipeline for ${s} completes`;
+    case "deployment.completed": {
+      const where = t.environment ? ` to ${t.environment}` : "";
+      if (t.status === "success") return `When ${s} is deployed${where}`;
+      if (t.status === "failed") return `When a deployment of ${s}${where} fails`;
+      return `When a deployment of ${s}${where} completes`;
+    }
     case "schedule":
       return `${cronLabel(t.cron)}, for issues matching “${t.jql ?? ""}”`;
     case "sla.breached":

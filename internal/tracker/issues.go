@@ -576,8 +576,8 @@ func (s *Service) UpdateIssue(ctx context.Context, actor *authz.Actor, ref strin
 			if err != nil {
 				return err
 			}
-			if releaseNames(before) != releaseNames(after) {
-				record("fixVersions", strp(releaseNames(before)), strp(releaseNames(after)), nil, nil)
+			if releaseRefs(before) != releaseRefs(after) {
+				record("fixVersions", strp(releaseNames(before)), strp(releaseNames(after)), strp(releaseRefs(before)), strp(releaseRefs(after)))
 			}
 		}
 
@@ -927,6 +927,16 @@ func releaseNames(rs []dbq.Release) string {
 		names[i] = r.Name
 	}
 	return strings.Join(names, ", ")
+}
+
+// releaseRefs is the history ref of an issue's fix versions: their ids, comma-separated, so a
+// release's burnup still finds its changes after it is renamed.
+func releaseRefs(rs []dbq.Release) string {
+	ids := make([]string, len(rs))
+	for i, r := range rs {
+		ids[i] = r.ID.String()
+	}
+	return strings.Join(ids, ",")
 }
 
 // rankBetween computes a rank to place an issue after `after` or before `before`, using the

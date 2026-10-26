@@ -94,7 +94,7 @@ WHERE i.sprint_id = $1;
 -- Releases
 
 -- name: ListReleases :many
-SELECT r.*,
+SELECT sqlc.embed(r),
     (SELECT count(*) FROM issue_releases ir WHERE ir.release_id = r.id)::int AS issue_count,
     (SELECT count(*) FROM issue_releases ir JOIN issues i ON i.id = ir.issue_id JOIN statuses s ON s.id = i.status_id
        WHERE ir.release_id = r.id AND s.category = 'done')::int AS done_count

@@ -232,7 +232,7 @@ const createRelease = `-- name: CreateRelease :one
 INSERT INTO releases (project_id, name, description, start_date, release_date, position)
 VALUES ($1, $2, $3, $4, $5,
         (SELECT coalesce(max(position), 0) + 1 FROM releases WHERE project_id = $1))
-RETURNING id, project_id, name, description, start_date, release_date, state, released_at, position, created_at
+RETURNING id, project_id, name, description, start_date, release_date, state, released_at, position, created_at, notes, notes_published_at, tag_repository_id, tag_name, tag_sha, tag_linked_at
 `
 
 type CreateReleaseParams struct {
@@ -263,6 +263,12 @@ func (q *Queries) CreateRelease(ctx context.Context, arg CreateReleaseParams) (R
 		&i.ReleasedAt,
 		&i.Position,
 		&i.CreatedAt,
+		&i.Notes,
+		&i.NotesPublishedAt,
+		&i.TagRepositoryID,
+		&i.TagName,
+		&i.TagSha,
+		&i.TagLinkedAt,
 	)
 	return i, err
 }
@@ -369,7 +375,7 @@ func (q *Queries) GetBoard(ctx context.Context, id uuid.UUID) (Board, error) {
 }
 
 const getRelease = `-- name: GetRelease :one
-SELECT id, project_id, name, description, start_date, release_date, state, released_at, position, created_at FROM releases WHERE id = $1
+SELECT id, project_id, name, description, start_date, release_date, state, released_at, position, created_at, notes, notes_published_at, tag_repository_id, tag_name, tag_sha, tag_linked_at FROM releases WHERE id = $1
 `
 
 func (q *Queries) GetRelease(ctx context.Context, id uuid.UUID) (Release, error) {
@@ -386,12 +392,18 @@ func (q *Queries) GetRelease(ctx context.Context, id uuid.UUID) (Release, error)
 		&i.ReleasedAt,
 		&i.Position,
 		&i.CreatedAt,
+		&i.Notes,
+		&i.NotesPublishedAt,
+		&i.TagRepositoryID,
+		&i.TagName,
+		&i.TagSha,
+		&i.TagLinkedAt,
 	)
 	return i, err
 }
 
 const getReleasesByIDs = `-- name: GetReleasesByIDs :many
-SELECT id, project_id, name, description, start_date, release_date, state, released_at, position, created_at FROM releases WHERE id = ANY($1::uuid[])
+SELECT id, project_id, name, description, start_date, release_date, state, released_at, position, created_at, notes, notes_published_at, tag_repository_id, tag_name, tag_sha, tag_linked_at FROM releases WHERE id = ANY($1::uuid[])
 `
 
 func (q *Queries) GetReleasesByIDs(ctx context.Context, ids []uuid.UUID) ([]Release, error) {
@@ -414,6 +426,12 @@ func (q *Queries) GetReleasesByIDs(ctx context.Context, ids []uuid.UUID) ([]Rele
 			&i.ReleasedAt,
 			&i.Position,
 			&i.CreatedAt,
+			&i.Notes,
+			&i.NotesPublishedAt,
+			&i.TagRepositoryID,
+			&i.TagName,
+			&i.TagSha,
+			&i.TagLinkedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -607,7 +625,7 @@ func (q *Queries) ListBoards(ctx context.Context, projectID uuid.UUID) ([]Board,
 
 const listReleases = `-- name: ListReleases :many
 
-SELECT r.id, r.project_id, r.name, r.description, r.start_date, r.release_date, r.state, r.released_at, r.position, r.created_at,
+SELECT r.id, r.project_id, r.name, r.description, r.start_date, r.release_date, r.state, r.released_at, r.position, r.created_at, r.notes, r.notes_published_at, r.tag_repository_id, r.tag_name, r.tag_sha, r.tag_linked_at,
     (SELECT count(*) FROM issue_releases ir WHERE ir.release_id = r.id)::int AS issue_count,
     (SELECT count(*) FROM issue_releases ir JOIN issues i ON i.id = ir.issue_id JOIN statuses s ON s.id = i.status_id
        WHERE ir.release_id = r.id AND s.category = 'done')::int AS done_count
@@ -615,18 +633,9 @@ FROM releases r WHERE r.project_id = $1 ORDER BY r.state = 'archived', r.positio
 `
 
 type ListReleasesRow struct {
-	ID          uuid.UUID
-	ProjectID   uuid.UUID
-	Name        string
-	Description string
-	StartDate   *time.Time
-	ReleaseDate *time.Time
-	State       string
-	ReleasedAt  *time.Time
-	Position    int32
-	CreatedAt   time.Time
-	IssueCount  int32
-	DoneCount   int32
+	Release    Release
+	IssueCount int32
+	DoneCount  int32
 }
 
 // ---------------------------------------------------------------------------
@@ -641,16 +650,22 @@ func (q *Queries) ListReleases(ctx context.Context, projectID uuid.UUID) ([]List
 	for rows.Next() {
 		var i ListReleasesRow
 		if err := rows.Scan(
-			&i.ID,
-			&i.ProjectID,
-			&i.Name,
-			&i.Description,
-			&i.StartDate,
-			&i.ReleaseDate,
-			&i.State,
-			&i.ReleasedAt,
-			&i.Position,
-			&i.CreatedAt,
+			&i.Release.ID,
+			&i.Release.ProjectID,
+			&i.Release.Name,
+			&i.Release.Description,
+			&i.Release.StartDate,
+			&i.Release.ReleaseDate,
+			&i.Release.State,
+			&i.Release.ReleasedAt,
+			&i.Release.Position,
+			&i.Release.CreatedAt,
+			&i.Release.Notes,
+			&i.Release.NotesPublishedAt,
+			&i.Release.TagRepositoryID,
+			&i.Release.TagName,
+			&i.Release.TagSha,
+			&i.Release.TagLinkedAt,
 			&i.IssueCount,
 			&i.DoneCount,
 		); err != nil {
@@ -936,7 +951,7 @@ func (q *Queries) UpdateBoard(ctx context.Context, arg UpdateBoardParams) (Board
 const updateRelease = `-- name: UpdateRelease :one
 UPDATE releases SET name = $2, description = $3, start_date = $4, release_date = $5, state = $6,
     released_at = CASE WHEN $6 = 'released' THEN coalesce(released_at, now()) ELSE released_at END
-WHERE id = $1 RETURNING id, project_id, name, description, start_date, release_date, state, released_at, position, created_at
+WHERE id = $1 RETURNING id, project_id, name, description, start_date, release_date, state, released_at, position, created_at, notes, notes_published_at, tag_repository_id, tag_name, tag_sha, tag_linked_at
 `
 
 type UpdateReleaseParams struct {
@@ -969,6 +984,12 @@ func (q *Queries) UpdateRelease(ctx context.Context, arg UpdateReleaseParams) (R
 		&i.ReleasedAt,
 		&i.Position,
 		&i.CreatedAt,
+		&i.Notes,
+		&i.NotesPublishedAt,
+		&i.TagRepositoryID,
+		&i.TagName,
+		&i.TagSha,
+		&i.TagLinkedAt,
 	)
 	return i, err
 }

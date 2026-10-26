@@ -96,6 +96,8 @@ func TestCompileFields(t *testing.T) {
 		`labels is EMPTY`:                              {"cardinality(i.labels) = 0"},
 		`sprint in openSprints()`:                      {"sprints WHERE state = $2::text"},
 		`fixVersion in unreleasedVersions()`:           {"r.state = $2::text"},
+		`deployedTo = production`:                      {"deployment_issues di", "d.status = 'success'", "lower(d.environment) = lower($2::text)"},
+		`deployedTo is EMPTY`:                          {"NOT EXISTS (SELECT 1 FROM deployment_issues di"},
 		`parent = PLAT-1`:                              {"i.parent_id IN (SELECT x.id FROM issues x WHERE x.number = $2::int"},
 		`key > PLAT-10`:                                {"i.number > $3::int"},
 		`text ~ "login bug"`:                           {"websearch_to_tsquery('simple', $2::text)", "issue_search_document_english(i.summary, i.description) @@ websearch_to_tsquery('english', $2::text)"},

@@ -888,7 +888,7 @@ func (q *Queries) IssueLinks(ctx context.Context, sourceID uuid.UUID) ([]IssueLi
 
 const issueReleases = `-- name: IssueReleases :many
 
-SELECT r.id, r.project_id, r.name, r.description, r.start_date, r.release_date, r.state, r.released_at, r.position, r.created_at FROM releases r JOIN issue_releases ir ON ir.release_id = r.id WHERE ir.issue_id = $1 ORDER BY r.position, r.name
+SELECT r.id, r.project_id, r.name, r.description, r.start_date, r.release_date, r.state, r.released_at, r.position, r.created_at, r.notes, r.notes_published_at, r.tag_repository_id, r.tag_name, r.tag_sha, r.tag_linked_at FROM releases r JOIN issue_releases ir ON ir.release_id = r.id WHERE ir.issue_id = $1 ORDER BY r.position, r.name
 `
 
 // ---------------------------------------------------------------------------
@@ -913,6 +913,12 @@ func (q *Queries) IssueReleases(ctx context.Context, issueID uuid.UUID) ([]Relea
 			&i.ReleasedAt,
 			&i.Position,
 			&i.CreatedAt,
+			&i.Notes,
+			&i.NotesPublishedAt,
+			&i.TagRepositoryID,
+			&i.TagName,
+			&i.TagSha,
+			&i.TagLinkedAt,
 		); err != nil {
 			return nil, err
 		}

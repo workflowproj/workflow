@@ -103,7 +103,7 @@ stream for one project (cookie or token auth); `?projects=PLAT,OPS` follows seve
 lists the projects followed. Event names are domain events —
 `issue.created`, `issue.updated`, `issue.transitioned`, `issue.deleted`, `comment.created`,
 `sprint.started`, `sprint.completed`, `release.released`, `board.updated`, development activity
-(`pr.opened`, `commit.pushed`, …) — with data `{type, projectId, issueId, issueKey, actorId}`.
+(`pr.opened`, `commit.pushed`, `deployment.completed`, …) — with data `{type, projectId, issueId, issueKey, actorId}`.
 Fetch the resource for its new state. A comment line is sent every 25 seconds to keep proxies
 from closing the connection.
 

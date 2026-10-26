@@ -37,6 +37,7 @@ fixVersion = "2026.11" AND statusCategory != Done
 | `labels` (`label`) | `=` `!=` `in` `not in` `is [not] EMPTY` | label |
 | `sprint` | `=` `!=` `in` `not in` `is [not] EMPTY` | sprint name or id, `openSprints()`, `futureSprints()`, `closedSprints()` |
 | `fixVersion` (`release`, `version`) | `=` `!=` `in` `not in` `is [not] EMPTY` | release name, `releasedVersions()`, `unreleasedVersions()` |
+| `deployedTo` | `=` `!=` `in` `not in` `is [not] EMPTY` | environment name (any case): issues a successful deployment there contained (see [scm.md](scm.md#deployments)); `EMPTY` for issues never deployed |
 | `parent` | `=` `!=` `in` `is [not] EMPTY` | issue key: the direct parent |
 | `epic` (`epicLink`) | `=` `!=` `in` `is [not] EMPTY` | epic key: everything under the epic, sub-tasks included |
 | `issueLinkType` | `=` `!=` `in` `not in` `is [not] EMPTY` | `blocks`, `"is blocked by"`, `relates`, `duplicates`, `"is duplicated by"`, `clones`, `"is cloned by"` — issues with such a link |

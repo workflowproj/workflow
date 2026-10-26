@@ -6,6 +6,8 @@ package scm
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -91,6 +93,24 @@ type (
 		Added   []RepoRef
 		Removed []RepoRef
 	}
+	// TagEvent reports a new tag; SHA is its commit when the provider sends it.
+	TagEvent struct {
+		Repo RepoRef
+		Name string
+		SHA  string
+	}
+	// DeploymentEvent reports a deployment's status.
+	DeploymentEvent struct {
+		Repo        RepoRef
+		ID          string
+		Environment string
+		Ref         string
+		SHA         string
+		Status      string // pending | running | success | failed | canceled
+		URL         string
+		Deployer    string
+		At          time.Time
+	}
 )
 
 // Delivery is the identity of an inbound webhook.
@@ -121,6 +141,47 @@ type Client interface {
 	CreateBranch(ctx context.Context, repo RepoRef, name, from string) error
 	// EnsureHook creates a project webhook (GitLab Free); returns the hook id. GitHub Apps use the app-level hook.
 	EnsureHook(ctx context.Context, repo RepoRef, url, secret string) (string, error)
+	// CommitsBetween lists the commits in head that base lacks, oldest first, keeping the newest
+	// `limit` (truncated says some were left out). Without a base it returns the head commit.
+	CommitsBetween(ctx context.Context, repo RepoRef, base, head string, limit int) ([]Commit, bool, error)
+}
+
+// APIError is an unsuccessful answer from a provider's API.
+type APIError struct {
+	Provider, Method, Path string
+	Status                 int
+	Body                   string
+}
+
+func (e *APIError) Error() string {
+	return fmt.Sprintf("%s %s %s: HTTP %d: %s", e.Provider, e.Method, e.Path, e.Status, e.Body)
+}
+
+// apiError builds an APIError from a response body (trimmed to what a log line needs).
+func apiError(provider, method, path string, status int, raw []byte) error {
+	return &APIError{Provider: provider, Method: method, Path: path, Status: status, Body: strings.TrimSpace(string(raw[:min(len(raw), 300)]))}
+}
+
+// IsAPIStatus reports an APIError with one of the given HTTP statuses.
+func IsAPIStatus(err error, statuses ...int) bool {
+	var e *APIError
+	if !errors.As(err, &e) {
+		return false
+	}
+	for _, s := range statuses {
+		if e.Status == s {
+			return true
+		}
+	}
+	return false
+}
+
+// newest keeps the last `limit` commits of an oldest-first list, saying whether any were dropped.
+func newest(commits []Commit, limit int) ([]Commit, bool) {
+	if limit <= 0 || len(commits) <= limit {
+		return commits, false
+	}
+	return commits[len(commits)-limit:], true
 }
 
 // keyPattern matches a candidate key; the character after it is checked separately (RE2 has no
