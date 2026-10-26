@@ -74,9 +74,6 @@ GROUP BY h.issue_id;
 -- name: DeleteSprint :exec
 DELETE FROM sprints WHERE id = $1;
 
--- name: CountSprints :one
-SELECT count(*) FROM sprints WHERE project_id = $1;
-
 -- name: MoveOpenSprintIssues :execrows
 -- Unfinished issues (not in a done status) leave a completed sprint.
 UPDATE issues SET sprint_id = sqlc.narg(target_sprint_id), version = version + 1, updated_at = now()

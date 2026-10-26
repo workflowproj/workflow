@@ -3912,6 +3912,11 @@ export interface components {
         /** @enum {string} */
         SprintState: "future" | "active" | "closed";
         SprintInput: {
+            /**
+             * @description Creating a sprint without a name continues the project's numbering: the latest
+             *     sprint's name with its trailing number plus one ("Sprint 24" → "Sprint 25"), else
+             *     "<KEY> Sprint <n>".
+             */
             name?: string;
             goal?: string;
             /** Format: date */

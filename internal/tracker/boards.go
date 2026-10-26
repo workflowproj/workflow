@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -421,11 +423,11 @@ func (s *Service) CreateSprint(ctx context.Context, actor *authz.Actor, ref stri
 		name = strings.TrimSpace(*in.Name)
 	}
 	if name == "" {
-		n, err := s.Q.CountSprints(ctx, p.ID)
+		sprints, err := s.Q.ListSprints(ctx, dbq.ListSprintsParams{ProjectID: p.ID})
 		if err != nil {
 			return dbq.Sprint{}, err
 		}
-		name = fmt.Sprintf("%s Sprint %d", p.Key, n+1)
+		name = nextSprintName(p.Key, sprints)
 	}
 	goal := ""
 	if in.Goal != nil {
@@ -441,6 +443,36 @@ func (s *Service) CreateSprint(ctx context.Context, actor *authz.Actor, ref stri
 		return s.emit(ctx, tx, actor, p, nil, "board.updated", nil)
 	})
 	return sp, err
+}
+
+var trailingNumber = regexp.MustCompile(`^(.*\D)?(\d+)$`)
+
+// nextSprintName names a sprint created without a name after the project's latest sprint:
+// its trailing number goes up by one ("Sprint 24" → "Sprint 25", "S09" → "S10"). When the
+// latest name has no number (or there are no sprints) it is "<KEY> Sprint <count+1>". Names
+// already taken are skipped.
+func nextSprintName(projectKey string, sprints []dbq.Sprint) string {
+	taken := map[string]bool{}
+	var latest *dbq.Sprint
+	for i := range sprints {
+		sp := &sprints[i]
+		taken[strings.ToLower(strings.TrimSpace(sp.Name))] = true
+		if latest == nil || sp.Position > latest.Position || (sp.Position == latest.Position && sp.CreatedAt.After(latest.CreatedAt)) {
+			latest = sp
+		}
+	}
+	prefix, n, width := projectKey+" Sprint ", len(sprints)+1, 0
+	if latest != nil {
+		if m := trailingNumber.FindStringSubmatch(strings.TrimSpace(latest.Name)); m != nil && len(m[2]) <= 9 {
+			v, _ := strconv.Atoi(m[2])
+			prefix, n, width = m[1], v+1, len(m[2])
+		}
+	}
+	name := func() string { return fmt.Sprintf("%s%0*d", prefix, width, n) }
+	for taken[strings.ToLower(name())] {
+		n++
+	}
+	return name()
 }
 
 func (s *Service) sprintForManage(ctx context.Context, actor *authz.Actor, id uuid.UUID) (dbq.Sprint, dbq.Project, error) {

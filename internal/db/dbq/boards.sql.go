@@ -142,17 +142,6 @@ func (q *Queries) CompleteSprint(ctx context.Context, id uuid.UUID) (Sprint, err
 	return i, err
 }
 
-const countSprints = `-- name: CountSprints :one
-SELECT count(*) FROM sprints WHERE project_id = $1
-`
-
-func (q *Queries) CountSprints(ctx context.Context, projectID uuid.UUID) (int64, error) {
-	row := q.db.QueryRow(ctx, countSprints, projectID)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
 const createBoard = `-- name: CreateBoard :one
 INSERT INTO boards (project_id, name, type, filter_jql, swimlanes, done_retention_days, position)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
