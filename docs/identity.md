@@ -280,6 +280,8 @@ re-hashed at the next sign-in if those parameters change.
   same, and takes as long, whether or not the address has an account; at most three emails per
   address per 15 minutes. Resetting signs the person out everywhere and emails them; two-factor
   authentication still applies at the next sign-in. Admins can also *Send password reset*.
+  Without an email server (`WFM_SMTP_HOST` unset) the page doesn't offer to send a link and
+  points to an administrator instead (`GET /auth/providers` reports `emailDelivery`).
 
 **Two-factor authentication** (TOTP, RFC 6238: SHA-1, 30-second steps, 6 digits, ±1 step for clock
 drift, each code accepted once). Profile → Sign-in and security → *Set up*: scan the QR code (or

@@ -110,6 +110,7 @@ func TestLocalAccountLifecycle(t *testing.T) {
 	var providers obj
 	e.anon().get("/api/v1/auth/providers", &providers)
 	eq(t, providers["localLogin"], any(true), "local login advertised")
+	eq(t, providers["emailDelivery"], any(false), "no SMTP server: reset and sign-up pages say no email is sent")
 
 	// An admin adds a person (with a group) and invites them.
 	var group obj
@@ -414,6 +415,9 @@ func TestLocalAccountAdministration(t *testing.T) {
 func TestInvitationsSayWhetherTheyWereEmailed(t *testing.T) {
 	// Nothing is delivered: the test runs no jobs.
 	e := newEnv(t, withEnv("WFM_SMTP_HOST", "127.0.0.1"), withEnv("WFM_SMTP_PORT", "9"))
+	var providers obj
+	e.anon().get("/api/v1/auth/providers", &providers)
+	eq(t, providers["emailDelivery"], any(true), "the sign-in pages know email is sent")
 	admin, agent := serviceDesk(t, e, "HELP")
 	var u, inv obj
 	admin.must("POST", "/api/v1/admin/users", obj{"displayName": "Ivy Invitee", "email": "ivy@example.com"}, 201, &u)

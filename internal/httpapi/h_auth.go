@@ -18,7 +18,7 @@ func meView(u dbq.User, orgRole string) api.Me {
 }
 
 func (s *Server) ListAuthProviders(ctx context.Context, _ api.ListAuthProvidersRequestObject) (api.ListAuthProvidersResponseObject, error) {
-	out := api.ListAuthProviders200JSONResponse{Providers: []api.AuthProvider{}, DevLogin: s.Cfg.DevLogin, LocalLogin: s.Cfg.Local.Enabled}
+	out := api.ListAuthProviders200JSONResponse{Providers: []api.AuthProvider{}, DevLogin: s.Cfg.DevLogin, LocalLogin: s.Cfg.Local.Enabled, EmailDelivery: s.Cfg.SMTP.Delivers()}
 	for _, p := range s.Cfg.OIDCProviders {
 		out.Providers = append(out.Providers, api.AuthProvider{Id: p.ID, Name: p.DisplayName, LoginUrl: "/auth/" + p.ID + "/login"})
 	}

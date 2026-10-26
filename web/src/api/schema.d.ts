@@ -3127,6 +3127,11 @@ export interface components {
             devLogin: boolean;
             /** @description Email and password sign-in for local accounts (WFM_LOCAL_LOGIN) */
             localLogin: boolean;
+            /**
+             * @description The server sends email (WFM_SMTP_HOST is set). Without it, password reset links and help
+             *     centre sign-up links reach nobody, so those pages say to ask an administrator or the team.
+             */
+            emailDelivery: boolean;
         };
         AuthProvider: {
             id: string;

@@ -3,7 +3,7 @@ import { getRouteApi, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowDown, ArrowUp, ListFilter, Megaphone, Pencil, Plus, Trash2 } from "lucide-react";
 import { api, ApiError, unwrap } from "@/api/client";
-import { projectsQuery } from "@/api/queries";
+import { projectsQuery, providersQuery } from "@/api/queries";
 import { Button, EmptyState, Field, IconButton, Input, Modal, PageHeader, PageSpinner, Select, Textarea, useConfirm, useToast } from "@/components/ui";
 import { ErrorBox } from "@/components/ErrorBox";
 import { Callout, CopyField, SettingsSection, Switch } from "@/features/settings/common";
@@ -134,6 +134,7 @@ function PortalForm({ desk }: { desk: ServiceDesk }) {
   const errs = save.error instanceof ApiError ? save.error.fieldErrors() : {};
   const dirty = name !== desk.portalName || description !== desk.portalDescription || access !== desk.portalAccess || selfSignup !== desk.selfSignup;
   const signupUrl = new URL(`/portal/signup/${desk.projectKey}`, desk.portalUrl).toString();
+  const emailDelivery = useQuery(providersQuery).data?.emailDelivery;
   return (
     <>
       {desk.openProject && (
@@ -194,6 +195,11 @@ function PortalForm({ desk }: { desk: ServiceDesk }) {
               <p className="text-[13px] text-muted">
                 Anyone with the sign-up link can create a customer account after confirming their email address. Needs password sign-in (local accounts) to be enabled.
               </p>
+              {selfSignup && emailDelivery === false && (
+                <Callout tone="warning" title="Sign-up needs email">
+                  Signing up emails a link to choose a password, and this server doesn't send email (WFM_SMTP_HOST isn't set). The sign-up page says so and asks people for an invitation instead.
+                </Callout>
+              )}
               {desk.selfSignup && <CopyField value={signupUrl} label="Copy sign-up link" />}
             </div>
           </div>

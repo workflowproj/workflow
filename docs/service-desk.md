@@ -43,6 +43,9 @@ Project settings → Help centre → *Who can raise requests*:
 to them, so the address is confirmed before the account can be used; an address that already
 has an account gets an email saying so instead (the page answers the same either way, so it
 does not reveal who has an account), and only customer accounts are added to the desk that way.
+Without an email server (`WFM_SMTP_HOST` unset) that link would reach nobody, so the sign-up page
+says sign-up is not available and asks people for an invitation; the help centre settings warn
+about it next to the switch.
 Addresses in the organisation's sign-in domains (`WFM_ALLOWED_DOMAINS` or a provider's own) can't
 sign up: those people get their account from the identity provider. Sign-ups are throttled like
 password resets.

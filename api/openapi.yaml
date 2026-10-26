@@ -3839,13 +3839,18 @@ components:
 
     AuthProviders:
       type: object
-      required: [providers, devLogin, localLogin]
+      required: [providers, devLogin, localLogin, emailDelivery]
       properties:
         providers:
           type: array
           items: { $ref: '#/components/schemas/AuthProvider' }
         devLogin: { type: boolean }
         localLogin: { type: boolean, description: Email and password sign-in for local accounts (WFM_LOCAL_LOGIN) }
+        emailDelivery:
+          type: boolean
+          description: |
+            The server sends email (WFM_SMTP_HOST is set). Without it, password reset links and help
+            centre sign-up links reach nobody, so those pages say to ask an administrator or the team.
     AuthProvider:
       type: object
       required: [id, name, loginUrl]
