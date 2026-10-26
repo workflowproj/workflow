@@ -334,6 +334,7 @@ type IssueType struct {
 	Position    int32
 	WorkflowID  uuid.UUID
 	CreatedAt   time.Time
+	Kind        string
 }
 
 type JiraImport struct {
@@ -470,17 +471,18 @@ type OauthToken struct {
 }
 
 type Project struct {
-	ID           uuid.UUID
-	Key          string
-	Name         string
-	Description  string
-	LeadID       *uuid.UUID
-	Template     string
-	OpenRoleID   *uuid.UUID
-	IssueCounter int32
-	ArchivedAt   *time.Time
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	ID             uuid.UUID
+	Key            string
+	Name           string
+	Description    string
+	LeadID         *uuid.UUID
+	Template       string
+	OpenRoleID     *uuid.UUID
+	IssueCounter   int32
+	ArchivedAt     *time.Time
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	RisksDecisions bool
 }
 
 type ProjectKeyAlias struct {

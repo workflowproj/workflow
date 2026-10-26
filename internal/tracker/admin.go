@@ -70,6 +70,9 @@ func (s *Service) CreateField(ctx context.Context, actor *authz.Actor, in FieldI
 	if !actor.IsOrgAdmin() {
 		return dbq.FieldDefinition{}, apperr.Forbidden("only organisation admins can define custom fields")
 	}
+	if IsReservedField(in.Key) {
+		return dbq.FieldDefinition{}, apperr.Conflict("field_reserved", "the key %q is reserved for risks and decisions", in.Key)
+	}
 	params, err := s.fieldParams(ctx, in)
 	if err != nil {
 		return dbq.FieldDefinition{}, err
@@ -92,6 +95,9 @@ func (s *Service) UpdateField(ctx context.Context, actor *authz.Actor, id uuid.U
 	if err != nil {
 		return cur, apperr.NotFound("field")
 	}
+	if IsReservedField(cur.Key) {
+		return cur, apperr.Conflict("field_reserved", "%s belongs to risks and decisions; turn the section on or off in a project's settings instead", cur.Name)
+	}
 	if cur.Key != in.Key || cur.Type != in.Type {
 		return cur, apperr.Invalid("key", "the key and type of a field cannot change once created")
 	}
@@ -112,6 +118,9 @@ func (s *Service) DeleteField(ctx context.Context, actor *authz.Actor, id uuid.U
 	f, err := s.Q.GetFieldDefinition(ctx, id)
 	if err != nil {
 		return apperr.NotFound("field")
+	}
+	if IsReservedField(f.Key) {
+		return apperr.Conflict("field_reserved", "%s belongs to risks and decisions and cannot be deleted", f.Name)
 	}
 	// Values stay in issues.fields; they simply stop being shown or searchable.
 	if err := s.Q.DeleteFieldDefinition(ctx, id); err != nil {

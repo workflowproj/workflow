@@ -924,6 +924,87 @@ func (q *Queries) IssueReleases(ctx context.Context, issueID uuid.UUID) ([]Relea
 	return items, nil
 }
 
+const linkedWorkProgress = `-- name: LinkedWorkProgress :many
+SELECT l.target_id, count(*)::int AS total, count(*) FILTER (WHERE s.category = 'done')::int AS done
+FROM issue_links l
+JOIN issues o ON o.id = l.source_id
+JOIN statuses s ON s.id = o.status_id
+WHERE l.target_id = ANY($1::uuid[]) AND l.link_type = $2
+GROUP BY l.target_id
+`
+
+type LinkedWorkProgressParams struct {
+	Ids      []uuid.UUID
+	LinkType string
+}
+
+type LinkedWorkProgressRow struct {
+	TargetID uuid.UUID
+	Total    int32
+	Done     int32
+}
+
+// For each target, how many issues link to it with a link type and how many of those are done
+// (mitigating work of a risk, implementing work of a decision).
+func (q *Queries) LinkedWorkProgress(ctx context.Context, arg LinkedWorkProgressParams) ([]LinkedWorkProgressRow, error) {
+	rows, err := q.db.Query(ctx, linkedWorkProgress, arg.Ids, arg.LinkType)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []LinkedWorkProgressRow{}
+	for rows.Next() {
+		var i LinkedWorkProgressRow
+		if err := rows.Scan(&i.TargetID, &i.Total, &i.Done); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const linksOfType = `-- name: LinksOfType :many
+SELECT id, source_id, target_id, link_type, created_by, created_at FROM issue_links
+WHERE link_type = $1 AND (source_id = ANY($2::uuid[]) OR target_id = ANY($2::uuid[]))
+ORDER BY created_at
+`
+
+type LinksOfTypeParams struct {
+	LinkType string
+	Ids      []uuid.UUID
+}
+
+// Links of one type that touch any of the issues, oldest first.
+func (q *Queries) LinksOfType(ctx context.Context, arg LinksOfTypeParams) ([]IssueLink, error) {
+	rows, err := q.db.Query(ctx, linksOfType, arg.LinkType, arg.Ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []IssueLink{}
+	for rows.Next() {
+		var i IssueLink
+		if err := rows.Scan(
+			&i.ID,
+			&i.SourceID,
+			&i.TargetID,
+			&i.LinkType,
+			&i.CreatedBy,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listAttachments = `-- name: ListAttachments :many
 SELECT id, issue_id, uploader_id, filename, content_type, size_bytes, object_key, created_at, public FROM attachments WHERE issue_id = $1 ORDER BY created_at
 `
@@ -1255,6 +1336,68 @@ func (q *Queries) PrevRanksBefore(ctx context.Context, arg PrevRanksBeforeParams
 	for rows.Next() {
 		var i PrevRanksBeforeRow
 		if err := rows.Scan(&i.ID, &i.Rank); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const projectIssuesOfKind = `-- name: ProjectIssuesOfKind :many
+SELECT i.id, i.project_id, i.number, i.type_id, i.parent_id, i.summary, i.description, i.status_id, i.workflow_version_id, i.priority, i.assignee_id, i.reporter_id, i.sprint_id, i.story_points, i.start_date, i.due_date, i.labels, i.resolution, i.resolved_at, i.fields, i.rank, i.version, i.created_at, i.updated_at, i.status_changed_at, i.original_estimate_seconds, i.remaining_estimate_seconds FROM issues i JOIN issue_types t ON t.id = i.type_id
+WHERE i.project_id = $1 AND t.kind = $2
+ORDER BY i.number DESC
+LIMIT $3
+`
+
+type ProjectIssuesOfKindParams struct {
+	ProjectID uuid.UUID
+	Kind      string
+	Lim       int32
+}
+
+// A project's issues of one issue-type kind (risks, decisions), newest first.
+func (q *Queries) ProjectIssuesOfKind(ctx context.Context, arg ProjectIssuesOfKindParams) ([]Issue, error) {
+	rows, err := q.db.Query(ctx, projectIssuesOfKind, arg.ProjectID, arg.Kind, arg.Lim)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Issue{}
+	for rows.Next() {
+		var i Issue
+		if err := rows.Scan(
+			&i.ID,
+			&i.ProjectID,
+			&i.Number,
+			&i.TypeID,
+			&i.ParentID,
+			&i.Summary,
+			&i.Description,
+			&i.StatusID,
+			&i.WorkflowVersionID,
+			&i.Priority,
+			&i.AssigneeID,
+			&i.ReporterID,
+			&i.SprintID,
+			&i.StoryPoints,
+			&i.StartDate,
+			&i.DueDate,
+			&i.Labels,
+			&i.Resolution,
+			&i.ResolvedAt,
+			&i.Fields,
+			&i.Rank,
+			&i.Version,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.StatusChangedAt,
+			&i.OriginalEstimateSeconds,
+			&i.RemainingEstimateSeconds,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

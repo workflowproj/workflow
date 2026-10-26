@@ -139,6 +139,19 @@ func TestMCPServer(t *testing.T) {
 	wantContains(t, mustCall(t, cs, "get_board", obj{"projectKey": "AI"}), "No active sprint")
 	wantContains(t, mustCall(t, cs, "find_users", obj{"query": "bob"}), "Bob <bob@example.com>")
 
+	// Risks take custom fields; links read either way round.
+	wantContains(t, mustCall(t, cs, "get_project", obj{"key": "AI"}), "risk — Risk (risk register", "Risks and decisions are on")
+	wantContains(t, mustCall(t, cs, "create_issue", obj{"projectKey": "AI", "type": "risk", "summary": "Model costs double", "fields": obj{"risk_likelihood": 3, "risk_impact": 4}}), "Created AI-3")
+	eq(t, str(ada.issue("AI-3")["fields"].(obj), "risk_rating"), "High", "scored from the tool's fields")
+	mustCall(t, cs, "update_issue", obj{"key": "AI-3", "fields": obj{"risk_response": "Reduce"}})
+	mustCall(t, cs, "link_issues", obj{"key": "AI-3", "type": "is mitigated by", "targetKey": "AI-2"})
+	wantContains(t, mustCall(t, cs, "get_issue", obj{"key": "AI-2"}), "mitigates AI-3")
+	_, isErr = call(t, cs, "link_issues", obj{"key": "AI-3", "type": "mitigates", "targetKey": "AI-2"})
+	if !isErr {
+		t.Fatal("a risk mitigates nothing")
+	}
+	wantContains(t, mustCall(t, cs, "search_issues", obj{"jql": `kind = risk AND "Risk score" >= 10`}), "1 issue match", "AI-3 [Risk")
+
 	// The history records the token's owner, as in the UI.
 	var hist []obj
 	ada.get("/api/v1/issues/AI-1/history", &hist)

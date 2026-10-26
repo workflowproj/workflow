@@ -109,6 +109,9 @@ func TestCompileFields(t *testing.T) {
 		`"Severity score" >= 7`:                        {"(i.fields->>$2::text)::numeric >= $3::numeric"},
 		`cf[platforms] = ios`:                          {"jsonb_exists"},
 		`level <= 0`:                                   {"SELECT level FROM issue_types"},
+		`kind in (risk, Decision)`:                     {"issue_types WHERE kind = $2::text", "kind = $3::text"},
+		`issueLinkType = "is mitigated by"`:            {"l.target_id = i.id AND l.link_type = $2::text"},
+		`issue in linkedIssues("ADR-1", supersedes)`:   {"SELECT l.target_id FROM issue_links l WHERE l.link_type = $4::text AND l.source_id IN"},
 		`watcher = currentUser()`:                      {"watchers w"},
 		`resolution = Unresolved`:                      {"i.resolution IS NULL"},
 	}
@@ -118,6 +121,23 @@ func TestCompileFields(t *testing.T) {
 			if !strings.Contains(c.Where, w) {
 				t.Errorf("%q compiled to\n  %s\nmissing %q", src, c.Where, w)
 			}
+		}
+	}
+}
+
+func TestKindsAndLinkTypes(t *testing.T) {
+	for _, src := range []string{`kind = chore`, `kind > risk`, `issueLinkType = mitigated`} {
+		if _, err := CompileString(src, Env{}, 1, nil); err == nil {
+			t.Errorf("%q compiled", src)
+		}
+	}
+	for phrase, want := range map[string]linkDescription{
+		"mitigates": {"mitigates", "source"}, "is mitigated by": {"mitigates", "target"},
+		"implements": {"implements", "source"}, "is implemented by": {"implements", "target"},
+		"supersedes": {"supersedes", "source"}, "is superseded by": {"supersedes", "target"},
+	} {
+		if got := linkDescriptions[normalize(phrase)]; got != want {
+			t.Errorf("%q = %+v, want %+v", phrase, got, want)
 		}
 	}
 }

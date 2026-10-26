@@ -318,7 +318,7 @@ func (s *Server) fieldView(ctx context.Context, f dbq.FieldDefinition) api.Field
 	if opts == nil {
 		opts = []string{}
 	}
-	v := api.FieldDefinition{Id: f.ID, Key: f.Key, Name: f.Name, Description: f.Description, Type: api.FieldType(f.Type), Options: opts}
+	v := api.FieldDefinition{Id: f.ID, Key: f.Key, Name: f.Name, Description: f.Description, Type: api.FieldType(f.Type), Options: opts, Reserved: tracker.IsReservedField(f.Key)}
 	if f.ProjectIds != nil {
 		ps, _ := s.Q.ListProjectsByIDs(ctx, f.ProjectIds)
 		keys := []string{}

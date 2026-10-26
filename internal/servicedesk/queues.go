@@ -17,9 +17,12 @@ import (
 // queueOrder sorts a queue without an ORDER BY: oldest first, like a line.
 var queueOrder = []search.Order{{Field: "created"}}
 
+// queueWork keeps a desk's risks and decisions (when it keeps them) out of its queues.
+var queueWork = []string{tracker.PlanningWork}
+
 func (s *Service) queueView(ctx context.Context, actor *authz.Actor, p dbq.Project, q dbq.ServiceQueue) api.Queue {
 	v := api.Queue{Id: q.ID, Name: q.Name, Jql: q.Jql, Position: int(q.Position)}
-	_, total, err := s.Tracker.SearchWith(ctx, actor, []uuid.UUID{p.ID}, tracker.SearchQuery{JQL: q.Jql, DefaultOrder: queueOrder, Limit: 1})
+	_, total, err := s.Tracker.SearchWith(ctx, actor, []uuid.UUID{p.ID}, tracker.SearchQuery{JQL: q.Jql, Extra: queueWork, DefaultOrder: queueOrder, Limit: 1})
 	if err != nil {
 		s.Log.Warn("queue count", "queue", q.ID, "error", err)
 	}
@@ -127,7 +130,7 @@ func (s *Service) QueueIssues(ctx context.Context, actor *authz.Actor, id uuid.U
 	if err != nil {
 		return api.QueueIssues{}, err
 	}
-	issues, total, err := s.Tracker.SearchWith(ctx, actor, []uuid.UUID{p.ID}, tracker.SearchQuery{JQL: q.Jql, DefaultOrder: queueOrder, Limit: limit, Offset: offset})
+	issues, total, err := s.Tracker.SearchWith(ctx, actor, []uuid.UUID{p.ID}, tracker.SearchQuery{JQL: q.Jql, Extra: queueWork, DefaultOrder: queueOrder, Limit: limit, Offset: offset})
 	if err != nil {
 		return api.QueueIssues{}, err
 	}

@@ -2,6 +2,7 @@ id: kanban
 name: Kanban
 description: Continuous flow with WIP limits; no sprints.
 boardType: kanban
+risksDecisions: true
 workflows:
   - name: Kanban flow
     description: Backlog → Selected for Development → In Progress → Done; move freely.

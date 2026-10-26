@@ -35,6 +35,7 @@ type MetricScope struct {
 }
 
 // scopeWhere compiles a scope into a SQL condition over issues aliased i; extraArgs are $2...
+// Metrics measure work: risks and decisions never count.
 func (s *Service) scopeWhere(ctx context.Context, actor *authz.Actor, sc MetricScope, extraArgs ...any) (string, []any, []dbq.Project, error) {
 	projects, err := s.projectsByKeys(ctx, actor, sc.Projects)
 	if err != nil {
@@ -45,7 +46,7 @@ func (s *Service) scopeWhere(ctx context.Context, actor *authz.Actor, sc MetricS
 		ids[i] = p.ID
 	}
 	where, _, args, err := s.compileWhere(ctx, s.Q, actor, ids, sc.JQL, extraArgs, nil)
-	return where, args, projects, err
+	return where + " AND " + PlanningWork, args, projects, err
 }
 
 func checkDays(days int) error {

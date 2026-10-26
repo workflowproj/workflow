@@ -322,6 +322,20 @@ func (s *Server) CreateIssueLink(ctx context.Context, req api.CreateIssueLinkReq
 	}, nil
 }
 
+func (s *Server) SupersedeDecision(ctx context.Context, req api.SupersedeDecisionRequestObject) (api.SupersedeDecisionResponseObject, error) {
+	a, err := actor(ctx)
+	if err != nil {
+		return nil, err
+	}
+	b := req.Body
+	i, err := s.Tracker.Supersede(ctx, a, req.IssueKey, b.SupersededByKey, b.Version, deref(b.Comment))
+	if err != nil {
+		return nil, err
+	}
+	d, err := s.detail(ctx, a, i)
+	return api.SupersedeDecision200JSONResponse(d), err
+}
+
 func (s *Server) DeleteIssueLink(ctx context.Context, req api.DeleteIssueLinkRequestObject) (api.DeleteIssueLinkResponseObject, error) {
 	a, err := actor(ctx)
 	if err != nil {
@@ -484,6 +498,11 @@ func (s *Server) GetSearchMetadata(ctx context.Context, _ api.GetSearchMetadataR
 			sf.Values = &[]string{"Highest", "High", "Medium", "Low", "Lowest"}
 		case "statusCategory":
 			sf.Values = &[]string{"To Do", "In Progress", "Done"}
+		case "kind":
+			sf.Values = &[]string{"work", "risk", "decision"}
+		case "issueLinkType":
+			sf.Values = &[]string{"blocks", "is blocked by", "relates", "duplicates", "is duplicated by", "clones", "is cloned by",
+				"mitigates", "is mitigated by", "implements", "is implemented by", "supersedes", "is superseded by"}
 		case "status":
 			sts, _ := s.Q.ListStatuses(ctx)
 			vals := []string{}

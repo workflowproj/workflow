@@ -1,0 +1,115 @@
+# The Risks and decisions section: the issue types of the risk and decision kinds, their
+# workflows and their fields. Not a project template: it is installed into a project when the
+# section is turned on (by its template or in its settings), skipping whatever is already there.
+workflows:
+  - name: Risk
+    description: Open → Mitigating → Closed with a resolution; reopen a risk that comes back.
+    statuses:
+      - { name: Open, category: todo }
+      - { name: Mitigating, category: in_progress }
+      - { name: Closed, category: done }
+    transitions:
+      - { name: Start mitigating, from: [Open], to: Mitigating }
+      - { name: Stop mitigating, from: [Mitigating], to: Open }
+      - name: Close
+        from: [Open, Mitigating]
+        to: Closed
+        screen:
+          - { field: resolution, required: true, options: [Mitigated, Accepted, Occurred, No longer relevant] }
+          - comment
+      - { name: Reopen, from: [Closed], to: Open }
+    layout:
+      Open: { x: 0, y: 120 }
+      Mitigating: { x: 280, y: 120 }
+      Closed: { x: 560, y: 120 }
+  - name: Decision
+    description: Proposed → Accepted or Rejected; an accepted decision is superseded by a newer one.
+    statuses:
+      - { name: Proposed, category: todo }
+      - { name: Accepted, category: done }
+      - { name: Rejected, category: done }
+      - { name: Superseded, category: done }
+    transitions:
+      - name: Accept
+        from: [Proposed]
+        to: Accepted
+        postFunctions: [{ setField: { field: resolution, value: Accepted } }]
+      - name: Reject
+        from: [Proposed]
+        to: Rejected
+        postFunctions: [{ setField: { field: resolution, value: Rejected } }]
+      # Superseding links the newer decision first (the Supersede action does both).
+      - name: Supersede
+        from: [Accepted]
+        to: Superseded
+        condition: 'issue.links.exists(l, l.type == "supersedes" && l.direction == "inward")'
+        postFunctions: [{ setField: { field: resolution, value: Superseded } }]
+      - { name: Reopen, from: [Accepted, Rejected, Superseded], to: Proposed }
+    layout:
+      Proposed: { x: 0, y: 120 }
+      Accepted: { x: 280, y: 40 }
+      Rejected: { x: 280, y: 220 }
+      Superseded: { x: 560, y: 40 }
+issueTypes:
+  - { key: risk, name: Risk, kind: risk, level: 0, icon: risk, color: '#c2410c', workflow: Risk }
+  - { key: decision, name: Decision, kind: decision, level: 0, icon: decision, color: '#0f766e', workflow: Decision }
+# Reserved keys: search, the risk matrix and the API rely on them. The score and rating are set
+# from the likelihood and impact.
+fields:
+  - key: risk_likelihood
+    name: Risk likelihood
+    kind: risk
+    type: number
+    description: 1 Rare, 2 Unlikely, 3 Possible, 4 Likely, 5 Almost certain.
+  - key: risk_impact
+    name: Risk impact
+    kind: risk
+    type: number
+    description: 1 Negligible, 2 Minor, 3 Moderate, 4 Major, 5 Severe.
+  - key: risk_score
+    name: Risk score
+    kind: risk
+    type: number
+    description: Likelihood × impact, from 1 to 25. Set from the likelihood and impact.
+  - key: risk_rating
+    name: Risk rating
+    kind: risk
+    type: select
+    options: [Low, Medium, High, Critical]
+    description: 'From the score: 1–4 Low, 5–9 Medium, 10–16 High, 20–25 Critical.'
+  - key: risk_response
+    name: Risk response
+    kind: risk
+    type: select
+    options: [Avoid, Reduce, Transfer, Accept]
+    description: How the team deals with the risk.
+  - key: risk_mitigation
+    name: Mitigation plan
+    kind: risk
+    type: text
+    description: What reduces the likelihood or the impact, and who does it.
+  - key: decision_context
+    name: Decision context
+    kind: decision
+    type: text
+    description: The situation and the forces that call for a decision.
+  - key: decision_options
+    name: Options considered
+    kind: decision
+    type: text
+    description: The alternatives weighed, with their pros and cons.
+  - key: decision_outcome
+    name: Decision
+    kind: decision
+    type: text
+    description: What was decided, and why.
+  - key: decision_consequences
+    name: Consequences
+    kind: decision
+    type: text
+    description: What becomes easier or harder because of the decision.
+  - key: decision_date
+    name: Decided on
+    kind: decision
+    type: date
+    description: When the decision was accepted or rejected (that day, unless set).

@@ -765,7 +765,7 @@ func (q *Queries) PruneWebhookEvents(ctx context.Context, receivedAt time.Time) 
 }
 
 const repositoryProjects = `-- name: RepositoryProjects :many
-SELECT p.id, p.key, p.name, p.description, p.lead_id, p.template, p.open_role_id, p.issue_counter, p.archived_at, p.created_at, p.updated_at FROM projects p JOIN project_repositories pr ON pr.project_id = p.id WHERE pr.repository_id = $1
+SELECT p.id, p.key, p.name, p.description, p.lead_id, p.template, p.open_role_id, p.issue_counter, p.archived_at, p.created_at, p.updated_at, p.risks_decisions FROM projects p JOIN project_repositories pr ON pr.project_id = p.id WHERE pr.repository_id = $1
 `
 
 // Projects connected to a repository: only their keys are linked from Git activity.
@@ -790,6 +790,7 @@ func (q *Queries) RepositoryProjects(ctx context.Context, repositoryID uuid.UUID
 			&i.ArchivedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.RisksDecisions,
 		); err != nil {
 			return nil, err
 		}

@@ -23,7 +23,9 @@ const jqlHelp = `Query examples (a JQL-like language):
   sprint in openSprints() AND assignee is EMPTY
   text ~ "checkout timeout" AND labels = backend
   parent = PLAT-1   (children of an epic)    fixVersion = "2026.11"
-Fields: project, key, type, status, statusCategory ("To Do", "In Progress", Done), assignee, reporter
+  kind = risk AND "Risk score" >= 10 AND statusCategory != Done   (serious open risks)
+  issue in linkedIssues("PLAT-40", "is mitigated by")   (work mitigating a risk)
+Fields: project, key, type, kind (work, risk, decision), status, statusCategory ("To Do", "In Progress", Done), assignee, reporter
 (email or currentUser()), priority (Highest..Lowest, comparable), labels, sprint (name, openSprints(),
 closedSprints(), futureSprints()), fixVersion, parent, summary/description/comment (~ contains), text ~
 (full text), created/updated/resolved/due/start (dates: "2026-11-01", -7d, startOfWeek()), storyPoints,
@@ -56,7 +58,7 @@ func (t *tools) register(s *mcp.Server) {
 	mcp.AddTool(s, &mcp.Tool{Name: "transition_issue", Description: "Move an issue through its workflow, by transition id, name or target status (get_issue lists the available ones). Some transitions ask for screen fields such as a resolution.", Annotations: write("Transition issue", false)}, t.transitionIssue)
 	mcp.AddTool(s, &mcp.Tool{Name: "add_comment", Description: "Comment on an issue (Markdown). On service requests a comment is an internal note unless visibility is public (a reply the customer is emailed).", Annotations: write("Add comment", false)}, t.addComment)
 	mcp.AddTool(s, &mcp.Tool{Name: "log_work", Description: "Log time spent on an issue, e.g. 2h or 1d 4h (a day is the team's working day). The remaining estimate goes down by the time logged unless you set it or leave it.", Annotations: write("Log work", false)}, t.logWork)
-	mcp.AddTool(s, &mcp.Tool{Name: "link_issues", Description: "Link two issues: key <type> targetKey, e.g. PLAT-3 blocks PLAT-7.", Annotations: write("Link issues", true)}, t.linkIssues)
+	mcp.AddTool(s, &mcp.Tool{Name: "link_issues", Description: "Link two issues: key <type> targetKey, e.g. PLAT-3 blocks PLAT-7, PLAT-8 mitigates PLAT-40 (work → risk), PLAT-9 implements PLAT-41 (work → decision), PLAT-42 supersedes PLAT-41 (decision → decision).", Annotations: write("Link issues", true)}, t.linkIssues)
 }
 
 // writeTools are the tools registered after the read tools above: they change issues, need the
@@ -137,6 +139,9 @@ func (t *tools) getProject(ctx context.Context, _ *mcp.CallToolRequest, in proje
 		b.WriteString("\nIssue types (key — name):\n")
 		for _, it := range types {
 			level := map[int]string{1: "epic level", 0: "standard", -1: "sub-task"}[it.Level]
+			if it.Kind != api.IssueTypeKindWork {
+				level = map[api.IssueTypeKind]string{api.IssueTypeKindRisk: "risk register", api.IssueTypeKindDecision: "decision log"}[it.Kind] + ", not planned in sprints"
+			}
 			fmt.Fprintf(&b, "- %s — %s (%s, workflow %q)\n", it.Key, it.Name, level, it.WorkflowName)
 		}
 	}
@@ -178,6 +183,11 @@ func (t *tools) getProject(ctx context.Context, _ *mcp.CallToolRequest, in proje
 	}
 	if labels, err := as[api.ListProjectLabels200JSONResponse](t.api.ListProjectLabels(ctx, api.ListProjectLabelsRequestObject{ProjectKey: in.Key})); err == nil && len(labels) > 0 {
 		b.WriteString("\nLabels in use: " + strings.Join(labels, ", ") + "\n")
+	}
+	if p.RisksDecisions {
+		b.WriteString("\nRisks and decisions are on: risks take fields risk_likelihood and risk_impact (1–5; the score and rating follow), " +
+			"risk_response (Avoid, Reduce, Transfer, Accept) and risk_mitigation, and the due date is the review date; decisions take " +
+			"decision_context, decision_options, decision_outcome, decision_consequences and decision_date. Link work to them with mitigates or implements.\n")
 	}
 	return text(b.String()), nil, nil
 }
@@ -640,18 +650,19 @@ func (t *tools) users(ctx context.Context, q, project string) ([]api.User, error
 // Write tools
 
 type createIn struct {
-	ProjectKey  string   `json:"projectKey" jsonschema:"project key"`
-	Type        string   `json:"type" jsonschema:"issue type key from get_project, e.g. story, task, bug, epic, subtask"`
-	Summary     string   `json:"summary" jsonschema:"one-line title"`
-	Description string   `json:"description,omitempty" jsonschema:"Markdown"`
-	Priority    string   `json:"priority,omitempty" jsonschema:"highest, high, medium, low or lowest"`
-	Assignee    string   `json:"assignee,omitempty" jsonschema:"email, name, or me"`
-	ParentKey   string   `json:"parentKey,omitempty" jsonschema:"epic (for a story/task/bug) or parent issue (for a sub-task)"`
-	Labels      []string `json:"labels,omitempty"`
-	StoryPoints *float64 `json:"storyPoints,omitempty"`
-	Sprint      string   `json:"sprint,omitempty" jsonschema:"active, or a sprint name or id"`
-	StartDate   string   `json:"startDate,omitempty" jsonschema:"YYYY-MM-DD"`
-	DueDate     string   `json:"dueDate,omitempty" jsonschema:"YYYY-MM-DD"`
+	ProjectKey  string         `json:"projectKey" jsonschema:"project key"`
+	Type        string         `json:"type" jsonschema:"issue type key from get_project, e.g. story, task, bug, epic, subtask"`
+	Summary     string         `json:"summary" jsonschema:"one-line title"`
+	Description string         `json:"description,omitempty" jsonschema:"Markdown"`
+	Priority    string         `json:"priority,omitempty" jsonschema:"highest, high, medium, low or lowest"`
+	Assignee    string         `json:"assignee,omitempty" jsonschema:"email, name, or me"`
+	ParentKey   string         `json:"parentKey,omitempty" jsonschema:"epic (for a story/task/bug) or parent issue (for a sub-task)"`
+	Labels      []string       `json:"labels,omitempty"`
+	StoryPoints *float64       `json:"storyPoints,omitempty"`
+	Sprint      string         `json:"sprint,omitempty" jsonschema:"active, or a sprint name or id"`
+	StartDate   string         `json:"startDate,omitempty" jsonschema:"YYYY-MM-DD"`
+	DueDate     string         `json:"dueDate,omitempty" jsonschema:"YYYY-MM-DD"`
+	Fields      map[string]any `json:"fields,omitempty" jsonschema:"custom field values by key, e.g. {\"risk_likelihood\": 4, \"risk_impact\": 3}"`
 }
 
 func (t *tools) createIssue(ctx context.Context, _ *mcp.CallToolRequest, in createIn) (*mcp.CallToolResult, any, error) {
@@ -660,6 +671,9 @@ func (t *tools) createIssue(ctx context.Context, _ *mcp.CallToolRequest, in crea
 		return nil, nil, err
 	}
 	body := api.IssueCreate{ProjectKey: in.ProjectKey, TypeKey: in.Type, Summary: in.Summary, StoryPoints: in.StoryPoints}
+	if len(in.Fields) > 0 {
+		body.Fields = &in.Fields
+	}
 	if in.Description != "" {
 		body.Description = &in.Description
 	}
@@ -701,19 +715,20 @@ func (t *tools) createIssue(ctx context.Context, _ *mcp.CallToolRequest, in crea
 }
 
 type updateIn struct {
-	Key         string   `json:"key" jsonschema:"issue key"`
-	Summary     string   `json:"summary,omitempty"`
-	Description *string  `json:"description,omitempty" jsonschema:"Markdown; replaces the whole description"`
-	Priority    string   `json:"priority,omitempty" jsonschema:"highest, high, medium, low or lowest"`
-	Type        string   `json:"type,omitempty" jsonschema:"change the issue type (key)"`
-	Assignee    string   `json:"assignee,omitempty" jsonschema:"email, name, or me"`
-	ParentKey   string   `json:"parentKey,omitempty"`
-	Labels      []string `json:"labels,omitempty" jsonschema:"replaces all labels"`
-	StoryPoints *float64 `json:"storyPoints,omitempty"`
-	Sprint      string   `json:"sprint,omitempty" jsonschema:"active, backlog, or a sprint name or id"`
-	StartDate   string   `json:"startDate,omitempty" jsonschema:"YYYY-MM-DD"`
-	DueDate     string   `json:"dueDate,omitempty" jsonschema:"YYYY-MM-DD"`
-	Clear       []string `json:"clear,omitempty" jsonschema:"fields to empty: assignee, parent, sprint, storyPoints, startDate, dueDate, labels"`
+	Key         string         `json:"key" jsonschema:"issue key"`
+	Summary     string         `json:"summary,omitempty"`
+	Description *string        `json:"description,omitempty" jsonschema:"Markdown; replaces the whole description"`
+	Priority    string         `json:"priority,omitempty" jsonschema:"highest, high, medium, low or lowest"`
+	Type        string         `json:"type,omitempty" jsonschema:"change the issue type (key)"`
+	Assignee    string         `json:"assignee,omitempty" jsonschema:"email, name, or me"`
+	ParentKey   string         `json:"parentKey,omitempty"`
+	Labels      []string       `json:"labels,omitempty" jsonschema:"replaces all labels"`
+	StoryPoints *float64       `json:"storyPoints,omitempty"`
+	Sprint      string         `json:"sprint,omitempty" jsonschema:"active, backlog, or a sprint name or id"`
+	StartDate   string         `json:"startDate,omitempty" jsonschema:"YYYY-MM-DD"`
+	DueDate     string         `json:"dueDate,omitempty" jsonschema:"YYYY-MM-DD"`
+	Clear       []string       `json:"clear,omitempty" jsonschema:"fields to empty: assignee, parent, sprint, storyPoints, startDate, dueDate, labels"`
+	Fields      map[string]any `json:"fields,omitempty" jsonschema:"custom field values to set by key; null clears one"`
 }
 
 func (t *tools) updateIssue(ctx context.Context, _ *mcp.CallToolRequest, in updateIn) (*mcp.CallToolResult, any, error) {
@@ -728,6 +743,9 @@ func (t *tools) updateIssue(ctx context.Context, _ *mcp.CallToolRequest, in upda
 	var p api.IssuePatch
 	if in.Summary != "" {
 		p.Summary = &in.Summary
+	}
+	if len(in.Fields) > 0 {
+		p.Fields = &in.Fields
 	}
 	p.Description = in.Description
 	if in.Priority != "" {
@@ -885,8 +903,14 @@ func (t *tools) addComment(ctx context.Context, _ *mcp.CallToolRequest, in comme
 
 type linkIn struct {
 	Key       string `json:"key" jsonschema:"issue key"`
-	Type      string `json:"type" jsonschema:"blocks, relates, duplicates or clones (key <type> targetKey)"`
+	Type      string `json:"type" jsonschema:"blocks, relates, duplicates, clones, mitigates, implements or supersedes, or the other way round: is blocked by, is mitigated by… (key <type> targetKey)"`
 	TargetKey string `json:"targetKey" jsonschema:"the other issue's key"`
+}
+
+// inwardLinks are the link types read from the target's side ("PLAT-40 is mitigated by PLAT-8").
+var inwardLinks = map[string]api.LinkType{
+	"is blocked by": api.LinkTypeBlocks, "is duplicated by": api.LinkTypeDuplicates, "is cloned by": api.LinkTypeClones,
+	"is mitigated by": api.LinkTypeMitigates, "is implemented by": api.LinkTypeImplements, "is superseded by": api.LinkTypeSupersedes,
 }
 
 func (t *tools) linkIssues(ctx context.Context, _ *mcp.CallToolRequest, in linkIn) (*mcp.CallToolResult, any, error) {
@@ -894,14 +918,21 @@ func (t *tools) linkIssues(ctx context.Context, _ *mcp.CallToolRequest, in linkI
 	if err != nil {
 		return nil, nil, err
 	}
-	lt := api.LinkType(strings.ToLower(in.Type))
-	if !lt.Valid() {
-		return nil, nil, fmt.Errorf("type must be blocks, relates, duplicates or clones")
+	phrase := strings.Join(strings.Fields(strings.ToLower(in.Type)), " ")
+	body := &api.CreateIssueLinkJSONRequestBody{Type: api.LinkType(phrase), TargetKey: in.TargetKey}
+	if lt, ok := inwardLinks[phrase]; ok {
+		dir := api.CreateIssueLinkJSONBodyDirectionInward
+		body.Type, body.Direction = lt, &dir
+	} else if phrase == "relates to" {
+		body.Type = api.LinkTypeRelates
 	}
-	if _, err := as[api.CreateIssueLink201JSONResponse](t.api.CreateIssueLink(ctx, api.CreateIssueLinkRequestObject{IssueKey: in.Key, Body: &api.CreateIssueLinkJSONRequestBody{Type: lt, TargetKey: in.TargetKey}})); err != nil {
+	if !body.Type.Valid() {
+		return nil, nil, fmt.Errorf("type must be blocks, relates, duplicates, clones, mitigates, implements or supersedes (or is blocked by, is mitigated by…)")
+	}
+	if _, err := as[api.CreateIssueLink201JSONResponse](t.api.CreateIssueLink(ctx, api.CreateIssueLinkRequestObject{IssueKey: in.Key, Body: body})); err != nil {
 		return nil, nil, err
 	}
-	return text(fmt.Sprintf("Linked: %s %s %s.", in.Key, lt, in.TargetKey)), nil, nil
+	return text(fmt.Sprintf("Linked: %s %s %s.", in.Key, phrase, in.TargetKey)), nil, nil
 }
 
 // ---------------------------------------------------------------------------

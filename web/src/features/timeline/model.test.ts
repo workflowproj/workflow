@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Issue } from "@/api/types";
 import { buildRows, dependencies, epicProgress, fromDay, isOverdue, schedules, stats, toDay, todayDay, weekday, withDates, type TimelineData } from "./model";
 
-const type = (level: number) => ({ id: `t${level}`, key: level === 1 ? "epic" : "story", name: level === 1 ? "Epic" : "Story", icon: "story", color: "#000", level });
+const type = (level: number) => ({ id: `t${level}`, key: level === 1 ? "epic" : "story", name: level === 1 ? "Epic" : "Story", icon: "story", color: "#000", level, kind: "work" as const });
 const status = (category: "todo" | "in_progress" | "done" = "todo") => ({ id: `s-${category}`, name: category, category });
 const ref = (i: Issue) => ({ id: i.id, key: i.key, summary: i.summary, type: i.type, status: i.status });
 

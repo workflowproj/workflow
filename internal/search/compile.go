@@ -180,6 +180,19 @@ func (b *builder) clause(c Clause) (string, error) {
 			p := b.arg(s)
 			return fmt.Sprintf("i.type_id IN (SELECT id FROM issue_types WHERE lower(key) = lower(%[1]s::text) OR lower(name) = lower(%[1]s::text))", p), nil
 		}, "")
+	case "kind", "typekind", "issuetypekind":
+		// Work, or the risks and decisions kept out of planning.
+		return b.setField(c, func(v Value) (string, error) {
+			s, err := b.str(v)
+			if err != nil {
+				return "", err
+			}
+			k := strings.ToLower(s)
+			if !slices.Contains([]string{"work", "risk", "decision"}, k) {
+				return "", errAt(v.Pos, "unknown kind %q (use work, risk or decision)", s)
+			}
+			return fmt.Sprintf("i.type_id IN (SELECT id FROM issue_types WHERE kind = %s::text)", b.arg(k)), nil
+		}, "")
 	case "level", "hierarchylevel":
 		return b.numberField(c, "(SELECT level FROM issue_types t WHERE t.id = i.type_id)")
 	case "assignee":
@@ -275,7 +288,7 @@ func (b *builder) clause(c Clause) (string, error) {
 			}
 			l, ok := linkDescriptions[normalize(s)]
 			if !ok {
-				return "", errAt(v.Pos, "unknown link type %q (use blocks, \"is blocked by\", relates, duplicates, \"is duplicated by\", clones or \"is cloned by\")", s)
+				return "", errAt(v.Pos, "unknown link type %q (use %s)", s, linkTypeHelp)
 			}
 			return l.exists(b.arg(l.typ), "i.id"), nil
 		}, "NOT EXISTS (SELECT 1 FROM issue_links l WHERE l.source_id = i.id OR l.target_id = i.id)")
@@ -500,7 +513,14 @@ var linkDescriptions = map[string]linkDescription{
 	"relates": {"relates", "either"}, "relatesto": {"relates", "either"},
 	"duplicates": {"duplicates", "source"}, "isduplicatedby": {"duplicates", "target"},
 	"clones": {"clones", "source"}, "isclonedby": {"clones", "target"},
+	// Work mitigates a risk, work implements a decision, a decision supersedes an earlier one.
+	"mitigates": {"mitigates", "source"}, "ismitigatedby": {"mitigates", "target"}, "mitigatedby": {"mitigates", "target"},
+	"implements": {"implements", "source"}, "isimplementedby": {"implements", "target"}, "implementedby": {"implements", "target"},
+	"supersedes": {"supersedes", "source"}, "issupersededby": {"supersedes", "target"}, "supersededby": {"supersedes", "target"},
 }
+
+const linkTypeHelp = `blocks, "is blocked by", relates, duplicates, "is duplicated by", clones, "is cloned by", ` +
+	`mitigates, "is mitigated by", implements, "is implemented by", supersedes or "is superseded by"`
 
 // exists is "issue col has a link of this description".
 func (l linkDescription) exists(typ, col string) string {
@@ -534,7 +554,7 @@ func (b *builder) issueFunction(v Value) (string, error) {
 		}
 		l, ok := linkDescriptions[normalize(s)]
 		if !ok {
-			return "", errAt(v.Args[1].Pos, "unknown link type %q", s)
+			return "", errAt(v.Args[1].Pos, "unknown link type %q (use %s)", s, linkTypeHelp)
 		}
 		// "PLAT-1 blocks X": X is the target of PLAT-1's blocks links, and so on.
 		t := b.arg(l.typ)
@@ -987,6 +1007,7 @@ var Fields = []struct {
 	{"project", "project", []string{"=", "!=", "in", "not in"}},
 	{"key", "issue", []string{"=", "!=", "in", "not in", ">", ">=", "<", "<="}},
 	{"type", "type", []string{"=", "!=", "in", "not in"}},
+	{"kind", "kind", []string{"=", "!=", "in", "not in"}},
 	{"status", "status", []string{"=", "!=", "in", "not in"}},
 	{"statusCategory", "category", []string{"=", "!=", "in", "not in"}},
 	{"assignee", "user", []string{"=", "!=", "in", "not in", "is", "is not"}},

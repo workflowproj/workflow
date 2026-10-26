@@ -190,7 +190,7 @@ function MoreMenu() {
                   icon={<IssueTypeIcon type={t} />}
                   onClick={() => {
                     close();
-                    update({ typeKey: t.key }, { type: { id: t.id, key: t.key, name: t.name, icon: t.icon, color: t.color, level: t.level } }).then(
+                    update({ typeKey: t.key }, { type: { id: t.id, key: t.key, name: t.name, icon: t.icon, color: t.color, level: t.level, kind: t.kind } }).then(
                       (res) => res && toast.success(`${issue.key} is now a ${t.name.toLowerCase()}`),
                     );
                   }}

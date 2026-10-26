@@ -1386,6 +1386,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{projectKey}/risks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description The project's risk register: every issue of a risk type (newest first, up to 2000), how
+         *     each is scored and how much of the work linked to it with `mitigates` is done, with
+         *     totals and the likelihood × impact matrix of open risks.
+         */
+        get: operations["getRiskRegister"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{projectKey}/decisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description The project's decision log: every issue of a decision type (newest first, up to 2000),
+         *     with the decisions it supersedes and is superseded by and the work implementing it.
+         */
+        get: operations["getDecisionLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/projects/{projectKey}/velocity": {
         parameters: {
             query?: never;
@@ -2118,6 +2159,27 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["createIssueLink"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/issues/{issueKey}/supersede": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Marks a decision as superseded by a newer one in one step: links the newer decision to it
+         *     with `supersedes` (unless already linked) and runs the transition to Superseded. Both must
+         *     be decisions; the workflow decides from which statuses that is allowed (Accepted, by default).
+         */
+        post: operations["supersedeDecision"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2944,8 +3006,11 @@ export interface components {
         Priority: "highest" | "high" | "medium" | "low" | "lowest";
         /** @enum {string} */
         LinkDirection: "outward" | "inward";
-        /** @enum {string} */
-        LinkType: "blocks" | "relates" | "duplicates" | "clones";
+        /**
+         * @description mitigates: work → the risk it mitigates; implements: work → the decision it implements; supersedes: a decision → the decision it replaces
+         * @enum {string}
+         */
+        LinkType: "blocks" | "relates" | "duplicates" | "clones" | "mitigates" | "implements" | "supersedes";
         /**
          * @description read = GET only; write = all project and issue operations; admin = organisation administration (if the owner is an admin).
          * @enum {string}
@@ -3222,6 +3287,8 @@ export interface components {
             name: string;
             description: string;
             boardType: components["schemas"]["BoardType"];
+            /** @description Whether new projects from this template start with the Risks and decisions section on */
+            risksDecisions: boolean;
             issueTypes: components["schemas"]["TemplateIssueType"][];
             workflows: string[];
         };
@@ -3241,6 +3308,8 @@ export interface components {
             access: components["schemas"]["ProjectAccess"];
             openRoleKey?: string;
             keyAliases?: string[];
+            /** @description The Risks and decisions section is on (risk register and decision log) */
+            risksDecisions: boolean;
             /** Format: date-time */
             createdAt: string;
             myPermissions: string[];
@@ -3255,6 +3324,8 @@ export interface components {
             access?: components["schemas"]["ProjectAccess"];
             /** @default member */
             openRoleKey?: string;
+            /** @description Turn the Risks and decisions section on or off; defaults to the template's setting */
+            risksDecisions?: boolean;
         };
         ProjectPatch: {
             /** @description Renaming keeps the old key as an alias */
@@ -3265,6 +3336,11 @@ export interface components {
             leadId?: string | null;
             access?: components["schemas"]["ProjectAccess"];
             openRoleKey?: string;
+            /**
+             * @description On installs the Risk and Decision issue types, their workflows and fields (again if
+             *     anything is missing) and shows the section; off hides it and keeps the issues.
+             */
+            risksDecisions?: boolean;
         };
         ProjectMember: {
             /** Format: uuid */
@@ -3283,6 +3359,7 @@ export interface components {
             color: string;
             /** @description Hierarchy level: epic 1, standard 0, sub-task -1 */
             level: number;
+            kind: components["schemas"]["IssueTypeKind"];
             position: number;
             /** Format: uuid */
             workflowId: string;
@@ -3295,9 +3372,17 @@ export interface components {
             icon?: string;
             color?: string;
             level: number;
+            /** @description Defaults to work; risk and decision types must be standard (level 0) */
+            kind?: components["schemas"]["IssueTypeKind"];
             /** Format: uuid */
             workflowId: string;
         };
+        /**
+         * @description work: planned work (boards, backlog, sprints, timeline, delivery metrics). risk and decision:
+         *     the project's risk register and decision log, kept out of planning. Fixed once created.
+         * @enum {string}
+         */
+        IssueTypeKind: "work" | "risk" | "decision";
         CycleTimeReport: {
             days: number;
             /** Format: double */
@@ -3603,6 +3688,8 @@ export interface components {
             /** @description resolution */
             field: string;
             required?: boolean;
+            /** @description resolution only: the resolutions this screen offers, instead of Done, Won't Do, Duplicate and Cannot Reproduce */
+            options?: string[];
         };
         /** @description Exactly one key is set. */
         PostFunction: {
@@ -3857,6 +3944,7 @@ export interface components {
             icon: string;
             color: string;
             level: number;
+            kind: components["schemas"]["IssueTypeKind"];
         };
         IssueRef: {
             /** Format: uuid */
@@ -4255,6 +4343,79 @@ export interface components {
             /** @description Service projects: public = added by a customer in the portal (the only files the portal shows) */
             visibility?: components["schemas"]["Visibility"];
         };
+        /**
+         * @description From the score (likelihood × impact): 1–4 low, 5–9 medium, 10–16 high, 20–25 critical
+         * @enum {string}
+         */
+        RiskRating: "low" | "medium" | "high" | "critical";
+        LinkedWork: {
+            /** @description Issues linked to this one (mitigating or implementing work) */
+            total: number;
+            /** @description Of those */
+            done: number;
+        };
+        RiskEntry: {
+            issue: components["schemas"]["Issue"];
+            /** @description 1 Rare, 2 Unlikely, 3 Possible, 4 Likely, 5 Almost certain */
+            likelihood?: number;
+            /** @description 1 Negligible, 2 Minor, 3 Moderate, 4 Major, 5 Severe */
+            impact?: number;
+            /** @description Likelihood × impact */
+            score?: number;
+            rating?: components["schemas"]["RiskRating"];
+            /** @enum {string} */
+            response?: "Avoid" | "Reduce" | "Transfer" | "Accept";
+            mitigation: components["schemas"]["LinkedWork"];
+        };
+        RiskCell: {
+            likelihood: number;
+            impact: number;
+            score: number;
+            rating: components["schemas"]["RiskRating"];
+            /** @description Open risks with this likelihood and impact */
+            count: number;
+        };
+        RiskSummary: {
+            /** @description Risks not in a done status */
+            open: number;
+            /** @description Open risks rated high or critical */
+            highOrCritical: number;
+            /** @description Open risks whose review date (due date) has passed */
+            reviewsOverdue: number;
+            /** @description Open risks without a likelihood or an impact */
+            unassessed: number;
+        };
+        RiskRegister: {
+            summary: components["schemas"]["RiskSummary"];
+            /** @description All 25 cells */
+            matrix: components["schemas"]["RiskCell"][];
+            risks: components["schemas"]["RiskEntry"][];
+            /** @description The project has more risks than the register returns (2000) */
+            truncated: boolean;
+        };
+        DecisionEntry: {
+            issue: components["schemas"]["Issue"];
+            /** Format: date */
+            decidedOn?: string;
+            /** @description Earlier decisions this one replaces */
+            supersedes: components["schemas"]["IssueRef"][];
+            /** @description Later decisions that replace this one */
+            supersededBy: components["schemas"]["IssueRef"][];
+            implementation: components["schemas"]["LinkedWork"];
+        };
+        DecisionLog: {
+            decisions: components["schemas"]["DecisionEntry"][];
+            /** @description The project has more decisions than the log returns (2000) */
+            truncated: boolean;
+        };
+        SupersedeRequest: {
+            /** @description The newer decision */
+            supersededByKey: string;
+            /** @description Expected current version of the superseded decision (optimistic locking) */
+            version?: number;
+            /** @description Optional comment added with the transition */
+            comment?: string;
+        };
         Timeline: {
             projects: components["schemas"]["ProjectRef"][];
             /** @description Epics and standard issues in rank order (children name their parent) */
@@ -4323,6 +4484,8 @@ export interface components {
             description: string;
             type: components["schemas"]["FieldType"];
             options: string[];
+            /** @description A field of risks and decisions (risk_*, decision_*): set up by the project setting and not changed or deleted here */
+            reserved: boolean;
             /** @description Omitted = all projects */
             projectKeys?: string[];
             /** @description Omitted = all issue types */
@@ -5391,7 +5554,7 @@ export interface components {
         DashboardId: string;
         /** @description Comma-separated project keys; omit for every project you can browse */
         MetricProjects: string;
-        /** @description Optional query the issues must also match */
+        /** @description Optional query the issues must also match. Metrics count work only: never risks or decisions. */
         MetricJql: string;
         /** @description Window in days */
         MetricDays: number;
@@ -7961,6 +8124,54 @@ export interface operations {
             default: components["responses"]["Problem"];
         };
     };
+    getRiskRegister: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project key (or id) */
+                projectKey: components["parameters"]["ProjectKey"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Risk register */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RiskRegister"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getDecisionLog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project key (or id) */
+                projectKey: components["parameters"]["ProjectKey"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Decision log */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DecisionLog"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
     getVelocity: {
         parameters: {
             query?: {
@@ -8365,7 +8576,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Columns with issues (Scrum boards show the active sprint) */
+            /** @description Columns with issues (Scrum boards show the active sprint). Risks and decisions are never on a board. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -8390,7 +8601,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Active and future sprints with their issues, then the backlog */
+            /** @description Active and future sprints with their issues, then the backlog (work only, never risks or decisions) */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -8742,7 +8953,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Timeline data. Sub-tasks are not included. */
+            /** @description Timeline data. Sub-tasks, risks and decisions are not included. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -8876,7 +9087,7 @@ export interface operations {
             query?: {
                 /** @description Comma-separated project keys; omit for every project you can browse */
                 projects?: components["parameters"]["MetricProjects"];
-                /** @description Optional query the issues must also match */
+                /** @description Optional query the issues must also match. Metrics count work only: never risks or decisions. */
                 jql?: components["parameters"]["MetricJql"];
                 /** @description Window in days */
                 days?: components["parameters"]["MetricDays"];
@@ -8904,7 +9115,7 @@ export interface operations {
             query?: {
                 /** @description Comma-separated project keys; omit for every project you can browse */
                 projects?: components["parameters"]["MetricProjects"];
-                /** @description Optional query the issues must also match */
+                /** @description Optional query the issues must also match. Metrics count work only: never risks or decisions. */
                 jql?: components["parameters"]["MetricJql"];
                 /** @description Window in days */
                 days?: components["parameters"]["MetricDays"];
@@ -8933,7 +9144,7 @@ export interface operations {
             query?: {
                 /** @description Comma-separated project keys; omit for every project you can browse */
                 projects?: components["parameters"]["MetricProjects"];
-                /** @description Optional query the issues must also match */
+                /** @description Optional query the issues must also match. Metrics count work only: never risks or decisions. */
                 jql?: components["parameters"]["MetricJql"];
                 /** @description Window in days */
                 days?: components["parameters"]["MetricDays"];
@@ -8962,7 +9173,7 @@ export interface operations {
             query: {
                 /** @description Comma-separated project keys; omit for every project you can browse */
                 projects?: components["parameters"]["MetricProjects"];
-                /** @description Optional query the issues must also match */
+                /** @description Optional query the issues must also match. Metrics count work only: never risks or decisions. */
                 jql?: components["parameters"]["MetricJql"];
                 by: components["schemas"]["BreakdownBy"];
             };
@@ -8989,7 +9200,7 @@ export interface operations {
             query?: {
                 /** @description Comma-separated project keys; omit for every project you can browse */
                 projects?: components["parameters"]["MetricProjects"];
-                /** @description Optional query the issues must also match */
+                /** @description Optional query the issues must also match. Metrics count work only: never risks or decisions. */
                 jql?: components["parameters"]["MetricJql"];
                 /** @description Window in days */
                 days?: components["parameters"]["MetricDays"];
@@ -9668,6 +9879,34 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["IssueLink"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    supersedeDecision: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Issue key such as PLAT-12 (or id) */
+                issueKey: components["parameters"]["IssueKey"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SupersedeRequest"];
+            };
+        };
+        responses: {
+            /** @description The superseded decision */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssueDetail"];
                 };
             };
             default: components["responses"]["Problem"];

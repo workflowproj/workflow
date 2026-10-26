@@ -102,7 +102,7 @@ describe("column edits", () => {
 });
 
 const issue = (id: string, status: string, rank: string): Issue => ({
-  id, key: `P-${id}`, projectKey: "P", type: { id: "t", key: "task", name: "Task", icon: "task", color: "#000", level: 0 },
+  id, key: `P-${id}`, projectKey: "P", type: { id: "t", key: "task", name: "Task", icon: "task", color: "#000", level: 0, kind: "work" },
   summary: id, status: { id: status, name: status, category: "todo" }, priority: "medium", labels: [], rank, version: 1, fields: {}, createdAt: "", updatedAt: "",
 });
 

@@ -93,6 +93,29 @@ DELETE FROM issue_links WHERE id = $1;
 -- name: IssueLinks :many
 SELECT * FROM issue_links WHERE source_id = $1 OR target_id = $1 ORDER BY created_at;
 
+-- name: LinksOfType :many
+-- Links of one type that touch any of the issues, oldest first.
+SELECT * FROM issue_links
+WHERE link_type = @link_type AND (source_id = ANY(@ids::uuid[]) OR target_id = ANY(@ids::uuid[]))
+ORDER BY created_at;
+
+-- name: LinkedWorkProgress :many
+-- For each target, how many issues link to it with a link type and how many of those are done
+-- (mitigating work of a risk, implementing work of a decision).
+SELECT l.target_id, count(*)::int AS total, count(*) FILTER (WHERE s.category = 'done')::int AS done
+FROM issue_links l
+JOIN issues o ON o.id = l.source_id
+JOIN statuses s ON s.id = o.status_id
+WHERE l.target_id = ANY(@ids::uuid[]) AND l.link_type = @link_type
+GROUP BY l.target_id;
+
+-- name: ProjectIssuesOfKind :many
+-- A project's issues of one issue-type kind (risks, decisions), newest first.
+SELECT i.* FROM issues i JOIN issue_types t ON t.id = i.type_id
+WHERE i.project_id = @project_id AND t.kind = @kind
+ORDER BY i.number DESC
+LIMIT @lim;
+
 -- ---------------------------------------------------------------------------
 -- Comments
 

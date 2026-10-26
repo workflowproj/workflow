@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Issue } from "@/api/types";
 import { buildLanes, cellId, findContainer, insertWithHint, moveAcross, neighbours, parseCellId, placeInBacklog, placeOnBoard, sumPoints } from "./model";
 
-const type = (level: number, name = level === 1 ? "Epic" : level === -1 ? "Sub-task" : "Story") => ({ id: `t${level}`, key: name.toLowerCase(), name, icon: "story", color: "#000", level });
+const type = (level: number, name = level === 1 ? "Epic" : level === -1 ? "Sub-task" : "Story") => ({ id: `t${level}`, key: name.toLowerCase(), name, icon: "story", color: "#000", level, kind: "work" as const });
 const status = (category: "todo" | "in_progress" | "done" = "todo") => ({ id: `s-${category}`, name: category, category });
 
 function issue(id: string, over: Partial<Issue> = {}): Issue {

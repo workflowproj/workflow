@@ -1617,6 +1617,37 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/CycleTimeReport' }
         default: { $ref: '#/components/responses/Problem' }
+  /projects/{projectKey}/risks:
+    get:
+      operationId: getRiskRegister
+      tags: [projects]
+      description: |
+        The project's risk register: every issue of a risk type (newest first, up to 2000), how
+        each is scored and how much of the work linked to it with `mitigates` is done, with
+        totals and the likelihood × impact matrix of open risks.
+      parameters: [{ $ref: '#/components/parameters/ProjectKey' }]
+      responses:
+        "200":
+          description: Risk register
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RiskRegister' }
+        default: { $ref: '#/components/responses/Problem' }
+  /projects/{projectKey}/decisions:
+    get:
+      operationId: getDecisionLog
+      tags: [projects]
+      description: |
+        The project's decision log: every issue of a decision type (newest first, up to 2000),
+        with the decisions it supersedes and is superseded by and the work implementing it.
+      parameters: [{ $ref: '#/components/parameters/ProjectKey' }]
+      responses:
+        "200":
+          description: Decision log
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DecisionLog' }
+        default: { $ref: '#/components/responses/Problem' }
   /projects/{projectKey}/velocity:
     get:
       operationId: getVelocity
@@ -1874,7 +1905,7 @@ paths:
         - { name: jql, in: query, description: Quick filter applied on top of the board filter, schema: { type: string } }
       responses:
         "200":
-          description: Columns with issues (Scrum boards show the active sprint)
+          description: Columns with issues (Scrum boards show the active sprint). Risks and decisions are never on a board.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/BoardData' }
@@ -1888,7 +1919,7 @@ paths:
         - { name: jql, in: query, schema: { type: string } }
       responses:
         "200":
-          description: Active and future sprints with their issues, then the backlog
+          description: Active and future sprints with their issues, then the backlog (work only, never risks or decisions)
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Backlog' }
@@ -2099,7 +2130,7 @@ paths:
         - { name: doneDays, in: query, description: 'Include issues resolved within this many days (default 90)', schema: { type: integer, minimum: 0, maximum: 3650 } }
       responses:
         "200":
-          description: Timeline data. Sub-tasks are not included.
+          description: Timeline data. Sub-tasks, risks and decisions are not included.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Timeline' }
@@ -2628,6 +2659,27 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/IssueLink' }
+        default: { $ref: '#/components/responses/Problem' }
+  /issues/{issueKey}/supersede:
+    post:
+      operationId: supersedeDecision
+      tags: [issues]
+      description: |
+        Marks a decision as superseded by a newer one in one step: links the newer decision to it
+        with `supersedes` (unless already linked) and runs the transition to Superseded. Both must
+        be decisions; the workflow decides from which statuses that is allowed (Accepted, by default).
+      parameters: [{ $ref: '#/components/parameters/IssueKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SupersedeRequest' }
+      responses:
+        "200":
+          description: The superseded decision
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IssueDetail' }
         default: { $ref: '#/components/responses/Problem' }
   /issue-links/{linkId}:
     delete:
@@ -3602,7 +3654,7 @@ components:
     SprintId: { name: sprintId, in: path, required: true, schema: { type: string, format: uuid } }
     DashboardId: { name: dashboardId, in: path, required: true, schema: { type: string, format: uuid } }
     MetricProjects: { name: projects, in: query, description: 'Comma-separated project keys; omit for every project you can browse', schema: { type: string } }
-    MetricJql: { name: jql, in: query, description: 'Optional query the issues must also match', schema: { type: string } }
+    MetricJql: { name: jql, in: query, description: 'Optional query the issues must also match. Metrics count work only: never risks or decisions.', schema: { type: string } }
     MetricDays: { name: days, in: query, description: Window in days, ending today, schema: { type: integer, default: 30, minimum: 1, maximum: 365 } }
     ReleaseId: { name: releaseId, in: path, required: true, schema: { type: string, format: uuid } }
     CommentId: { name: commentId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -3650,7 +3702,10 @@ components:
     StatusCategory: { type: string, enum: [todo, in_progress, done] }
     Priority: { type: string, enum: [highest, high, medium, low, lowest] }
     LinkDirection: { type: string, enum: [outward, inward] }
-    LinkType: { type: string, enum: [blocks, relates, duplicates, clones] }
+    LinkType:
+      type: string
+      enum: [blocks, relates, duplicates, clones, mitigates, implements, supersedes]
+      description: 'mitigates: work → the risk it mitigates; implements: work → the decision it implements; supersedes: a decision → the decision it replaces'
     TokenScope:
       type: string
       enum: [read, write, admin]
@@ -3935,12 +3990,13 @@ components:
 
     ProjectTemplate:
       type: object
-      required: [id, name, description, boardType, issueTypes, workflows]
+      required: [id, name, description, boardType, issueTypes, workflows, risksDecisions]
       properties:
         id: { type: string }
         name: { type: string }
         description: { type: string }
         boardType: { $ref: '#/components/schemas/BoardType' }
+        risksDecisions: { type: boolean, description: Whether new projects from this template start with the Risks and decisions section on }
         issueTypes:
           type: array
           items: { $ref: '#/components/schemas/TemplateIssueType' }
@@ -3954,7 +4010,7 @@ components:
         level: { type: integer }
     Project:
       type: object
-      required: [id, key, name, description, template, access, createdAt, myPermissions]
+      required: [id, key, name, description, template, access, risksDecisions, createdAt, myPermissions]
       properties:
         id: { type: string, format: uuid }
         key: { type: string }
@@ -3965,6 +4021,7 @@ components:
         access: { $ref: '#/components/schemas/ProjectAccess' }
         openRoleKey: { type: string }
         keyAliases: { type: array, items: { type: string } }
+        risksDecisions: { type: boolean, description: The Risks and decisions section is on (risk register and decision log) }
         createdAt: { type: string, format: date-time }
         myPermissions: { type: array, items: { type: string } }
     ProjectAccess: { type: string, enum: [open, private] }
@@ -3978,6 +4035,7 @@ components:
         template: { type: string }
         access: { $ref: '#/components/schemas/ProjectAccess' }
         openRoleKey: { type: string, default: member }
+        risksDecisions: { type: boolean, description: Turn the Risks and decisions section on or off; defaults to the template's setting }
     ProjectPatch:
       type: object
       properties:
@@ -3987,6 +4045,11 @@ components:
         leadId: { type: [string, 'null'], format: uuid }
         access: { $ref: '#/components/schemas/ProjectAccess' }
         openRoleKey: { type: string }
+        risksDecisions:
+          type: boolean
+          description: |
+            On installs the Risk and Decision issue types, their workflows and fields (again if
+            anything is missing) and shows the section; off hides it and keeps the issues.
     ProjectMember:
       type: object
       required: [id, role]
@@ -3997,7 +4060,7 @@ components:
         role: { $ref: '#/components/schemas/Role' }
     IssueType:
       type: object
-      required: [id, key, name, description, icon, color, level, position, workflowId, workflowName]
+      required: [id, key, name, description, icon, color, level, kind, position, workflowId, workflowName]
       properties:
         id: { type: string, format: uuid }
         key: { type: string }
@@ -4006,6 +4069,7 @@ components:
         icon: { type: string }
         color: { type: string }
         level: { type: integer, description: 'Hierarchy level: epic 1, standard 0, sub-task -1' }
+        kind: { $ref: '#/components/schemas/IssueTypeKind' }
         position: { type: integer }
         workflowId: { type: string, format: uuid }
         workflowName: { type: string }
@@ -4019,7 +4083,14 @@ components:
         icon: { type: string }
         color: { type: string }
         level: { type: integer, minimum: -1, maximum: 2 }
+        kind: { $ref: '#/components/schemas/IssueTypeKind', description: 'Defaults to work; risk and decision types must be standard (level 0)' }
         workflowId: { type: string, format: uuid }
+    IssueTypeKind:
+      type: string
+      enum: [work, risk, decision]
+      description: |
+        work: planned work (boards, backlog, sprints, timeline, delivery metrics). risk and decision:
+        the project's risk register and decision log, kept out of planning. Fixed once created.
     CycleTimeReport:
       type: object
       required: [days, issues, averageHours, medianHours, p85Hours]
@@ -4325,6 +4396,10 @@ components:
       properties:
         field: { type: string, description: resolution, comment, assignee, a system field or a custom field key }
         required: { type: boolean }
+        options:
+          type: array
+          items: { type: string }
+          description: 'resolution only: the resolutions this screen offers, instead of Done, Won''t Do, Duplicate and Cannot Reproduce'
     PostFunction:
       type: object
       description: Exactly one key is set.
@@ -4538,7 +4613,7 @@ components:
 
     IssueTypeRef:
       type: object
-      required: [id, key, name, icon, color, level]
+      required: [id, key, name, icon, color, level, kind]
       properties:
         id: { type: string, format: uuid }
         key: { type: string }
@@ -4546,6 +4621,7 @@ components:
         icon: { type: string }
         color: { type: string }
         level: { type: integer }
+        kind: { $ref: '#/components/schemas/IssueTypeKind' }
     IssueRef:
       type: object
       required: [id, key, summary, type, status]
@@ -4876,6 +4952,75 @@ components:
         url: { type: string }
         visibility: { $ref: '#/components/schemas/Visibility', description: 'Service projects: public = added by a customer in the portal (the only files the portal shows)' }
 
+    RiskRating:
+      type: string
+      enum: [low, medium, high, critical]
+      description: 'From the score (likelihood × impact): 1–4 low, 5–9 medium, 10–16 high, 20–25 critical'
+    LinkedWork:
+      type: object
+      required: [total, done]
+      properties:
+        total: { type: integer, description: Issues linked to this one (mitigating or implementing work) }
+        done: { type: integer, description: Of those, how many are in a done status }
+    RiskEntry:
+      type: object
+      required: [issue, mitigation]
+      properties:
+        issue: { $ref: '#/components/schemas/Issue' }
+        likelihood: { type: integer, minimum: 1, maximum: 5, description: '1 Rare, 2 Unlikely, 3 Possible, 4 Likely, 5 Almost certain' }
+        impact: { type: integer, minimum: 1, maximum: 5, description: '1 Negligible, 2 Minor, 3 Moderate, 4 Major, 5 Severe' }
+        score: { type: integer, minimum: 1, maximum: 25, description: Likelihood × impact, when both are set }
+        rating: { $ref: '#/components/schemas/RiskRating' }
+        response: { type: string, enum: [Avoid, Reduce, Transfer, Accept] }
+        mitigation: { $ref: '#/components/schemas/LinkedWork' }
+    RiskCell:
+      type: object
+      required: [likelihood, impact, score, rating, count]
+      properties:
+        likelihood: { type: integer }
+        impact: { type: integer }
+        score: { type: integer }
+        rating: { $ref: '#/components/schemas/RiskRating' }
+        count: { type: integer, description: Open risks with this likelihood and impact }
+    RiskSummary:
+      type: object
+      required: [open, highOrCritical, reviewsOverdue, unassessed]
+      properties:
+        open: { type: integer, description: Risks not in a done status }
+        highOrCritical: { type: integer, description: Open risks rated high or critical }
+        reviewsOverdue: { type: integer, description: Open risks whose review date (due date) has passed }
+        unassessed: { type: integer, description: Open risks without a likelihood or an impact }
+    RiskRegister:
+      type: object
+      required: [summary, matrix, risks, truncated]
+      properties:
+        summary: { $ref: '#/components/schemas/RiskSummary' }
+        matrix: { type: array, items: { $ref: '#/components/schemas/RiskCell' }, description: All 25 cells, likelihood 5 to 1 then impact 1 to 5 }
+        risks: { type: array, items: { $ref: '#/components/schemas/RiskEntry' } }
+        truncated: { type: boolean, description: The project has more risks than the register returns (2000) }
+    DecisionEntry:
+      type: object
+      required: [issue, supersedes, supersededBy, implementation]
+      properties:
+        issue: { $ref: '#/components/schemas/Issue' }
+        decidedOn: { type: string, format: date }
+        supersedes: { type: array, items: { $ref: '#/components/schemas/IssueRef' }, description: Earlier decisions this one replaces }
+        supersededBy: { type: array, items: { $ref: '#/components/schemas/IssueRef' }, description: Later decisions that replace this one }
+        implementation: { $ref: '#/components/schemas/LinkedWork' }
+    DecisionLog:
+      type: object
+      required: [decisions, truncated]
+      properties:
+        decisions: { type: array, items: { $ref: '#/components/schemas/DecisionEntry' } }
+        truncated: { type: boolean, description: The project has more decisions than the log returns (2000) }
+    SupersedeRequest:
+      type: object
+      required: [supersededByKey]
+      properties:
+        supersededByKey: { type: string, description: The newer decision }
+        version: { type: integer, description: Expected current version of the superseded decision (optimistic locking) }
+        comment: { type: string, description: Optional comment added with the transition }
+
     Timeline:
       type: object
       required: [projects, issues, links, sprints, releases, truncated]
@@ -4952,7 +5097,7 @@ components:
 
     FieldDefinition:
       type: object
-      required: [id, key, name, description, type, options]
+      required: [id, key, name, description, type, options, reserved]
       properties:
         id: { type: string, format: uuid }
         key: { type: string }
@@ -4960,6 +5105,7 @@ components:
         description: { type: string }
         type: { $ref: '#/components/schemas/FieldType' }
         options: { type: array, items: { type: string } }
+        reserved: { type: boolean, description: 'A field of risks and decisions (risk_*, decision_*): set up by the project setting and not changed or deleted here' }
         projectKeys: { type: array, items: { type: string }, description: Omitted = all projects }
         issueTypeKeys: { type: array, items: { type: string }, description: Omitted = all issue types }
     FieldType: { type: string, enum: [text, number, select, multiselect, user, date, version, checkbox, url] }

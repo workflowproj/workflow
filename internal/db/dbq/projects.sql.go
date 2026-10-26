@@ -13,6 +13,38 @@ import (
 	"github.com/google/uuid"
 )
 
+const addFieldDefinitionIssueType = `-- name: AddFieldDefinitionIssueType :exec
+UPDATE field_definitions SET issue_type_keys = array_append(issue_type_keys, $1::text), updated_at = now()
+WHERE id = $2 AND issue_type_keys IS NOT NULL AND NOT $1::text = ANY(issue_type_keys)
+`
+
+type AddFieldDefinitionIssueTypeParams struct {
+	TypeKey string
+	ID      uuid.UUID
+}
+
+// Extends a field limited to some issue types to one more (no change when it applies to every type).
+func (q *Queries) AddFieldDefinitionIssueType(ctx context.Context, arg AddFieldDefinitionIssueTypeParams) error {
+	_, err := q.db.Exec(ctx, addFieldDefinitionIssueType, arg.TypeKey, arg.ID)
+	return err
+}
+
+const addFieldDefinitionProject = `-- name: AddFieldDefinitionProject :exec
+UPDATE field_definitions SET project_ids = array_append(project_ids, $1::uuid), updated_at = now()
+WHERE id = $2 AND project_ids IS NOT NULL AND NOT $1::uuid = ANY(project_ids)
+`
+
+type AddFieldDefinitionProjectParams struct {
+	ProjectID uuid.UUID
+	ID        uuid.UUID
+}
+
+// Extends a field limited to some projects to one more (no change when it applies to every project).
+func (q *Queries) AddFieldDefinitionProject(ctx context.Context, arg AddFieldDefinitionProjectParams) error {
+	_, err := q.db.Exec(ctx, addFieldDefinitionProject, arg.ProjectID, arg.ID)
+	return err
+}
+
 const addProjectKeyAlias = `-- name: AddProjectKeyAlias :exec
 INSERT INTO project_key_aliases (key, project_id) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET project_id = excluded.project_id
 `
@@ -111,9 +143,9 @@ func (q *Queries) CreateFieldDefinition(ctx context.Context, arg CreateFieldDefi
 }
 
 const createIssueType = `-- name: CreateIssueType :one
-INSERT INTO issue_types (project_id, key, name, description, icon, color, level, position, workflow_id)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-RETURNING id, project_id, key, name, description, icon, color, level, position, workflow_id, created_at
+INSERT INTO issue_types (project_id, key, name, description, icon, color, level, position, workflow_id, kind)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+RETURNING id, project_id, key, name, description, icon, color, level, position, workflow_id, created_at, kind
 `
 
 type CreateIssueTypeParams struct {
@@ -126,6 +158,7 @@ type CreateIssueTypeParams struct {
 	Level       int32
 	Position    int32
 	WorkflowID  uuid.UUID
+	Kind        string
 }
 
 func (q *Queries) CreateIssueType(ctx context.Context, arg CreateIssueTypeParams) (IssueType, error) {
@@ -139,6 +172,7 @@ func (q *Queries) CreateIssueType(ctx context.Context, arg CreateIssueTypeParams
 		arg.Level,
 		arg.Position,
 		arg.WorkflowID,
+		arg.Kind,
 	)
 	var i IssueType
 	err := row.Scan(
@@ -153,6 +187,7 @@ func (q *Queries) CreateIssueType(ctx context.Context, arg CreateIssueTypeParams
 		&i.Position,
 		&i.WorkflowID,
 		&i.CreatedAt,
+		&i.Kind,
 	)
 	return i, err
 }
@@ -160,7 +195,7 @@ func (q *Queries) CreateIssueType(ctx context.Context, arg CreateIssueTypeParams
 const createProject = `-- name: CreateProject :one
 INSERT INTO projects (key, name, description, lead_id, template, open_role_id)
 VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, key, name, description, lead_id, template, open_role_id, issue_counter, archived_at, created_at, updated_at
+RETURNING id, key, name, description, lead_id, template, open_role_id, issue_counter, archived_at, created_at, updated_at, risks_decisions
 `
 
 type CreateProjectParams struct {
@@ -194,6 +229,7 @@ func (q *Queries) CreateProject(ctx context.Context, arg CreateProjectParams) (P
 		&i.ArchivedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.RisksDecisions,
 	)
 	return i, err
 }
@@ -324,6 +360,36 @@ func (q *Queries) DeleteWorkflow(ctx context.Context, id uuid.UUID) error {
 	return err
 }
 
+const ensureFieldDefinition = `-- name: EnsureFieldDefinition :exec
+INSERT INTO field_definitions (key, name, description, type, options, project_ids, issue_type_keys)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+ON CONFLICT (key) DO NOTHING
+`
+
+type EnsureFieldDefinitionParams struct {
+	Key           string
+	Name          string
+	Description   string
+	Type          string
+	Options       json.RawMessage
+	ProjectIds    []uuid.UUID
+	IssueTypeKeys []string
+}
+
+// Creates a field unless one with the key exists (risks and decisions set up their fields).
+func (q *Queries) EnsureFieldDefinition(ctx context.Context, arg EnsureFieldDefinitionParams) error {
+	_, err := q.db.Exec(ctx, ensureFieldDefinition,
+		arg.Key,
+		arg.Name,
+		arg.Description,
+		arg.Type,
+		arg.Options,
+		arg.ProjectIds,
+		arg.IssueTypeKeys,
+	)
+	return err
+}
+
 const getFieldDefinition = `-- name: GetFieldDefinition :one
 SELECT id, key, name, description, type, options, project_ids, issue_type_keys, created_at, updated_at FROM field_definitions WHERE id = $1
 `
@@ -346,8 +412,30 @@ func (q *Queries) GetFieldDefinition(ctx context.Context, id uuid.UUID) (FieldDe
 	return i, err
 }
 
+const getFieldDefinitionByKey = `-- name: GetFieldDefinitionByKey :one
+SELECT id, key, name, description, type, options, project_ids, issue_type_keys, created_at, updated_at FROM field_definitions WHERE key = $1
+`
+
+func (q *Queries) GetFieldDefinitionByKey(ctx context.Context, key string) (FieldDefinition, error) {
+	row := q.db.QueryRow(ctx, getFieldDefinitionByKey, key)
+	var i FieldDefinition
+	err := row.Scan(
+		&i.ID,
+		&i.Key,
+		&i.Name,
+		&i.Description,
+		&i.Type,
+		&i.Options,
+		&i.ProjectIds,
+		&i.IssueTypeKeys,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getIssueType = `-- name: GetIssueType :one
-SELECT id, project_id, key, name, description, icon, color, level, position, workflow_id, created_at FROM issue_types WHERE id = $1
+SELECT id, project_id, key, name, description, icon, color, level, position, workflow_id, created_at, kind FROM issue_types WHERE id = $1
 `
 
 func (q *Queries) GetIssueType(ctx context.Context, id uuid.UUID) (IssueType, error) {
@@ -365,12 +453,13 @@ func (q *Queries) GetIssueType(ctx context.Context, id uuid.UUID) (IssueType, er
 		&i.Position,
 		&i.WorkflowID,
 		&i.CreatedAt,
+		&i.Kind,
 	)
 	return i, err
 }
 
 const getIssueTypeByKey = `-- name: GetIssueTypeByKey :one
-SELECT id, project_id, key, name, description, icon, color, level, position, workflow_id, created_at FROM issue_types WHERE project_id = $1 AND key = $2
+SELECT id, project_id, key, name, description, icon, color, level, position, workflow_id, created_at, kind FROM issue_types WHERE project_id = $1 AND key = $2
 `
 
 type GetIssueTypeByKeyParams struct {
@@ -393,12 +482,13 @@ func (q *Queries) GetIssueTypeByKey(ctx context.Context, arg GetIssueTypeByKeyPa
 		&i.Position,
 		&i.WorkflowID,
 		&i.CreatedAt,
+		&i.Kind,
 	)
 	return i, err
 }
 
 const getIssueTypesByIDs = `-- name: GetIssueTypesByIDs :many
-SELECT id, project_id, key, name, description, icon, color, level, position, workflow_id, created_at FROM issue_types WHERE id = ANY($1::uuid[])
+SELECT id, project_id, key, name, description, icon, color, level, position, workflow_id, created_at, kind FROM issue_types WHERE id = ANY($1::uuid[])
 `
 
 func (q *Queries) GetIssueTypesByIDs(ctx context.Context, ids []uuid.UUID) ([]IssueType, error) {
@@ -422,6 +512,7 @@ func (q *Queries) GetIssueTypesByIDs(ctx context.Context, ids []uuid.UUID) ([]Is
 			&i.Position,
 			&i.WorkflowID,
 			&i.CreatedAt,
+			&i.Kind,
 		); err != nil {
 			return nil, err
 		}
@@ -434,7 +525,7 @@ func (q *Queries) GetIssueTypesByIDs(ctx context.Context, ids []uuid.UUID) ([]Is
 }
 
 const getProject = `-- name: GetProject :one
-SELECT id, key, name, description, lead_id, template, open_role_id, issue_counter, archived_at, created_at, updated_at FROM projects WHERE id = $1
+SELECT id, key, name, description, lead_id, template, open_role_id, issue_counter, archived_at, created_at, updated_at, risks_decisions FROM projects WHERE id = $1
 `
 
 func (q *Queries) GetProject(ctx context.Context, id uuid.UUID) (Project, error) {
@@ -452,12 +543,13 @@ func (q *Queries) GetProject(ctx context.Context, id uuid.UUID) (Project, error)
 		&i.ArchivedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.RisksDecisions,
 	)
 	return i, err
 }
 
 const getProjectByAlias = `-- name: GetProjectByAlias :one
-SELECT p.id, p.key, p.name, p.description, p.lead_id, p.template, p.open_role_id, p.issue_counter, p.archived_at, p.created_at, p.updated_at FROM projects p JOIN project_key_aliases a ON a.project_id = p.id WHERE a.key = upper($1::text)
+SELECT p.id, p.key, p.name, p.description, p.lead_id, p.template, p.open_role_id, p.issue_counter, p.archived_at, p.created_at, p.updated_at, p.risks_decisions FROM projects p JOIN project_key_aliases a ON a.project_id = p.id WHERE a.key = upper($1::text)
 `
 
 func (q *Queries) GetProjectByAlias(ctx context.Context, key string) (Project, error) {
@@ -475,12 +567,13 @@ func (q *Queries) GetProjectByAlias(ctx context.Context, key string) (Project, e
 		&i.ArchivedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.RisksDecisions,
 	)
 	return i, err
 }
 
 const getProjectByKey = `-- name: GetProjectByKey :one
-SELECT id, key, name, description, lead_id, template, open_role_id, issue_counter, archived_at, created_at, updated_at FROM projects WHERE key = upper($1::text)
+SELECT id, key, name, description, lead_id, template, open_role_id, issue_counter, archived_at, created_at, updated_at, risks_decisions FROM projects WHERE key = upper($1::text)
 `
 
 func (q *Queries) GetProjectByKey(ctx context.Context, key string) (Project, error) {
@@ -498,6 +591,7 @@ func (q *Queries) GetProjectByKey(ctx context.Context, key string) (Project, err
 		&i.ArchivedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.RisksDecisions,
 	)
 	return i, err
 }
@@ -823,7 +917,7 @@ func (q *Queries) ListFieldDefinitions(ctx context.Context) ([]FieldDefinition, 
 
 const listIssueTypes = `-- name: ListIssueTypes :many
 
-SELECT it.id, it.project_id, it.key, it.name, it.description, it.icon, it.color, it.level, it.position, it.workflow_id, it.created_at, w.name AS workflow_name FROM issue_types it JOIN workflows w ON w.id = it.workflow_id
+SELECT it.id, it.project_id, it.key, it.name, it.description, it.icon, it.color, it.level, it.position, it.workflow_id, it.created_at, it.kind, w.name AS workflow_name FROM issue_types it JOIN workflows w ON w.id = it.workflow_id
 WHERE it.project_id = $1 ORDER BY it.level DESC, it.position
 `
 
@@ -839,6 +933,7 @@ type ListIssueTypesRow struct {
 	Position     int32
 	WorkflowID   uuid.UUID
 	CreatedAt    time.Time
+	Kind         string
 	WorkflowName string
 }
 
@@ -865,6 +960,7 @@ func (q *Queries) ListIssueTypes(ctx context.Context, projectID uuid.UUID) ([]Li
 			&i.Position,
 			&i.WorkflowID,
 			&i.CreatedAt,
+			&i.Kind,
 			&i.WorkflowName,
 		); err != nil {
 			return nil, err
@@ -934,7 +1030,7 @@ func (q *Queries) ListProjectMembers(ctx context.Context, projectID uuid.UUID) (
 }
 
 const listProjects = `-- name: ListProjects :many
-SELECT id, key, name, description, lead_id, template, open_role_id, issue_counter, archived_at, created_at, updated_at FROM projects WHERE archived_at IS NULL ORDER BY name
+SELECT id, key, name, description, lead_id, template, open_role_id, issue_counter, archived_at, created_at, updated_at, risks_decisions FROM projects WHERE archived_at IS NULL ORDER BY name
 `
 
 func (q *Queries) ListProjects(ctx context.Context) ([]Project, error) {
@@ -958,6 +1054,7 @@ func (q *Queries) ListProjects(ctx context.Context) ([]Project, error) {
 			&i.ArchivedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.RisksDecisions,
 		); err != nil {
 			return nil, err
 		}
@@ -970,7 +1067,7 @@ func (q *Queries) ListProjects(ctx context.Context) ([]Project, error) {
 }
 
 const listProjectsByIDs = `-- name: ListProjectsByIDs :many
-SELECT id, key, name, description, lead_id, template, open_role_id, issue_counter, archived_at, created_at, updated_at FROM projects WHERE id = ANY($1::uuid[])
+SELECT id, key, name, description, lead_id, template, open_role_id, issue_counter, archived_at, created_at, updated_at, risks_decisions FROM projects WHERE id = ANY($1::uuid[])
 `
 
 func (q *Queries) ListProjectsByIDs(ctx context.Context, ids []uuid.UUID) ([]Project, error) {
@@ -994,6 +1091,7 @@ func (q *Queries) ListProjectsByIDs(ctx context.Context, ids []uuid.UUID) ([]Pro
 			&i.ArchivedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.RisksDecisions,
 		); err != nil {
 			return nil, err
 		}
@@ -1266,6 +1364,35 @@ func (q *Queries) SetProjectCounter(ctx context.Context, arg SetProjectCounterPa
 	return err
 }
 
+const setProjectRisksDecisions = `-- name: SetProjectRisksDecisions :one
+UPDATE projects SET risks_decisions = $1, updated_at = now() WHERE id = $2 RETURNING id, key, name, description, lead_id, template, open_role_id, issue_counter, archived_at, created_at, updated_at, risks_decisions
+`
+
+type SetProjectRisksDecisionsParams struct {
+	RisksDecisions bool
+	ID             uuid.UUID
+}
+
+func (q *Queries) SetProjectRisksDecisions(ctx context.Context, arg SetProjectRisksDecisionsParams) (Project, error) {
+	row := q.db.QueryRow(ctx, setProjectRisksDecisions, arg.RisksDecisions, arg.ID)
+	var i Project
+	err := row.Scan(
+		&i.ID,
+		&i.Key,
+		&i.Name,
+		&i.Description,
+		&i.LeadID,
+		&i.Template,
+		&i.OpenRoleID,
+		&i.IssueCounter,
+		&i.ArchivedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.RisksDecisions,
+	)
+	return i, err
+}
+
 const setWorkflowVersion = `-- name: SetWorkflowVersion :exec
 UPDATE workflows SET current_version = $1, description = $2, updated_at = now() WHERE id = $3
 `
@@ -1329,7 +1456,7 @@ func (q *Queries) UpdateFieldDefinition(ctx context.Context, arg UpdateFieldDefi
 const updateIssueType = `-- name: UpdateIssueType :one
 UPDATE issue_types SET name = $1, description = $2, icon = $3, color = $4, workflow_id = $5
 WHERE id = $6
-RETURNING id, project_id, key, name, description, icon, color, level, position, workflow_id, created_at
+RETURNING id, project_id, key, name, description, icon, color, level, position, workflow_id, created_at, kind
 `
 
 type UpdateIssueTypeParams struct {
@@ -1363,6 +1490,7 @@ func (q *Queries) UpdateIssueType(ctx context.Context, arg UpdateIssueTypeParams
 		&i.Position,
 		&i.WorkflowID,
 		&i.CreatedAt,
+		&i.Kind,
 	)
 	return i, err
 }
@@ -1371,7 +1499,7 @@ const updateProject = `-- name: UpdateProject :one
 UPDATE projects SET key = $1, name = $2, description = $3, lead_id = $4,
     open_role_id = $5, updated_at = now()
 WHERE id = $6
-RETURNING id, key, name, description, lead_id, template, open_role_id, issue_counter, archived_at, created_at, updated_at
+RETURNING id, key, name, description, lead_id, template, open_role_id, issue_counter, archived_at, created_at, updated_at, risks_decisions
 `
 
 type UpdateProjectParams struct {
@@ -1405,6 +1533,7 @@ func (q *Queries) UpdateProject(ctx context.Context, arg UpdateProjectParams) (P
 		&i.ArchivedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.RisksDecisions,
 	)
 	return i, err
 }
