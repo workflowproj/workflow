@@ -16,6 +16,9 @@ request, plus a service desk for requests from outside the team.
   post-functions, edited visually or applied from CI.
 - **Boards and planning**: Scrum and Kanban boards with WIP limits and swimlanes, a ranked backlog,
   sprints, releases and a timeline across projects, updated live.
+- **Releases**: a page per release with progress, a burnup and readiness checks before you ship,
+  release notes generated from done issues and published to the help centre, Git tags and the
+  environments a release reached.
 - **Search**: a JQL-like query language compiled to SQL, with saved and shared filters.
 - **Reports and dashboards**: lead and cycle time, burndown and burnup, velocity, cumulative flow
   and breakdowns, on personal and shared dashboards.
@@ -24,7 +27,7 @@ request, plus a service desk for requests from outside the team.
   on business-hours calendars and approvals.
 - **Automation**: rules on issue events, Git activity or a schedule, and signed outbound webhooks.
 - **Git**: GitHub and GitLab (cloud or self-managed) linked to issues by key, with smart commits,
-  pull and merge requests and pipeline status.
+  pull and merge requests, pipeline status, tags and deployments.
 - **Identity**: sign-in with any OpenID Connect provider, groups from sign-in tokens, single and
   back-channel logout, directory sync from Google Workspace or Keycloak, SCIM 2.0, and local
   accounts with two-factor authentication.
@@ -65,12 +68,13 @@ The reference pages live in [`docs/`](docs/) and are published at
 | [Configuration](docs/configuration.md) | Every `WFM_*` environment variable |
 | [Sign-in and provisioning](docs/identity.md) | OpenID Connect, SCIM, Google and Keycloak directory sync, local accounts, roles and tokens |
 | [Workflows as code](docs/workflows.md) | The YAML format, CEL reference, versioning and migration |
+| [Releases](docs/releases.md) | Release pages, readiness, release notes and What's new, tags and deployments |
 | [Search](docs/search.md) | The query language |
 | [Metrics and dashboards](docs/metrics.md) | Issue timing, sprint reports, flow metrics, dashboards |
 | [Time tracking](docs/time-tracking.md) | Estimates, logging work, the hours burndown and the timesheet |
 | [Service desk](docs/service-desk.md) | Help centre, customers, request types, queues, SLAs and approvals |
 | [Automation and webhooks](docs/automation.md) | Rules, actions, outbound webhook signatures |
-| [GitHub and GitLab](docs/scm.md) | Connecting a GitHub App or GitLab, smart commits, write-back |
+| [GitHub and GitLab](docs/scm.md) | Connecting a GitHub App or GitLab, smart commits, write-back, tags and deployments |
 | [Notifications and email](docs/notifications.md) | Email preferences, immediate emails, daily digests, unsubscribe |
 | [Slack and Mattermost](docs/chat.md) | Channel notifications and the `/wfm` command |
 | [AI assistants (MCP)](docs/mcp.md) | Connecting Claude and other assistants; the tools |
