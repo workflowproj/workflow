@@ -139,8 +139,9 @@ function MoreMenu() {
   const navigate = useNavigate();
   const { data: types = [] } = useQuery(issueTypesQuery(issue.projectKey));
   const { data: project } = useProject(issue.projectKey);
-  const sameLevel = types.filter((t) => t.level === issue.type.level && t.key !== issue.type.key);
-  const childLevel = hasPermission(project, "issue.create") && types.some((t) => t.level === issue.type.level - 1);
+  // Types of the same level and kind: work stays work, a risk stays a risk.
+  const sameLevel = types.filter((t) => t.level === issue.type.level && t.kind === issue.type.kind && t.key !== issue.type.key);
+  const childLevel = hasPermission(project, "issue.create") && issue.type.kind === "work" && types.some((t) => t.level === issue.type.level - 1);
   const remove = useMutation({
     mutationFn: () => unwrap(api.DELETE("/issues/{issueKey}", { params: { path: { issueKey: issue.key } } })),
     onSuccess: () => {

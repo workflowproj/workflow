@@ -20,6 +20,7 @@ import { DetailsPanel } from "./DetailsPanel";
 import { MetricsPanel } from "./MetricsPanel";
 import { TimeTrackingPanel } from "@/features/time/TimeTrackingPanel";
 import { RequestPanel } from "@/features/servicedesk/RequestPanel";
+import { DecisionPanel, DecisionRecord, MitigationSection, RiskPanel } from "@/features/risks/panels";
 
 /**
  * IssueView is the full issue view: header, description, sub-tasks, links, comments,
@@ -79,12 +80,16 @@ function IssueLayout({ gone }: { gone: boolean }) {
         </div>
         <aside className="flex min-w-0 flex-col gap-4 [grid-area:side]">
           {project?.template === "service" && <RequestPanel />}
+          {issue.type.kind === "risk" && <RiskPanel />}
+          {issue.type.kind === "decision" && <DecisionPanel />}
           <DetailsPanel />
           <TimeTrackingPanel />
           <MetricsPanel />
         </aside>
         <div className="flex min-w-0 flex-col gap-8 [grid-area:body]">
           <DescriptionSection />
+          {issue.type.kind === "risk" && <MitigationSection />}
+          {issue.type.kind === "decision" && <DecisionRecord />}
           <AttachmentsSection upload={upload} uploading={uploading} />
           <ChildrenSection />
           <LinksSection />
@@ -103,7 +108,7 @@ function QuickActions() {
   const { data: types = [] } = useQuery(issueTypesQuery(issue.projectKey));
   const { data: project } = useProject(issue.projectKey);
   const p = issue.permissions;
-  const childLevel = issue.type.level >= 0 && hasPermission(project, "issue.create") && types.some((t) => t.level === issue.type.level - 1);
+  const childLevel = issue.type.level >= 0 && issue.type.kind === "work" && hasPermission(project, "issue.create") && types.some((t) => t.level === issue.type.level - 1);
   return (
     <>
       {p.comment && (

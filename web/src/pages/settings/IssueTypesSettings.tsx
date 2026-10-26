@@ -8,7 +8,7 @@ import type { IssueType } from "@/api/types";
 import { Button, EmptyState, IconButton, PageHeader, PageSpinner, table, useConfirm, useToast } from "@/components/ui";
 import { ErrorBox } from "@/components/ErrorBox";
 import { IssueTypeIcon } from "@/components/issue-bits";
-import { IssueTypeDialog, LEVELS } from "@/features/settings/IssueTypeDialog";
+import { IssueTypeDialog, KINDS, LEVELS } from "@/features/settings/IssueTypeDialog";
 
 const route = getRouteApi("/app/projects/$projectKey/settings/issue-types");
 
@@ -34,7 +34,7 @@ export function IssueTypesSettings() {
     <div className="flex max-w-5xl flex-col gap-5">
       <PageHeader
         title="Issue types"
-        subtitle="The kinds of work in this project, their place in the hierarchy and the workflow each one follows."
+        subtitle="The kinds of work in this project, their place in the hierarchy and the workflow each one follows. Risk and decision types live in their own section, outside planning."
         actions={
           <Button variant="primary" icon={<Plus className="size-4" />} onClick={() => setEditing("new")}>
             New issue type
@@ -56,6 +56,7 @@ export function IssueTypesSettings() {
                 <th>Issue type</th>
                 <th>Key</th>
                 <th>Level</th>
+                <th>Kind</th>
                 <th>Workflow</th>
                 <th className="w-20">
                   <span className="sr-only">Actions</span>
@@ -76,6 +77,7 @@ export function IssueTypesSettings() {
                   </td>
                   <td className="font-mono text-xs text-muted">{t.key}</td>
                   <td className="text-muted">{LEVELS.find((l) => l.value === t.level)?.label ?? t.level}</td>
+                  <td className="text-muted">{KINDS.find((k) => k.value === t.kind)?.label ?? t.kind}</td>
                   <td>
                     <Link to="/projects/$projectKey/settings/workflows/$workflowId" params={{ projectKey, workflowId: t.workflowId }} className="hover:text-accent hover:underline">
                       {t.workflowName}

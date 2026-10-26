@@ -42,7 +42,7 @@ describe("templates", () => {
 
   it("filters my work to the viewer", () => {
     const d = templateById("mine").build([]);
-    expect(d.gadgets.every((g) => g.config.jql?.startsWith("assignee = currentUser()"))).toBe(true);
+    expect(d.gadgets.every((g) => g.config.jql?.startsWith("assignee = currentUser() AND kind = work"))).toBe(true);
     expect(d.shared).toBe(false);
   });
 

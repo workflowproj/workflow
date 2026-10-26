@@ -12,6 +12,7 @@ import { IssueKeyLink, useIssue } from "./issue-context";
 import { ghost, InlineDate, InlineLabels, InlineMulti, InlineSelect, InlineText, InlineUser, MenuKeys, None } from "./inline-edit";
 import { CustomFieldInline, fieldsFor, priorityOptions } from "./field-values";
 import { IssuePicker } from "./IssuePicker";
+import { RESERVED_FIELDS } from "@/features/risks/model";
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -24,16 +25,22 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-/** DetailsPanel is the issue's field sidebar; every field saves on its own with a PATCH. */
+/**
+ * DetailsPanel is the issue's field sidebar; every field saves on its own with a PATCH. Risks and
+ * decisions leave out the planning fields (epic, sprint, fix versions, story points); their own
+ * fields are in the risk and decision panels.
+ */
 export function DetailsPanel() {
   const { issue, update } = useIssue();
   const { data: me } = useMe();
   const { data: defs = [] } = useQuery(fieldsQuery);
   const level = issue.type.level;
-  const { data: sprints = [] } = useQuery({ ...sprintsQuery(issue.projectKey), enabled: level === 0 });
-  const { data: releases = [] } = useQuery(releasesQuery(issue.projectKey));
+  const planned = issue.type.kind === "work";
+  const risk = issue.type.kind === "risk";
+  const { data: sprints = [] } = useQuery({ ...sprintsQuery(issue.projectKey), enabled: level === 0 && planned });
+  const { data: releases = [] } = useQuery({ ...releasesQuery(issue.projectKey), enabled: planned });
   const p = issue.permissions;
-  const custom = fieldsFor(defs, issue.projectKey, issue.type.key);
+  const custom = fieldsFor(defs, issue.projectKey, issue.type.key).filter((d) => !RESERVED_FIELDS.has(d.key));
 
   const assign = (u: User | null) => update({ assigneeId: u?.id ?? null }, { assignee: u ?? undefined });
   const canAssignSelf = !!me && issue.assignee?.id !== me.id && (p.assign || p.edit || p.transition);
@@ -49,8 +56,8 @@ export function DetailsPanel() {
     <div className="@container rounded-lg border border-line bg-surface">
       <h2 className="border-b border-line px-4 py-2.5 text-sm font-semibold">Details</h2>
       <dl className="grid gap-x-8 gap-y-1.5 px-4 py-3 @xl:grid-cols-2">
-        <Row label="Assignee">
-          <InlineUser label="Assignee" value={issue.assignee} project={issue.projectKey} disabled={!p.assign} onCommit={assign} />
+        <Row label={risk ? "Owner" : "Assignee"}>
+          <InlineUser label={risk ? "Owner" : "Assignee"} value={issue.assignee} project={issue.projectKey} disabled={!p.assign} onCommit={assign} />
           {canAssignSelf && (
             <button type="button" onClick={() => assign(me)} className="mb-1 text-xs text-accent hover:underline">
               Assign to me
@@ -76,7 +83,7 @@ export function DetailsPanel() {
             onCommit={(v) => v && update({ priority: v as Priority }, { priority: v as Priority })}
           />
         </Row>
-        {level === 0 && <ParentRow />}
+        {level === 0 && planned && <ParentRow />}
         {level < 0 && issue.parent && (
           <Row label="Parent">
             <div className="flex min-h-8 items-center gap-2 text-sm">
@@ -87,7 +94,7 @@ export function DetailsPanel() {
             </div>
           </Row>
         )}
-        {level === 0 && (sprintOptions.length > 0 || issue.sprint) && (
+        {level === 0 && planned && (sprintOptions.length > 0 || issue.sprint) && (
           <Row label="Sprint">
             <InlineSelect
               label="Sprint"
@@ -107,20 +114,22 @@ export function DetailsPanel() {
             </p>
           </Row>
         )}
-        <Row label="Fix versions">
-          <InlineMulti
-            label="Fix versions"
-            values={issue.releases.map((r) => r.id)}
-            options={releaseOptions}
-            disabled={!p.edit}
-            empty="No unreleased versions. Create one on the Releases page."
-            onCommit={(ids) => update({ releaseIds: ids }, { releases: releases.filter((r) => ids.includes(r.id)) })}
-          />
-        </Row>
+        {(planned || issue.releases.length > 0) && (
+          <Row label="Fix versions">
+            <InlineMulti
+              label="Fix versions"
+              values={issue.releases.map((r) => r.id)}
+              options={releaseOptions}
+              disabled={!p.edit}
+              empty="No unreleased versions. Create one on the Releases page."
+              onCommit={(ids) => update({ releaseIds: ids }, { releases: releases.filter((r) => ids.includes(r.id)) })}
+            />
+          </Row>
+        )}
         <Row label="Labels">
           <InlineLabels value={issue.labels} projectKey={issue.projectKey} disabled={!p.edit} onCommit={(labels) => update({ labels }, { labels })} />
         </Row>
-        {level >= 0 && (
+        {level >= 0 && planned && (
           <Row label="Story points">
             <InlineText
               label="Story points"
@@ -138,9 +147,9 @@ export function DetailsPanel() {
         <Row label="Start date">
           <InlineDate label="Start date" value={issue.startDate} disabled={!p.edit} onCommit={(v) => update({ startDate: v }, { startDate: v ?? undefined })} />
         </Row>
-        <Row label="Due date">
+        <Row label={risk ? "Review date" : "Due date"}>
           <div className={cn(isOverdue(issue) && "text-danger")}>
-            <InlineDate label="Due date" value={issue.dueDate} disabled={!p.edit} onCommit={(v) => update({ dueDate: v }, { dueDate: v ?? undefined })} />
+            <InlineDate label={risk ? "Review date" : "Due date"} value={issue.dueDate} disabled={!p.edit} onCommit={(v) => update({ dueDate: v }, { dueDate: v ?? undefined })} />
           </div>
         </Row>
         {custom.map((def) => (

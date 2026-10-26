@@ -34,7 +34,7 @@ transitions:
   - name: Close
     from: [Open, In Progress]
     to: Closed
-    screen: [{ field: resolution, required: true }, comment]
+    screen: [{ field: resolution, required: true, options: [Fixed, Not a bug] }, comment]
     validators:
       - 'issue.subtasks.all(s, s.category == "done")'
       - { expr: 'issue.assignee != ""', message: Assign it first. }
@@ -55,7 +55,7 @@ describe("parseWorkflowYaml", () => {
     expect(d.name).toBe("Bug triage");
     expect(d.statuses.map((s) => s.name)).toEqual(["Open", "In Progress", "Closed", "Won't Fix"]);
     expect(d.transitions[0].from).toEqual(["Open"]); // `from: Open` is a one-element list
-    expect(d.transitions[1].screen).toEqual([{ field: "resolution", required: true }, { field: "comment" }]);
+    expect(d.transitions[1].screen).toEqual([{ field: "resolution", required: true, options: ["Fixed", "Not a bug"] }, { field: "comment" }]);
     expect(d.transitions[1].validators).toEqual([{ expr: 'issue.subtasks.all(s, s.category == "done")' }, { expr: 'issue.assignee != ""', message: "Assign it first." }]);
     expect(d.transitions[2].from).toBeUndefined(); // global
     expect(d.transitions[3].from).toBeUndefined(); // "*" means any

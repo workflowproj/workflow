@@ -68,6 +68,11 @@ export function FieldsAdmin() {
                   <td>
                     <span className="block font-medium">{f.name}</span>
                     <code className="font-mono text-xs text-muted">{f.key}</code>
+                    {f.reserved && (
+                      <span className="mt-1 block" title="Set up by a project's Risks and decisions setting; search and the risk matrix rely on it">
+                        <Badge tone="accent">Risks and decisions</Badge>
+                      </span>
+                    )}
                   </td>
                   <td>
                     <Badge>{FIELD_TYPES.find((t) => t.id === f.type)?.label ?? f.type}</Badge>
@@ -91,26 +96,31 @@ export function FieldsAdmin() {
                     <span className="block text-xs">{f.issueTypeKeys?.length ? f.issueTypeKeys.join(", ") : "All issue types"}</span>
                   </td>
                   <td className="text-right whitespace-nowrap">
-                    <IconButton label={`Edit ${f.name}`} size="sm" onClick={() => setEditing(f)}>
-                      <Pencil className="size-4" />
-                    </IconButton>
-                    <IconButton
-                      label={`Delete ${f.name}`}
-                      size="sm"
-                      onClick={async () => {
-                        if (
-                          await confirm({
-                            title: `Delete ${f.name}?`,
-                            body: "The field disappears from issues, screens and search. Stored values are kept on issues but no longer shown.",
-                            confirmLabel: "Delete field",
-                            danger: true,
-                          })
-                        )
-                          remove.mutate(f);
-                      }}
-                    >
-                      <Trash2 className="size-4" />
-                    </IconButton>
+                    {/* Reserved fields follow the projects' Risks and decisions setting. */}
+                    {!f.reserved && (
+                      <>
+                        <IconButton label={`Edit ${f.name}`} size="sm" onClick={() => setEditing(f)}>
+                          <Pencil className="size-4" />
+                        </IconButton>
+                        <IconButton
+                          label={`Delete ${f.name}`}
+                          size="sm"
+                          onClick={async () => {
+                            if (
+                              await confirm({
+                                title: `Delete ${f.name}?`,
+                                body: "The field disappears from issues, screens and search. Stored values are kept on issues but no longer shown.",
+                                confirmLabel: "Delete field",
+                                danger: true,
+                              })
+                            )
+                              remove.mutate(f);
+                          }}
+                        >
+                          <Trash2 className="size-4" />
+                        </IconButton>
+                      </>
+                    )}
                   </td>
                 </tr>
               ))}

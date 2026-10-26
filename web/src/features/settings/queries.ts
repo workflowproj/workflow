@@ -49,11 +49,12 @@ export type ProjectStatus = { id: string; name: string; category: StatusCategory
 
 /**
  * useProjectStatuses lists the statuses the project's issue types can be in, gathered from the
- * current version of each workflow the project uses (in workflow order, deduplicated).
+ * current version of each workflow the project uses (in workflow order, deduplicated). With
+ * `workOnly`, only work types count: boards never show risks or decisions.
  */
-export function useProjectStatuses(projectKey: string) {
+export function useProjectStatuses(projectKey: string, { workOnly = false }: { workOnly?: boolean } = {}) {
   const types = useQuery(issueTypesQuery(projectKey));
-  const ids = [...new Set((types.data ?? []).map((t) => t.workflowId))];
+  const ids = [...new Set((types.data ?? []).filter((t) => !workOnly || t.kind === "work").map((t) => t.workflowId))];
   const workflows = useQueries({ queries: ids.map((id) => workflowQuery(id)) });
   const loading = types.isLoading || workflows.some((w) => w.isLoading);
   const error = types.error ?? workflows.find((w) => w.error)?.error;

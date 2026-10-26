@@ -152,7 +152,7 @@ function RequestTypeDialog({
   const { data: issueTypes = [] } = useQuery(issueTypesQuery(projectKey));
   const { data: defs = [] } = useQuery(fieldsQuery);
   const { data: allGroups = [] } = useQuery({ queryKey: ["groups", ""], queryFn: () => unwrap(api.GET("/groups")) });
-  const standard = issueTypes.filter((t) => t.level === 0);
+  const standard = issueTypes.filter((t) => t.level === 0 && t.kind === "work");
   const [name, setName] = useState(type?.name ?? "");
   const [description, setDescription] = useState(type?.description ?? "");
   const [icon, setIcon] = useState(type?.icon ?? "help");

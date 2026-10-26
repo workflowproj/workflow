@@ -175,6 +175,20 @@ const queuesRoute = createRoute({
   component: lazyRouteComponent(() => import("@/pages/project/QueuesPage"), "QueuesPage"),
 });
 const releasesRoute = createRoute({ getParentRoute: () => projectRoute, path: "/releases", validateSearch: issueSearch, component: lazyRouteComponent(() => import("@/pages/project/ReleasesPage"), "ReleasesPage") });
+// Risks and decisions: the project's own section, outside planning (shown when it is turned on).
+export type RisksSearch = { cell?: string; status?: "closed" | "all"; issue?: string };
+const risksRoute = createRoute({
+  getParentRoute: () => projectRoute,
+  path: "/risks",
+  validateSearch: (s: Record<string, unknown>): RisksSearch => ({ cell: str(s.cell), status: s.status === "closed" || s.status === "all" ? s.status : undefined, issue: str(s.issue) }),
+  component: lazyRouteComponent(() => import("@/pages/project/RisksPage"), "RisksPage"),
+});
+const decisionsRoute = createRoute({
+  getParentRoute: () => projectRoute,
+  path: "/decisions",
+  validateSearch: (s: Record<string, unknown>): { status?: string; issue?: string } => ({ status: str(s.status), issue: str(s.issue) }),
+  component: lazyRouteComponent(() => import("@/pages/project/DecisionsPage"), "DecisionsPage"),
+});
 const reportsRoute = createRoute({ getParentRoute: () => projectRoute, path: "/reports", component: lazyRouteComponent(() => import("@/pages/project/ReportsPage"), "ReportsPage") });
 
 const customersRoute = createRoute({ getParentRoute: () => projectRoute, path: "/customers", component: lazyRouteComponent(() => import("@/pages/project/CustomersPage"), "CustomersPage") });
@@ -267,6 +281,8 @@ export const routeTree = rootRoute.addChildren([
       queuesRoute,
       customersRoute,
       releasesRoute,
+      risksRoute,
+      decisionsRoute,
       reportsRoute,
       settingsRoute.addChildren([
         settingsIndexRoute,

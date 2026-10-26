@@ -3,6 +3,7 @@ import { getRouteApi, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bot, ChevronDown, ChevronRight, Clock, Pencil, Plus, RefreshCw, Sparkles, Trash2 } from "lucide-react";
 import { api, unwrap } from "@/api/client";
+import { useProject } from "@/api/queries";
 import { Badge, Button, IconButton, Modal, PageHeader, PageSpinner, Spinner, useConfirm, useToast } from "@/components/ui";
 import { ErrorBox } from "@/components/ErrorBox";
 import { Switch, When } from "@/features/settings/common";
@@ -24,6 +25,8 @@ export function AutomationSettings() {
     queryFn: () => unwrap(api.GET("/projects/{projectKey}/automation-rules", { params: { path: { projectKey } } })),
   });
   const project = useProjectStatuses(projectKey);
+  const { data: settings } = useProject(projectKey);
+  const hasRisks = !!settings?.risksDecisions;
   const [dialog, setDialog] = useState<{ rule?: Rule; template?: RuleTemplate } | null>(null);
   const [gallery, setGallery] = useState(false);
   const list = rules.data ?? [];
@@ -76,7 +79,7 @@ export function AutomationSettings() {
             </Button>
           </div>
           <div className="p-4">
-            <TemplateGallery onPick={pick} existingNames={existingNames} statusNames={statusNames} hasChat={channels.length > 0} />
+            <TemplateGallery onPick={pick} existingNames={existingNames} statusNames={statusNames} hasChat={channels.length > 0} hasRisks={hasRisks} />
           </div>
         </section>
       ) : (
@@ -87,7 +90,7 @@ export function AutomationSettings() {
         </ul>
       )}
       <Modal open={gallery} onClose={() => setGallery(false)} title="Start from a template" size="xl">
-        <TemplateGallery onPick={pick} existingNames={existingNames} statusNames={statusNames} hasChat={channels.length > 0} />
+        <TemplateGallery onPick={pick} existingNames={existingNames} statusNames={statusNames} hasChat={channels.length > 0} hasRisks={hasRisks} />
       </Modal>
       {dialog && <RuleDialog projectKey={projectKey} rule={dialog.rule} initial={dialog.template?.rule} templateTitle={dialog.template?.title} onClose={() => setDialog(null)} />}
     </div>

@@ -30,9 +30,12 @@ import { assignStatus, insertColumn, moveColumn, removeColumn, renameColumn, set
 
 export type StatusInfo = { id: string; name: string; category: StatusCategory; inProject: boolean };
 
-/** useStatusInfo lists every status a column might reference: the project's (in workflow order) plus stale ones. */
+/**
+ * useStatusInfo lists every status a column might reference: the project's work statuses (in
+ * workflow order) plus stale ones. Risk and decision statuses never need a column.
+ */
 export function useStatusInfo(projectKey: string) {
-  const project = useProjectStatuses(projectKey);
+  const project = useProjectStatuses(projectKey, { workOnly: true });
   const { data: all = [] } = useQuery(statusesQuery);
   const statuses = new Map<string, StatusInfo>();
   for (const s of project.statuses) statuses.set(s.id, { id: s.id, name: s.name, category: s.category, inProject: true });
