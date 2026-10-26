@@ -279,6 +279,12 @@ func TestReleaseNotesInTheHelpCentre(t *testing.T) {
 	projects := sd["releaseNotesProjects"].([]any)
 	eq(t, len(projects), 1, "one project")
 	eq(t, str(projects[0].(map[string]any), "key"), "APP", "APP chosen")
+	// A project another admin chose can stay, or go, without Pat being able to browse it.
+	admin.must("PATCH", "/api/v1/projects/HELP/service-desk", obj{"releaseNotesProjectKeys": []string{"APP", "SECRET"}}, 200, nil)
+	pat.must("PATCH", "/api/v1/projects/HELP/service-desk", obj{"releaseNotesProjectKeys": []string{"SECRET", "APP"}}, 200, &sd)
+	eq(t, len(sd["releaseNotesProjects"].([]any)), 2, "SECRET kept")
+	pat.must("PATCH", "/api/v1/projects/HELP/service-desk", obj{"releaseNotesProjectKeys": []string{"APP"}}, 200, &sd)
+	eq(t, len(sd["releaseNotesProjects"].([]any)), 1, "SECRET removed")
 
 	// Customers see the published notes of the chosen projects, and only the notes.
 	cust.get("/api/v1/portal/projects/HELP/whats-new", &notes)
