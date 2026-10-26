@@ -114,9 +114,11 @@ export function CopyableCode({ code }: { code: string }) {
       // Clipboard unavailable (insecure context): the text stays selectable.
     }
   };
+  // Long lines (a command with a token in it) wrap rather than scroll out of sight; Copy and
+  // selecting the text still give the command as it is, without the wraps.
   return (
     <div className="relative">
-      <pre className="overflow-x-auto rounded-md border border-line bg-surface-2 py-2.5 pr-20 pl-3 font-mono text-[12px] leading-relaxed">{code}</pre>
+      <pre className="rounded-md border border-line bg-surface-2 py-2.5 pr-20 pl-3 font-mono text-[12px] leading-relaxed whitespace-pre-wrap wrap-anywhere">{code}</pre>
       <button
         type="button"
         onClick={copy}

@@ -5,7 +5,7 @@ import { api, ApiError, unwrap, type Schemas } from "@/api/client";
 import { providersQuery } from "@/api/queries";
 import { Button, Field, Input, Modal, PageSpinner, Select, useToast } from "@/components/ui";
 import { ErrorBox } from "@/components/ErrorBox";
-import { CodeBlock } from "@/features/settings/common";
+import { CopyableCode } from "@/features/settings/tokens/ConnectSnippets";
 import { CreateTokenDialog, TokenTable } from "@/features/settings/tokens/Tokens";
 import { GroupChoice, SignInChoice, startSignIn, TemporaryPasswordDialog, type SignInMethod } from "@/features/admin/LocalAccount";
 import { cn } from "@/lib/cn";
@@ -229,7 +229,7 @@ export function ServiceTokensDialog({ user, onClose }: { user: AdminUser; onClos
           qc.invalidateQueries({ queryKey: key });
           return t;
         }}
-        after={(token) => <CodeBlock>{`# e.g. as CI secrets\nWFM_SERVER=${window.location.origin}\nWFM_TOKEN=${token}`}</CodeBlock>}
+        after={(token) => <CopyableCode code={`# e.g. as CI secrets\nWFM_SERVER=${window.location.origin}\nWFM_TOKEN=${token}`} />}
       />
     </>
   );
