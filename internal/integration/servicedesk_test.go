@@ -340,14 +340,17 @@ func TestPortalConversation(t *testing.T) {
 	var view obj
 	carol.get("/api/v1/portal/requests/"+key, &view)
 	sameStrings(t, commentBodies(view), []string{"Could you try the new client?"}, "public conversation only")
-	if strings.Contains(string(carol.do("GET", "/api/v1/portal/requests/"+key, nil).Body), "MTU") {
+	// Look for the note's words, not just "MTU": three letters can turn up in base64 (signed
+	// links, tokens), but a phrase with spaces can't.
+	const internalNote = "probably the MTU again"
+	if strings.Contains(string(carol.do("GET", "/api/v1/portal/requests/"+key, nil).Body), internalNote) {
 		t.Fatal("the internal note reached the portal")
 	}
 	mail := e.mailText("carol@customer.test")
 	if !strings.Contains(mail, "Aaron Agent replied on HELP-1") || !strings.Contains(mail, "Could you try the new client?") {
 		t.Fatalf("reply email missing:\n%s", mail)
 	}
-	if strings.Contains(mail, "MTU") {
+	if strings.Contains(mail, internalNote) {
 		t.Fatal("the internal note was emailed to the customer")
 	}
 
