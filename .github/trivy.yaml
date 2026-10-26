@@ -1,0 +1,6 @@
+# Trivy settings for the Security workflow. The Helm chart requires Kubernetes 1.30 or later, and
+# Trivy renders charts for 1.20 unless told otherwise; this matches what CI validates the chart
+# against with kubeconform.
+misconfiguration:
+  helm:
+    kube-version: "1.33.0"
