@@ -26,7 +26,7 @@ export function IssueCard({ issue, fields = DEFAULT_CARD_FIELDS, lifted, classNa
         className,
       )}
     >
-      <p className={cn("line-clamp-3 text-[13px] leading-snug text-ink", done && "text-muted")}>{issue.summary}</p>
+      <p className={cn("line-clamp-3 text-[13px] leading-snug break-words text-ink", done && "text-muted")}>{issue.summary}</p>
       <CardChips issue={issue} fields={tags} />
       <div className="mt-2.5 flex items-center gap-1.5">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-1">
