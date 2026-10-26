@@ -70,8 +70,12 @@ export function useMe() {
   return useQuery(meQuery);
 }
 
+/**
+ * useProject loads a project; with an empty key (a dialog kept mounted before it has an issue,
+ * say) it waits instead of requesting /projects/.
+ */
 export function useProject(key: string) {
-  return useQuery(projectQuery(key));
+  return useQuery({ ...projectQuery(key), enabled: key !== "" });
 }
 
 export function useUsers(q: string, project?: string) {

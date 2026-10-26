@@ -2,6 +2,11 @@ import { expect, test } from "@playwright/test";
 import { api, projectKey, signIn } from "./helpers";
 
 test("sign in, create a project from a template and open an issue", async ({ page }) => {
+  // No page asks for a project without a key (GET /api/v1/projects/ answers 404).
+  const keyless: string[] = [];
+  page.on("request", (r) => {
+    if (/\/api\/v1\/projects\/(\?|$|\/)/.test(r.url())) keyless.push(`${r.url()} on ${page.url()}`);
+  });
   await signIn(page, "e2e-admin@example.com", "E2E Admin");
   const key = projectKey("SM");
 
@@ -22,6 +27,11 @@ test("sign in, create a project from a template and open an issue", async ({ pag
   await search.press("Enter");
   await expect(page).toHaveURL(new RegExp(`/browse/${issue.key}`));
   await expect(page.getByText("Smoke test issue").first()).toBeVisible();
+  for (const path of [`/projects/${key}/board?issue=${issue.key}`, `/projects/${key}/settings`]) {
+    await page.goto(path);
+    await page.waitForLoadState("networkidle");
+  }
+  expect(keyless).toEqual([]);
 });
 
 test("unknown pages and signed-out visits are handled", async ({ page }) => {
