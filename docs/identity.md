@@ -333,7 +333,9 @@ projects and can create projects), `guest` (only projects they are explicitly ad
 can be mapped to an organisation role; a person gets the highest of their own and their
 groups' roles. `customer` is for the people a [service desk](service-desk.md#customers)
 supports: they only use the help centre, groups never raise their role, and they cannot be
-project members.
+project members, project leads or assignees. Administration → Users shows them as *Customer*;
+changing a customer's role (or making someone a customer) asks for confirmation. Service
+accounts can be neither admins nor customers.
 
 **Projects** are *open* (every member gets the project's open role, `member` by default) or
 *private*. Project roles — built-in `viewer`, `member`, `admin`, plus custom roles — are granted

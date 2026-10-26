@@ -1041,3 +1041,61 @@ func TestPortalLastUpdate(t *testing.T) {
 	agent.transitionTo(key, "wait-for-customer", nil)
 	moved("a status change", time.Now().Add(-time.Minute))
 }
+
+// TestCustomersAreNeverOfferedAsAgents: the people searched for assignees and for new project
+// members leave customers out, however many there are, and a customer cannot lead a project or
+// become an agent other than by an admin changing their own role.
+func TestCustomersAreNeverOfferedAsAgents(t *testing.T) {
+	e := newEnv(t)
+	admin, agent := serviceDesk(t, e, "HELP")
+	carol := admin.addCustomer("HELP", "carol@customer.test", "Carol Customer")
+	// A busy help desk: more customers than the candidates an assignee search checks, all
+	// sorting before the agents.
+	if _, err := e.Pool.Exec(context.Background(), `INSERT INTO users (kind, email, username, display_name, org_role, source, active)
+		SELECT 'human', 'c' || g || '@customer.test', 'c' || g || '@customer.test', 'Aa customer ' || lpad(g::text, 3, '0'), 'customer', 'admin', true
+		FROM generate_series(1, 150) g`); err != nil {
+		t.Fatal(err)
+	}
+	names := func(c *Client, path string) []string {
+		t.Helper()
+		var users []obj
+		c.get(path, &users)
+		out := []string{}
+		for _, u := range users {
+			out = append(out, str(u, "displayName"))
+		}
+		return out
+	}
+
+	// Assignees: the agents are found, and no customer is.
+	sameStrings(t, names(agent, "/api/v1/users?project=HELP&limit=20"), []string{"Aaron Agent", "Ada Admin"}, "assignable in HELP")
+	sameStrings(t, names(agent, "/api/v1/users?project=HELP&q=carol"), []string{}, "Carol is not assignable")
+	request := str(carol.raise("HELP", str(admin.requestType("HELP", "Get IT help"), "id"), obj{"summary": "Printer jam"}), "key")
+	agent.must("PATCH", "/api/v1/issues/"+request, obj{"assigneeId": carol.id()}, 400, nil)
+
+	// New project members: customers are left out on request; other people pickers (approvers,
+	// the audit log) still find them.
+	for _, n := range names(admin, "/api/v1/users?customers=false&limit=200") {
+		if strings.Contains(n, "ustomer") {
+			t.Fatalf("the member picker offers the customer %s", n)
+		}
+	}
+	sameStrings(t, names(admin, "/api/v1/users?customers=false&q=carol"), []string{}, "Carol is not offered as a member")
+	sameStrings(t, names(admin, "/api/v1/users?q=carol"), []string{"Carol Customer"}, "approver pickers find customers")
+	admin.must("POST", "/api/v1/projects/HELP/members", obj{"userId": carol.id(), "roleKey": "member"}, 400, nil)
+
+	// Project lead.
+	admin.must("PATCH", "/api/v1/projects/HELP", obj{"leadId": carol.id()}, 400, nil)
+	admin.must("PATCH", "/api/v1/projects/HELP", obj{"leadId": agent.id()}, 200, nil)
+
+	// The organisation role: service accounts are never customers; a person becomes an agent
+	// (or a customer) only by an admin changing their own role.
+	var bot obj
+	admin.must("POST", "/api/v1/admin/users", obj{"kind": "service", "displayName": "Deploy bot"}, 201, &bot)
+	admin.must("PATCH", "/api/v1/admin/users/"+str(bot, "id"), obj{"orgRole": "customer"}, 400, nil)
+	var updated obj
+	admin.must("PATCH", "/api/v1/admin/users/"+carol.id(), obj{"orgRole": "member"}, 200, &updated)
+	eq(t, str(updated, "orgRole"), "member", "Carol is now a member")
+	admin.must("POST", "/api/v1/projects/HELP/members", obj{"userId": carol.id(), "roleKey": "member"}, 201, nil)
+	sameStrings(t, names(agent, "/api/v1/users?project=HELP&q=carol"), []string{"Carol Customer"}, "a member of HELP can be assigned")
+}

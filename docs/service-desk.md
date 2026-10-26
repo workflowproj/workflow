@@ -55,7 +55,12 @@ A customer is a person with the organisation role `customer`:
   outside the portal, their own profile, sign-in and email settings answers `403 portal_only`
   — search, issues, comments, history, attachments, live updates, MCP and tokens included.
 - They hold no project permissions: a group mapped to an organisation role does not raise a
-  customer's role, and a customer cannot be added as a project member.
+  customer's role, and a customer cannot be added as a project member or lead a project. People
+  pickers for assignees and new project members never offer them (`GET /api/v1/users` leaves
+  customers out with `project`, or with `customers=false`).
+- Only an administrator changing their own role (Administration → Users, which shows them as
+  *Customer* and asks for confirmation) turns a customer into an agent, or an agent into a
+  customer. Service accounts are never customers.
 - They see a request when they raised it, when an agent shared it with them (*Shared with*,
   in the issue's Service request panel), or when they are asked to approve it.
 - They sign in with a password (local accounts) or, if your identity provider lets them in,

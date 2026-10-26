@@ -245,6 +245,13 @@ func (s *Service) UpdateProject(ctx context.Context, actor *authz.Actor, ref str
 			params.Description = *in.Description
 		}
 		if in.LeadID != nil {
+			if id := *in.LeadID; id != nil {
+				if u, err := q.GetUser(ctx, *id); err != nil || u.DeletedAt != nil {
+					return apperr.Invalid("leadId", "user not found")
+				} else if u.OrgRole == authz.OrgCustomer {
+					return apperr.Invalid("leadId", "%s is a customer: customers use the help centre and cannot lead a project", u.DisplayName)
+				}
+			}
 			params.LeadID = *in.LeadID
 		}
 		if in.OpenRoleKey != nil {
@@ -386,13 +393,15 @@ func (s *Service) RemoveMember(ctx context.Context, actor *authz.Actor, ref stri
 	return nil
 }
 
-// AssignableUsers lists people who can browse the project (for assignee pickers).
+// AssignableUsers lists people who can browse the project (for assignee pickers). Customers
+// are left out in the query, so that a help desk's many customers never crowd agents out of
+// the candidates checked.
 func (s *Service) AssignableUsers(ctx context.Context, actor *authz.Actor, ref, q string, limit int) ([]dbq.User, error) {
 	p, _, err := s.ProjectFor(ctx, actor, ref, authz.ProjectBrowse)
 	if err != nil {
 		return nil, err
 	}
-	candidates, err := s.Q.SearchUsers(ctx, dbq.SearchUsersParams{Q: q, Lim: int32(max(limit*4, 100))})
+	candidates, err := s.Q.SearchUsers(ctx, dbq.SearchUsersParams{Q: q, ExcludeCustomers: true, Lim: int32(max(limit*4, 100))})
 	if err != nil {
 		return nil, err
 	}

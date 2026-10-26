@@ -80,7 +80,7 @@ export function AddMemberDialog({ open, onClose, projectKey }: { open: boolean; 
           ))}
         </div>
         {kind === "user" ? (
-          <Field label="Person">{() => <UserPicker value={user} onChange={setUser} allowNone={false} noneLabel="Choose a person…" label="Person" />}</Field>
+          <Field label="Person">{() => <UserPicker value={user} onChange={setUser} customers={false} allowNone={false} noneLabel="Choose a person…" label="Person" />}</Field>
         ) : (
           <Field label="Group" hint="Everyone in the group gets the role, now and as membership changes (including groups synced from your directory).">
             {(id) => (

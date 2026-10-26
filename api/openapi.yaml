@@ -545,7 +545,13 @@ paths:
       tags: [users]
       parameters:
         - { name: q, in: query, schema: { type: string } }
-        - { name: project, in: query, description: Only users who can be assigned in this project, schema: { type: string } }
+        - { name: project, in: query, description: Only users who can be assigned in this project (never customers), schema: { type: string } }
+        - name: customers
+          in: query
+          description: |
+            false leaves out customers (people who only use a help centre), for pickers of people
+            who can become project members. Customers are never listed with project.
+          schema: { type: boolean, default: true }
         - { $ref: '#/components/parameters/Limit' }
       responses:
         "200":

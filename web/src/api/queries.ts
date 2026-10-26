@@ -6,7 +6,7 @@ import { api, unwrap } from "./client";
  * invalidate by prefix and live events (lib/events.ts) invalidate the same prefixes:
  *
  *   ["me"], ["projects"], ["project", key], ["issue-types", projectKey], ["statuses"],
- *   ["users", q, project], ["issue", key], ["issue-comments", key], ["issue-history", key],
+ *   ["users", q, project, customers], ["issue", key], ["issue-comments", key], ["issue-history", key],
  *   ["boards", projectKey], ["board", boardId, ...], ["backlog", boardId], ["search", jql, ...], ["sprints", projectKey],
  *   ["releases", projectKey], ["notifications"], ["fields"], ["labels", projectKey],
  *   ["timeline", projects, jql, doneDays], ["dashboards"], ["dashboards", id],
@@ -78,10 +78,14 @@ export function useProject(key: string) {
   return useQuery({ ...projectQuery(key), enabled: key !== "" });
 }
 
-export function useUsers(q: string, project?: string) {
+/**
+ * useUsers searches people: with a project, those who can be assigned there; with customers
+ * false, only people who can become project members (customers only use the help centre).
+ */
+export function useUsers(q: string, project?: string, customers = true) {
   return useQuery({
-    queryKey: ["users", q, project ?? ""],
-    queryFn: () => unwrap(api.GET("/users", { params: { query: { q: q || undefined, project } } })),
+    queryKey: ["users", q, project ?? "", customers],
+    queryFn: () => unwrap(api.GET("/users", { params: { query: { q: q || undefined, project, customers: customers ? undefined : false } } })),
     placeholderData: keepPreviousData,
     staleTime: 30_000,
   });

@@ -8,12 +8,14 @@ import { cn } from "@/lib/cn";
 
 /**
  * UserPicker selects one user (or none). With `project`, only people who can be assigned in
- * that project are offered.
+ * that project are offered; with `customers={false}`, only people who can become project
+ * members (no help desk customers).
  */
 export function UserPicker({
   value,
   onChange,
   project,
+  customers = true,
   allowNone = true,
   noneLabel = "Unassigned",
   disabled,
@@ -23,6 +25,7 @@ export function UserPicker({
   value?: User | null;
   onChange: (u: User | null) => void;
   project?: string;
+  customers?: boolean;
   allowNone?: boolean;
   noneLabel?: string;
   disabled?: boolean;
@@ -30,7 +33,7 @@ export function UserPicker({
   label?: string;
 }) {
   const [q, setQ] = useState("");
-  const { data: users = [], isFetching } = useUsers(q, project);
+  const { data: users = [], isFetching } = useUsers(q, project, customers);
   return (
     <Popover
       trigger={({ toggle }) => (

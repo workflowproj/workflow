@@ -6581,8 +6581,13 @@ export interface operations {
         parameters: {
             query?: {
                 q?: string;
-                /** @description Only users who can be assigned in this project */
+                /** @description Only users who can be assigned in this project (never customers) */
                 project?: string;
+                /**
+                 * @description false leaves out customers (people who only use a help centre), for pickers of people
+                 *     who can become project members. Customers are never listed with project.
+                 */
+                customers?: boolean;
                 limit?: components["parameters"]["Limit"];
             };
             header?: never;
