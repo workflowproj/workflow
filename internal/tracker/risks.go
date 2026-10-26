@@ -153,7 +153,17 @@ func (a risksDecisionsAddon) workflowSource(name string) (string, error) {
 
 // IsReservedField reports a field key that risks and decisions own.
 func IsReservedField(key string) bool {
-	return slices.ContainsFunc(risksDecisions.Fields, func(f addonField) bool { return f.Key == key })
+	return reservedFieldKind(key) != ""
+}
+
+// reservedFieldKind is the issue-type kind a reserved field belongs to ("" for other fields).
+func reservedFieldKind(key string) string {
+	for _, f := range risksDecisions.Fields {
+		if f.Key == key {
+			return f.Kind
+		}
+	}
+	return ""
 }
 
 // ensureKindFields makes the fields of a kind apply to an issue type of that kind in a project,
@@ -352,7 +362,11 @@ func (s *Service) kindIssues(ctx context.Context, actor *authz.Actor, ref, kind,
 	for k, i := range issues {
 		ids[k] = i.ID
 	}
-	rows, err := s.Q.LinkedWorkProgress(ctx, dbq.LinkedWorkProgressParams{Ids: ids, LinkType: linkType})
+	browsable, err := s.BrowsableProjectIDs(ctx, actor)
+	if err != nil {
+		return p, nil, nil, false, err
+	}
+	rows, err := s.Q.LinkedWorkProgress(ctx, dbq.LinkedWorkProgressParams{Ids: ids, LinkType: linkType, ProjectIds: browsable})
 	if err != nil {
 		return p, nil, nil, false, err
 	}
@@ -425,7 +439,7 @@ func (s *Service) RiskRegister(ctx context.Context, actor *authz.Actor, ref stri
 // by, and the work implementing them.
 func (s *Service) DecisionLog(ctx context.Context, actor *authz.Actor, ref string) (api.DecisionLog, error) {
 	out := api.DecisionLog{Decisions: []api.DecisionEntry{}}
-	_, issues, progress, truncated, err := s.kindIssues(ctx, actor, ref, KindDecision, "implements")
+	p, issues, progress, truncated, err := s.kindIssues(ctx, actor, ref, KindDecision, "implements")
 	if err != nil {
 		return out, err
 	}
@@ -453,6 +467,10 @@ func (s *Service) DecisionLog(ctx context.Context, actor *authz.Actor, ref strin
 	}
 	others, err := s.Q.GetIssuesByIDs(ctx, missing)
 	if err != nil {
+		return out, err
+	}
+	// Decisions in projects the viewer can't browse are left out, links to them too.
+	if others, err = s.browsableIssues(ctx, actor, p.ID, others); err != nil {
 		return out, err
 	}
 	for _, o := range others {

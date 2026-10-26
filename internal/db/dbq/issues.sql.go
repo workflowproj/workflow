@@ -935,13 +935,14 @@ SELECT l.target_id, count(*)::int AS total, count(*) FILTER (WHERE s.category = 
 FROM issue_links l
 JOIN issues o ON o.id = l.source_id
 JOIN statuses s ON s.id = o.status_id
-WHERE l.target_id = ANY($1::uuid[]) AND l.link_type = $2
+WHERE l.target_id = ANY($1::uuid[]) AND l.link_type = $2 AND o.project_id = ANY($3::uuid[])
 GROUP BY l.target_id
 `
 
 type LinkedWorkProgressParams struct {
-	Ids      []uuid.UUID
-	LinkType string
+	Ids        []uuid.UUID
+	LinkType   string
+	ProjectIds []uuid.UUID
 }
 
 type LinkedWorkProgressRow struct {
@@ -951,9 +952,10 @@ type LinkedWorkProgressRow struct {
 }
 
 // For each target, how many issues link to it with a link type and how many of those are done
-// (mitigating work of a risk, implementing work of a decision).
+// (mitigating work of a risk, implementing work of a decision), counting only issues in the
+// projects given (those the viewer can browse).
 func (q *Queries) LinkedWorkProgress(ctx context.Context, arg LinkedWorkProgressParams) ([]LinkedWorkProgressRow, error) {
-	rows, err := q.db.Query(ctx, linkedWorkProgress, arg.Ids, arg.LinkType)
+	rows, err := q.db.Query(ctx, linkedWorkProgress, arg.Ids, arg.LinkType, arg.ProjectIds)
 	if err != nil {
 		return nil, err
 	}

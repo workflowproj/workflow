@@ -708,6 +708,11 @@ type fieldChange struct {
 }
 
 func fieldApplies(f dbq.FieldDefinition, p dbq.Project, t dbq.IssueType) bool {
+	// Risk and decision fields belong to their kind's types only: the type keys they list are
+	// shared by every project, and a work type may have the same key in another project.
+	if k := reservedFieldKind(f.Key); k != "" && t.Kind != k {
+		return false
+	}
 	if f.ProjectIds != nil && !slices.Contains(f.ProjectIds, p.ID) {
 		return false
 	}

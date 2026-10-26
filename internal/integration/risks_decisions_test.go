@@ -609,3 +609,63 @@ func TestRiskReviewReminderTemplate(t *testing.T) {
 	bob.get("/api/v1/notifications?unread=true", &notes)
 	eq(t, notes.Unread, 0, "nobody else")
 }
+
+// Risks and decisions never reveal other projects' issues, their fields stay on their own types,
+// and help desk request types can't create them.
+func TestRisksAndDecisionsAcrossProjects(t *testing.T) {
+	e := newEnv(t)
+	admin := e.login("admin@example.com", "Admin")
+	member := e.login("mel@example.com", "Mel")
+	admin.createProject("OPEN", "kanban")
+	admin.must("POST", "/api/v1/projects", obj{"key": "SECRET", "name": "Secret", "template": "kanban", "access": "private"}, 201, nil)
+
+	// The decision log leaves out a superseding decision in a project the viewer can't browse.
+	old := str(admin.createIssue("OPEN", "decision", "Use vendor X", nil), "key")
+	admin.transition(old, "accept", 200)
+	newer := str(admin.createIssue("SECRET", "decision", "Acquire vendor Y", nil), "key")
+	admin.must("POST", "/api/v1/issues/"+old+"/supersede", obj{"supersededByKey": newer}, 200, nil)
+	supersededBy := func(c *Client) []any {
+		var log obj
+		c.get("/api/v1/projects/OPEN/decisions", &log)
+		for _, d := range log["decisions"].([]any) {
+			if str(d.(obj), "issue", "key") == old {
+				return d.(obj)["supersededBy"].([]any)
+			}
+		}
+		t.Fatalf("%s not in the log", old)
+		return nil
+	}
+	eq(t, len(supersededBy(admin)), 1, "the admin sees what supersedes it")
+	eq(t, len(supersededBy(member)), 0, "a member doesn't see a private project's decision")
+
+	// The register counts only mitigating work the viewer can browse.
+	risk := str(admin.createIssue("OPEN", "risk", "Outage", obj{"fields": obj{"risk_likelihood": 3, "risk_impact": 3}}), "key")
+	admin.link(str(admin.createIssue("SECRET", "task", "Secret mitigation", nil), "key"), "mitigates", risk, 201)
+	mitigation := func(c *Client) obj {
+		var reg obj
+		c.get("/api/v1/projects/OPEN/risks", &reg)
+		for _, r := range reg["risks"].([]any) {
+			if str(r.(obj), "issue", "key") == risk {
+				m, _ := r.(obj)["mitigation"].(obj)
+				return m
+			}
+		}
+		t.Fatalf("%s not in the register", risk)
+		return nil
+	}
+	eq(t, fmt.Sprint(mitigation(admin)["total"]), "1", "the admin counts the private work")
+	if m := mitigation(member); m != nil && fmt.Sprint(m["total"]) != "0" {
+		t.Fatalf("a member's register counts private work: %v", m)
+	}
+
+	// A risk type keyed like another project's story doesn't give stories the risk fields.
+	admin.createProject("SCR", "scrum")
+	admin.createProject("BUGP", "bug_tracking")
+	admin.must("POST", "/api/v1/projects/BUGP/issue-types", obj{"key": "story", "name": "Story risk", "level": 0, "kind": "risk", "workflowId": str(admin.issueTypes("BUGP")["risk"], "workflowId")}, 201, nil)
+	admin.must("POST", "/api/v1/issues", obj{"projectKey": "SCR", "typeKey": "story", "summary": "A story", "fields": obj{"risk_score": 25, "risk_rating": "Critical", "risk_likelihood": 9}}, 400, nil)
+
+	// Request types create work only.
+	admin.createProject("DESK", "service")
+	admin.must("PATCH", "/api/v1/projects/DESK", obj{"risksDecisions": true}, 200, nil)
+	admin.must("POST", "/api/v1/projects/DESK/request-types", obj{"name": "Report a risk", "issueTypeKey": "risk"}, 400, nil)
+}

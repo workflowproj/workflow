@@ -59,7 +59,8 @@ function CreateIssueForm({ onClose, projectKey: initialProject, defaults, onCrea
   const key = project?.key ?? "";
 
   const { data: allTypes = [] } = useQuery({ ...issueTypesQuery(key), enabled: !!key });
-  const types = allTypes.filter((t) => t.kind === "work" || project?.risksDecisions || t.key === defaults?.typeKey);
+  // Risks and decisions when the project keeps them, but never from a board column (planning).
+  const types = allTypes.filter((t) => t.kind === "work" || (project?.risksDecisions && !defaults?.statusId) || t.key === defaults?.typeKey);
   const { data: sprints = [] } = useQuery({
     queryKey: ["sprints", key],
     queryFn: () => unwrap(api.GET("/projects/{projectKey}/sprints", { params: { path: { projectKey: key } } })),

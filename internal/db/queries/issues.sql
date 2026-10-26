@@ -101,12 +101,13 @@ ORDER BY created_at;
 
 -- name: LinkedWorkProgress :many
 -- For each target, how many issues link to it with a link type and how many of those are done
--- (mitigating work of a risk, implementing work of a decision).
+-- (mitigating work of a risk, implementing work of a decision), counting only issues in the
+-- projects given (those the viewer can browse).
 SELECT l.target_id, count(*)::int AS total, count(*) FILTER (WHERE s.category = 'done')::int AS done
 FROM issue_links l
 JOIN issues o ON o.id = l.source_id
 JOIN statuses s ON s.id = o.status_id
-WHERE l.target_id = ANY(@ids::uuid[]) AND l.link_type = @link_type
+WHERE l.target_id = ANY(@ids::uuid[]) AND l.link_type = @link_type AND o.project_id = ANY(@project_ids::uuid[])
 GROUP BY l.target_id;
 
 -- name: ProjectIssuesOfKind :many
