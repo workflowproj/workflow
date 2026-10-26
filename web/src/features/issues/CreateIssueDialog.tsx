@@ -25,6 +25,9 @@ type Defaults = {
 };
 type ParentRef = Pick<Issue, "key" | "summary" | "type" | "status">;
 
+/** How the note above the form words the link the new issue gets (`defaults.link`, outward). */
+const LINK_VERB: Partial<Record<Schemas["LinkType"], string>> = { mitigates: "mitigates", implements: "implements", supersedes: "supersedes", blocks: "blocks", relates: "relates to" };
+
 /**
  * CreateIssueDialog creates an issue. Opened from the top bar ("Create"), boards and backlogs.
  * `projectKey` preselects the project; `defaults` pre-fills fields (e.g. sprintId, parentKey).
@@ -229,6 +232,12 @@ function CreateIssueForm({ onClose, projectKey: initialProject, defaults, onCrea
             was created. Add the next one.
           </span>
         </div>
+      )}
+      {defaults?.link && (
+        <p className="text-sm text-muted">
+          The new issue {defaults.link.direction === "outward" ? (LINK_VERB[defaults.link.type] ?? "links to") : "is linked to"}{" "}
+          <span className="font-mono text-ink">{defaults.link.key}</span>.
+        </p>
       )}
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Project" required error={fe.projectKey}>

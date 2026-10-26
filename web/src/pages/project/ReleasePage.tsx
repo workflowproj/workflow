@@ -88,7 +88,7 @@ function Release({ release: r, projectKey, onOpen }: { release: ReleaseDetail; p
       </div>
       <Environments release={r} />
 
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid items-start gap-5 lg:grid-cols-2">
         <Card title="Progress">
           <ReleaseProgress release={r} />
         </Card>
