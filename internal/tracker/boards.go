@@ -854,6 +854,12 @@ type ReleaseInput struct {
 	StartDate   Opt[time.Time]
 	ReleaseDate Opt[time.Time]
 	State       *string
+	// Notes and NotesPublished set the release notes and whether help centres show them.
+	Notes          *string
+	NotesPublished *bool
+	// TagRepositoryID and TagName link the release to a Git tag; both null unlink it.
+	TagRepositoryID Opt[uuid.UUID]
+	TagName         Opt[string]
 }
 
 func (s *Service) ListReleases(ctx context.Context, actor *authz.Actor, ref string) ([]dbq.ListReleasesRow, error) {
@@ -876,7 +882,16 @@ func (s *Service) CreateRelease(ctx context.Context, actor *authz.Actor, ref str
 	if in.Description != nil {
 		desc = *in.Description
 	}
-	r, err := s.Q.CreateRelease(ctx, dbq.CreateReleaseParams{ProjectID: p.ID, Name: strings.TrimSpace(*in.Name), Description: desc, StartDate: in.StartDate.Value, ReleaseDate: in.ReleaseDate.Value})
+	var r dbq.Release
+	err = s.tx(ctx, func(_ pgx.Tx, q *dbq.Queries) error {
+		var err error
+		r, err = q.CreateRelease(ctx, dbq.CreateReleaseParams{ProjectID: p.ID, Name: strings.TrimSpace(*in.Name), Description: desc, StartDate: in.StartDate.Value, ReleaseDate: in.ReleaseDate.Value})
+		if err != nil {
+			return err
+		}
+		r, err = s.setReleaseExtras(ctx, q, p, r, in)
+		return err
+	})
 	if err != nil && isUnique(err) {
 		return r, apperr.Conflict("duplicate_release", "a release named %q already exists", *in.Name)
 	}
@@ -902,7 +917,7 @@ func (s *Service) releaseForManage(ctx context.Context, actor *authz.Actor, id u
 }
 
 func (s *Service) UpdateRelease(ctx context.Context, actor *authz.Actor, id uuid.UUID, in ReleaseInput) (dbq.Release, error) {
-	r, _, err := s.releaseForManage(ctx, actor, id)
+	r, p, err := s.releaseForManage(ctx, actor, id)
 	if err != nil {
 		return r, err
 	}
@@ -925,9 +940,20 @@ func (s *Service) UpdateRelease(ctx context.Context, actor *authz.Actor, id uuid
 		}
 		params.State = *in.State
 	}
-	out, err := s.Q.UpdateRelease(ctx, params)
+	var out dbq.Release
+	err = s.tx(ctx, func(_ pgx.Tx, q *dbq.Queries) error {
+		var err error
+		if out, err = q.UpdateRelease(ctx, params); err != nil {
+			return err
+		}
+		out, err = s.setReleaseExtras(ctx, q, p, out, in)
+		return err
+	})
 	if err != nil && isUnique(err) {
 		return out, apperr.Conflict("duplicate_release", "a release with that name already exists")
+	}
+	if err == nil && in.NotesPublished != nil && *in.NotesPublished != (r.NotesPublishedAt != nil) {
+		Audit(ctx, s.Q, actor, "release.notes_publish", "release", id.String(), &p.ID, map[string]any{"name": out.Name, "published": *in.NotesPublished})
 	}
 	return out, err
 }
@@ -951,7 +977,7 @@ func (s *Service) ShipRelease(ctx context.Context, actor *authz.Actor, id uuid.U
 				return apperr.Invalid("moveOpenIssuesTo", "release not found in %s", p.Key)
 			}
 		}
-		if err := q.MoveOpenReleaseIssues(ctx, dbq.MoveOpenReleaseIssuesParams{ReleaseID: id, TargetReleaseID: moveTo}); err != nil {
+		if err := s.moveOpenReleaseIssues(ctx, q, actor, id, moveTo); err != nil {
 			return err
 		}
 		var err error

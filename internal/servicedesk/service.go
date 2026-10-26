@@ -90,10 +90,14 @@ func (s *Service) deskView(ctx context.Context, p dbq.Project, d dbq.ServiceDesk
 	if err != nil {
 		return api.ServiceDesk{}, err
 	}
+	notes, err := s.releaseNotesProjects(ctx, s.Q, p.ID)
+	if err != nil {
+		return api.ServiceDesk{}, err
+	}
 	return api.ServiceDesk{
 		ProjectKey: p.Key, PortalName: d.PortalName, PortalDescription: d.PortalDescription,
 		PortalAccess: api.PortalAccess(d.PortalAccess), SelfSignup: d.SelfSignup, PortalUrl: s.PortalURL(p),
-		CustomerCount: int(n), OpenProject: p.OpenRoleID != nil,
+		CustomerCount: int(n), OpenProject: p.OpenRoleID != nil, ReleaseNotesProjects: notes,
 	}, nil
 }
 
@@ -130,13 +134,20 @@ func (s *Service) UpdateDesk(ctx context.Context, actor *authz.Actor, ref string
 	if in.SelfSignup != nil {
 		params.SelfSignup = *in.SelfSignup
 	}
+	if in.ReleaseNotesProjectKeys != nil {
+		if err := s.setReleaseNotesProjects(ctx, actor, p, *in.ReleaseNotesProjectKeys); err != nil {
+			return api.ServiceDesk{}, err
+		}
+	}
 	d, err = s.Q.UpdateServiceDesk(ctx, params)
 	if err != nil {
 		return api.ServiceDesk{}, err
 	}
-	tracker.Audit(ctx, s.Q, actor, "service_desk.update", "project", p.ID.String(), &p.ID, map[string]any{
-		"portalName": d.PortalName, "portalAccess": d.PortalAccess, "selfSignup": d.SelfSignup,
-	})
+	audit := map[string]any{"portalName": d.PortalName, "portalAccess": d.PortalAccess, "selfSignup": d.SelfSignup}
+	if in.ReleaseNotesProjectKeys != nil {
+		audit["releaseNotesProjects"] = *in.ReleaseNotesProjectKeys
+	}
+	tracker.Audit(ctx, s.Q, actor, "service_desk.update", "project", p.ID.String(), &p.ID, audit)
 	return s.deskView(ctx, p, d)
 }
 

@@ -599,11 +599,22 @@ func (s *Service) applyScreenField(ctx context.Context, q *dbq.Queries, p dbq.Pr
 			}
 			ids = append(ids, id)
 		}
+		before, err := q.IssueReleases(ctx, i.ID)
+		if err != nil {
+			return err
+		}
 		if err := q.ClearIssueReleases(ctx, i.ID); err != nil {
 			return err
 		}
 		if err := s.setReleases(ctx, q, p, i.ID, ids); err != nil {
 			return err
+		}
+		after, err := q.IssueReleases(ctx, i.ID)
+		if err != nil {
+			return err
+		}
+		if releaseRefs(before) != releaseRefs(after) {
+			*changes = append(*changes, change{"fixVersions", strp(releaseNames(before)), strp(releaseNames(after)), strp(releaseRefs(before)), strp(releaseRefs(after))})
 		}
 	default:
 		custom[field] = v

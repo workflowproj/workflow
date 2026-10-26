@@ -127,6 +127,20 @@ func (SCMEnsureHook) InsertOpts() river.InsertOpts {
 	return river.InsertOpts{Queue: QueueOutbound, MaxAttempts: 5}
 }
 
+// SCMDeployment works out which issues a completed deployment contains (asking the provider for
+// the commits since the previous successful deployment to the environment) and raises
+// deployment.completed on them. It is idempotent: the issues are worked out once, and the event
+// is raised once per outcome, so a status that arrives while a job runs gets a job of its own.
+type SCMDeployment struct {
+	DeploymentID uuid.UUID `json:"deploymentId"`
+}
+
+func (SCMDeployment) Kind() string { return "scm_deployment" }
+
+func (SCMDeployment) InsertOpts() river.InsertOpts {
+	return river.InsertOpts{Queue: QueueOutbound, MaxAttempts: 6}
+}
+
 // WorkflowMigrate moves issues onto a workflow's current version, mapping removed statuses.
 type WorkflowMigrate struct {
 	WorkflowID uuid.UUID `json:"workflowId"`

@@ -204,6 +204,11 @@ func (s *Service) PortalDesk(ctx context.Context, actor *authz.Actor, ref string
 		}
 		out.RequestTypes = append(out.RequestTypes, v)
 	}
+	notes, err := s.Q.CountPublishedReleaseNotes(ctx, p.ID)
+	if err != nil {
+		return out, err
+	}
+	out.WhatsNew = notes > 0
 	return out, nil
 }
 

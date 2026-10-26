@@ -2038,6 +2038,18 @@ paths:
               schema: { $ref: '#/components/schemas/Release' }
         default: { $ref: '#/components/responses/Problem' }
   /releases/{releaseId}:
+    get:
+      operationId: getRelease
+      tags: [releases]
+      summary: A release with its progress, notes, Git tag and the environments it reached
+      parameters: [{ $ref: '#/components/parameters/ReleaseId' }]
+      responses:
+        "200":
+          description: Release
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReleaseDetail' }
+        default: { $ref: '#/components/responses/Problem' }
     patch:
       operationId: updateRelease
       tags: [releases]
@@ -2083,6 +2095,82 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Release' }
+        default: { $ref: '#/components/responses/Problem' }
+  /releases/{releaseId}/readiness:
+    get:
+      operationId: getReleaseReadiness
+      tags: [releases]
+      summary: What stands in the way of shipping the release
+      description: |
+        Warnings, each with the issues concerned: issues that are not done, issues with open
+        (unmerged) pull or merge requests, issues whose latest pipeline failed, and a release date
+        that has passed. Shipping stays possible whatever they say.
+      parameters: [{ $ref: '#/components/parameters/ReleaseId' }]
+      responses:
+        "200":
+          description: Readiness
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReleaseReadiness' }
+        default: { $ref: '#/components/responses/Problem' }
+  /releases/{releaseId}/burnup:
+    get:
+      operationId: getReleaseBurnup
+      tags: [releases]
+      summary: Done work against the release's scope, day by day
+      parameters: [{ $ref: '#/components/parameters/ReleaseId' }]
+      responses:
+        "200":
+          description: Burnup
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReleaseBurnup' }
+        default: { $ref: '#/components/responses/Problem' }
+  /releases/{releaseId}/notes/generated:
+    get:
+      operationId: generateReleaseNotes
+      tags: [releases]
+      summary: Release notes generated from the release's done issues (not saved)
+      description: |
+        Markdown with a section per issue type (Features from stories, Bug fixes from bugs,
+        Improvements from tasks, else the type's plural name) and a line "summary (KEY)" per done
+        issue, sub-tasks left out. Save it with `PATCH /releases/{releaseId}` (`notes`).
+      parameters: [{ $ref: '#/components/parameters/ReleaseId' }]
+      responses:
+        "200":
+          description: Generated notes
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GeneratedReleaseNotes' }
+        default: { $ref: '#/components/responses/Problem' }
+  /projects/{projectKey}/release-settings:
+    get:
+      operationId: getReleaseSettings
+      tags: [releases]
+      summary: What new Git tags do to the project's releases
+      parameters: [{ $ref: '#/components/parameters/ProjectKey' }]
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReleaseSettings' }
+        default: { $ref: '#/components/responses/Problem' }
+    patch:
+      operationId: updateReleaseSettings
+      tags: [releases]
+      parameters: [{ $ref: '#/components/parameters/ProjectKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReleaseSettingsPatch' }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReleaseSettings' }
         default: { $ref: '#/components/responses/Problem' }
 
   # ---------------------------------------------------------------------------
@@ -3382,6 +3470,24 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/PortalDeskDetail' }
         default: { $ref: '#/components/responses/Problem' }
+  /portal/projects/{projectKey}/whats-new:
+    get:
+      operationId: listPortalReleaseNotes
+      tags: [portal]
+      summary: What's new - the published release notes of the software projects the desk shows
+      description: |
+        Only the notes themselves, with the product's and the release's names and dates: never
+        issues. Answers 404 to anyone who may not raise requests in the desk.
+      parameters: [{ $ref: '#/components/parameters/ProjectKey' }]
+      responses:
+        "200":
+          description: Release notes, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PortalReleaseNote' }
+        default: { $ref: '#/components/responses/Problem' }
   /portal/projects/{projectKey}/requests:
     post:
       operationId: createPortalRequest
@@ -4514,7 +4620,7 @@ components:
         completedSeconds: { type: integer, format: int64, description: Time logged on the sprint's issues since it started }
     Release:
       type: object
-      required: [id, name, description, state, position, issueCount, doneCount]
+      required: [id, name, description, state, position, issueCount, doneCount, notesPublished]
       properties:
         id: { type: string, format: uuid }
         name: { type: string }
@@ -4526,6 +4632,10 @@ components:
         position: { type: integer }
         issueCount: { type: integer }
         doneCount: { type: integer }
+        notesPublished: { type: boolean, description: 'The release notes are shown on the What''s new page of the help centres that chose this project' }
+        notesPublishedAt: { type: string, format: date-time }
+        tagName: { type: string, description: The Git tag the release ships as }
+        tagRepositoryId: { type: string, format: uuid }
     ReleaseState: { type: string, enum: [unreleased, released, archived] }
     ReleaseInput:
       type: object
@@ -4535,6 +4645,125 @@ components:
         startDate: { type: [string, 'null'], format: date }
         releaseDate: { type: [string, 'null'], format: date }
         state: { $ref: '#/components/schemas/ReleaseState' }
+        notes: { type: string, maxLength: 100000, description: Release notes (Markdown) }
+        notesPublished: { type: boolean, description: 'Publish the notes to the What''s new page of the help centres that chose this project' }
+        tagRepositoryId: { type: [string, 'null'], format: uuid, description: 'The repository of the release''s Git tag (one connected to the project); null, with tagName null, unlinks the tag' }
+        tagName: { type: [string, 'null'], maxLength: 250, description: The Git tag the release ships as }
+    ReleaseDetail:
+      allOf:
+        - $ref: '#/components/schemas/Release'
+        - type: object
+          required: [projectKey, notes, progress, environments, canManage]
+          properties:
+            projectKey: { type: string }
+            notes: { type: string, description: Release notes (Markdown) }
+            tag: { $ref: '#/components/schemas/ReleaseTag' }
+            progress: { $ref: '#/components/schemas/ReleaseProgress' }
+            environments: { type: array, items: { $ref: '#/components/schemas/ReleaseEnvironment' } }
+            canManage: { type: boolean, description: The caller holds release.manage in the project }
+    ReleaseTag:
+      type: object
+      required: [name, repository, url]
+      properties:
+        name: { type: string }
+        sha: { type: string }
+        repository: { $ref: '#/components/schemas/RepositoryRef' }
+        url: { type: string, description: The tag's page at the provider }
+        previousTag: { type: string, description: The tag of the previous release with one in the same repository }
+        compareUrl: { type: string, description: The changes between the previous release's tag and this one }
+        linkedAt: { type: string, format: date-time }
+    ReleaseProgress:
+      type: object
+      required: [issues, points, unestimated]
+      properties:
+        issues: { $ref: '#/components/schemas/CategoryCounts' }
+        points: { $ref: '#/components/schemas/CategoryCounts' }
+        unestimated: { type: integer, description: Issues without story points }
+    CategoryCounts:
+      type: object
+      required: [todo, inProgress, done, total]
+      properties:
+        todo: { type: number, format: double }
+        inProgress: { type: number, format: double }
+        done: { type: number, format: double }
+        total: { type: number, format: double }
+    ReleaseEnvironment:
+      type: object
+      required: [environment, reachedAt, via]
+      properties:
+        environment: { type: string }
+        reachedAt: { type: string, format: date-time }
+        via:
+          type: string
+          enum: [tag, issues]
+          description: 'tag: the release''s tag was deployed there; issues: every done issue of the release was'
+        url: { type: string, description: 'The deployment (tag only)' }
+    ReleaseBurnup:
+      type: object
+      required: [from, to, scopeSource, days]
+      properties:
+        from: { type: string, format: date }
+        to: { type: string, format: date, description: Today, or the day the release was released }
+        releaseDate: { type: string, format: date }
+        scopeSource:
+          type: string
+          enum: [history, current]
+          description: 'history: scope follows the fix version changes recorded in issue history; current: there are none, so scope is the release''s current issues, each from its creation'
+        days: { type: array, items: { $ref: '#/components/schemas/ReleaseBurnupDay' } }
+    ReleaseBurnupDay:
+      type: object
+      description: The release at the end of a day.
+      required: [date, scopeIssues, doneIssues, scopePoints, donePoints]
+      properties:
+        date: { type: string, format: date }
+        scopeIssues: { type: integer }
+        doneIssues: { type: integer }
+        scopePoints: { type: number, format: double }
+        donePoints: { type: number, format: double }
+    ReleaseReadiness:
+      type: object
+      required: [ready, warnings]
+      properties:
+        ready: { type: boolean, description: There are no warnings }
+        warnings: { type: array, items: { $ref: '#/components/schemas/ReadinessWarning' } }
+    ReadinessWarning:
+      type: object
+      required: [kind, message, issues]
+      properties:
+        kind: { type: string, enum: [not_done, open_pull_requests, failed_pipelines, overdue] }
+        message: { type: string }
+        issues: { type: array, items: { $ref: '#/components/schemas/ReadinessIssue' } }
+    ReadinessIssue:
+      type: object
+      required: [issue, links]
+      properties:
+        issue: { $ref: '#/components/schemas/IssueRef' }
+        links: { type: array, items: { $ref: '#/components/schemas/ReadinessLink' }, description: The open pull requests or the failed pipeline }
+    ReadinessLink:
+      type: object
+      required: [title, url, state, repository]
+      properties:
+        title: { type: string }
+        url: { type: string }
+        state: { type: string }
+        repository: { type: string }
+    GeneratedReleaseNotes:
+      type: object
+      required: [notes, issueCount]
+      properties:
+        notes: { type: string, description: Markdown }
+        issueCount: { type: integer, description: The done issues listed }
+    ReleaseSettings:
+      type: object
+      required: [createFromTags, releaseOnTag]
+      properties:
+        createFromTags: { type: boolean, description: A new tag in a connected repository without a release of its name creates one }
+        releaseOnTag: { type: boolean, description: Pushing a release's tag marks the release released }
+    ReleaseSettingsPatch:
+      type: object
+      properties:
+        createFromTags: { type: boolean }
+        releaseOnTag: { type: boolean }
 
     IssueTypeRef:
       type: object
@@ -4565,6 +4794,7 @@ components:
         openPullRequests: { type: integer }
         mergedPullRequests: { type: integer }
         pipelineState: { type: string }
+        deployedTo: { type: array, items: { type: string }, description: Environments a successful deployment containing the issue reached }
     Issue:
       type: object
       required: [id, key, projectKey, type, summary, status, priority, labels, rank, version, fields, createdAt, updatedAt]
@@ -4598,7 +4828,7 @@ components:
       allOf:
         - $ref: '#/components/schemas/Issue'
         - type: object
-          required: [description, project, children, links, development, attachments, releases, watching, watcherCount, permissions]
+          required: [description, project, children, links, development, deployments, attachments, releases, watching, watcherCount, permissions]
           properties:
             description: { type: string }
             project: { $ref: '#/components/schemas/ProjectRef' }
@@ -4608,6 +4838,10 @@ components:
             progress: { $ref: '#/components/schemas/IssueProgress' }
             links: { type: array, items: { $ref: '#/components/schemas/IssueLink' } }
             development: { type: array, items: { $ref: '#/components/schemas/DevLink' } }
+            deployments:
+              type: array
+              items: { $ref: '#/components/schemas/IssueDeployment' }
+              description: One per environment the issue was deployed to - the latest successful deployment containing it, else the latest one that failed
             attachments: { type: array, items: { $ref: '#/components/schemas/Attachment' } }
             watching: { type: boolean }
             watcherCount: { type: integer }
@@ -4854,6 +5088,20 @@ components:
         data: { type: object, additionalProperties: true }
         updatedAt: { type: string, format: date-time }
     DevLinkKind: { type: string, enum: [branch, commit, pull_request, pipeline] }
+    IssueDeployment:
+      type: object
+      required: [id, environment, status, deployedAt, url, ref, sha, deployer, repository]
+      properties:
+        id: { type: string, format: uuid }
+        environment: { type: string }
+        status: { $ref: '#/components/schemas/DeploymentStatus' }
+        deployedAt: { type: string, format: date-time, description: When the provider reported the status }
+        url: { type: string }
+        ref: { type: string }
+        sha: { type: string }
+        deployer: { type: string }
+        repository: { $ref: '#/components/schemas/RepositoryRef' }
+    DeploymentStatus: { type: string, enum: [pending, running, success, failed, canceled] }
     ScmProvider: { type: string, enum: [github, gitlab] }
     RepositoryRef:
       type: object
@@ -5432,12 +5680,17 @@ components:
       properties:
         type:
           type: string
-          enum: [issue.created, issue.transitioned, issue.field_changed, pr.opened, pr.merged, commit.pushed, branch.created, pipeline.completed, schedule, sla.breached]
+          enum: [issue.created, issue.transitioned, issue.field_changed, pr.opened, pr.merged, commit.pushed, branch.created, pipeline.completed, deployment.completed, schedule, sla.breached]
         toStatus: { type: string, description: 'issue.transitioned: only when entering this status (name)' }
         toCategory: { $ref: '#/components/schemas/StatusCategory', description: 'issue.transitioned: only when entering a status of this category' }
         field: { type: string, description: 'issue.field_changed: the field(s) to watch, comma-separated (e.g. "startDate, dueDate")' }
         cron: { type: string, description: 'schedule: 5-field cron expression (UTC)' }
         jql: { type: string, description: 'schedule: issues to run the actions against' }
+        environment: { type: string, description: 'deployment.completed: only deployments to this environment (case-insensitive)' }
+        status:
+          type: string
+          enum: [success, failed]
+          description: 'deployment.completed: only deployments that succeeded, or that failed'
     AutomationAction:
       type: object
       required: [type]
@@ -5518,7 +5771,7 @@ components:
           minItems: 1
           items:
             type: string
-            enum: ['*', issue.created, issue.updated, issue.transitioned, issue.deleted, comment.created, sprint.started, sprint.completed, release.released, sla.breached]
+            enum: ['*', issue.created, issue.updated, issue.transitioned, issue.deleted, comment.created, sprint.started, sprint.completed, release.released, sla.breached, deployment.completed]
         active: { type: boolean, default: true }
     WebhookSubscriptionCreated:
       allOf:
@@ -5651,7 +5904,7 @@ components:
       description: 'Who may raise requests: customers = people on the customer list; organisation = also every organisation member (not guests)'
     ServiceDesk:
       type: object
-      required: [projectKey, portalName, portalDescription, portalAccess, selfSignup, portalUrl, customerCount, openProject]
+      required: [projectKey, portalName, portalDescription, portalAccess, selfSignup, portalUrl, customerCount, openProject, releaseNotesProjects]
       properties:
         projectKey: { type: string }
         portalName: { type: string }
@@ -5661,6 +5914,10 @@ components:
         portalUrl: { type: string }
         customerCount: { type: integer }
         openProject: { type: boolean, description: 'The project is open: every organisation member can browse it as an agent, internal notes included' }
+        releaseNotesProjects:
+          type: array
+          items: { $ref: '#/components/schemas/ProjectRef' }
+          description: Software projects whose published release notes the help centre shows on its What's new page
     ServiceDeskPatch:
       type: object
       properties:
@@ -5668,6 +5925,11 @@ components:
         portalDescription: { type: string, maxLength: 2000 }
         portalAccess: { $ref: '#/components/schemas/PortalAccess' }
         selfSignup: { type: boolean }
+        releaseNotesProjectKeys:
+          type: array
+          maxItems: 50
+          items: { type: string }
+          description: Software projects (ones you can browse) whose published release notes the help centre shows; replaces the list
     FormFieldType:
       type: string
       enum: [text, textarea, select, multiselect, number, date, checkbox, url]
@@ -5921,12 +6183,22 @@ components:
         needsApproval: { type: boolean }
     PortalDeskDetail:
       type: object
-      required: [projectKey, name, description, requestTypes]
+      required: [projectKey, name, description, requestTypes, whatsNew]
       properties:
         projectKey: { type: string }
         name: { type: string }
         description: { type: string }
         requestTypes: { type: array, items: { $ref: '#/components/schemas/PortalRequestType' } }
+        whatsNew: { type: boolean, description: 'The desk''s What''s new page has release notes' }
+    PortalReleaseNote:
+      type: object
+      required: [id, product, name, notes]
+      properties:
+        id: { type: string, format: uuid }
+        product: { type: string, description: The software project's name }
+        name: { type: string, description: The release's name }
+        date: { type: string, format: date, description: When it was released, else its planned release date }
+        notes: { type: string, description: Markdown }
     PortalRequestCreate:
       type: object
       required: [requestTypeId, values]

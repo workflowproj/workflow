@@ -546,7 +546,7 @@ func (q *Queries) ImportInsertIssue(ctx context.Context, arg ImportInsertIssuePa
 const importInsertRelease = `-- name: ImportInsertRelease :one
 INSERT INTO releases (project_id, name, description, start_date, release_date, state, released_at, position)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, project_id, name, description, start_date, release_date, state, released_at, position, created_at
+RETURNING id, project_id, name, description, start_date, release_date, state, released_at, position, created_at, notes, notes_published_at, tag_repository_id, tag_name, tag_sha, tag_linked_at
 `
 
 type ImportInsertReleaseParams struct {
@@ -583,6 +583,12 @@ func (q *Queries) ImportInsertRelease(ctx context.Context, arg ImportInsertRelea
 		&i.ReleasedAt,
 		&i.Position,
 		&i.CreatedAt,
+		&i.Notes,
+		&i.NotesPublishedAt,
+		&i.TagRepositoryID,
+		&i.TagName,
+		&i.TagSha,
+		&i.TagLinkedAt,
 	)
 	return i, err
 }
@@ -705,7 +711,7 @@ func (q *Queries) ImportMaxRank(ctx context.Context, projectID uuid.UUID) (strin
 }
 
 const importReleaseByName = `-- name: ImportReleaseByName :one
-SELECT id, project_id, name, description, start_date, release_date, state, released_at, position, created_at FROM releases WHERE project_id = $1 AND lower(name) = lower($2)
+SELECT id, project_id, name, description, start_date, release_date, state, released_at, position, created_at, notes, notes_published_at, tag_repository_id, tag_name, tag_sha, tag_linked_at FROM releases WHERE project_id = $1 AND lower(name) = lower($2)
 `
 
 type ImportReleaseByNameParams struct {
@@ -727,6 +733,12 @@ func (q *Queries) ImportReleaseByName(ctx context.Context, arg ImportReleaseByNa
 		&i.ReleasedAt,
 		&i.Position,
 		&i.CreatedAt,
+		&i.Notes,
+		&i.NotesPublishedAt,
+		&i.TagRepositoryID,
+		&i.TagName,
+		&i.TagSha,
+		&i.TagLinkedAt,
 	)
 	return i, err
 }
@@ -890,7 +902,7 @@ const importUpdateRelease = `-- name: ImportUpdateRelease :one
 UPDATE releases SET name = $1, description = $2, start_date = $3, release_date = $4,
     state = $5, released_at = $6, position = $7
 WHERE id = $8
-RETURNING id, project_id, name, description, start_date, release_date, state, released_at, position, created_at
+RETURNING id, project_id, name, description, start_date, release_date, state, released_at, position, created_at, notes, notes_published_at, tag_repository_id, tag_name, tag_sha, tag_linked_at
 `
 
 type ImportUpdateReleaseParams struct {
@@ -927,6 +939,12 @@ func (q *Queries) ImportUpdateRelease(ctx context.Context, arg ImportUpdateRelea
 		&i.ReleasedAt,
 		&i.Position,
 		&i.CreatedAt,
+		&i.Notes,
+		&i.NotesPublishedAt,
+		&i.TagRepositoryID,
+		&i.TagName,
+		&i.TagSha,
+		&i.TagLinkedAt,
 	)
 	return i, err
 }

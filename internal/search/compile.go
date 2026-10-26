@@ -250,6 +250,16 @@ func (b *builder) clause(c Clause) (string, error) {
 			}
 			return "EXISTS (SELECT 1 FROM issue_releases ir JOIN releases r ON r.id = ir.release_id WHERE ir.issue_id = i.id AND " + cond + ")", nil
 		}, "NOT EXISTS (SELECT 1 FROM issue_releases ir WHERE ir.issue_id = i.id)")
+	case "deployedto":
+		// Environments a successful deployment containing the issue reached.
+		const deployed = "SELECT 1 FROM deployment_issues di JOIN deployments d ON d.id = di.deployment_id WHERE di.issue_id = i.id AND d.status = 'success'"
+		return b.setField(c, func(v Value) (string, error) {
+			s, err := b.str(v)
+			if err != nil {
+				return "", err
+			}
+			return fmt.Sprintf("EXISTS (%s AND lower(d.environment) = lower(%s::text))", deployed, b.arg(s)), nil
+		}, "NOT EXISTS ("+deployed+")")
 	case "parent":
 		return b.setField(c, func(v Value) (string, error) {
 			sub, err := b.issueByKey(v)
@@ -997,6 +1007,7 @@ var Fields = []struct {
 	{"labels", "label", []string{"=", "!=", "in", "not in", "is", "is not"}},
 	{"sprint", "sprint", []string{"=", "!=", "in", "not in", "is", "is not"}},
 	{"fixVersion", "release", []string{"=", "!=", "in", "not in", "is", "is not"}},
+	{"deployedTo", "environment", []string{"=", "!=", "in", "not in", "is", "is not"}},
 	{"parent", "issue", []string{"=", "!=", "in", "not in", "is", "is not"}},
 	{"epic", "issue", []string{"=", "!=", "in", "not in", "is", "is not"}},
 	{"issueLinkType", "linkType", []string{"=", "!=", "in", "not in", "is", "is not"}},

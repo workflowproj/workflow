@@ -172,6 +172,60 @@ func (GitLab) Parse(eventType string, payload []byte) ([]any, error) {
 			return []any{ReviewEvent{Repo: repo, Number: strconv.Itoa(mr.IID), State: state, Reviewer: p.User.Username}}, nil
 		}
 		return []any{mr.event(repo, action)}, nil
+	case "tag_push":
+		var p struct {
+			Ref         string `json:"ref"`
+			After       string `json:"after"`
+			CheckoutSHA string `json:"checkout_sha"`
+		}
+		if err := json.Unmarshal(payload, &p); err != nil {
+			return nil, err
+		}
+		tag, ok := strings.CutPrefix(p.Ref, "refs/tags/")
+		if !ok || p.After == "" || p.After == strings.Repeat("0", 40) {
+			return nil, nil // a deleted tag
+		}
+		sha := p.CheckoutSHA
+		if sha == "" {
+			sha = p.After
+		}
+		return []any{TagEvent{Repo: repo, Name: tag, SHA: sha}}, nil
+	case "deployment":
+		var p struct {
+			Status          string `json:"status"`
+			StatusChangedAt string `json:"status_changed_at"`
+			DeploymentID    int64  `json:"deployment_id"`
+			DeployableURL   string `json:"deployable_url"`
+			Environment     string `json:"environment"`
+			ExternalURL     string `json:"environment_external_url"`
+			ShortSHA        string `json:"short_sha"`
+			CommitURL       string `json:"commit_url"`
+			Ref             string `json:"ref"`
+			User            struct {
+				Username string `json:"username"`
+			} `json:"user"`
+		}
+		if err := json.Unmarshal(payload, &p); err != nil {
+			return nil, err
+		}
+		status := map[string]string{
+			"created": "pending", "blocked": "pending", "running": "running", "success": "success",
+			"failed": "failed", "canceled": "canceled", "skipped": "canceled",
+		}[p.Status]
+		if status == "" {
+			return nil, nil
+		}
+		// The payload names the commit by its URL (the full sha) and a short sha.
+		sha := p.ShortSHA
+		if i := strings.LastIndex(p.CommitURL, "/commit/"); i >= 0 {
+			sha = strings.Trim(p.CommitURL[i+len("/commit/"):], "/")
+		}
+		link := p.DeployableURL
+		if link == "" {
+			link = p.ExternalURL
+		}
+		return []any{DeploymentEvent{Repo: repo, ID: strconv.FormatInt(p.DeploymentID, 10), Environment: p.Environment, Ref: p.Ref, SHA: sha,
+			Status: status, URL: link, Deployer: p.User.Username, At: parseGitLabTime(p.StatusChangedAt)}}, nil
 	case "pipeline":
 		var p struct {
 			ObjectAttributes struct {
@@ -255,7 +309,7 @@ func (c *gitlabClient) do(ctx context.Context, method, path string, body, out an
 	defer res.Body.Close()
 	raw, _ := io.ReadAll(io.LimitReader(res.Body, 16<<20))
 	if res.StatusCode >= 300 {
-		return fmt.Errorf("gitlab %s %s: HTTP %d: %s", method, path, res.StatusCode, strings.TrimSpace(string(raw[:min(len(raw), 300)])))
+		return apiError("gitlab", method, path, res.StatusCode, raw)
 	}
 	if out != nil && len(raw) > 0 {
 		return json.Unmarshal(raw, out)
@@ -328,7 +382,7 @@ func (c *gitlabClient) EnsureHook(ctx context.Context, repo RepoRef, hookURL, se
 	}
 	body := map[string]any{
 		"url": hookURL, "token": secret, "push_events": true, "merge_requests_events": true,
-		"pipeline_events": true, "tag_push_events": false, "enable_ssl_verification": true,
+		"pipeline_events": true, "tag_push_events": true, "deployment_events": true, "enable_ssl_verification": true,
 	}
 	for _, h := range hooks {
 		if h.URL == hookURL {
@@ -343,4 +397,41 @@ func (c *gitlabClient) EnsureHook(ctx context.Context, repo RepoRef, hookURL, se
 		return "", err
 	}
 	return strconv.FormatInt(created.ID, 10), nil
+}
+
+type glCommit struct {
+	ID           string `json:"id"`
+	Message      string `json:"message"`
+	WebURL       string `json:"web_url"`
+	AuthorName   string `json:"author_name"`
+	AuthorEmail  string `json:"author_email"`
+	AuthoredDate string `json:"authored_date"`
+}
+
+func (g glCommit) commit() Commit {
+	return Commit{SHA: g.ID, Message: g.Message, URL: g.WebURL, AuthorName: g.AuthorName, AuthorEmail: strings.ToLower(g.AuthorEmail), Timestamp: parseGitLabTime(g.AuthoredDate)}
+}
+
+// CommitsBetween uses the repository compare API (commits oldest first).
+func (c *gitlabClient) CommitsBetween(ctx context.Context, repo RepoRef, base, head string, limit int) ([]Commit, bool, error) {
+	if base == "" {
+		var one glCommit
+		if err := c.do(ctx, http.MethodGet, projectPath(repo)+"/repository/commits/"+url.PathEscape(head), nil, &one); err != nil {
+			return nil, false, err
+		}
+		return []Commit{one.commit()}, false, nil
+	}
+	var res struct {
+		Commits []glCommit `json:"commits"`
+	}
+	q := url.Values{"from": {base}, "to": {head}, "straight": {"false"}}
+	if err := c.do(ctx, http.MethodGet, projectPath(repo)+"/repository/compare?"+q.Encode(), nil, &res); err != nil {
+		return nil, false, err
+	}
+	out := make([]Commit, len(res.Commits))
+	for i, g := range res.Commits {
+		out[i] = g.commit()
+	}
+	out, truncated := newest(out, limit)
+	return out, truncated, nil
 }

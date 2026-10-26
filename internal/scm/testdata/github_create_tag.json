@@ -1,0 +1,17 @@
+{
+  "ref": "v3.9.0",
+  "ref_type": "tag",
+  "master_branch": "main",
+  "description": "The shop",
+  "pusher_type": "user",
+  "repository": {
+    "id": 101,
+    "name": "shop",
+    "full_name": "acme/shop",
+    "private": true,
+    "html_url": "https://github.com/acme/shop",
+    "default_branch": "main"
+  },
+  "sender": { "login": "ada", "id": 1, "type": "User" },
+  "installation": { "id": 77, "node_id": "MDIzOkludGVncmF0aW9uSW5zdGFsbGF0aW9uNzc=" }
+}

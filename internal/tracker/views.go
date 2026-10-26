@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -47,6 +48,7 @@ func ReleaseView(r dbq.Release, issueCount, doneCount int) api.Release {
 		Id: r.ID, Name: r.Name, Description: r.Description, State: api.ReleaseState(r.State), Position: int(r.Position),
 		StartDate: dateView(r.StartDate), ReleaseDate: dateView(r.ReleaseDate), ReleasedAt: r.ReleasedAt,
 		IssueCount: issueCount, DoneCount: doneCount,
+		NotesPublished: r.NotesPublishedAt != nil, NotesPublishedAt: r.NotesPublishedAt, TagName: r.TagName, TagRepositoryId: r.TagRepositoryID,
 	}
 }
 
@@ -88,6 +90,7 @@ type lookups struct {
 	users    map[uuid.UUID]dbq.User
 	parents  map[uuid.UUID]dbq.Issue
 	dev      map[uuid.UUID]dbq.DevSummariesRow
+	deployed map[uuid.UUID][]string
 	spent    map[uuid.UUID]int64
 }
 
@@ -95,6 +98,7 @@ func (s *Service) loadLookups(ctx context.Context, issues []dbq.Issue) (*lookups
 	l := &lookups{
 		projects: map[uuid.UUID]dbq.Project{}, types: map[uuid.UUID]dbq.IssueType{}, statuses: map[uuid.UUID]dbq.Status{},
 		users: map[uuid.UUID]dbq.User{}, parents: map[uuid.UUID]dbq.Issue{}, dev: map[uuid.UUID]dbq.DevSummariesRow{},
+		deployed: map[uuid.UUID][]string{},
 	}
 	var projectIDs, typeIDs, statusIDs, userIDs, parentIDs, issueIDs []uuid.UUID
 	for _, i := range issues {
@@ -150,6 +154,13 @@ func (s *Service) loadLookups(ctx context.Context, issues []dbq.Issue) (*lookups
 	for _, d := range dev {
 		l.dev[d.IssueID] = d
 	}
+	envs, err := s.Q.IssueEnvironments(ctx, issueIDs)
+	if err != nil {
+		return nil, err
+	}
+	for _, e := range envs {
+		l.deployed[e.IssueID] = append(l.deployed[e.IssueID], e.Environment)
+	}
 	if l.spent, err = s.TimeSpent(ctx, s.Q, issueIDs); err != nil {
 		return nil, err
 	}
@@ -195,13 +206,19 @@ func (l *lookups) issue(i dbq.Issue) api.Issue {
 			v.Parent = &r
 		}
 	}
-	if d, ok := l.dev[i.ID]; ok {
+	d, hasDev := l.dev[i.ID]
+	envs := l.deployed[i.ID]
+	if hasDev || len(envs) > 0 {
 		ds := api.DevSummary{
 			Branches: int(d.Branches), Commits: int(d.Commits), PullRequests: int(d.PullRequests),
 			OpenPullRequests: int(d.OpenPullRequests), MergedPullRequests: int(d.MergedPullRequests),
 		}
 		if d.PipelineState != "" {
 			ds.PipelineState = &d.PipelineState
+		}
+		if len(envs) > 0 {
+			sorted := slices.Sorted(slices.Values(envs))
+			ds.DeployedTo = &sorted
 		}
 		v.Dev = &ds
 	}
@@ -291,6 +308,7 @@ func (s *Service) IssueDetail(ctx context.Context, actor *authz.Actor, i dbq.Iss
 		Description: i.Description,
 		Project:     api.ProjectRef{Id: p.ID, Key: p.Key, Name: p.Name},
 		Children:    []api.Issue{}, Links: []api.IssueLink{}, Development: []api.DevLink{}, Attachments: []api.Attachment{}, Releases: []api.Release{},
+		Deployments: []api.IssueDeployment{},
 	}
 	for _, c := range children {
 		d.Children = append(d.Children, l.issue(c))
@@ -346,6 +364,9 @@ func (s *Service) IssueDetail(ctx context.Context, actor *authz.Actor, i dbq.Iss
 			AuthorName: dl.AuthorName, Data: data, UpdatedAt: dl.UpdatedAt,
 			Repository: api.RepositoryRef{Id: dl.RepositoryID, Provider: api.ScmProvider(dl.Provider), FullPath: dl.FullPath, WebUrl: dl.RepoWebUrl},
 		})
+	}
+	if d.Deployments, err = s.issueDeployments(ctx, i.ID); err != nil {
+		return d, err
 	}
 	atts, err := s.Q.ListAttachments(ctx, i.ID)
 	if err != nil {
