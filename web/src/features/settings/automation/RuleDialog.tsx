@@ -47,16 +47,16 @@ export function RuleDialog({ projectKey, rule, initial, templateTitle, onClose }
   const chat = useQuery({ ...chatChannelsQuery(projectKey), enabled: usesChat });
   const chatChannels = (chat.data ?? []).map((c) => ({ id: c.id, name: c.name, provider: c.provider }));
   const statusNames = useMemo(() => project.statuses.map((s) => s.name), [project.statuses]);
-  // Named statuses that no workflow of this project has (only once the workflows are loaded).
+  // Named statuses that no workflow of this project has (only once every workflow has loaded).
   const missing = useMemo(() => {
-    if (project.loading) return new Set<string>();
+    if (!project.complete) return new Set<string>();
     const known = new Set(statusNames.map((s) => s.toLowerCase()));
     return new Set(
       namedStatuses({ trigger, actions })
         .map((s) => s.toLowerCase())
         .filter((s) => !known.has(s)),
     );
-  }, [project.loading, statusNames, trigger, actions]);
+  }, [project.complete, statusNames, trigger, actions]);
   const missingNames = namedStatuses({ trigger, actions }).filter((s) => missing.has(s.toLowerCase()));
 
   const body = (): RuleInput => ({ name: name.trim(), description, enabled, trigger: cleanTrigger(trigger), condition: condition.trim(), actions: actions.map(cleanAction) });

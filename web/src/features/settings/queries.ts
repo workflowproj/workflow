@@ -50,7 +50,9 @@ export type ProjectStatus = { id: string; name: string; category: StatusCategory
 /**
  * useProjectStatuses lists the statuses the project's issue types can be in, gathered from the
  * current version of each workflow the project uses (in workflow order, deduplicated). With
- * `workOnly`, only work types count: boards never show risks or decisions.
+ * `workOnly`, only work types count: boards never show risks or decisions. `complete` says the
+ * list has every workflow in it: while loading, or after a request failed (a rate limit, say),
+ * it is partial, so a status missing from it may still exist.
  */
 export function useProjectStatuses(projectKey: string, { workOnly = false }: { workOnly?: boolean } = {}) {
   const types = useQuery(issueTypesQuery(projectKey));
@@ -58,6 +60,7 @@ export function useProjectStatuses(projectKey: string, { workOnly = false }: { w
   const workflows = useQueries({ queries: ids.map((id) => workflowQuery(id)) });
   const loading = types.isLoading || workflows.some((w) => w.isLoading);
   const error = types.error ?? workflows.find((w) => w.error)?.error;
+  const complete = !!types.data && workflows.every((w) => !!w.data);
   const byId = new Map<string, ProjectStatus>();
   for (const w of workflows) {
     if (!w.data) continue;
@@ -69,5 +72,5 @@ export function useProjectStatuses(projectKey: string, { workOnly = false }: { w
   }
   const order: Record<StatusCategory, number> = { todo: 0, in_progress: 1, done: 2 };
   const statuses = [...byId.values()].sort((a, b) => order[a.category] - order[b.category]);
-  return { statuses, loading, error };
+  return { statuses, loading, error, complete };
 }

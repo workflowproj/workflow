@@ -137,7 +137,9 @@ function Options({
               ))}
             </optgroup>
             <optgroup label="A specific status">
-              {a.status && !statuses.some((s) => s.toLowerCase() === a.status!.toLowerCase()) && <option value={`status:${a.status}`}>{a.status} (not in this project)</option>}
+              {a.status && !statuses.some((s) => s.toLowerCase() === a.status!.toLowerCase()) && (
+                <option value={`status:${a.status}`}>{`${a.status}${unknown ? " (not in this project)" : ""}`}</option>
+              )}
               {statuses.map((s) => (
                 <option key={s} value={`status:${s}`}>
                   {s}

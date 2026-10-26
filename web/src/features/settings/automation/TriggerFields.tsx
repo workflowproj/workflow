@@ -69,7 +69,7 @@ export function TriggerFields({
               </optgroup>
               <optgroup label="A specific status">
                 {trigger.toStatus && !statuses.some((s) => s.toLowerCase() === trigger.toStatus!.toLowerCase()) && (
-                  <option value={`status:${trigger.toStatus}`}>{trigger.toStatus} (not in this project)</option>
+                  <option value={`status:${trigger.toStatus}`}>{`${trigger.toStatus}${missing.has(trigger.toStatus.toLowerCase()) ? " (not in this project)" : ""}`}</option>
                 )}
                 {statuses.map((s) => (
                   <option key={s} value={`status:${s}`}>
