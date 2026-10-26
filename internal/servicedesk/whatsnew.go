@@ -39,14 +39,30 @@ func (s *Service) releaseNotesProjects(ctx context.Context, q *dbq.Queries, desk
 	return out, nil
 }
 
-// setReleaseNotesProjects replaces the projects a desk shows release notes of. The admin must be
-// able to browse each one, and only software projects qualify.
+// setReleaseNotesProjects replaces the projects a desk shows release notes of. Only software
+// projects qualify, and the admin must be able to browse each one they add; projects already
+// chosen (perhaps by another admin) can stay or go without that.
 func (s *Service) setReleaseNotesProjects(ctx context.Context, actor *authz.Actor, desk dbq.Project, keys []string) error {
+	current, err := s.Q.DeskReleaseProjects(ctx, desk.ID)
+	if err != nil {
+		return err
+	}
+	chosen := map[string]uuid.UUID{}
+	for _, p := range current {
+		chosen[strings.ToUpper(p.Key)] = p.ID
+	}
 	var ids []uuid.UUID
 	seen := map[uuid.UUID]bool{}
 	for _, key := range keys {
 		key = strings.TrimSpace(key)
 		if key == "" {
+			continue
+		}
+		if id, ok := chosen[strings.ToUpper(key)]; ok {
+			if !seen[id] {
+				seen[id] = true
+				ids = append(ids, id)
+			}
 			continue
 		}
 		p, _, err := s.Tracker.ProjectFor(ctx, actor, key, authz.ProjectBrowse)

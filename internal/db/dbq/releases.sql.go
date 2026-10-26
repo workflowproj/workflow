@@ -354,6 +354,7 @@ WHERE project_id = $1
   AND (lower(name) = lower($2::text) OR 'v' || lower(name) = lower($2::text) OR lower(name) = 'v' || lower($2::text))
 ORDER BY lower(name) = lower($2::text) DESC, position
 LIMIT 1
+FOR UPDATE
 `
 
 type ReleaseForTagParams struct {
@@ -362,7 +363,8 @@ type ReleaseForTagParams struct {
 }
 
 // The project's release a tag names: the same name, or the name with or without a leading "v"
-// (v3.9.0 and 3.9.0), an exact match first.
+// (v3.9.0 and 3.9.0), an exact match first. Locked: GitHub sends both a create and a push
+// webhook for each tag, and the two must not both link (or release) it.
 func (q *Queries) ReleaseForTag(ctx context.Context, arg ReleaseForTagParams) (Release, error) {
 	row := q.db.QueryRow(ctx, releaseForTag, arg.ProjectID, arg.Tag)
 	var i Release

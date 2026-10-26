@@ -3,6 +3,7 @@ package scm
 import (
 	"context"
 	"net/http"
+	"net/url"
 	"slices"
 	"time"
 
@@ -64,7 +65,7 @@ func (s *Service) applyDeployment(ctx context.Context, c dbq.ScmConnection, ev D
 	err = db.Tx(ctx, s.Pool, func(tx pgx.Tx, q *dbq.Queries) error {
 		d, err := q.UpsertDeployment(ctx, dbq.UpsertDeploymentParams{
 			RepositoryID: sc.repo.ID, ExternalID: ev.ID, Environment: ev.Environment, Ref: ev.Ref, Sha: ev.SHA,
-			Status: ev.Status, Url: ev.URL, Deployer: ev.Deployer, StatusAt: at,
+			Status: ev.Status, Url: webURL(ev.URL), Deployer: ev.Deployer, StatusAt: at,
 		})
 		if err != nil {
 			return err
@@ -79,6 +80,15 @@ func (s *Service) applyDeployment(ctx context.Context, c dbq.ScmConnection, ev D
 }
 
 func completed(status string) bool { return status == "success" || status == "failed" }
+
+// webURL keeps a link from a webhook only if it is http(s): it is shown as a link and passed on
+// to outbound webhooks.
+func webURL(raw string) string {
+	if u, err := url.Parse(raw); err == nil && (u.Scheme == "https" || u.Scheme == "http") && u.Host != "" {
+		return raw
+	}
+	return ""
+}
 
 func deref(s *string) string {
 	if s == nil {

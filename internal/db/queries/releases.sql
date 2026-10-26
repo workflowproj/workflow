@@ -42,12 +42,14 @@ UPDATE releases SET tag_sha = @tag_sha WHERE id = @id;
 
 -- name: ReleaseForTag :one
 -- The project's release a tag names: the same name, or the name with or without a leading "v"
--- (v3.9.0 and 3.9.0), an exact match first.
+-- (v3.9.0 and 3.9.0), an exact match first. Locked: GitHub sends both a create and a push
+-- webhook for each tag, and the two must not both link (or release) it.
 SELECT * FROM releases
 WHERE project_id = @project_id
   AND (lower(name) = lower(@tag::text) OR 'v' || lower(name) = lower(@tag::text) OR lower(name) = 'v' || lower(@tag::text))
 ORDER BY lower(name) = lower(@tag::text) DESC, position
-LIMIT 1;
+LIMIT 1
+FOR UPDATE;
 
 -- name: PreviousTaggedRelease :one
 -- The release before this one (in the releases list's order) with a tag in the same repository.

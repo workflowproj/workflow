@@ -42,3 +42,18 @@ func TestParseSmartCommits(t *testing.T) {
 		t.Fatalf("got %q, want %q", got, want)
 	}
 }
+
+func TestWebURL(t *testing.T) {
+	for in, want := range map[string]string{
+		"https://github.com/acme/shop/deployments": "https://github.com/acme/shop/deployments",
+		"http://ci.internal/job/7":                 "http://ci.internal/job/7",
+		"javascript:alert(1)":                      "",
+		"data:text/html,hi":                        "",
+		"https:///no-host":                         "",
+		"":                                         "",
+	} {
+		if got := webURL(in); got != want {
+			t.Errorf("webURL(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

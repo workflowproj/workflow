@@ -744,7 +744,7 @@ func (s *Service) TagPushed(ctx context.Context, actor *authz.Actor, p dbq.Proje
 			shaPtr = &sha
 		}
 		switch {
-		case r.TagName == nil:
+		case r.TagName == nil || r.TagRepositoryID == nil: // unlinked, or its repository was removed
 			if r, err = q.SetReleaseTag(ctx, dbq.SetReleaseTagParams{ID: r.ID, RepositoryID: &repo.ID, TagName: &tag, TagSha: shaPtr}); err != nil {
 				return err
 			}

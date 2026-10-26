@@ -2,12 +2,21 @@
 
 -- name: UpsertDeployment :one
 -- Records a deployment's status. Reports can arrive out of order: an older status never
--- replaces a newer one.
+-- replaces a newer one, and as providers' times are to the second, on a tie a later stage
+-- (pending, then running, then an outcome) wins.
 INSERT INTO deployments (repository_id, external_id, environment, ref, sha, status, url, deployer, status_at)
 VALUES (@repository_id, @external_id, @environment, @ref, @sha, @status, @url, @deployer, @status_at)
 ON CONFLICT (repository_id, external_id) DO UPDATE SET
-    status = CASE WHEN excluded.status_at >= deployments.status_at THEN excluded.status ELSE deployments.status END,
-    url = CASE WHEN excluded.url <> '' AND excluded.status_at >= deployments.status_at THEN excluded.url ELSE deployments.url END,
+    status = CASE WHEN excluded.status_at > deployments.status_at
+        OR excluded.status_at = deployments.status_at
+           AND (CASE excluded.status WHEN 'pending' THEN 0 WHEN 'running' THEN 1 ELSE 2 END)
+            >= (CASE deployments.status WHEN 'pending' THEN 0 WHEN 'running' THEN 1 ELSE 2 END)
+        THEN excluded.status ELSE deployments.status END,
+    url = CASE WHEN excluded.url <> '' AND (excluded.status_at > deployments.status_at
+        OR excluded.status_at = deployments.status_at
+           AND (CASE excluded.status WHEN 'pending' THEN 0 WHEN 'running' THEN 1 ELSE 2 END)
+            >= (CASE deployments.status WHEN 'pending' THEN 0 WHEN 'running' THEN 1 ELSE 2 END))
+        THEN excluded.url ELSE deployments.url END,
     status_at = greatest(deployments.status_at, excluded.status_at),
     environment = CASE WHEN excluded.environment <> '' THEN excluded.environment ELSE deployments.environment END,
     ref = CASE WHEN excluded.ref <> '' THEN excluded.ref ELSE deployments.ref END,

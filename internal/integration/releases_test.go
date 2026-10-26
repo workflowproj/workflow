@@ -1,12 +1,17 @@
 package integration
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"slices"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/workflowproj/workflow/internal/authz"
+	"github.com/workflowproj/workflow/internal/db/dbq"
 )
 
 // release creates a release and returns it.
@@ -494,10 +499,14 @@ func TestGitLabTagsAndDeployments(t *testing.T) {
 	eq(t, len(admin.issue("APP-2")["deployments"].([]any)), 0, "APP-2 not yet")
 
 	e.deliver(hook, deploy(2, "production", "2.0", "ccc333", "success", "2026-10-21 09:05:00 UTC"), glh("Deployment Hook", "g-4")...)
+	// A late report of an earlier stage, stamped the same second, doesn't undo the success.
+	e.deliver(hook, deploy(2, "production", "2.0", "ccc333", "running", "2026-10-21 09:05:00 UTC"), glh("Deployment Hook", "g-5")...)
 	e.DrainJobs()
 	cmp := gl.find("GET", "/api/v4/projects/42/repository/compare")
 	eq(t, len(cmp), 1, "compared with the previous deployment")
-	eq(t, len(admin.issue("APP-2")["deployments"].([]any)), 1, "APP-2 deployed by the second deployment")
+	deps = admin.issue("APP-2")["deployments"].([]any)
+	eq(t, len(deps), 1, "APP-2 deployed by the second deployment")
+	eq(t, str(deps[0].(map[string]any), "status"), "success", "a tie keeps the outcome")
 	// The release's tag reached production.
 	d = admin.releaseDetail(str(rel, "id"))
 	envs := d["environments"].([]any)
@@ -640,4 +649,54 @@ func countRows(e *Env, sql string) int {
 		e.t.Fatal(err)
 	}
 	return n
+}
+
+// GitHub sends both a create and a push webhook for each tag, and the scm queue handles them at
+// the same time: the tag must be linked once, keep its commit, and release the release once.
+func TestTagWebhooksAtOnce(t *testing.T) {
+	e := newEnv(t)
+	admin := e.login("ada@example.com", "Ada")
+	admin.createProject("SHOP", "kanban")
+	_, _, repoID := githubRepo(t, e, admin, "SHOP", map[string]any{})
+	admin.must("PATCH", "/api/v1/projects/SHOP/release-settings", obj{"releaseOnTag": true}, 200, nil)
+	ctx := context.Background()
+	q := dbq.New(e.Pool)
+	p, err := q.GetProjectByKey(ctx, "SHOP")
+	if err != nil {
+		t.Fatal(err)
+	}
+	repo, err := q.GetScmRepository(ctx, uuid.MustParse(repoID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := range 10 {
+		name := fmt.Sprintf("1.%d.0", i)
+		rel := admin.release("SHOP", obj{"name": name})
+		if i%2 == 1 { // linked by hand beforehand
+			admin.must("PATCH", "/api/v1/releases/"+str(rel, "id"), obj{"tagRepositoryId": repoID, "tagName": "v" + name}, 200, nil)
+		}
+		start := make(chan struct{})
+		errs := make(chan error, 2)
+		for _, sha := range []string{"", "c0ffee"} { // create carries no commit; push does
+			go func() {
+				<-start
+				_, err := e.App.Tracker.TagPushed(ctx, authz.SystemActor(), p, repo, "v"+name, sha)
+				errs <- err
+			}()
+		}
+		close(start)
+		for range 2 {
+			if err := <-errs; err != nil {
+				t.Fatal(err)
+			}
+		}
+		d := admin.releaseDetail(str(rel, "id"))
+		eq(t, str(d, "tag", "sha"), "c0ffee", name+": the push's commit is kept")
+		eq(t, str(d, "state"), "released", name+": released")
+		var ships int
+		if err := e.Pool.QueryRow(ctx, `SELECT count(*) FROM audit_events WHERE action = 'release.ship' AND target_id = $1`, str(rel, "id")).Scan(&ships); err != nil {
+			t.Fatal(err)
+		}
+		eq(t, ships, 1, name+": released once")
+	}
 }
