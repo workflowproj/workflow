@@ -669,3 +669,35 @@ func TestRisksAndDecisionsAcrossProjects(t *testing.T) {
 	admin.must("PATCH", "/api/v1/projects/DESK", obj{"risksDecisions": true}, 200, nil)
 	admin.must("POST", "/api/v1/projects/DESK/request-types", obj{"name": "Report a risk", "issueTypeKey": "risk"}, 400, nil)
 }
+
+// A link can be made from either end, so whoever can edit either end can remove it: a risk's
+// owner unlinks mitigating work in a project where they only view.
+func TestUnlinkFromEitherEnd(t *testing.T) {
+	e := newEnv(t)
+	admin := e.login("admin@example.com", "Admin")
+	mel := e.login("mel@example.com", "Mel")
+	outsider := e.login("ola@example.com", "Ola")
+	admin.createProject("OPEN", "kanban")
+	admin.createProject("OPS", "kanban")
+	admin.must("POST", "/api/v1/projects/OPS/members", obj{"userId": mel.id(), "roleKey": "viewer"}, 201, nil)
+	admin.must("POST", "/api/v1/projects/OPEN/members", obj{"userId": outsider.id(), "roleKey": "viewer"}, 201, nil)
+	admin.must("POST", "/api/v1/projects/OPS/members", obj{"userId": outsider.id(), "roleKey": "viewer"}, 201, nil)
+	risk := str(admin.createIssue("OPEN", "risk", "Outage", obj{"fields": obj{"risk_likelihood": 2, "risk_impact": 4}}), "key")
+	work := str(admin.createIssue("OPS", "task", "Add a standby", nil), "key")
+	links := func() []any {
+		var reg obj
+		mel.get("/api/v1/issues/"+risk, &reg)
+		return reg["links"].([]any)
+	}
+	for _, unlinker := range []*Client{outsider, mel} {
+		admin.link(work, "mitigates", risk, 201)
+		id := str(links()[0].(obj), "id")
+		if unlinker == outsider {
+			outsider.must("DELETE", "/api/v1/issue-links/"+id, nil, 403, nil) // views both ends, edits neither
+			admin.must("DELETE", "/api/v1/issue-links/"+id, nil, 204, nil)
+			continue
+		}
+		mel.must("DELETE", "/api/v1/issue-links/"+id, nil, 204, nil) // edits the risk, only views the work
+		eq(t, len(links()), 0, "unlinked from the risk's end")
+	}
+}
