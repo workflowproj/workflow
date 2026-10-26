@@ -947,3 +947,96 @@ func TestSelfSignupLeavesStaffAndSignInDomainsAlone(t *testing.T) {
 		}
 	}
 }
+
+// TestPortalLastUpdate: a request's last update in the help centre is its latest activity the
+// customer can see (replies either way, status changes, files they see), never an internal note
+// or an edit agents keep to themselves. Lists put the latest first.
+func TestPortalLastUpdate(t *testing.T) {
+	e := newEnv(t)
+	admin, agent := serviceDesk(t, e, "HELP")
+	carol := admin.addCustomer("HELP", "carol@customer.test", "Carol Customer")
+	rt := str(admin.requestType("HELP", "Get IT help"), "id")
+	older := str(carol.raise("HELP", rt, obj{"summary": "Printer jam"}), "key")
+	key := str(carol.raise("HELP", rt, obj{"summary": "VPN drops"}), "key")
+
+	// age moves everything that happened to a request a day further into the past.
+	age := func(key string) {
+		t.Helper()
+		id := uuid.MustParse(str(agent.issue(key), "id"))
+		for _, q := range []string{
+			`UPDATE issues SET created_at = created_at - interval '1 day', updated_at = updated_at - interval '1 day' WHERE id = $1`,
+			`UPDATE comments SET created_at = created_at - interval '1 day' WHERE issue_id = $1`,
+			`UPDATE issue_history SET created_at = created_at - interval '1 day' WHERE issue_id = $1`,
+			`UPDATE attachments SET created_at = created_at - interval '1 day' WHERE issue_id = $1`,
+		} {
+			if _, err := e.Pool.Exec(context.Background(), q, id); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	updated := func(key string) time.Time {
+		t.Helper()
+		var r obj
+		carol.get("/api/v1/portal/requests/"+key, &r)
+		at, err := time.Parse(time.RFC3339Nano, str(r, "updatedAt"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var list []obj
+		carol.get("/api/v1/portal/requests", &list)
+		for _, x := range list {
+			if str(x, "key") == key {
+				eq(t, str(x, "updatedAt"), str(r, "updatedAt"), "the list and the request agree")
+			}
+		}
+		return at
+	}
+	order := func() []string {
+		var list []obj
+		carol.get("/api/v1/portal/requests", &list)
+		return keys(list)
+	}
+	moved := func(what string, since time.Time) {
+		t.Helper()
+		if at := updated(key); at.Before(since) {
+			t.Fatalf("%s: last update %v, want after %v", what, at, since)
+		}
+	}
+	stayed := func(what string) {
+		t.Helper()
+		if at := updated(key); time.Since(at) < 12*time.Hour {
+			t.Fatalf("%s moved the last update to %v", what, at)
+		}
+	}
+
+	age(key)
+	age(key)
+	age(older)
+	sameStrings(t, order(), []string{older, key}, "the request raised later but aged more is older")
+	if at := updated(key); time.Since(at) < 47*time.Hour {
+		t.Fatalf("a new request's last update is when it was raised: %v", at)
+	}
+
+	// What agents keep to themselves does not count.
+	agent.must("POST", "/api/v1/issues/"+key+"/comments", obj{"body": "INTERNAL: check the gateway"}, 201, nil)
+	agent.must("PATCH", "/api/v1/issues/"+key, obj{"priority": "high", "assigneeId": agent.id()}, 200, nil)
+	agent.upload("/api/v1/issues/"+key+"/attachments", "trace.txt", "agents only")
+	stayed("an internal note, an edit or an agent's file")
+	sameStrings(t, order(), []string{older, key}, "internal activity does not reorder the list")
+
+	// A reply to the customer does, and so does theirs, and a status change.
+	before := time.Now().Add(-time.Second)
+	agent.must("POST", "/api/v1/issues/"+key+"/comments", obj{"body": "Could you try the new client?", "visibility": "public"}, 201, nil)
+	moved("the team's reply", before)
+	sameStrings(t, order(), []string{key, older}, "the request with the reply comes first")
+	age(key)
+	stayed("time")
+	carol.must("POST", "/api/v1/portal/requests/"+key+"/comments", obj{"body": "Still dropping"}, 201, nil)
+	moved("the customer's reply", time.Now().Add(-time.Minute))
+	age(key)
+	carol.upload("/api/v1/portal/requests/"+key+"/attachments", "screenshot.txt", "a screenshot")
+	moved("the customer's file", time.Now().Add(-time.Minute))
+	age(key)
+	agent.transitionTo(key, "wait-for-customer", nil)
+	moved("a status change", time.Now().Add(-time.Minute))
+}

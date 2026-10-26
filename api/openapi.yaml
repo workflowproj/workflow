@@ -6363,7 +6363,13 @@ components:
         reporter: { $ref: '#/components/schemas/PortalPerson' }
         resolution: { type: string }
         createdAt: { type: string, format: date-time }
-        updatedAt: { type: string, format: date-time }
+        updatedAt:
+          type: string
+          format: date-time
+          description: |
+            The latest activity the caller can see: the request was raised, a reply they can see, a
+            status change or a file added in the help centre. Internal notes and other changes
+            agents make do not count.
         role: { type: string, enum: [reporter, participant, approver], description: Why the caller sees it }
     PortalFieldValue:
       type: object

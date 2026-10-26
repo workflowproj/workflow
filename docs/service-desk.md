@@ -170,7 +170,10 @@ drops off the approvers' lists, and a late decision is refused rather than movin
 
 - **Get help**: the desks you can raise requests in, then a desk's request types by group,
   then the request type's form.
-- **My requests**: what you raised or what was shared with you, open or closed.
+- **My requests**: what you raised or what was shared with you, open or closed, most recently
+  updated first. A request's *last update* is the latest thing its customer can see: a reply
+  from either side, a status change or a file added in the help centre. Internal notes and
+  other changes agents make (the assignee, labels) don't move it.
 - A **request**: status, details from the form, the conversation (replies only) with a reply
   box, files (attach yours), approvals, and who it is shared with.
 - **Approvals**: requests waiting for your decision.

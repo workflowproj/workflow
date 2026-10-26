@@ -5755,7 +5755,12 @@ export interface components {
             resolution?: string;
             /** Format: date-time */
             createdAt: string;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @description The latest activity the caller can see: the request was raised, a reply they can see, a
+             *     status change or a file added in the help centre. Internal notes and other changes
+             *     agents make do not count.
+             */
             updatedAt: string;
             /**
              * @description Why the caller sees it
