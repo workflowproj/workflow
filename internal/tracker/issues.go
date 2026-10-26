@@ -310,6 +310,17 @@ func (s *Service) setReleases(ctx context.Context, q *dbq.Queries, p dbq.Project
 	if len(ids) == 0 {
 		return nil
 	}
+	// Risks and decisions stay out of releases, as out of sprints: release progress, readiness
+	// and notes count work only.
+	i, err := q.GetIssue(ctx, issueID)
+	if err != nil {
+		return err
+	}
+	if it, err := q.GetIssueType(ctx, i.TypeID); err != nil {
+		return err
+	} else if it.Kind != KindWork {
+		return apperr.Invalid("releaseIds", "%s issues aren't part of releases", it.Name)
+	}
 	rels, err := q.GetReleasesByIDs(ctx, ids)
 	if err != nil {
 		return err
@@ -575,7 +586,17 @@ func (s *Service) UpdateIssue(ctx context.Context, actor *authz.Actor, ref strin
 			record(c.field, c.from, c.to, c.fromRef, c.toRef)
 			upd.RemainingEstimateSeconds = in.RemainingEstimate.Value
 		}
-		if in.ReleaseIDs != nil {
+		// Risks and decisions are never in a release; work that becomes one leaves its releases.
+		releaseIDs := in.ReleaseIDs
+		if newType.Kind != KindWork {
+			if releaseIDs != nil && len(*releaseIDs) > 0 {
+				return apperr.Invalid("releaseIds", "%s issues aren't part of releases", newType.Name)
+			}
+			if curType.Kind == KindWork {
+				releaseIDs = &[]uuid.UUID{}
+			}
+		}
+		if releaseIDs != nil {
 			before, err := q.IssueReleases(ctx, i.ID)
 			if err != nil {
 				return err
@@ -583,7 +604,7 @@ func (s *Service) UpdateIssue(ctx context.Context, actor *authz.Actor, ref strin
 			if err := q.ClearIssueReleases(ctx, i.ID); err != nil {
 				return err
 			}
-			if err := s.setReleases(ctx, q, p, i.ID, *in.ReleaseIDs); err != nil {
+			if err := s.setReleases(ctx, q, p, i.ID, *releaseIDs); err != nil {
 				return err
 			}
 			after, err := q.IssueReleases(ctx, i.ID)

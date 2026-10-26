@@ -357,11 +357,20 @@ func TestRisksAndDecisionsStayOutOfPlanning(t *testing.T) {
 	c.must("POST", "/api/v1/issues", obj{"projectKey": "PLN", "typeKey": "subtask", "summary": "x", "parentKey": risk}, 400, nil)
 	c.must("PATCH", "/api/v1/issues/"+decision, obj{"parentKey": epic}, 400, nil)
 
-	// A story that turns out to be a risk leaves its sprint and its epic.
-	turned := str(c.createIssue("PLN", "story", "Fraud rules may block real customers", obj{"sprintId": sprint, "parentKey": epic}), "key")
+	// Nor in a release: release progress, readiness and notes count work only.
+	var rel obj
+	c.must("POST", "/api/v1/projects/PLN/releases", obj{"name": "1.0"}, 201, &rel)
+	c.must("POST", "/api/v1/issues", obj{"projectKey": "PLN", "typeKey": "risk", "summary": "x", "releaseIds": []string{str(rel, "id")}}, 400, nil)
+	c.must("PATCH", "/api/v1/issues/"+decision, obj{"releaseIds": []string{str(rel, "id")}}, 400, nil)
+
+	// A story that turns out to be a risk leaves its sprint, its epic and its release.
+	turned := str(c.createIssue("PLN", "story", "Fraud rules may block real customers", obj{"sprintId": sprint, "parentKey": epic, "releaseIds": []string{str(rel, "id")}}), "key")
 	got := c.must("PATCH", "/api/v1/issues/"+turned, obj{"typeKey": "risk"}, 200, nil).JSON()
 	if got["sprintId"] != nil || got["parent"] != nil {
 		t.Fatalf("a risk keeps no sprint or parent: %v %v", got["sprintId"], got["parent"])
+	}
+	if rels, ok := got["releases"].([]any); !ok || len(rels) != 0 {
+		t.Fatalf("a risk keeps no release: %v", got["releases"])
 	}
 	c.must("PATCH", "/api/v1/issues/"+story, obj{"typeKey": "risk"}, 200, nil)
 	c.must("PATCH", "/api/v1/issues/"+story, obj{"typeKey": "story", "sprintId": sprint, "parentKey": epic}, 200, nil)
