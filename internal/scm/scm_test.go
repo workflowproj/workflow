@@ -43,6 +43,24 @@ func TestParseSmartCommits(t *testing.T) {
 	}
 }
 
+func TestCommitFooter(t *testing.T) {
+	sha := "0123456789abcdef0123456789abcdef01234567"
+	for url, want := range map[string]string{
+		"https://github.com/acme/shop/commit/" + sha: "Via commit [01234567](https://github.com/acme/shop/commit/" + sha + ")",
+		"":                       "Via commit `01234567`",
+		"javascript:alert(1)":    "Via commit `01234567`",
+		"https://x.test/a)b[c]d": "Via commit `01234567`",
+	} {
+		got := commitFooter(Commit{SHA: sha, URL: url})
+		if got != want {
+			t.Errorf("commitFooter(%q) = %q, want %q", url, got, want)
+		}
+		if strings.Contains(got, "<") {
+			t.Errorf("commitFooter(%q) has HTML: %q", url, got)
+		}
+	}
+}
+
 func TestWebURL(t *testing.T) {
 	for in, want := range map[string]string{
 		"https://github.com/acme/shop/deployments": "https://github.com/acme/shop/deployments",

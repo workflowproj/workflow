@@ -187,6 +187,8 @@ func TestGitHubIntegration(t *testing.T) {
 	if !strings.Contains(str(comments[0], "body"), "Picked this up") || str(comments[0], "author", "email") != "ada@example.com" {
 		t.Fatalf("comment = %v", comments[0])
 	}
+	// Comments render Markdown without HTML, so the commit is named in Markdown.
+	eq(t, str(comments[0], "body"), "Picked this up\n\nVia commit [bbb222](https://github.com/acme/shop/commit/bbb222)", "smart commit comment body")
 	links := devLinks(admin, "SHOP-1")
 	eq(t, len(links["branch"]), 1, "branch link")
 	eq(t, len(links["commit"]), 1, "commit link")
@@ -354,6 +356,7 @@ func TestGitLabIntegration(t *testing.T) {
 	admin.get("/api/v1/issues/APP-1/comments", &comments)
 	eq(t, len(comments), 1, "smart commit comment")
 	eq(t, str(comments[0], "author", "id"), bob.id(), "comment by mapped user")
+	eq(t, str(comments[0], "body"), "Form done\n\nVia commit [abc](https://gitlab.example.com/grp/app/-/commit/abc)", "smart commit comment body")
 	links := devLinks(admin, "APP-1")
 	eq(t, len(links["branch"]), 1, "branch")
 	eq(t, len(links["commit"]), 1, "commit")

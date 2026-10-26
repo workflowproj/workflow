@@ -78,6 +78,14 @@ func TestADFToMarkdown(t *testing.T) {
 			want: "| Key | Value |\n| --- | --- |\n| a\\|b | 1 |",
 		},
 		{
+			name: "table cells with several lines stay on one line, without HTML",
+			adf: `{"type":"doc","content":[{"type":"table","content":[
+				{"type":"tableRow","content":[{"type":"tableCell","content":[
+					{"type":"paragraph","content":[{"type":"text","text":"first"},{"type":"hardBreak"},{"type":"text","text":"second"}]},
+					{"type":"paragraph","content":[{"type":"text","text":"third"}]}]}]}]}]}`,
+			want: "|  |\n| --- |\n| first · second · third |",
+		},
+		{
 			name: "task list, panel and media",
 			adf: `{"type":"doc","content":[
 				{"type":"taskList","content":[{"type":"taskItem","attrs":{"state":"DONE"},"content":[{"type":"text","text":"done"}]},{"type":"taskItem","attrs":{"state":"TODO"},"content":[{"type":"text","text":"todo"}]}]},

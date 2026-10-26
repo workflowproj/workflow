@@ -313,7 +313,7 @@ func (s *Service) runSmartCommits(ctx context.Context, sc *scope, key string, cm
 		}
 		switch cmd.Command {
 		case "comment":
-			if _, err := s.Tracker.AddComment(ctx, actor, issue.ID.String(), cmd.Arg+fmt.Sprintf("\n\n<sub>via commit %s</sub>", shortSHA(cm.SHA))); err != nil {
+			if _, err := s.Tracker.AddComment(ctx, actor, issue.ID.String(), cmd.Arg+"\n\n"+commitFooter(cm)); err != nil {
 				s.Log.Warn("smart commit comment failed", "issue", key, "error", err)
 			}
 		default:
@@ -325,6 +325,17 @@ func (s *Service) runSmartCommits(ctx context.Context, sc *scope, key string, cm
 			}
 		}
 	}
+}
+
+// commitFooter names the commit a smart-commit comment came from, in Markdown that every
+// renderer shows (comments render no HTML): a link to the commit when the host gave a usable
+// URL, else the short SHA as code.
+func commitFooter(cm Commit) string {
+	sha := shortSHA(cm.SHA)
+	if u := webURL(cm.URL); u != "" && !strings.ContainsAny(u, " ()[]<>") {
+		return fmt.Sprintf("Via commit [%s](%s)", sha, u)
+	}
+	return fmt.Sprintf("Via commit `%s`", sha)
 }
 
 func containsKey(keys []string, key string) bool {

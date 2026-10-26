@@ -15,7 +15,8 @@ What you get on each issue:
 - **Smart commits** — commands in commit messages, run as the committer (matched by
   email to an active account, with that person's permissions; unknown committers are linked
   but cannot change issues):
-  - `PLAT-12 #comment Fixed the retry logic` adds a comment.
+  - `PLAT-12 #comment Fixed the retry logic` adds a comment, ending with a link to the commit
+    ("Via commit [3f2a91c0](…)").
   - `PLAT-12 #start-work`, `PLAT-12 #in-review`, `PLAT-12 #done` run the transition whose id,
     name or target status matches (slugified). Conditions, validators and post-functions apply;
     a transition that needs a screen is skipped.
