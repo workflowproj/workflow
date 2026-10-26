@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addDays, daysBetween, formatRange, parseISODate, remainingLabel, toISODate } from "./dates";
+import { addDays, daysBetween, formatRange, parseISODate, remainingLabel, sprintDatesProblem, toISODate } from "./dates";
 
 describe("dates", () => {
   it("round-trips and adds days across months", () => {
@@ -22,5 +22,12 @@ describe("dates", () => {
     const y = new Date().getFullYear();
     expect(formatRange(`${y}-10-19`, `${y}-11-02`)).toMatch(/19.*–.*2/);
     expect(formatRange()).toBe("");
+  });
+  it("says why sprint dates can't start a sprint", () => {
+    expect(sprintDatesProblem("2026-10-19", "2026-11-02")).toBeUndefined();
+    expect(sprintDatesProblem("", "2026-11-02")).toEqual({ field: "startDate", message: "Choose a start date." });
+    expect(sprintDatesProblem("2026-10-19", "")).toEqual({ field: "endDate", message: "Choose an end date." });
+    expect(sprintDatesProblem("2026-10-19", "2026-10-19")?.message).toBe("The end date must be after the start date.");
+    expect(sprintDatesProblem("2026-10-19", "2026-10-12")?.field).toBe("endDate");
   });
 });

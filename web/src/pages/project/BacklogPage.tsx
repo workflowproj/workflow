@@ -11,7 +11,7 @@ import { ErrorBox } from "@/components/ErrorBox";
 import { IssueDrawer } from "@/features/issues/IssueDrawer";
 import { BoardSwitcher } from "@/features/board/BoardSwitcher";
 import { hasFilters, NO_FILTERS, quickFilterJql, type QuickFilters } from "@/features/board/jql";
-import { BACKLOG, findContainer, sumPoints, type Containers } from "@/features/board/model";
+import { BACKLOG, findContainer, type Containers } from "@/features/board/model";
 import { filterBacklog, peopleOf } from "@/features/board/people";
 import { QuickFilterBar } from "@/features/board/QuickFilterBar";
 import { backlogQuery, useBoardSelection, type Board, type Sprint } from "@/features/board/queries";
@@ -127,7 +127,7 @@ function BacklogScreen({ project, boards, board, onSelect, onOpen }: { project: 
   };
 
   const toggle = (id: string) => setCollapsed((s) => (s.has(id) ? new Set([...s].filter((x) => x !== id)) : new Set(s).add(id)));
-  const hasActive = !!data?.sprints.some((s) => s.sprint.state === "active");
+  const activeSprint = data?.sprints.find((s) => s.sprint.state === "active")?.sprint;
   const lists = [...(data?.sprints ?? []).map((s) => s.sprint), null];
 
   // Menu alternative to drag and drop: send an issue to the top or bottom of any list.
@@ -227,8 +227,18 @@ function BacklogScreen({ project, boards, board, onSelect, onOpen }: { project: 
                         <Button size="sm" onClick={() => setDialog({ kind: "complete", sprint })}>
                           Complete sprint
                         </Button>
+                      ) : activeSprint ? (
+                        // Only one sprint runs at a time: say so next to the disabled button.
+                        <>
+                          <span id={`start-${sprint.id}-blocked`} className="text-xs text-muted">
+                            Complete {activeSprint.name} first
+                          </span>
+                          <Button size="sm" disabled aria-describedby={`start-${sprint.id}-blocked`}>
+                            Start sprint
+                          </Button>
+                        </>
                       ) : (
-                        <Button size="sm" variant={hasActive ? "secondary" : "primary"} disabled={hasActive} title={hasActive ? "Complete the active sprint before starting another" : undefined} onClick={() => setDialog({ kind: "start", sprint })}>
+                        <Button size="sm" variant="primary" onClick={() => setDialog({ kind: "start", sprint })}>
                           Start sprint
                         </Button>
                       )}
@@ -258,20 +268,10 @@ function BacklogScreen({ project, boards, board, onSelect, onOpen }: { project: 
         <DragOverlay dropAnimation={{ duration: 160, easing: "cubic-bezier(0.2, 0, 0, 1)" }}>{active ? <IssueRow issue={active} lifted /> : null}</DragOverlay>
       </DndContext>
       <EditSprintDialog open={dialog?.kind === "edit"} onClose={() => setDialog(null)} sprint={dialog?.sprint ?? null} projectKey={project.key} />
-      <StartSprintDialog
-        open={dialog?.kind === "start"}
-        onClose={() => setDialog(null)}
-        sprint={dialog?.sprint ?? null}
-        projectKey={project.key}
-        {...startStats(data.sprints.find((s) => s.sprint.id === dialog?.sprint.id)?.issues ?? [])}
-      />
+      <StartSprintDialog open={dialog?.kind === "start"} onClose={() => setDialog(null)} sprint={dialog?.sprint ?? null} projectKey={project.key} />
       <CompleteSprintDialog open={dialog?.kind === "complete"} onClose={() => setDialog(null)} sprint={dialog?.sprint ?? null} projectKey={project.key} />
     </>
   );
-}
-
-function startStats(issues: Issue[]) {
-  return { issueCount: issues.length, points: sumPoints(issues).total };
 }
 
 function SprintMenu({ sprint, onEdit, onDelete }: { sprint: Sprint; onEdit: () => void; onDelete: () => void }) {

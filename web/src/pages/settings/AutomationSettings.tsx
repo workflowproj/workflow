@@ -31,7 +31,8 @@ export function AutomationSettings() {
   const [gallery, setGallery] = useState(false);
   const list = rules.data ?? [];
   const existingNames = new Set(list.map((r) => r.name.toLowerCase()));
-  const statusNames = project.loading ? null : project.statuses.map((s) => s.name);
+  // Templates are marked for missing statuses only once every workflow has loaded.
+  const statusNames = project.complete ? project.statuses.map((s) => s.name) : null;
   const chat = useQuery(chatChannelsQuery(projectKey));
   const channels = chat.data ?? [];
   const pick = (t: RuleTemplate) => {

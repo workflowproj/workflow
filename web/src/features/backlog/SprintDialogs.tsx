@@ -4,8 +4,9 @@ import { CircleCheck, CircleDashed } from "lucide-react";
 import { api, ApiError, unwrap } from "@/api/client";
 import { Button, Field, Input, Modal, Select, Textarea, useToast } from "@/components/ui";
 import { ErrorBox } from "@/components/ErrorBox";
+import { formatPoints } from "@/features/board/model";
 import { sprintsQuery, type Sprint } from "@/features/board/queries";
-import { addDays, daysBetween, todayISO } from "./dates";
+import { addDays, daysBetween, sprintDatesProblem, todayISO } from "./dates";
 
 function useInvalidateSprints(projectKey: string) {
   const qc = useQueryClient();
@@ -15,6 +16,12 @@ function useInvalidateSprints(projectKey: string) {
 }
 
 const fieldErrors = (e: unknown) => (e instanceof ApiError ? e.fieldErrors() : {});
+
+// The sprint report (same key as the dashboards'): for a future sprint, what it holds now.
+const sprintReportQuery = (projectKey: string, sprintId: string) => ({
+  queryKey: ["sprints", projectKey, "report", sprintId],
+  queryFn: () => unwrap(api.GET("/sprints/{sprintId}/report", { params: { path: { sprintId } } })),
+});
 
 /** EditSprintDialog changes a sprint's name, goal and dates. */
 export function EditSprintDialog({ open, onClose, sprint, projectKey }: { open: boolean; onClose: () => void; sprint: Sprint | null; projectKey: string }) {
@@ -89,24 +96,17 @@ const DURATIONS = [
   { value: "custom", label: "Custom" },
 ];
 
-/** StartSprintDialog starts a future sprint; only one sprint can be active (409 otherwise). */
-export function StartSprintDialog({
-  open,
-  onClose,
-  sprint,
-  projectKey,
-  issueCount,
-  points,
-}: {
-  open: boolean;
-  onClose: () => void;
-  sprint: Sprint | null;
-  projectKey: string;
-  issueCount: number;
-  points: number;
-}) {
+/**
+ * StartSprintDialog starts a future sprint; only one sprint can be active (409 otherwise). What
+ * it will commit comes from the sprint's report, so it counts like the report does after the
+ * start (sub-tasks with their parent) whatever filters the backlog has on.
+ */
+export function StartSprintDialog({ open, onClose, sprint, projectKey }: { open: boolean; onClose: () => void; sprint: Sprint | null; projectKey: string }) {
   const invalidate = useInvalidateSprints(projectKey);
   const toast = useToast();
+  const { data: scope } = useQuery({ ...sprintReportQuery(projectKey, sprint?.id ?? ""), enabled: open && !!sprint });
+  const issueCount = scope?.committedIssues;
+  const points = scope?.committedPoints;
   const [name, setName] = useState("");
   const [goal, setGoal] = useState("");
   const [duration, setDuration] = useState("2");
@@ -146,6 +146,9 @@ export function StartSprintDialog({
     },
   });
   const fe = fieldErrors(run.error);
+  // Dates that can't start a sprint disable the button; the field says why.
+  const problem = sprintDatesProblem(start, end);
+  const dateError = (field: "startDate" | "endDate") => fe[field] ?? (problem?.field === field ? problem.message : undefined);
   return (
     <Modal
       open={open}
@@ -154,7 +157,7 @@ export function StartSprintDialog({
       footer={
         <>
           <Button onClick={onClose}>Cancel</Button>
-          <Button variant="primary" type="submit" form="start-sprint" loading={run.isPending} disabled={!start || !end || end <= start}>
+          <Button variant="primary" type="submit" form="start-sprint" loading={run.isPending} disabled={!!problem}>
             Start sprint
           </Button>
         </>
@@ -169,8 +172,8 @@ export function StartSprintDialog({
         }}
       >
         <p className="text-sm text-muted">
-          <span className="font-medium text-ink">{issueCount}</span> issue{issueCount === 1 ? "" : "s"} and{" "}
-          <span className="font-medium text-ink">{points}</span> story point{points === 1 ? "" : "s"} will be included in this sprint.
+          <span className="font-medium text-ink">{issueCount ?? "–"}</span> issue{issueCount === 1 ? "" : "s"} and{" "}
+          <span className="font-medium text-ink">{points == null ? "–" : formatPoints(points)}</span> story point{points === 1 ? "" : "s"} will be included in this sprint.
         </p>
         <Field label="Sprint name" required error={fe.name}>
           {(id) => <Input id={id} value={name} onChange={(e) => setName(e.target.value)} maxLength={80} />}
@@ -187,15 +190,19 @@ export function StartSprintDialog({
               </Select>
             )}
           </Field>
-          <Field label="Start date" required error={fe.startDate}>
-            {(id) => <Input id={id} type="date" value={start} onChange={(e) => changeStart(e.target.value)} />}
+          <Field label="Start date" required error={dateError("startDate")}>
+            {(id) => (
+              <Input id={id} type="date" value={start} invalid={!!dateError("startDate")} aria-invalid={!!dateError("startDate")} onChange={(e) => changeStart(e.target.value)} />
+            )}
           </Field>
-          <Field label="End date" required error={fe.endDate}>
+          <Field label="End date" required error={dateError("endDate")}>
             {(id) => (
               <Input
                 id={id}
                 type="date"
                 value={end}
+                invalid={!!dateError("endDate")}
+                aria-invalid={!!dateError("endDate")}
                 min={start ? addDays(start, 1) : undefined}
                 onChange={(e) => {
                   setEnd(e.target.value);
@@ -237,8 +244,9 @@ export function CompleteSprintDialog({
   const invalidate = useInvalidateSprints(projectKey);
   const toast = useToast();
   const id = sprint?.id ?? "";
-  const done = useQuery(countQuery(`sprint = ${id} AND statusCategory = Done`, open && !!id));
-  const openCount = useQuery(countQuery(`sprint = ${id} AND statusCategory != Done`, open && !!id));
+  // Sub-tasks go with their parent and aren't counted on their own, as on the backlog and in reports.
+  const done = useQuery(countQuery(`sprint = ${id} AND level >= 0 AND statusCategory = Done`, open && !!id));
+  const openCount = useQuery(countQuery(`sprint = ${id} AND level >= 0 AND statusCategory != Done`, open && !!id));
   const { data: sprints = [] } = useQuery({ ...sprintsQuery(projectKey), enabled: open });
   const future = sprints.filter((s) => s.state === "future");
   const [target, setTarget] = useState("backlog");
@@ -295,7 +303,7 @@ export function CompleteSprintDialog({
           </div>
         </div>
         {remaining > 0 ? (
-          <Field label="Move open issues to" hint="Issues in a done status stay with the completed sprint.">
+          <Field label="Move open issues to" hint="Issues in a done status stay with the completed sprint. Sub-tasks go wherever their parent goes.">
             {(fid) => (
               <Select id={fid} value={target} onChange={(e) => setTarget(e.target.value)}>
                 <option value="backlog">Backlog</option>

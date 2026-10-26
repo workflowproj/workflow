@@ -54,3 +54,11 @@ export function remainingLabel(end: string | undefined, today = todayISO()): { t
   if (n === 0) return { text: "Ends today", overdue: false };
   return { text: `${-n} day${n === -1 ? "" : "s"} overdue`, overdue: true };
 }
+
+/** sprintDatesProblem says why a sprint can't start with these dates, or nothing when it can. */
+export function sprintDatesProblem(start: string, end: string): { field: "startDate" | "endDate"; message: string } | undefined {
+  if (!start) return { field: "startDate", message: "Choose a start date." };
+  if (!end) return { field: "endDate", message: "Choose an end date." };
+  if (end <= start) return { field: "endDate", message: "The end date must be after the start date." };
+  return undefined;
+}

@@ -162,6 +162,34 @@ export function placeOnBoard<T extends { columns: ColumnData[] }>(data: T, issue
   return { ...data, columns };
 }
 
+type Transition = Schemas["AvailableTransition"];
+
+/** needsScreen: the transition asks for required fields, so it runs from its screen rather than a drop. */
+export const needsScreen = (t: Pick<Transition, "screen">) => t.screen.some((f) => f.required);
+
+/**
+ * DropPlan is what a card dropped on a column does: re-rank in the same status, refuse (no
+ * transition there), ask which transition when several reach the column, open the transition's
+ * screen, or move straight away (`transition` null when the issue's transitions aren't loaded,
+ * so the API picks one by status). Only "rank" and "move" show the card in its new place before
+ * the server answers; a chooser or a screen leaves it where it was until the move is confirmed.
+ */
+export type DropPlan =
+  | { kind: "rank" }
+  | { kind: "refuse" }
+  | { kind: "choose"; options: Transition[] }
+  | { kind: "screen"; transition: Transition }
+  | { kind: "move"; transition: Transition | null };
+
+export function planDrop(statusId: string, columnStatusIds: string[], known: Transition[] | undefined): DropPlan {
+  if (columnStatusIds.includes(statusId)) return { kind: "rank" };
+  if (!known) return { kind: "move", transition: null };
+  const options = known.filter((t) => columnStatusIds.includes(t.to.id));
+  if (options.length === 0) return { kind: "refuse" };
+  if (options.length > 1) return { kind: "choose", options };
+  return needsScreen(options[0]) ? { kind: "screen", transition: options[0] } : { kind: "move", transition: options[0] };
+}
+
 /** The backlog's container id next to sprint ids. */
 export const BACKLOG = "backlog";
 

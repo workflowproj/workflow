@@ -26,6 +26,27 @@ DELETE FROM board_columns WHERE board_id = $1;
 -- name: CreateBoardColumn :one
 INSERT INTO board_columns (board_id, name, position, status_ids, wip_limit) VALUES ($1, $2, $3, $4, $5) RETURNING *;
 
+-- name: ShowMappedStatusOnBoards :many
+-- A workflow change maps @old_status to @new_status: on the projects' boards, the first column
+-- showing the old status also shows the new one, unless the board has a column for it already.
+-- Returns the projects whose boards changed.
+WITH target AS (
+    SELECT DISTINCT ON (bc.board_id) bc.id
+    FROM board_columns bc JOIN boards b ON b.id = bc.board_id
+    WHERE b.project_id = ANY(@project_ids::uuid[]) AND @old_status::uuid = ANY(bc.status_ids)
+      AND NOT EXISTS (SELECT 1 FROM board_columns o WHERE o.board_id = bc.board_id AND @new_status::uuid = ANY(o.status_ids))
+    ORDER BY bc.board_id, bc.position
+), changed AS (
+    UPDATE board_columns c SET status_ids = array_append(c.status_ids, @new_status::uuid)
+    FROM target WHERE c.id = target.id
+    RETURNING c.board_id
+)
+SELECT DISTINCT b.project_id FROM boards b JOIN changed ON changed.board_id = b.id;
+
+-- name: WorkflowWorkProjects :many
+-- Projects whose work issue types (the ones boards show) use a workflow.
+SELECT DISTINCT project_id FROM issue_types WHERE workflow_id = $1 AND kind = 'work';
+
 -- ---------------------------------------------------------------------------
 -- Sprints
 
@@ -74,21 +95,32 @@ GROUP BY h.issue_id;
 -- name: DeleteSprint :exec
 DELETE FROM sprints WHERE id = $1;
 
--- name: CountSprints :one
-SELECT count(*) FROM sprints WHERE project_id = $1;
-
--- name: MoveOpenSprintIssues :execrows
--- Unfinished issues (not in a done status) leave a completed sprint.
-UPDATE issues SET sprint_id = sqlc.narg(target_sprint_id), version = version + 1, updated_at = now()
-WHERE sprint_id = @sprint_id AND status_id IN (SELECT id FROM statuses WHERE category <> 'done');
+-- name: MoveOpenSprintIssues :one
+-- Unfinished issues (not in a done status) leave a completed sprint. Sub-tasks go with their
+-- parent whatever their own status, since they always follow its sprint. Returns how many
+-- issues moved, not counting sub-tasks.
+WITH open_issues AS (
+    SELECT i.id FROM issues i
+    JOIN issue_types t ON t.id = i.type_id
+    JOIN statuses s ON s.id = i.status_id
+    WHERE i.sprint_id = @sprint_id AND t.level >= 0 AND s.category <> 'done'
+), moved AS (
+    UPDATE issues SET sprint_id = sqlc.narg(target_sprint_id), version = version + 1, updated_at = now()
+    WHERE issues.id IN (SELECT id FROM open_issues)
+       OR (issues.sprint_id = @sprint_id AND issues.parent_id IN (SELECT id FROM open_issues)
+           AND issues.type_id IN (SELECT id FROM issue_types WHERE level < 0))
+    RETURNING issues.id
+)
+SELECT count(*)::int FROM moved WHERE moved.id IN (SELECT id FROM open_issues);
 
 -- name: SprintIssueStats :one
+-- A sprint's issues and story points now; sub-tasks count as part of their parent.
 SELECT count(*)::int AS issues,
        count(*) FILTER (WHERE s.category = 'done')::int AS done_issues,
        coalesce(sum(i.story_points), 0)::float8 AS points,
        coalesce(sum(i.story_points) FILTER (WHERE s.category = 'done'), 0)::float8 AS done_points
-FROM issues i JOIN statuses s ON s.id = i.status_id
-WHERE i.sprint_id = $1;
+FROM issues i JOIN statuses s ON s.id = i.status_id JOIN issue_types t ON t.id = i.type_id
+WHERE i.sprint_id = $1 AND t.level >= 0;
 
 -- ---------------------------------------------------------------------------
 -- Releases

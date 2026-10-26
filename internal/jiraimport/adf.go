@@ -264,10 +264,15 @@ func (c *adfConv) table(n adfNode) string {
 			if r == 0 && cell.Type == "tableHeader" {
 				header = true
 			}
-			text := c.blocks(cell.Content, "")
-			text = strings.ReplaceAll(strings.TrimSpace(text), "\n\n", "<br>")
-			text = strings.ReplaceAll(text, "\n", "<br>")
-			cells = append(cells, strings.ReplaceAll(text, "|", "\\|"))
+			// A Markdown table cell is one line, and comments and descriptions render no HTML
+			// (so no <br>): a cell's paragraphs and lines are joined with " · ".
+			var lines []string
+			for _, l := range strings.Split(c.blocks(cell.Content, ""), "\n") {
+				if l = strings.TrimSpace(l); l != "" {
+					lines = append(lines, l)
+				}
+			}
+			cells = append(cells, strings.ReplaceAll(strings.Join(lines, " · "), "|", "\\|"))
 		}
 		rows = append(rows, cells)
 	}

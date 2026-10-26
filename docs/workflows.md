@@ -111,6 +111,13 @@ API answers 422 `status_mapping_required` with the statuses that need one. Valid
 Changing an issue type's workflow (Project settings → Issue types) works the same way: statuses
 that exist in both workflows carry over; others need a mapping.
 
+Boards follow a mapping: on the boards of the projects that use the workflow, the column that
+shows a removed status also shows the status it maps to, unless the board already has a column
+for that one. So renaming *In Review* to *Code Review* (the editor sends renames as mappings, even
+when no issue is in the status) keeps that work in the same column; the old status stays in the
+column until you remove it in the board's settings. Boards show work only, so changes to the
+workflows of risk and decision types leave them alone.
+
 ## The CLI
 
 ```sh

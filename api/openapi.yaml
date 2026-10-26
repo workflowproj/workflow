@@ -4672,12 +4672,22 @@ components:
     SprintInput:
       type: object
       properties:
-        name: { type: string, minLength: 1, maxLength: 80 }
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+          description: |
+            Creating a sprint without a name continues the project's numbering: the latest
+            sprint's name with its trailing number plus one ("Sprint 24" → "Sprint 25"), else
+            "<KEY> Sprint <n>".
         goal: { type: string }
         startDate: { type: [string, 'null'], format: date }
         endDate: { type: [string, 'null'], format: date }
     SprintReport:
       type: object
+      description: |
+        Issue counts and story points are of standard issues: sub-tasks count as part of their
+        parent. Seconds include sub-tasks. For a future sprint, committed is what it holds now.
       required: [sprint, committedPoints, completedPoints, committedIssues, completedIssues, addedPoints, removedPoints, addedIssues, removedIssues, burndown, committedSeconds, completedSeconds, addedSeconds, removedSeconds]
       properties:
         sprint: { $ref: '#/components/schemas/Sprint' }

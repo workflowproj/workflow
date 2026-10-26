@@ -142,17 +142,6 @@ func (q *Queries) CompleteSprint(ctx context.Context, id uuid.UUID) (Sprint, err
 	return i, err
 }
 
-const countSprints = `-- name: CountSprints :one
-SELECT count(*) FROM sprints WHERE project_id = $1
-`
-
-func (q *Queries) CountSprints(ctx context.Context, projectID uuid.UUID) (int64, error) {
-	row := q.db.QueryRow(ctx, countSprints, projectID)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
 const createBoard = `-- name: CreateBoard :one
 INSERT INTO boards (project_id, name, type, filter_jql, swimlanes, done_retention_days, position)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -749,23 +738,35 @@ func (q *Queries) MoveOpenReleaseIssues(ctx context.Context, arg MoveOpenRelease
 	return err
 }
 
-const moveOpenSprintIssues = `-- name: MoveOpenSprintIssues :execrows
-UPDATE issues SET sprint_id = $1, version = version + 1, updated_at = now()
-WHERE sprint_id = $2 AND status_id IN (SELECT id FROM statuses WHERE category <> 'done')
+const moveOpenSprintIssues = `-- name: MoveOpenSprintIssues :one
+WITH open_issues AS (
+    SELECT i.id FROM issues i
+    JOIN issue_types t ON t.id = i.type_id
+    JOIN statuses s ON s.id = i.status_id
+    WHERE i.sprint_id = $1 AND t.level >= 0 AND s.category <> 'done'
+), moved AS (
+    UPDATE issues SET sprint_id = $2, version = version + 1, updated_at = now()
+    WHERE issues.id IN (SELECT id FROM open_issues)
+       OR (issues.sprint_id = $1 AND issues.parent_id IN (SELECT id FROM open_issues)
+           AND issues.type_id IN (SELECT id FROM issue_types WHERE level < 0))
+    RETURNING issues.id
+)
+SELECT count(*)::int FROM moved WHERE moved.id IN (SELECT id FROM open_issues)
 `
 
 type MoveOpenSprintIssuesParams struct {
-	TargetSprintID *uuid.UUID
 	SprintID       *uuid.UUID
+	TargetSprintID *uuid.UUID
 }
 
-// Unfinished issues (not in a done status) leave a completed sprint.
-func (q *Queries) MoveOpenSprintIssues(ctx context.Context, arg MoveOpenSprintIssuesParams) (int64, error) {
-	result, err := q.db.Exec(ctx, moveOpenSprintIssues, arg.TargetSprintID, arg.SprintID)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
+// Unfinished issues (not in a done status) leave a completed sprint. Sub-tasks go with their
+// parent whatever their own status, since they always follow its sprint. Returns how many
+// issues moved, not counting sub-tasks.
+func (q *Queries) MoveOpenSprintIssues(ctx context.Context, arg MoveOpenSprintIssuesParams) (int32, error) {
+	row := q.db.QueryRow(ctx, moveOpenSprintIssues, arg.SprintID, arg.TargetSprintID)
+	var column_1 int32
+	err := row.Scan(&column_1)
+	return column_1, err
 }
 
 const releaseIDsOfIssues = `-- name: ReleaseIDsOfIssues :many
@@ -806,6 +807,50 @@ func (q *Queries) SetBoardCardFields(ctx context.Context, arg SetBoardCardFields
 	return err
 }
 
+const showMappedStatusOnBoards = `-- name: ShowMappedStatusOnBoards :many
+WITH target AS (
+    SELECT DISTINCT ON (bc.board_id) bc.id
+    FROM board_columns bc JOIN boards b ON b.id = bc.board_id
+    WHERE b.project_id = ANY($1::uuid[]) AND $2::uuid = ANY(bc.status_ids)
+      AND NOT EXISTS (SELECT 1 FROM board_columns o WHERE o.board_id = bc.board_id AND $3::uuid = ANY(o.status_ids))
+    ORDER BY bc.board_id, bc.position
+), changed AS (
+    UPDATE board_columns c SET status_ids = array_append(c.status_ids, $3::uuid)
+    FROM target WHERE c.id = target.id
+    RETURNING c.board_id
+)
+SELECT DISTINCT b.project_id FROM boards b JOIN changed ON changed.board_id = b.id
+`
+
+type ShowMappedStatusOnBoardsParams struct {
+	ProjectIds []uuid.UUID
+	OldStatus  uuid.UUID
+	NewStatus  uuid.UUID
+}
+
+// A workflow change maps @old_status to @new_status: on the projects' boards, the first column
+// showing the old status also shows the new one, unless the board has a column for it already.
+// Returns the projects whose boards changed.
+func (q *Queries) ShowMappedStatusOnBoards(ctx context.Context, arg ShowMappedStatusOnBoardsParams) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, showMappedStatusOnBoards, arg.ProjectIds, arg.OldStatus, arg.NewStatus)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var project_id uuid.UUID
+		if err := rows.Scan(&project_id); err != nil {
+			return nil, err
+		}
+		items = append(items, project_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const sprintDoneEvents = `-- name: SprintDoneEvents :many
 SELECT h.issue_id, min(h.created_at)::timestamptz AS done_at
 FROM issue_history h JOIN statuses s ON s.id::text = h.to_ref
@@ -844,8 +889,8 @@ SELECT count(*)::int AS issues,
        count(*) FILTER (WHERE s.category = 'done')::int AS done_issues,
        coalesce(sum(i.story_points), 0)::float8 AS points,
        coalesce(sum(i.story_points) FILTER (WHERE s.category = 'done'), 0)::float8 AS done_points
-FROM issues i JOIN statuses s ON s.id = i.status_id
-WHERE i.sprint_id = $1
+FROM issues i JOIN statuses s ON s.id = i.status_id JOIN issue_types t ON t.id = i.type_id
+WHERE i.sprint_id = $1 AND t.level >= 0
 `
 
 type SprintIssueStatsRow struct {
@@ -855,6 +900,7 @@ type SprintIssueStatsRow struct {
 	DonePoints float64
 }
 
+// A sprint's issues and story points now; sub-tasks count as part of their parent.
 func (q *Queries) SprintIssueStats(ctx context.Context, sprintID *uuid.UUID) (SprintIssueStatsRow, error) {
 	row := q.db.QueryRow(ctx, sprintIssueStats, sprintID)
 	var i SprintIssueStatsRow
@@ -1031,4 +1077,29 @@ func (q *Queries) UpdateSprint(ctx context.Context, arg UpdateSprintParams) (Spr
 		&i.CreatedAt,
 	)
 	return i, err
+}
+
+const workflowWorkProjects = `-- name: WorkflowWorkProjects :many
+SELECT DISTINCT project_id FROM issue_types WHERE workflow_id = $1 AND kind = 'work'
+`
+
+// Projects whose work issue types (the ones boards show) use a workflow.
+func (q *Queries) WorkflowWorkProjects(ctx context.Context, workflowID uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, workflowWorkProjects, workflowID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var project_id uuid.UUID
+		if err := rows.Scan(&project_id); err != nil {
+			return nil, err
+		}
+		items = append(items, project_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

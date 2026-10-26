@@ -487,6 +487,22 @@ export interface DocDiff {
 }
 
 /** diffDocs summarises what a draft changes compared with the published version. */
+/**
+ * renamedStatuses is the status mapping that renames imply: each status of `before` that is gone
+ * from `after` and was renamed (`renames`: old name → new name) to a status `after` has.
+ */
+export function renamedStatuses(before: WorkflowDoc, after: WorkflowDoc, renames: Record<string, string>): Record<string, string> {
+  const key = (s: string) => s.trim().toLowerCase();
+  const removed = new Set(diffDocs(before, after).removedStatuses.map(key));
+  const names = new Map(after.statuses.map((s) => [key(s.name), s.name]));
+  const out: Record<string, string> = {};
+  for (const [from, to] of Object.entries(renames)) {
+    const target = names.get(key(to));
+    if (removed.has(key(from)) && target) out[from] = target;
+  }
+  return out;
+}
+
 export function diffDocs(before: WorkflowDoc, after: WorkflowDoc): DocDiff {
   const key = (s: string) => s.trim().toLowerCase();
   const sb = new Map(before.statuses.map((s) => [key(s.name), s]));

@@ -3918,6 +3918,11 @@ export interface components {
         /** @enum {string} */
         SprintState: "future" | "active" | "closed";
         SprintInput: {
+            /**
+             * @description Creating a sprint without a name continues the project's numbering: the latest
+             *     sprint's name with its trailing number plus one ("Sprint 24" → "Sprint 25"), else
+             *     "<KEY> Sprint <n>".
+             */
             name?: string;
             goal?: string;
             /** Format: date */
@@ -3925,6 +3930,10 @@ export interface components {
             /** Format: date */
             endDate?: string | null;
         };
+        /**
+         * @description Issue counts and story points are of standard issues: sub-tasks count as part of their
+         *     parent. Seconds include sub-tasks. For a future sprint, committed is what it holds now.
+         */
         SprintReport: {
             sprint: components["schemas"]["Sprint"];
             /**
