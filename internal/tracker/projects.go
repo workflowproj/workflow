@@ -618,7 +618,7 @@ func (s *Service) UpdateIssueType(ctx context.Context, actor *authz.Actor, ref s
 				}
 				target, ok := def.StatusByName(lookupMapping(in.StatusMapping, u.name))
 				if !ok {
-					missing.Fields = append(missing.Fields, apperr.FieldError{Field: u.name, Message: fmt.Sprintf("%d issue(s) are in %q", u.n, u.name)})
+					missing.Fields = append(missing.Fields, apperr.FieldError{Field: u.name, Message: fmt.Sprintf("%s in %q", plural(u.n, "issue is", "issues are"), u.name)})
 					continue
 				}
 				statusMap[u.id.String()] = target.ID.String()
@@ -664,7 +664,7 @@ func (s *Service) DeleteIssueType(ctx context.Context, actor *authz.Actor, ref s
 		return err
 	}
 	if n > 0 {
-		return apperr.Conflict("type_in_use", "%d issue(s) use this type; change their type first", n)
+		return apperr.Conflict("type_in_use", "%s this type; change their type first", plural(int(n), "issue uses", "issues use"))
 	}
 	if err := s.Q.DeleteIssueType(ctx, t.ID); db.IsForeignKeyViolation(err) {
 		return apperr.Conflict("type_in_use", "request types create issues of this type; change them first")

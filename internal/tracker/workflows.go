@@ -172,7 +172,7 @@ func (s *Service) publishTx(ctx context.Context, tx pgx.Tx, q *dbq.Queries, acto
 		if target == "" || !ok {
 			missing.Fields = append(missing.Fields, apperr.FieldError{
 				Field:   old[0].Name,
-				Message: fmt.Sprintf("%d issue(s) are in %q, which this version removes", u.N, old[0].Name),
+				Message: fmt.Sprintf("%s in %q, which this version removes", plural(int(u.N), "issue is", "issues are"), old[0].Name),
 			})
 			continue
 		}
@@ -488,7 +488,7 @@ func (s *Service) DeleteWorkflow(ctx context.Context, actor *authz.Actor, id uui
 		return err
 	}
 	if len(usage) > 0 {
-		return apperr.Conflict("workflow_in_use", "the workflow is used by %d issue type(s); map them to another workflow first", len(usage))
+		return apperr.Conflict("workflow_in_use", "the workflow is used by %s; map them to another workflow first", plural(len(usage), "issue type", "issue types"))
 	}
 	return s.tx(ctx, func(tx pgx.Tx, q *dbq.Queries) error {
 		if err := q.DeleteWorkflow(ctx, id); err != nil {

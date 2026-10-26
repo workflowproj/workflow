@@ -113,6 +113,8 @@ func TestBoardsFollowStatusMappings(t *testing.T) {
 	renamed := strings.ReplaceAll(v1, "In Review", "Code Review")
 	r := admin.do("POST", "/api/v1/workflows/"+wfID+"/versions", obj{"yaml": renamed})
 	eq(t, r.Status, 422, "mapping required")
+	fields := r.JSON()["errors"].([]any)
+	eq(t, str(fields[0].(obj), "message"), `1 issue is in "In Review", which this version removes`, "pluralised message")
 	admin.must("POST", "/api/v1/workflows/"+wfID+"/versions", obj{"yaml": renamed, "statusMapping": obj{"In Review": "Code Review"}}, 201, nil)
 
 	board := func(project string) (cols map[string][]string, unmapped int, cards map[string][]string) {
@@ -184,6 +186,12 @@ func TestBoardsFollowStatusMappings(t *testing.T) {
 	bugType := types[slices.IndexFunc(types, func(t obj) bool { return str(t, "key") == "bug" })]
 	r = admin.do("PATCH", "/api/v1/projects/ALT/issue-types/"+str(bugType, "id"), obj{"workflowId": str(created, "id")})
 	eq(t, r.Status, 422, "mapping required for the type")
+	msgs := map[string]string{}
+	for _, f := range r.JSON()["errors"].([]any) {
+		msgs[str(f.(obj), "field")] = str(f.(obj), "message")
+	}
+	eq(t, msgs["To Do"], `2 issues are in "To Do"`, "plural")
+	eq(t, msgs["In Review"], `1 issue is in "In Review"`, "singular")
 	admin.must("PATCH", "/api/v1/projects/ALT/issue-types/"+str(bugType, "id"), obj{"workflowId": str(created, "id"), "statusMapping": obj{"To Do": "Open", "In Review": "QA"}}, 200, nil)
 	e.DrainJobs()
 	alt, unmapped, _ = board("ALT")
