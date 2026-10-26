@@ -411,6 +411,10 @@ func TestJQLSearch(t *testing.T) {
 		`priority >= High ORDER BY priority DESC`:                          {k1, k3},
 		`type = Bug OR labels = auth`:                                      {k1},
 		`text ~ "night themes"`:                                            {k2},
+		`text ~ "night theme"`:                                             {k2}, // English word forms
+		`text ~ "upgrading"`:                                               {k3},
+		`text ~ "login failing"`:                                           {k1},
+		`text ~ "\"mode dark\""`:                                           {}, // phrases keep their word order
 		`summary ~ postgres`:                                               {k3},
 		`statusCategory = "In Progress"`:                                   {k3},
 		`status != Done AND due <= "+7d" ORDER BY due`:                     {k3},
