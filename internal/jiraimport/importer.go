@@ -189,6 +189,9 @@ func (r *run) projectCtx(ctx context.Context, idx int) (*projectCtx, error) {
 		return nil, err
 	}
 	for _, it := range types {
+		if it.Kind != tracker.KindWork {
+			continue // never a target (see projectTarget)
+		}
 		def, wv, err := r.s.workflowDef(ctx, it.WorkflowID)
 		if err != nil {
 			return nil, err
