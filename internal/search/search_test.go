@@ -98,7 +98,7 @@ func TestCompileFields(t *testing.T) {
 		`fixVersion in unreleasedVersions()`:           {"r.state = $2::text"},
 		`parent = PLAT-1`:                              {"i.parent_id IN (SELECT x.id FROM issues x WHERE x.number = $2::int"},
 		`key > PLAT-10`:                                {"i.number > $3::int"},
-		`text ~ "login bug"`:                           {"websearch_to_tsquery"},
+		`text ~ "login bug"`:                           {"websearch_to_tsquery('simple', $2::text)", "issue_search_document_english(i.summary, i.description) @@ websearch_to_tsquery('english', $2::text)"},
 		`summary !~ crash`:                             {"NOT i.summary ILIKE $2::text"},
 		`comment ~ "LGTM"`:                             {"comments cm"},
 		`created >= -7d`:                               {"i.created_at >= $2::timestamptz"},

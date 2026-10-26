@@ -633,7 +633,9 @@ func (b *builder) fullText(c Clause) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	cond := fmt.Sprintf("(issue_search_document(i.summary, i.description) @@ websearch_to_tsquery('simple', %s::text) OR i.summary ILIKE %s::text)", b.arg(s), b.arg(likePattern(s)))
+	// Exact terms, or English word forms ("backups" finds "backup"); each document has its own index.
+	q := b.arg(s)
+	cond := fmt.Sprintf("(issue_search_document(i.summary, i.description) @@ websearch_to_tsquery('simple', %s::text) OR issue_search_document_english(i.summary, i.description) @@ websearch_to_tsquery('english', %s::text) OR i.summary ILIKE %s::text)", q, q, b.arg(likePattern(s)))
 	if c.Op == "!~" {
 		return "(NOT " + cond + ")", nil
 	}
