@@ -82,6 +82,12 @@ between them (`sourceKey` blocks `targetKey`), and each project's sprints and re
 `projects` for every project you can browse. Change dates with `PATCH /issues/{key}`
 (`startDate`, `dueDate`) and add dependencies with `POST /issues/{key}/links` (`type: blocks`).
 
+## Risks and decisions
+
+The risk register (`GET /projects/{key}/risks`), the decision log (`GET /projects/{key}/decisions`)
+and superseding a decision (`POST /issues/{key}/supersede`); turn the section on or off with
+`risksDecisions` on `PATCH /projects/{key}`. See [risks-decisions.md](risks-decisions.md).
+
 ## Metrics and dashboards
 
 Issue timing (`/issues/{key}/metrics`), sprint burndown and burnup (`/sprints/{id}/report`),
