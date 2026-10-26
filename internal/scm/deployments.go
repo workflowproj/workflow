@@ -2,9 +2,7 @@ package scm
 
 import (
 	"context"
-	"fmt"
 	"net/http"
-	"net/url"
 	"slices"
 	"time"
 
@@ -14,7 +12,6 @@ import (
 	"github.com/workflowproj/workflow/internal/db"
 	"github.com/workflowproj/workflow/internal/db/dbq"
 	"github.com/workflowproj/workflow/internal/jobs"
-	"github.com/workflowproj/workflow/internal/netguard"
 )
 
 /*
@@ -198,7 +195,7 @@ func (s *Service) contentsOf(ctx context.Context, c dbq.ScmConnection, sc *scope
 	if out.base != nil && *out.base == d.Sha {
 		return out, nil // a redeploy of what is already there brings nothing new
 	}
-	cl, err := s.guardedClient(ctx, c)
+	cl, err := s.client(ctx, c)
 	if err != nil {
 		return out, err
 	}
@@ -236,29 +233,4 @@ func (s *Service) contentsOf(ctx context.Context, c dbq.ScmConnection, sc *scope
 		}
 	}
 	return out, nil
-}
-
-// guardedClient is a provider client for the worker's own calls (deployments), made through the
-// outbound request guard. The connection's API host, which an organisation admin configured, may
-// be on a private network (self-managed GitLab, GitHub Enterprise Server); any other destination
-// (a redirect, say) may not be, unless WFM_OUTBOUND_ALLOWED_HOSTS or WFM_WEBHOOK_ALLOW_PRIVATE
-// allows it.
-func (s *Service) guardedClient(ctx context.Context, c dbq.ScmConnection) (Client, error) {
-	conn, err := s.decrypt(c)
-	if err != nil {
-		return nil, err
-	}
-	p, ok := s.Providers[c.Provider]
-	if !ok {
-		return nil, fmt.Errorf("unknown provider %s", c.Provider)
-	}
-	host := ""
-	if u, err := url.Parse(c.ApiUrl); err == nil {
-		host = u.Hostname()
-	}
-	hc, ok := s.guarded.Load(host)
-	if !ok {
-		hc, _ = s.guarded.LoadOrStore(host, netguard.Client(30*time.Second, s.Cfg.WebhookAllowPrivate, append(slices.Clone(s.Cfg.OutboundAllowedHosts), host)...))
-	}
-	return p.Client(ctx, conn, hc.(*http.Client))
 }

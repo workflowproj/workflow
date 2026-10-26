@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -49,8 +48,6 @@ type Service struct {
 	HTTP    *http.Client
 	// Providers by name; tests may substitute fakes.
 	Providers map[string]Provider
-
-	guarded sync.Map // API host -> *http.Client through the outbound request guard
 }
 
 func NewService(pool *pgxpool.Pool, box *secure.Box, cfg *config.Config, tr *tracker.Service, enq jobs.Enqueuer, log *slog.Logger) *Service {

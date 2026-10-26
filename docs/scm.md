@@ -64,9 +64,8 @@ GitLab's repository compare), reads at most 250 of them (the newest), and takes 
 commits mention plus the issues already linked to them. The first deployment to an environment
 only has its head commit's issues; a redeploy of the same commit brings nothing new. If the
 provider cannot compare the two (the earlier commit was rewritten away), the head commit is used.
-These calls go through the outbound request guard: the connection's own API host may be on a
-private network, other destinations may not (see `WFM_OUTBOUND_ALLOWED_HOSTS` in
-[configuration.md](configuration.md)). Failed calls are retried with backoff.
+These calls go to the connection's API URL like its other calls (through `HTTPS_PROXY` when it
+is set). Failed calls are retried with backoff.
 
 Each issue the deployment contains then gets `deployment.completed` (automation rules, outbound
 webhooks), once per outcome: redeliveries stay quiet, and a re-run that turns a failure into a
