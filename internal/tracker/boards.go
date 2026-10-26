@@ -895,6 +895,9 @@ func (s *Service) CreateRelease(ctx context.Context, actor *authz.Actor, ref str
 	if err != nil && isUnique(err) {
 		return r, apperr.Conflict("duplicate_release", "a release named %q already exists", *in.Name)
 	}
+	if err == nil && r.NotesPublishedAt != nil {
+		Audit(ctx, s.Q, actor, "release.notes_publish", "release", r.ID.String(), &p.ID, map[string]any{"name": r.Name, "published": true})
+	}
 	return r, err
 }
 

@@ -1,8 +1,17 @@
 package scm
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/json"
+	"encoding/pem"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -124,6 +133,51 @@ func TestGitLabTagAndDeploymentEvents(t *testing.T) {
 	short := strings.Replace(dep, `"commit_url": "https://gitlab.example.com/grp/app/-/commit/279484c09fbe69ededfced8c1bb6e6d24616b468",`, "", 1)
 	if d, _ := parseOne(t, gl, "Deployment Hook", short).(DeploymentEvent); d.SHA != "279484c0" {
 		t.Errorf("sha = %q", d.SHA)
+	}
+}
+
+// A comparison longer than GitHub's 250 commits is read from its last pages, so the newest commits
+// are the ones kept.
+func TestGitHubCommitsBetweenKeepsTheNewest(t *testing.T) {
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pemKey := string(pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)}))
+	const total = 320
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/app/installations/7/access_tokens":
+			_ = json.NewEncoder(w).Encode(map[string]any{"token": "t", "expires_at": time.Now().Add(time.Hour)})
+		case "/repos/acme/shop/compare/aaa...bbb":
+			from, to := 1, 250 // unpaged: the first 250
+			if page, _ := strconv.Atoi(r.URL.Query().Get("page")); page > 0 {
+				from, to = (page-1)*100+1, min(page*100, total)
+			}
+			var cs []map[string]any
+			for n := from; n <= to; n++ {
+				cs = append(cs, map[string]any{"sha": fmt.Sprintf("c%03d", n), "commit": map[string]any{"message": fmt.Sprintf("commit %d", n)}})
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"total_commits": total, "commits": cs})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+	cl, err := GitHub{}.Client(t.Context(), Connection{ID: "paging-test", APIURL: srv.URL, AppID: 1, PrivateKey: pemKey}, srv.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	commits, truncated, err := cl.CommitsBetween(t.Context(), RepoRef{FullPath: "acme/shop", InstallationID: 7}, "aaa", "bbb", 250)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(commits) != 250 || commits[0].SHA != "c071" || commits[249].SHA != "c320" || !truncated {
+		t.Fatalf("got %d commits %s..%s, truncated %v", len(commits), commits[0].SHA, commits[len(commits)-1].SHA, truncated)
+	}
+	// A short range needs one call.
+	if commits, truncated, err := cl.CommitsBetween(t.Context(), RepoRef{FullPath: "acme/shop", InstallationID: 7}, "aaa", "bbb", 400); err != nil || len(commits) != total || truncated {
+		t.Fatalf("limit 400: %d commits, truncated %v, %v", len(commits), truncated, err)
 	}
 }
 

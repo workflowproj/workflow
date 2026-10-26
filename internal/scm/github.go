@@ -538,7 +538,8 @@ func (g ghCommit) commit() Commit {
 		AuthorEmail: strings.ToLower(g.Commit.Author.Email), Timestamp: g.Commit.Author.Date}
 }
 
-// CommitsBetween uses the compare API, which answers with up to 250 commits, oldest first.
+// CommitsBetween uses the compare API. It answers with the first 250 commits, oldest first; for a
+// longer range the newest are read from its last pages instead.
 func (c *githubClient) CommitsBetween(ctx context.Context, repo RepoRef, base, head string, limit int) ([]Commit, bool, error) {
 	if base == "" {
 		var one ghCommit
@@ -547,17 +548,31 @@ func (c *githubClient) CommitsBetween(ctx context.Context, repo RepoRef, base, h
 		}
 		return []Commit{one.commit()}, false, nil
 	}
-	var res struct {
+	type compare struct {
 		TotalCommits int        `json:"total_commits"`
 		Commits      []ghCommit `json:"commits"`
 	}
-	if err := c.repoCall(ctx, repo, http.MethodGet, repoPath(repo)+"/compare/"+url.PathEscape(base)+"..."+url.PathEscape(head), nil, &res); err != nil {
+	path := repoPath(repo) + "/compare/" + url.PathEscape(base) + "..." + url.PathEscape(head)
+	var res compare
+	if err := c.repoCall(ctx, repo, http.MethodGet, path, nil, &res); err != nil {
 		return nil, false, err
 	}
-	out := make([]Commit, len(res.Commits))
-	for i, g := range res.Commits {
+	commits := res.Commits
+	if res.TotalCommits > len(commits) && limit > 0 {
+		const perPage = 100
+		commits = nil
+		for page := (res.TotalCommits + perPage - 1) / perPage; page >= 1 && len(commits) < limit; page-- {
+			var p compare
+			if err := c.repoCall(ctx, repo, http.MethodGet, fmt.Sprintf("%s?per_page=%d&page=%d", path, perPage, page), nil, &p); err != nil {
+				return nil, false, err
+			}
+			commits = append(p.Commits, commits...)
+		}
+	}
+	out := make([]Commit, len(commits))
+	for i, g := range commits {
 		out[i] = g.commit()
 	}
 	out, truncated := newest(out, limit)
-	return out, truncated || res.TotalCommits > len(res.Commits), nil
+	return out, truncated || res.TotalCommits > len(out), nil
 }
