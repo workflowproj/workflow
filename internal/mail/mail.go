@@ -46,7 +46,7 @@ type Sender interface {
 
 // New returns an SMTP sender when a host is configured, else an in-memory mailbox.
 func New(cfg config.SMTP, log *slog.Logger) Sender {
-	if cfg.Host == "" {
+	if !cfg.Delivers() {
 		return &Memory{Log: log, Max: 200}
 	}
 	return &SMTP{Cfg: cfg}

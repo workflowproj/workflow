@@ -199,6 +199,10 @@ type SMTP struct {
 	TLS                            string // starttls, tls or none
 }
 
+// Delivers reports whether email goes out through an SMTP server. Without one (WFM_SMTP_HOST
+// unset) messages are only logged and kept in memory, so nobody receives them.
+func (c SMTP) Delivers() bool { return c.Host != "" }
+
 type env struct {
 	get  func(string) string
 	errs []error

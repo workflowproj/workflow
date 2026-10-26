@@ -602,7 +602,9 @@ export interface paths {
         put?: never;
         /**
          * Email a person an invitation to choose a password (makes them a local account)
-         * @description A new invitation replaces any open one. Refused for people managed by SCIM or Google directory sync.
+         * @description A new invitation replaces any open one. Refused for people managed by SCIM or Google
+         *     directory sync. emailed is false when the server has no SMTP server: the invitation exists
+         *     but nobody receives it (set a temporary password instead, or set up email and resend it).
          */
         post: operations["adminInviteUser"];
         delete: operations["adminRevokeInvitation"];
@@ -637,7 +639,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Email a local account a password-reset link */
+        /**
+         * Email a local account a password-reset link
+         * @description emailed is false when the server has no SMTP server, so the link reaches nobody.
+         */
         post: operations["adminSendPasswordReset"];
         delete?: never;
         options?: never;
@@ -2689,8 +2694,9 @@ export interface paths {
         /**
          * Add a customer by email
          * @description Someone new gets a customer account and an email invitation to choose a password (local
-         *     accounts); an existing account (a customer of another project, an organisation member,
-         *     a single sign-on user) is added as it is. Needs the customer.manage permission.
+         *     accounts; emailed says whether it was sent); an existing account (a customer of another
+         *     project, an organisation member, a single sign-on user) is added as it is. Needs the
+         *     customer.manage permission.
          */
         post: operations["addServiceCustomer"];
         delete?: never;
@@ -4823,6 +4829,11 @@ export interface components {
         };
         /** @enum {string} */
         EmailTransport: "smtp" | "memory";
+        /**
+         * @description Whether the email was queued for delivery through the SMTP server. False when the server
+         *     has none (WFM_SMTP_HOST unset): the message is only logged and kept in memory.
+         */
+        Emailed: boolean;
         EmailStatus: {
             transport: components["schemas"]["EmailTransport"];
             host?: string;
@@ -5534,8 +5545,9 @@ export interface components {
         };
         ServiceCustomerAdded: {
             customer: components["schemas"]["ServiceCustomer"];
-            /** @description A new customer account was created and emailed an invitation */
+            /** @description A new customer account was created with an invitation to choose a password */
             invited: boolean;
+            emailed: components["schemas"]["Emailed"];
         };
         Queue: {
             /** Format: uuid */
@@ -6799,7 +6811,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Sent */
+            /** @description Created, and emailed when the server can send email */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -6808,6 +6820,7 @@ export interface operations {
                     "application/json": {
                         /** Format: date-time */
                         expiresAt: string;
+                        emailed: components["schemas"]["Emailed"];
                     };
                 };
             };
@@ -6871,12 +6884,16 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Sent */
+            /** @description Created, and emailed when the server can send email */
             202: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        emailed: components["schemas"]["Emailed"];
+                    };
+                };
             };
             default: components["responses"]["Problem"];
         };

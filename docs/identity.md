@@ -237,7 +237,10 @@ password, reset and invitation endpoint answers 404.
 
 - *Email invitation* — a signed, single-use link valid for 7 days. *Resend invitation* replaces
   the link, *Revoke invitation* cancels it. Following the link, they choose a password and then
-  sign in.
+  sign in. Without an SMTP server (`WFM_SMTP_HOST` unset, see
+  [notifications.md](notifications.md)) the invitation is created but not emailed: Workflow says
+  so and offers a temporary password instead. The invitation and password-reset endpoints
+  answer `emailed: false` in that case.
 - *Temporary password* — generated and shown to you once; give it to them through a channel you
   trust. They must choose their own password at their first sign-in.
 - *Single sign-on* (when an OIDC provider is configured) — no password; they are matched by email

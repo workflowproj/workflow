@@ -22,8 +22,10 @@ This is a first cut. What it covers, and what it does not yet, is listed under
 3. **Customers** (a tab of the project): add the people you support by email. Someone without
    an account gets a customer account and an invitation email to choose a password (this needs
    local accounts, see [identity.md](identity.md#local-accounts)); people who already have an
-   account are just added. Agents with the `customer.manage` permission (project `member` and
-   `admin` roles) add and remove customers.
+   account are just added. Without an SMTP server the invitation is created but reaches nobody:
+   the page says so (the API's `emailed` is `false`), and an administrator can set up email or
+   give the customer a temporary password. Agents with the `customer.manage` permission
+   (project `member` and `admin` roles) add and remove customers.
 4. Share the help centre's address, `WFM_PUBLIC_URL/portal/KEY`, shown in Project settings →
    Help centre.
 

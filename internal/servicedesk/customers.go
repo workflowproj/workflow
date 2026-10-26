@@ -48,7 +48,8 @@ func (s *Service) ListCustomers(ctx context.Context, actor *authz.Actor, ref, q 
 
 // AddCustomer puts someone on a desk's customer list by email. Someone new gets a customer
 // account and, with local accounts on, an email invitation to choose a password (otherwise they
-// sign in with single sign-on, matched by their email). An existing account is added as it is.
+// sign in with single sign-on, matched by their email); Emailed says whether that invitation
+// can reach them (there is an SMTP server). An existing account is added as it is.
 func (s *Service) AddCustomer(ctx context.Context, actor *authz.Actor, ref string, in api.ServiceCustomerInput, ip string) (api.ServiceCustomerAdded, error) {
 	p, d, _, err := s.desk(ctx, actor, ref, authz.CustomerManage)
 	if err != nil {
@@ -79,6 +80,7 @@ func (s *Service) AddCustomer(ctx context.Context, actor *authz.Actor, ref strin
 					return err
 				}
 				out.Invited = true
+				out.Emailed = s.Cfg.SMTP.Delivers()
 			}
 		case err != nil:
 			return err
@@ -88,7 +90,7 @@ func (s *Service) AddCustomer(ctx context.Context, actor *authz.Actor, ref strin
 		if err := q.AddServiceCustomer(ctx, dbq.AddServiceCustomerParams{ProjectID: p.ID, UserID: u.ID, AddedBy: actor.UserID()}); err != nil {
 			return err
 		}
-		tracker.Audit(ctx, q, actor, "service_desk.customer_add", "user", u.ID.String(), &p.ID, map[string]any{"email": email, "invited": out.Invited})
+		tracker.Audit(ctx, q, actor, "service_desk.customer_add", "user", u.ID.String(), &p.ID, map[string]any{"email": email, "invited": out.Invited, "emailed": out.Emailed})
 		out.Customer = s.customerView(ctx, q, u)
 		out.Customer.AddedAt = s.Now()
 		return nil

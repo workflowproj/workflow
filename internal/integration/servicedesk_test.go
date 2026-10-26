@@ -273,6 +273,7 @@ func TestPortalConversation(t *testing.T) {
 	var added obj
 	agent.must("POST", "/api/v1/projects/HELP/customers", obj{"email": "Carol@Customer.test", "displayName": "Carol Customer"}, 201, &added)
 	eq(t, added["invited"], any(true), "invited")
+	eq(t, added["emailed"], any(false), "no SMTP server: the invitation is not emailed (only kept in memory)")
 	eq(t, str(added, "customer", "account"), "customer", "a customer account")
 	msgs := e.mailTo("carol@customer.test")
 	eq(t, len(msgs), 1, "invitation email")

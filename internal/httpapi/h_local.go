@@ -308,7 +308,9 @@ func (s *Server) AdminInviteUser(ctx context.Context, req api.AdminInviteUserReq
 	if err != nil {
 		return nil, err
 	}
-	return api.AdminInviteUser200JSONResponse{ExpiresAt: exp}, nil
+	// The invitation exists either way; without an SMTP server nobody receives it, and the
+	// administrator is told so rather than that it was sent.
+	return api.AdminInviteUser200JSONResponse{ExpiresAt: exp, Emailed: s.Cfg.SMTP.Delivers()}, nil
 }
 
 func (s *Server) AdminRevokeInvitation(ctx context.Context, req api.AdminRevokeInvitationRequestObject) (api.AdminRevokeInvitationResponseObject, error) {
@@ -342,7 +344,7 @@ func (s *Server) AdminSendPasswordReset(ctx context.Context, req api.AdminSendPa
 	if err := s.Local.SendPasswordReset(ctx, a, req.UserId, requestIP(ctx)); err != nil {
 		return nil, err
 	}
-	return api.AdminSendPasswordReset202Response{}, nil
+	return api.AdminSendPasswordReset202JSONResponse{Emailed: s.Cfg.SMTP.Delivers()}, nil
 }
 
 func (s *Server) AdminUnlockUser(ctx context.Context, req api.AdminUnlockUserRequestObject) (api.AdminUnlockUserResponseObject, error) {

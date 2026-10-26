@@ -59,7 +59,7 @@ func (s *Service) Brand() string {
 
 // Transport says how mail leaves: "smtp", or "memory" when no SMTP server is configured.
 func (s *Service) Transport() string {
-	if s.Cfg.SMTP.Host != "" {
+	if s.Cfg.SMTP.Delivers() {
 		return "smtp"
 	}
 	return "memory"
