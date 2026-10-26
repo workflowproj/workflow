@@ -88,10 +88,16 @@ func (s *Service) validateBoard(ctx context.Context, actor *authz.Actor, in *Boa
 	if in.DoneRetentionDays <= 0 {
 		in.DoneRetentionDays = 14
 	}
+	if in.DoneRetentionDays > 365 {
+		return apperr.Invalid("doneRetentionDays", "done issues stay on the board for at most 365 days")
+	}
 	seen := map[uuid.UUID]string{}
 	for k, c := range in.Columns {
 		if strings.TrimSpace(c.Name) == "" {
 			return apperr.Invalid(fmt.Sprintf("columns[%d].name", k), "every column needs a name")
+		}
+		if c.WipLimit != nil && (*c.WipLimit < 0 || *c.WipLimit > 10000) {
+			return apperr.Invalid(fmt.Sprintf("columns[%d].wipLimit", k), "WIP limits are between 1 and 10000")
 		}
 		for _, id := range c.StatusIDs {
 			if other, ok := seen[id]; ok {

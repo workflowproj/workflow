@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"encoding/json"
+	"math"
 
 	"github.com/google/uuid"
 
@@ -631,6 +632,9 @@ func (s *Server) GetWorkflowVersion(ctx context.Context, req api.GetWorkflowVers
 	}
 	if _, err := s.Tracker.GetWorkflow(ctx, a, req.WorkflowId); err != nil {
 		return nil, err
+	}
+	if req.Version < 1 || req.Version > math.MaxInt32 {
+		return nil, apperr.NotFound("workflow version")
 	}
 	wv, err := s.Q.GetWorkflowVersion(ctx, dbq.GetWorkflowVersionParams{WorkflowID: req.WorkflowId, Version: int32(req.Version)})
 	if err != nil {

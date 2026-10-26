@@ -47,10 +47,16 @@ func (s *Service) ListQueues(ctx context.Context, actor *authz.Actor, ref string
 	return out, nil
 }
 
+// maxPosition bounds the positions people may give queues and request types (stored as int32).
+const maxPosition = 10000
+
 func (s *Service) validateQueue(ctx context.Context, actor *authz.Actor, in api.QueueInput) (string, string, error) {
 	name := strings.TrimSpace(in.Name)
 	if name == "" || len(name) > 80 {
 		return "", "", apperr.Invalid("name", "a queue needs a name of at most 80 characters")
+	}
+	if in.Position != nil && (*in.Position < 0 || *in.Position > maxPosition) {
+		return "", "", apperr.Invalid("position", "positions are between 0 and %d", maxPosition)
 	}
 	jql := strings.TrimSpace(in.Jql)
 	if err := s.Tracker.ValidateJQL(ctx, actor, jql); err != nil {

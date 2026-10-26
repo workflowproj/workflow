@@ -500,6 +500,9 @@ func (s *Service) CreateIssueType(ctx context.Context, actor *authz.Actor, ref s
 	if !slices.Contains(issueTypeKinds, in.Kind) {
 		return dbq.IssueType{}, apperr.Invalid("kind", "kind must be work, risk or decision")
 	}
+	if in.Level < -1 || in.Level > 2 {
+		return dbq.IssueType{}, apperr.Invalid("level", "levels are -1 (sub-task), 0 (standard), 1 (epic) or 2")
+	}
 	if in.Kind != KindWork && in.Level != 0 {
 		return dbq.IssueType{}, apperr.Invalid("level", "risk and decision types are standard issue types (level 0)")
 	}

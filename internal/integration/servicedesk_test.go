@@ -142,6 +142,7 @@ func TestServiceProjectSetUp(t *testing.T) {
 
 	var queues []obj
 	agent.get("/api/v1/projects/HELP/queues", &queues)
+	admin.must("POST", "/api/v1/projects/HELP/queues", obj{"name": "Far", "jql": "resolution = Unresolved", "position": 4294967296}, 400, nil)
 	var names []string
 	for _, q := range queues {
 		names = append(names, str(q, "name"))

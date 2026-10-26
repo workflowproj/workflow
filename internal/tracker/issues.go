@@ -365,7 +365,7 @@ func (s *Service) UpdateIssue(ctx context.Context, actor *authz.Actor, ref strin
 		if err != nil {
 			return err
 		}
-		if in.Version != nil && int32(*in.Version) != i.Version {
+		if in.Version != nil && int64(*in.Version) != int64(i.Version) {
 			return apperr.Conflict("version_conflict", "%s was changed by someone else; reload and try again", issueKey(p, i))
 		}
 		upd := updateFromIssue(i)

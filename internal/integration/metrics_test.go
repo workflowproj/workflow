@@ -301,4 +301,11 @@ func TestDashboardsAndCardFields(t *testing.T) {
 	ada.must("PUT", "/api/v1/boards/"+str(board, "id"), board, 400, nil)
 	board["cardFields"] = []string{"colour"}
 	ada.must("PUT", "/api/v1/boards/"+str(board, "id"), board, 400, nil)
+	// Numbers that would wrap round when stored (as int32) are refused.
+	delete(board, "cardFields")
+	board["doneRetentionDays"] = 4294967310
+	ada.must("PUT", "/api/v1/boards/"+str(board, "id"), board, 400, nil)
+	board["doneRetentionDays"] = 14
+	board["columns"].([]any)[0].(obj)["wipLimit"] = 4294967297
+	ada.must("PUT", "/api/v1/boards/"+str(board, "id"), board, 400, nil)
 }

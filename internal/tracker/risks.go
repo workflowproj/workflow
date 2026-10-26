@@ -518,7 +518,7 @@ func (s *Service) Supersede(ctx context.Context, actor *authz.Actor, ref, byRef 
 		if err != nil {
 			return err
 		}
-		if version != nil && int32(*version) != i.Version {
+		if version != nil && int64(*version) != int64(i.Version) {
 			return apperr.Conflict("version_conflict", "%s was changed by someone else; reload and try again", issueKey(p, i))
 		}
 		links, err := q.IssueLinks(ctx, i.ID)
