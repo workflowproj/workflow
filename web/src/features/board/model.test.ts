@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Issue } from "@/api/types";
-import { buildLanes, cellId, findContainer, insertWithHint, moveAcross, neighbours, parseCellId, placeInBacklog, placeOnBoard, sumPoints } from "./model";
+import { buildLanes, cellId, findContainer, insertWithHint, moveAcross, neighbours, parseCellId, placeInBacklog, placeOnBoard, planDrop, sumPoints } from "./model";
 
 const type = (level: number, name = level === 1 ? "Epic" : level === -1 ? "Sub-task" : "Story") => ({ id: `t${level}`, key: name.toLowerCase(), name, icon: "story", color: "#000", level, kind: "work" as const });
 const status = (category: "todo" | "in_progress" | "done" = "todo") => ({ id: `s-${category}`, name: category, category });
@@ -57,6 +57,33 @@ describe("placeOnBoard", () => {
     expect(out.columns[1].issues.map((i) => i.id)).toEqual(["a", "c"]);
     expect(out.columns[1].issues[0].status.category).toBe("in_progress");
     expect(out.columns[1].overLimit).toBe(true);
+  });
+});
+
+describe("planDrop", () => {
+  const to = (id: string, required: boolean[] = []) => ({
+    id: `t-${id}`,
+    name: id,
+    to: { id, name: id, category: "done" as const },
+    screen: required.map((r, i) => ({ field: `f${i}`, name: `f${i}`, type: "text", required: r })),
+  });
+
+  it("re-ranks within the status and lets the API pick when transitions aren't loaded", () => {
+    expect(planDrop("a", ["a", "b"], [to("b")])).toEqual({ kind: "rank" });
+    expect(planDrop("a", ["b"], undefined)).toEqual({ kind: "move", transition: null });
+  });
+
+  it("moves at once when nothing needs confirming", () => {
+    expect(planDrop("a", ["b"], [to("b", [false]), to("c")])).toEqual({ kind: "move", transition: to("b", [false]) });
+  });
+
+  it("asks first when the column has several targets or the transition has a required screen", () => {
+    expect(planDrop("a", ["b", "c"], [to("b"), to("c")])).toEqual({ kind: "choose", options: [to("b"), to("c")] });
+    expect(planDrop("a", ["b"], [to("b", [false, true])])).toEqual({ kind: "screen", transition: to("b", [false, true]) });
+  });
+
+  it("refuses when no transition reaches the column", () => {
+    expect(planDrop("a", ["b"], [to("c")])).toEqual({ kind: "refuse" });
   });
 });
 
