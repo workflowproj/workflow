@@ -194,6 +194,10 @@ func (s *Service) ensureKindFields(ctx context.Context, q *dbq.Queries, p dbq.Pr
 // and Decision workflows and issue types (unless the project has types of those kinds) and
 // their fields.
 func (s *Service) installRisksDecisions(ctx context.Context, tx pgx.Tx, q *dbq.Queries, actor *authz.Actor, p dbq.Project) (dbq.Project, error) {
+	// One install at a time per project: a second one waits, then finds the types in place.
+	if _, err := q.LockProjectCounter(ctx, p.ID); err != nil {
+		return p, err
+	}
 	types, err := q.ListIssueTypes(ctx, p.ID)
 	if err != nil {
 		return p, err

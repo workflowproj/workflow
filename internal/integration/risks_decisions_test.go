@@ -142,6 +142,21 @@ func TestRisksDecisionsSection(t *testing.T) {
 	admin.get("/api/v1/admin/audit?action=project.risks_decisions", &audit)
 	eq(t, len(audit), 3, "the switch is audited when it changes")
 
+	// Two admins turning it on at once install it once.
+	admin.createProject("TWIN", "service")
+	statuses := make(chan int, 2)
+	for range 2 {
+		go func() { statuses <- admin.do("PATCH", "/api/v1/projects/TWIN", obj{"risksDecisions": true}).Status }()
+	}
+	eq(t, fmt.Sprint(<-statuses, <-statuses), "200 200", "concurrent switches")
+	kinds := 0
+	for _, it := range admin.issueTypes("TWIN") {
+		if str(it, "kind") != "work" {
+			kinds++
+		}
+	}
+	eq(t, kinds, 2, "one Risk and one Decision type")
+
 	// A work type already keyed "risk" blocks the section until it goes.
 	wf := str(admin.issueTypes("PLAIN")["task"], "workflowId")
 	var own obj
