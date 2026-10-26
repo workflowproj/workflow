@@ -17,10 +17,12 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<H
   },
 );
 
+// The browser draws the select's arrow in space it keeps for it, so the right padding is small:
+// more would be taken from the text, cutting off options that would fit.
 export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSelectElement> & { invalid?: boolean }>(
   function Select({ className, invalid, children, ...rest }, ref) {
     return (
-      <select ref={ref} className={cn(control, "h-8.5 pr-8", invalid && "border-danger", className)} {...rest}>
+      <select ref={ref} className={cn(control, "h-8.5 pr-1.5", invalid && "border-danger", className)} {...rest}>
         {children}
       </select>
     );

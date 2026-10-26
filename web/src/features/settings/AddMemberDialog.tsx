@@ -7,6 +7,7 @@ import { Button, Field, Modal, Select, useToast } from "@/components/ui";
 import { ErrorBox } from "@/components/ErrorBox";
 import { UserPicker } from "@/components/UserPicker";
 import { cn } from "@/lib/cn";
+import { plural } from "@/lib/format";
 import { rolesQuery } from "./queries";
 
 export function AddMemberDialog({ open, onClose, projectKey }: { open: boolean; onClose: () => void; projectKey: string }) {
@@ -17,6 +18,8 @@ export function AddMemberDialog({ open, onClose, projectKey }: { open: boolean; 
   const [groupId, setGroupId] = useState("");
   const [role, setRole] = useState("member");
   const { data: roles = [] } = useQuery(rolesQuery);
+  // The chosen role's description shows under the select, which stays as narrow as its names.
+  const chosen = roles.find((r) => r.key === role);
   const { data: groups = [] } = useQuery({ queryKey: ["groups", ""], queryFn: () => unwrap(api.GET("/groups")), enabled: open && kind === "group" });
 
   const add = useMutation({
@@ -85,7 +88,7 @@ export function AddMemberDialog({ open, onClose, projectKey }: { open: boolean; 
                 <option value="">Choose a group…</option>
                 {groups.map((g) => (
                   <option key={g.id} value={g.id}>
-                    {g.displayName} ({g.memberCount} member{g.memberCount === 1 ? "" : "s"}
+                    {g.displayName} ({plural(g.memberCount, "member")}
                     {g.source !== "local" ? `, ${g.source}` : ""})
                   </option>
                 ))}
@@ -93,12 +96,12 @@ export function AddMemberDialog({ open, onClose, projectKey }: { open: boolean; 
             )}
           </Field>
         )}
-        <Field label="Role" error={fe.roleKey}>
+        <Field label="Role" error={fe.roleKey} hint={chosen && (chosen.description || plural(chosen.permissions.length, "permission"))}>
           {(id) => (
             <Select id={id} value={role} onChange={(e) => setRole(e.target.value)}>
               {roles.map((r) => (
                 <option key={r.key} value={r.key}>
-                  {r.name} — {r.description || `${r.permissions.length} permissions`}
+                  {r.name}
                 </option>
               ))}
             </Select>

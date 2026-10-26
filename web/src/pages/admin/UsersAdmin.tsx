@@ -91,7 +91,8 @@ export function UsersAdmin() {
           <EmptyState title="No users match" body="Try another search or filter." />
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-line bg-surface">
+        // relative: the screen-reader-only header text is positioned, and must scroll with the table rather than widen the page.
+        <div className="relative overflow-x-auto rounded-lg border border-line bg-surface">
           <table className={table}>
             <thead>
               <tr>
@@ -114,14 +115,16 @@ export function UsersAdmin() {
                     <td>
                       <span className="flex items-center gap-2.5">
                         <UserAvatar user={u} size={28} />
-                        <span className="min-w-0">
+                        <span className="max-w-72 min-w-0">
                           <span className="flex items-center gap-1.5 font-medium">
                             {u.displayName}
                             {self && <Badge>You</Badge>}
                             {u.kind === "service" && <Badge tone="accent">Service</Badge>}
                             {managed && <Lock className="size-3 text-faint" aria-label={`Profile managed by ${sourceLabel(u.source)}`} />}
                           </span>
-                          <span className="block truncate text-xs text-muted">{u.email}</span>
+                          <span className="block truncate text-xs text-muted" title={u.email}>
+                            {u.email}
+                          </span>
                         </span>
                       </span>
                     </td>
