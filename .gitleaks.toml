@@ -1,0 +1,17 @@
+# Secret scanning (gitleaks), over the whole history. On top of gitleaks' default rules, these
+# reviewed matches are allowed: test passwords and keys, and the OpenAPI spec that the generated
+# server embeds. Anything else that looks like a secret fails the Security workflow.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Test fixtures and generated code"
+paths = [
+  '''_test\.go$''',
+  '''^web/e2e/''',
+  '''^internal/api/api\.gen\.go$''',
+]
+
+[[allowlists]]
+description = "The dummy WFM_SECRET_KEY used to lint the Helm chart"
+regexes = ['''dummy-secret-key-[0-9a-f]+''']

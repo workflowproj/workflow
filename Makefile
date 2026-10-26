@@ -4,7 +4,7 @@ VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X github.com/workflowproj/workflow/internal/telemetry.Version=$(VERSION)
 DATABASE_URL ?= postgres://wfm:wfm@localhost:5432/wfm?sslmode=disable
 
-.PHONY: help tools generate generate-check build web web-dev embed-web test test-unit test-integration lint dev db-up db-down image
+.PHONY: help tools generate generate-check build web web-dev embed-web test test-unit test-integration lint dev db-up db-down image security-tools security
 
 help: ## Show targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-18s %s\n", $$1, $$2}'
@@ -43,6 +43,17 @@ test: ## All Go tests
 lint: ## go vet + web typecheck
 	go vet ./...
 	cd web && npm run typecheck
+
+security-tools: ## Install the security scanners used by `make security`
+	go install golang.org/x/vuln/cmd/govulncheck@v1.9.0
+	go install github.com/securego/gosec/v2/cmd/gosec@v2.30.0
+	go install github.com/zricethezav/gitleaks/v8@v8.30.1
+
+security: ## Security scans: reachable Go vulnerabilities, gosec, secrets in history, npm audit
+	$(GOBIN)/govulncheck ./...
+	$(GOBIN)/gosec -quiet -exclude-generated -exclude-dir=.claude -exclude=G115 -severity=medium -confidence=medium ./...
+	$(GOBIN)/gitleaks git --redact --no-banner .
+	cd web && npm audit --omit=dev --audit-level=moderate
 
 db-up: ## Start a local PostgreSQL 17
 	docker run -d --name wfm-pg -p 5432:5432 -e POSTGRES_USER=wfm -e POSTGRES_PASSWORD=wfm -e POSTGRES_DB=wfm postgres:17-alpine

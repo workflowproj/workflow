@@ -1,0 +1,220 @@
+name: Security
+
+# Static analysis, dependency and image vulnerability scanning, and secret scanning. Every job fails
+# on what it finds, so a pull request can't add a known vulnerability without someone deciding to.
+# Findings also appear under the repository's Security tab (code scanning) where GitHub allows it.
+# Run most of these locally with `make security-tools security`.
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["docs/**", "**/*.md"]
+  pull_request:
+    paths-ignore: ["docs/**", "**/*.md"]
+  schedule:
+    # Weekly, so newly published advisories are caught even when nothing changes here.
+    - cron: "23 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GOVULNCHECK_VERSION: v1.9.0
+  GOSEC_VERSION: v2.30.0
+  GITLEAKS_VERSION: v8.30.1
+  # Pull requests from forks can't write code scanning results; their jobs still fail on findings.
+  CAN_UPLOAD: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+
+jobs:
+  govulncheck:
+    name: Go vulnerabilities (govulncheck)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      # Check against the Go release the image is built with (the Dockerfile's GO_IMAGE), since
+      # standard library fixes arrive in patch releases.
+      - name: Go version of the release build
+        id: go
+        run: echo "version=$(sed -n 's/^ARG GO_IMAGE=golang:\([0-9.]*\)-.*/\1/p' Dockerfile)" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ steps.go.outputs.version }}
+          cache: true
+      # Reports only vulnerabilities in code the binary can reach, so it fails on what matters.
+      - run: go run golang.org/x/vuln/cmd/govulncheck@${{ env.GOVULNCHECK_VERSION }} ./...
+
+  gosec:
+    name: Go static analysis (gosec)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: go install github.com/securego/gosec/v2/cmd/gosec@${{ env.GOSEC_VERSION }}
+      # G115 (integer conversions) is off: nearly every hit converts a bounded value (a length, a
+      # clamped page size) to sqlc's int32 parameters, and input is range-checked where it's parsed.
+      # Reviewed false positives carry a `#nosec <rule> -- reason` comment.
+      - name: gosec
+        run: |
+          "$(go env GOPATH)/bin/gosec" -exclude-generated -exclude=G115 -severity=medium -confidence=medium \
+            -fmt=sarif -out=gosec.sarif -stdout -verbose=text ./...
+      - if: always() && env.CAN_UPLOAD == 'true' && hashFiles('gosec.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: gosec.sarif
+          category: gosec
+
+  codeql:
+    name: CodeQL (${{ matrix.language }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { language: go, build-mode: autobuild }
+          - { language: javascript-typescript, build-mode: none }
+          - { language: actions, build-mode: none }
+    steps:
+      - uses: actions/checkout@v5
+      - if: matrix.language == 'go'
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          queries: security-extended
+      - uses: github/codeql-action/analyze@v4
+        with:
+          category: /language:${{ matrix.language }}
+          upload: ${{ env.CAN_UPLOAD == 'true' && 'always' || 'never' }}
+
+  secrets:
+    name: Secrets (gitleaks)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # the whole history: a secret removed in a later commit is still leaked
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+      - run: go install github.com/zricethezav/gitleaks/v8@${{ env.GITLEAKS_VERSION }}
+      # .gitleaks.toml allows the test fixtures and dummy development values by path.
+      - run: '"$(go env GOPATH)/bin/gitleaks" git --redact --no-banner --verbose .'
+
+  npm-audit:
+    name: UI dependencies (npm audit)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # Fails on what ships in the UI bundle; build tools are reported but don't fail the job.
+      - run: npm audit --omit=dev --audit-level=moderate
+      - if: always()
+        run: npm audit --audit-level=critical || true
+
+  trivy-config:
+    name: Dependencies and configuration (Trivy)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v5
+      # Known vulnerabilities in go.mod and package-lock.json, and misconfigurations in the
+      # Dockerfile and the Helm chart. deploy/k3d is skipped: it holds throwaway development
+      # services (a dev Keycloak and PostgreSQL) for the local cluster and CI, never deployed.
+      # .trivyignore lists accepted findings.
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,misconfig
+          skip-dirs: deploy/k3d
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          format: sarif
+          output: trivy-config.sarif
+          limit-severities-for-sarif: true
+          trivyignores: .trivyignore
+      - if: always() && env.CAN_UPLOAD == 'true' && hashFiles('trivy-config.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy-config.sarif
+          category: trivy-config
+
+  trivy-image:
+    name: Container image (Trivy)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v3
+      - name: Build the image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: workflow:scan
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: workflow:scan
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          format: sarif
+          output: trivy-image.sarif
+          limit-severities-for-sarif: true
+          trivyignores: .trivyignore
+      - if: always() && env.CAN_UPLOAD == 'true' && hashFiles('trivy-image.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy-image.sarif
+          category: trivy-image
+
+  dependency-review:
+    name: New dependencies (dependency review)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      # Fails a pull request that adds a dependency with a known high or critical vulnerability.
+      - uses: actions/dependency-review-action@v4.9.0
+        with:
+          fail-on-severity: high
