@@ -5,7 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 const EVENT_TYPES = [
   "issue.created", "issue.updated", "issue.transitioned", "issue.deleted", "comment.created",
   "board.updated", "project.updated", "sprint.started", "sprint.completed", "release.released",
-  "branch.created", "commit.pushed", "pr.opened", "pr.merged", "pr.closed", "pipeline.completed",
+  "branch.created", "commit.pushed", "pr.opened", "pr.merged", "pr.closed", "pipeline.completed", "deployment.completed",
 ];
 
 export type LiveEvent = { type: string; projectId: string; issueId?: string; issueKey?: string; actorId?: string };

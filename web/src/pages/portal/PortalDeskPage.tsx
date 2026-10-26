@@ -1,6 +1,6 @@
 import { getRouteApi, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronRight, ShieldCheck } from "lucide-react";
+import { ChevronRight, Megaphone, ShieldCheck } from "lucide-react";
 import { EmptyState, PageSpinner } from "@/components/ui";
 import { ErrorBox } from "@/components/ErrorBox";
 import { RequestTypeIcon } from "@/features/servicedesk/bits";
@@ -32,6 +32,17 @@ export function PortalDeskPage() {
       <Crumbs items={[{ label: "Help centre", to: "/portal" }, { label: desk.name }]} />
       <h1 className="text-2xl font-semibold tracking-tight">{desk.name}</h1>
       {desk.description && <p className="mt-1.5 max-w-2xl text-sm text-muted">{desk.description}</p>}
+      {desk.whatsNew && (
+        <Link
+          to="/portal/$projectKey/whats-new"
+          params={{ projectKey: desk.projectKey }}
+          className="mt-4 inline-flex items-center gap-2 rounded-md border border-line bg-surface px-3 py-2 text-sm font-medium hover:border-accent hover:text-accent focus-visible:outline-2 focus-visible:outline-accent"
+        >
+          <Megaphone aria-hidden className="size-4 text-accent" />
+          What's new
+          <ChevronRight aria-hidden className="size-4 text-faint" />
+        </Link>
+      )}
       <h2 className="mt-7 mb-1 text-base font-semibold">What can we help you with?</h2>
       {groups.length === 0 && (
         <div className="mt-3 rounded-lg border border-line bg-surface">

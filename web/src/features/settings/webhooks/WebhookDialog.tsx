@@ -17,6 +17,7 @@ export const WEBHOOK_EVENTS: { id: Exclude<EventName, "*">; label: string }[] = 
   { id: "sprint.started", label: "Sprint started" },
   { id: "sprint.completed", label: "Sprint completed" },
   { id: "release.released", label: "Release shipped" },
+  { id: "deployment.completed", label: "Deployment completed" },
 ];
 
 /** WebhookDialog creates or edits a webhook; after creation it shows the signing secret once. */

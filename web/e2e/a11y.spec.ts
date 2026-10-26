@@ -34,8 +34,11 @@ test("accessibility: main pages in light and dark mode", async ({ page, browser 
   const a = api(page.request);
   const key = projectKey("AX");
   await a.post("/projects", { key, name: `Accessible ${key}`, template: "scrum" });
+  // A release with published notes, overdue so its readiness has warnings to show.
+  const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+  const release = await a.post(`/projects/${key}/releases`, { name: "1.0", description: "The first one", releaseDate: yesterday, notes: "## Features\n\n- Pay by card", notesPublished: true });
   const epic = await a.post("/issues", { projectKey: key, typeKey: "epic", summary: "Checkout" });
-  const story = await a.post("/issues", { projectKey: key, typeKey: "story", summary: "Pay by card", parentKey: epic.key, storyPoints: 3 });
+  const story = await a.post("/issues", { projectKey: key, typeKey: "story", summary: "Pay by card", parentKey: epic.key, storyPoints: 3, releaseIds: [release.id] });
   await a.post(`/issues/${story.key}/comments`, { body: "Looks **good**" });
   const dashboard = await a.post("/dashboards", {
     name: `Accessible ${key}`,
@@ -71,7 +74,7 @@ test("accessibility: main pages in light and dark mode", async ({ page, browser 
   });
   expect(put.ok(), await put.text()).toBeTruthy();
   const pending = await a.post(`/portal/projects/${sd}/requests`, { requestTypeId: hardware.id, values: { summary: "A standing desk" } });
-  await a.patch(`/projects/${sd}/service-desk`, { selfSignup: true });
+  await a.patch(`/projects/${sd}/service-desk`, { selfSignup: true, releaseNotesProjectKeys: [key] });
 
   const pages: [string, string][] = [
     ["projects", "/projects"],
@@ -82,7 +85,9 @@ test("accessibility: main pages in light and dark mode", async ({ page, browser 
     ["issue", `/browse/${story.key}`],
     ["reports", `/projects/${key}/reports`],
     ["releases", `/projects/${key}/releases`],
+    ["release", `/projects/${key}/releases/${release.id}`],
     ["project settings", `/projects/${key}/settings`],
+    ["release settings", `/projects/${key}/settings/releases`],
     ["board settings", `/projects/${key}/settings/boards`],
     ["automation", `/projects/${key}/settings/automation`],
     ["search", `/issues?jql=${encodeURIComponent(`project = ${key}`)}`],
@@ -105,6 +110,7 @@ test("accessibility: main pages in light and dark mode", async ({ page, browser 
     ["SLA settings", `/projects/${sd}/settings/slas`],
     ["portal home", "/portal"],
     ["portal desk", `/portal/${sd}`],
+    ["portal what's new", `/portal/${sd}/whats-new`],
     ["portal form", `/portal/${sd}/new/${help.id}`],
     ["portal requests", "/portal/requests"],
     ["portal request", `/portal/requests/${request.key}?created=true`],
@@ -123,6 +129,11 @@ test("accessibility: main pages in light and dark mode", async ({ page, browser 
     await page.getByRole("button", { name: `Edit ${hardware.name}` }).click();
     await expect(page.getByRole("dialog", { name: `Edit ${hardware.name}` })).toBeVisible();
     await audit(page, `request type form builder (${theme})`);
+    // The Release dialog, with its readiness warnings.
+    await page.goto(`/projects/${key}/releases/${release.id}`);
+    await page.getByRole("button", { name: "Release", exact: true }).click();
+    await expect(page.getByRole("dialog", { name: "Release 1.0" }).getByText(/not done/)).toBeVisible();
+    await audit(page, `release dialog (${theme})`);
   }
   // The help centre's sign-up page, signed out.
   const anonDesk = await browser.newContext();

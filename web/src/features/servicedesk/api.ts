@@ -71,6 +71,9 @@ export const portalDesksQuery = queryOptions({ queryKey: ["portal", "desks"], qu
 export const portalDeskQuery = (projectKey: string) =>
   queryOptions({ queryKey: ["portal", "desk", projectKey], queryFn: () => unwrap(api.GET("/portal/projects/{projectKey}", project(projectKey))) });
 
+export const portalReleaseNotesQuery = (projectKey: string) =>
+  queryOptions({ queryKey: ["portal", "whats-new", projectKey], queryFn: () => unwrap(api.GET("/portal/projects/{projectKey}/whats-new", project(projectKey))) });
+
 export type RequestFilter = "open" | "closed" | "all";
 
 export const portalRequestsQuery = (status: RequestFilter) =>

@@ -1,7 +1,7 @@
 import type { KeyboardEvent } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { CalendarDays, CircleCheck, CircleDot, CircleX, Clock3, CornerDownRight, GitBranch, GitMerge, GitPullRequest } from "lucide-react";
+import { CalendarDays, CircleCheck, CircleDot, CircleX, Clock3, CornerDownRight, GitBranch, GitMerge, GitPullRequest, Rocket } from "lucide-react";
 import type { Issue } from "@/api/types";
 import { IssueTypeIcon, PriorityIcon } from "@/components/issue-bits";
 import { UserAvatar } from "@/components/UserAvatar";
@@ -175,7 +175,8 @@ export function DevIndicators({ dev }: { dev?: Issue["dev"] }) {
   if (dev.openPullRequests > 0) pr = { icon: GitPullRequest, className: "text-progress", label: `${dev.openPullRequests} open pull request${dev.openPullRequests > 1 ? "s" : ""}`, count: dev.openPullRequests };
   else if (dev.mergedPullRequests > 0) pr = { icon: GitMerge, className: "text-done", label: `${dev.mergedPullRequests} merged pull request${dev.mergedPullRequests > 1 ? "s" : ""}`, count: dev.mergedPullRequests };
   else if (dev.branches > 0) pr = { icon: GitBranch, className: "text-muted", label: `${dev.branches} branch${dev.branches > 1 ? "es" : ""}` };
-  if (!pr && !pipeline) return null;
+  const deployed = dev.deployedTo?.length ? `Deployed to ${dev.deployedTo.join(", ")}` : undefined;
+  if (!pr && !pipeline && !deployed) return null;
   return (
     <span className="inline-flex items-center gap-1">
       {pr && (
@@ -187,6 +188,11 @@ export function DevIndicators({ dev }: { dev?: Issue["dev"] }) {
       {pipeline && (
         <span title={pipeline.label} className="inline-flex">
           <pipeline.icon className={cn("size-3.5", pipeline.className)} aria-label={pipeline.label} />
+        </span>
+      )}
+      {deployed && (
+        <span title={deployed} className="inline-flex">
+          <Rocket className="size-3.5 text-success" aria-label={deployed} />
         </span>
       )}
     </span>

@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Ban, Check, CircleCheck, CircleX, Clock, Copy, GitBranch, GitCommitHorizontal, GitPullRequest, LoaderCircle, MessageSquare, TriangleAlert } from "lucide-react";
+import { Ban, Check, CircleCheck, CircleX, Clock, Copy, GitBranch, GitCommitHorizontal, GitPullRequest, LoaderCircle, MessageSquare, Rocket, TriangleAlert } from "lucide-react";
 import { ApiError, api, unwrap, type Schemas } from "@/api/client";
 import { hasPermission, useProject } from "@/api/queries";
 import { Badge, Button, Field, Input, Modal, Select, useToast, type Tone } from "@/components/ui";
@@ -12,6 +12,7 @@ import { repositoriesQuery } from "./issue-api";
 import { Section, useIssue } from "./issue-context";
 
 type DevLink = Schemas["DevLink"];
+type Deployment = Schemas["IssueDeployment"];
 
 const prTone: Record<string, Tone> = { open: "success", draft: "neutral", merged: "accent", closed: "danger" };
 const prIcon: Record<string, string> = { open: "text-success", draft: "text-muted", merged: "text-accent", closed: "text-danger" };
@@ -30,6 +31,7 @@ export function DevelopmentPanel() {
   const branches = dev.filter((d) => d.kind === "branch" && d.state !== "deleted").sort(byRecent);
   const commits = dev.filter((d) => d.kind === "commit").sort(byRecent);
   const pipeline = dev.filter((d) => d.kind === "pipeline").sort(byRecent)[0];
+  const deployments = issue.deployments ?? [];
   const hasRepos = (repos?.length ?? 0) > 0;
   const canBranch = issue.permissions.edit && hasRepos;
 
@@ -44,7 +46,7 @@ export function DevelopmentPanel() {
         )
       }
     >
-      {dev.length === 0 ? (
+      {dev.length === 0 && deployments.length === 0 ? (
         <p className="text-sm text-muted">
           {isLoading ? (
             "Loading…"
@@ -83,6 +85,13 @@ export function DevelopmentPanel() {
               </a>
             )}
           </div>
+          {deployments.length > 0 && (
+            <Group label="Deployments">
+              {deployments.map((d) => (
+                <DeploymentRow key={d.id} deployment={d} />
+              ))}
+            </Group>
+          )}
           {prs.length > 0 && (
             <Group label="Pull requests">
               {prs.map((pr) => (
@@ -173,6 +182,25 @@ function PullRequestRow({ pr }: { pr: DevLink }) {
         <Badge tone={prTone[pr.state] ?? "neutral"}>{pr.state}</Badge>
         {review && pr.state !== "merged" && pr.state !== "closed" && <ReviewState state={review} />}
       </div>
+    </li>
+  );
+}
+
+const deploymentText: Record<Deployment["status"], string> = { success: "deployed", failed: "failed", running: "deploying", pending: "pending", canceled: "canceled" };
+
+/** DeploymentRow is one environment the issue went to: the latest successful deployment there, else the failed one. */
+function DeploymentRow({ deployment: d }: { deployment: Deployment }) {
+  return (
+    <li className="flex items-center gap-2 px-3 py-1.5 text-sm">
+      {d.status === "success" ? <Rocket aria-hidden className="size-3.5 shrink-0 text-success" /> : <PipelineIcon state={d.status} />}
+      <a href={d.url} target="_blank" rel="noreferrer noopener" className="min-w-0 truncate font-medium hover:text-accent" title={`${d.repository.fullPath} · ${d.ref || d.sha.slice(0, 7)}`}>
+        {d.environment}
+      </a>
+      <span className={cn("shrink-0 text-xs", d.status === "failed" ? "text-danger" : "text-muted")}>{deploymentText[d.status]}</span>
+      <span className="ml-auto shrink-0 truncate text-xs text-faint" title={formatDateTime(d.deployedAt)}>
+        {d.deployer && `${d.deployer} · `}
+        {relativeTime(d.deployedAt)}
+      </span>
     </li>
   );
 }
