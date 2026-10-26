@@ -368,7 +368,14 @@ func (c *gitlabClient) Comment(ctx context.Context, repo RepoRef, number, body s
 
 func (c *gitlabClient) CreateBranch(ctx context.Context, repo RepoRef, name, from string) error {
 	q := url.Values{"branch": {name}, "ref": {from}}
-	return c.do(ctx, http.MethodPost, projectPath(repo)+"/repository/branches?"+q.Encode(), nil, nil)
+	err := c.do(ctx, http.MethodPost, projectPath(repo)+"/repository/branches?"+q.Encode(), nil, nil)
+	// A missing branch to start from is 400 "Invalid reference name: <ref>" (an existing or
+	// invalid new branch name is a 400 too, with another message).
+	var e *APIError
+	if errors.As(err, &e) && e.Status == http.StatusBadRequest && strings.Contains(e.Body, "Invalid reference name") {
+		return fmt.Errorf("%w: %w", ErrNoBaseBranch, err)
+	}
+	return err
 }
 
 // EnsureHook creates a project webhook through the API (group hooks need Premium).

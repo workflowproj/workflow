@@ -24,7 +24,10 @@ What you get on each issue:
     does not repeat them.
 - **Write-back**: when an issue is first linked to a PR/MR, a comment with the issue key, summary
   and status is posted on it (turn off per connection with *write back*).
-- **Create branch** from an issue (named `KEY-summary-slug` by default).
+- **Create branch** from an issue (named `KEY-summary-slug` by default). When the provider
+  refuses, the message says what failed, with its HTTP status and what to check (the GitHub
+  App's *Contents: Read & write* permission, the GitLab token's scope and role, the name of the
+  branch to start from); the provider's own answer goes to the server log.
 - **Deployments**: the environments the issue reached, with status and time (below).
 - **Automation triggers**: `pr.opened`, `pr.merged`, `commit.pushed`, `branch.created`,
   `pipeline.completed`, `deployment.completed` (see [automation.md](automation.md)), e.g. "move

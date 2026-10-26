@@ -12,6 +12,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -505,15 +506,64 @@ func (c *githubClient) Comment(ctx context.Context, repo RepoRef, number, body s
 }
 
 func (c *githubClient) CreateBranch(ctx context.Context, repo RepoRef, name, from string) error {
-	var ref struct {
-		Object struct {
-			SHA string `json:"sha"`
-		} `json:"object"`
-	}
-	if err := c.repoCall(ctx, repo, http.MethodGet, repoPath(repo)+"/git/ref/heads/"+url.PathEscape(from), nil, &ref); err != nil {
+	var raw json.RawMessage
+	if err := c.repoCall(ctx, repo, http.MethodGet, repoPath(repo)+"/git/ref/heads/"+refPath(from), nil, &raw); err != nil {
+		if IsAPIStatus(err, http.StatusNotFound) {
+			return fmt.Errorf("%w: %w", ErrNoBaseBranch, err)
+		}
 		return err
 	}
-	return c.repoCall(ctx, repo, http.MethodPost, repoPath(repo)+"/git/refs", map[string]string{"ref": "refs/heads/" + name, "sha": ref.Object.SHA}, nil)
+	sha, err := refSHA(raw, "refs/heads/"+from)
+	if err != nil {
+		return err
+	}
+	return c.repoCall(ctx, repo, http.MethodPost, repoPath(repo)+"/git/refs", map[string]string{"ref": "refs/heads/" + name, "sha": sha}, nil)
+}
+
+// refPath escapes a branch name for a URL path, keeping the slashes between its parts.
+func refPath(name string) string {
+	parts := strings.Split(name, "/")
+	for i, p := range parts {
+		parts[i] = url.PathEscape(p)
+	}
+	return strings.Join(parts, "/")
+}
+
+type ghRef struct {
+	Ref    string `json:"ref"`
+	Object struct {
+		SHA string `json:"sha"`
+	} `json:"object"`
+}
+
+// refSHA reads the commit a branch points to from GitHub's answer for its ref: the ref itself,
+// or, when the name matches no ref exactly, a list of the refs that start with it (asking for
+// "main" can answer "main-old"); only an exact match counts.
+func refSHA(raw json.RawMessage, want string) (string, error) {
+	raw = bytes.TrimSpace(raw)
+	var refs []ghRef
+	if len(raw) > 0 && raw[0] == '[' {
+		if err := json.Unmarshal(raw, &refs); err != nil {
+			return "", fmt.Errorf("read the refs GitHub listed for %s: %w", want, err)
+		}
+		refs = slices.DeleteFunc(refs, func(r ghRef) bool { return r.Ref != want })
+	} else {
+		var one ghRef
+		if err := json.Unmarshal(raw, &one); err != nil {
+			return "", fmt.Errorf("read GitHub's ref %s: %w", want, err)
+		}
+		if one.Ref != "" && one.Ref != want {
+			return "", ErrNoBaseBranch
+		}
+		refs = []ghRef{one}
+	}
+	if len(refs) == 0 {
+		return "", ErrNoBaseBranch
+	}
+	if refs[0].Object.SHA == "" {
+		return "", fmt.Errorf("GitHub's ref %s names no commit", want)
+	}
+	return refs[0].Object.SHA, nil
 }
 
 func (c *githubClient) EnsureHook(context.Context, RepoRef, string, string) (string, error) {
