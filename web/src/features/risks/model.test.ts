@@ -77,6 +77,19 @@ describe("ADR export", () => {
     );
   });
 
+  it("keeps titles and summaries literal", () => {
+    const md = adrMarkdown({
+      key: "PLAT-14",
+      summary: "Use *stars* and [a link](javascript:alert(1))\n# not a heading",
+      status: { name: "Proposed" },
+      fields: { decision_context: "**Markdown** stays." },
+      links: [link("supersedes", "outward", ref("PLAT-9", "Keep `x_y`"))],
+    });
+    expect(md.split("\n")[0]).toBe("# PLAT-14: Use \\*stars\\* and \\[a link\\](javascript:alert(1)) # not a heading");
+    expect(md).toContain("- Supersedes: PLAT-9 (Keep \\`x\\_y\\`)");
+    expect(md).toContain("## Context\n\n**Markdown** stays.");
+  });
+
   it("names the file after the key and title", () => {
     expect(adrFileName({ key: "PLAT-12", summary: "Store sessions in PostgreSQL!" })).toBe("PLAT-12-store-sessions-in-postgresql.md");
     expect(adrFileName({ key: "PLAT-13", summary: "???" })).toBe("PLAT-13.md");

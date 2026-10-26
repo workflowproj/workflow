@@ -121,23 +121,32 @@ type DecisionForExport = {
  * consequences.
  */
 export function adrMarkdown(d: DecisionForExport): string {
-  const status = [`- Status: ${d.status.name}`];
+  const status = [`- Status: ${inline(d.status.name)}`];
   const date = textField(d.fields, DECISION_FIELDS.date);
-  if (date) status.push(`- Date: ${date}`);
-  const ref = (i: { key: string; summary: string }) => `${i.key} (${i.summary})`;
+  if (date) status.push(`- Date: ${inline(date)}`);
+  const ref = (i: { key: string; summary: string }) => `${i.key} (${inline(i.summary)})`;
   const supersededBy = linkedFrom(d.links, "supersedes").issues;
   if (supersededBy.length) status.push(`- Superseded by: ${supersededBy.map(ref).join(", ")}`);
   const supersedes = linkedTo(d.links, "supersedes");
   if (supersedes.length) status.push(`- Supersedes: ${supersedes.map(ref).join(", ")}`);
   const section = (title: string, key: string) => `## ${title}\n\n${textField(d.fields, key).trim() || "_Not recorded._"}\n`;
   return [
-    `# ${d.key}: ${d.summary}\n`,
+    `# ${d.key}: ${inline(d.summary)}\n`,
     `${status.join("\n")}\n`,
     section("Context", DECISION_FIELDS.context),
     section("Options considered", DECISION_FIELDS.options),
     section("Decision", DECISION_FIELDS.outcome),
     section("Consequences", DECISION_FIELDS.consequences),
   ].join("\n");
+}
+
+/**
+ * inline makes plain text safe on one line of Markdown: titles and summaries are text, so their
+ * `*`, `[`… stay literal (no surprise emphasis or links) and a line break can't start a block.
+ * The record's sections are left as written: they are Markdown.
+ */
+export function inline(s: string) {
+  return s.replace(/\s*\n\s*/g, " ").replace(/[\\`*_[\]<>|~]/g, "\\$&");
 }
 
 /** adrFileName names the export: PLAT-12-use-postgresql-for-sessions.md. */
