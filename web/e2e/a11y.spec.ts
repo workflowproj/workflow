@@ -37,6 +37,12 @@ test("accessibility: main pages in light and dark mode", async ({ page, browser 
   const epic = await a.post("/issues", { projectKey: key, typeKey: "epic", summary: "Checkout" });
   const story = await a.post("/issues", { projectKey: key, typeKey: "story", summary: "Pay by card", parentKey: epic.key, storyPoints: 3 });
   await a.post(`/issues/${story.key}/comments`, { body: "Looks **good**" });
+  // The risk register and decision log (Scrum projects keep them).
+  const risk = await a.post("/issues", { projectKey: key, typeKey: "risk", summary: "Card scheme fees rise", fields: { risk_likelihood: 4, risk_impact: 5, risk_response: "Reduce", risk_mitigation: "Negotiate a cap." } });
+  await a.post(`/issues/${story.key}/links`, { type: "mitigates", targetKey: risk.key });
+  await a.post("/issues", { projectKey: key, typeKey: "risk", summary: "Office move delays", fields: { risk_likelihood: 1, risk_impact: 2 } });
+  const decision = await a.post("/issues", { projectKey: key, typeKey: "decision", summary: "Take cards through one provider", fields: { decision_context: "Two providers double the work.", decision_outcome: "One provider." } });
+  await a.post(`/issues/${decision.key}/transitions`, { transitionId: "accept" });
   const dashboard = await a.post("/dashboards", {
     name: `Accessible ${key}`,
     gadgets: [
@@ -82,6 +88,12 @@ test("accessibility: main pages in light and dark mode", async ({ page, browser 
     ["issue", `/browse/${story.key}`],
     ["reports", `/projects/${key}/reports`],
     ["releases", `/projects/${key}/releases`],
+    ["risks", `/projects/${key}/risks`],
+    ["risks filtered by a cell", `/projects/${key}/risks?cell=4-5`],
+    ["decisions", `/projects/${key}/decisions`],
+    ["risk", `/browse/${risk.key}`],
+    ["decision", `/browse/${decision.key}`],
+    ["issue types settings", `/projects/${key}/settings/issue-types`],
     ["project settings", `/projects/${key}/settings`],
     ["board settings", `/projects/${key}/settings/boards`],
     ["automation", `/projects/${key}/settings/automation`],
@@ -118,6 +130,11 @@ test("accessibility: main pages in light and dark mode", async ({ page, browser 
       await page.goto(path);
       await audit(page, `${name} (${theme})`);
     }
+    // The create dialog preset to a risk.
+    await page.goto(`/projects/${key}/risks`);
+    await page.getByRole("button", { name: "New risk" }).click();
+    await expect(page.getByRole("dialog", { name: "Create issue" })).toBeVisible();
+    await audit(page, `new risk dialog (${theme})`);
     // The request type form builder, open.
     await page.goto(`/projects/${sd}/settings/request-types`);
     await page.getByRole("button", { name: `Edit ${hardware.name}` }).click();
