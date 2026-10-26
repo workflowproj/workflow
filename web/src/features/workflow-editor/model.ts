@@ -24,6 +24,8 @@ export interface ValidatorDoc {
 export interface ScreenFieldDoc {
   field: string;
   required?: boolean;
+  /** A resolution field may offer its own resolutions (the risk workflow's Mitigated, Accepted…). */
+  options?: string[];
 }
 /** A post-function sets exactly one of these keys. */
 export interface PostFunctionDoc {
@@ -118,6 +120,7 @@ export function normalize(raw: unknown): WorkflowDoc {
         const fo = (f ?? {}) as Record<string, unknown>;
         const out: ScreenFieldDoc = { field: str(fo.field) };
         if (fo.required === true) out.required = true;
+        if (Array.isArray(fo.options) && fo.options.length) out.options = fo.options.map(str);
         return out;
       });
     }
@@ -199,7 +202,8 @@ function cleanTransition(t: TransitionDoc): Record<string, unknown> {
   o.to = t.to;
   if (t.condition?.trim()) o.condition = t.condition.trim();
   if (t.validators?.length) o.validators = t.validators.map((v) => (v.message ? { expr: v.expr, message: v.message } : { expr: v.expr }));
-  if (t.screen?.length) o.screen = t.screen.map((f) => (f.required ? { field: f.field, required: true } : { field: f.field }));
+  if (t.screen?.length)
+    o.screen = t.screen.map((f) => ({ field: f.field, ...(f.required ? { required: true } : {}), ...(f.options?.some(Boolean) ? { options: f.options.filter(Boolean) } : {}) }));
   if (t.postFunctions?.length) {
     o.postFunctions = t.postFunctions.map((p) => {
       const k = postFunctionKind(p);

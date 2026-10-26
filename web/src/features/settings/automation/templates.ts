@@ -1,15 +1,17 @@
-import { CalendarRange, CircleCheckBig, GitMerge, GitPullRequestArrow, ListChecks, Megaphone, OctagonAlert, Play, Rocket, Siren, Timer, type LucideIcon } from "lucide-react";
+import { CalendarClock, CalendarRange, CircleCheckBig, GitMerge, GitPullRequestArrow, ListChecks, Megaphone, OctagonAlert, Play, Rocket, Siren, Timer, type LucideIcon } from "lucide-react";
 import type { RuleInput } from "./meta";
 
 export interface RuleTemplate {
   id: string;
   title: string;
   description: string;
-  group: "Development" | "Hierarchy" | "Hygiene" | "Chat";
+  group: "Development" | "Hierarchy" | "Hygiene" | "Risks" | "Chat";
   icon: LucideIcon;
   rule: RuleInput;
   /** Offered only when the project has a chat channel; the first one is pre-selected. */
   needsChat?: boolean;
+  /** Offered only when the project keeps risks and decisions. */
+  needsRisks?: boolean;
 }
 
 /*
@@ -169,6 +171,22 @@ export const RULE_TEMPLATES: RuleTemplate[] = [
         { type: "transition", category: "done" },
         { type: "comment", body: "Deployed to {{event.environment}}: {{event.url}}" },
       ],
+    },
+  },
+  {
+    id: "risk-reviews",
+    title: "Remind risk owners about reviews due this week",
+    description: "Every Monday morning, the owner of each open risk whose review date is in the next 7 days (or has passed) gets a notification.",
+    group: "Risks",
+    icon: CalendarClock,
+    needsRisks: true,
+    rule: {
+      name: "Remind risk owners about reviews due this week",
+      description: "Keeps the risk register reviewed on time.",
+      enabled: true,
+      trigger: { type: "schedule", cron: "0 8 * * 1", jql: "kind = risk AND statusCategory != Done AND due <= 7d AND assignee is not EMPTY" },
+      condition: "",
+      actions: [{ type: "notify", recipients: "assignee" }],
     },
   },
   {

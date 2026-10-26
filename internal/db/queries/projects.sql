@@ -36,6 +36,9 @@ DELETE FROM project_key_aliases WHERE key = $1;
 -- name: DeleteProject :exec
 DELETE FROM projects WHERE id = $1;
 
+-- name: SetProjectRisksDecisions :one
+UPDATE projects SET risks_decisions = @risks_decisions, updated_at = now() WHERE id = @id RETURNING *;
+
 -- name: LockProjectCounter :one
 -- The per-project issue counter row, locked for the rest of the transaction.
 SELECT issue_counter FROM projects WHERE id = $1 FOR UPDATE;
@@ -194,8 +197,8 @@ SELECT * FROM issue_types WHERE id = ANY(@ids::uuid[]);
 SELECT * FROM issue_types WHERE project_id = $1 AND key = $2;
 
 -- name: CreateIssueType :one
-INSERT INTO issue_types (project_id, key, name, description, icon, color, level, position, workflow_id)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+INSERT INTO issue_types (project_id, key, name, description, icon, color, level, position, workflow_id, kind)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 RETURNING *;
 
 -- name: UpdateIssueType :one
@@ -226,6 +229,25 @@ SELECT * FROM field_definitions ORDER BY name;
 
 -- name: GetFieldDefinition :one
 SELECT * FROM field_definitions WHERE id = $1;
+
+-- name: GetFieldDefinitionByKey :one
+SELECT * FROM field_definitions WHERE key = $1;
+
+-- name: EnsureFieldDefinition :exec
+-- Creates a field unless one with the key exists (risks and decisions set up their fields).
+INSERT INTO field_definitions (key, name, description, type, options, project_ids, issue_type_keys)
+VALUES (@key, @name, @description, @type, @options, @project_ids, @issue_type_keys)
+ON CONFLICT (key) DO NOTHING;
+
+-- name: AddFieldDefinitionIssueType :exec
+-- Extends a field limited to some issue types to one more (no change when it applies to every type).
+UPDATE field_definitions SET issue_type_keys = array_append(issue_type_keys, @type_key::text), updated_at = now()
+WHERE id = @id AND issue_type_keys IS NOT NULL AND NOT @type_key::text = ANY(issue_type_keys);
+
+-- name: AddFieldDefinitionProject :exec
+-- Extends a field limited to some projects to one more (no change when it applies to every project).
+UPDATE field_definitions SET project_ids = array_append(project_ids, @project_id::uuid), updated_at = now()
+WHERE id = @id AND project_ids IS NOT NULL AND NOT @project_id::uuid = ANY(project_ids);
 
 -- name: CreateFieldDefinition :one
 INSERT INTO field_definitions (key, name, description, type, options, project_ids, issue_type_keys)

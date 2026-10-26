@@ -19,6 +19,9 @@ request, plus a service desk for requests from outside the team.
 - **Releases**: a page per release with progress, a burnup and readiness checks before you ship,
   release notes generated from done issues and published to the help centre, Git tags and the
   environments a release reached.
+- **Risks and decisions**: a risk register scored by likelihood × impact with a heat map, and a
+  decision log with ADR export, in their own project tabs and out of sprint planning; work links
+  to the risks it mitigates and the decisions it implements.
 - **Search**: a JQL-like query language compiled to SQL, with saved and shared filters.
 - **Reports and dashboards**: lead and cycle time, burndown and burnup, velocity, cumulative flow
   and breakdowns, on personal and shared dashboards.
@@ -70,6 +73,7 @@ The reference pages live in [`docs/`](docs/) and are published at
 | [Workflows as code](docs/workflows.md) | The YAML format, CEL reference, versioning and migration |
 | [Releases](docs/releases.md) | Release pages, readiness, release notes and What's new, tags and deployments |
 | [Search](docs/search.md) | The query language |
+| [Risks and decisions](docs/risks-decisions.md) | The risk register, the decision log, scoring and their links |
 | [Metrics and dashboards](docs/metrics.md) | Issue timing, sprint reports, flow metrics, dashboards |
 | [Time tracking](docs/time-tracking.md) | Estimates, logging work, the hours burndown and the timesheet |
 | [Service desk](docs/service-desk.md) | Help centre, customers, request types, queues, SLAs and approvals |

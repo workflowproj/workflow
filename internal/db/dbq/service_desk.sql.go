@@ -1090,7 +1090,7 @@ func (q *Queries) ListServiceCustomers(ctx context.Context, arg ListServiceCusto
 }
 
 const listServiceDesks = `-- name: ListServiceDesks :many
-SELECT service_desks.project_id, service_desks.portal_name, service_desks.portal_description, service_desks.portal_access, service_desks.self_signup, service_desks.created_at, service_desks.updated_at, projects.id, projects.key, projects.name, projects.description, projects.lead_id, projects.template, projects.open_role_id, projects.issue_counter, projects.archived_at, projects.created_at, projects.updated_at
+SELECT service_desks.project_id, service_desks.portal_name, service_desks.portal_description, service_desks.portal_access, service_desks.self_signup, service_desks.created_at, service_desks.updated_at, projects.id, projects.key, projects.name, projects.description, projects.lead_id, projects.template, projects.open_role_id, projects.issue_counter, projects.archived_at, projects.created_at, projects.updated_at, projects.risks_decisions
 FROM service_desks JOIN projects ON projects.id = service_desks.project_id
 WHERE projects.archived_at IS NULL
 ORDER BY lower(service_desks.portal_name)
@@ -1129,6 +1129,7 @@ func (q *Queries) ListServiceDesks(ctx context.Context) ([]ListServiceDesksRow, 
 			&i.Project.ArchivedAt,
 			&i.Project.CreatedAt,
 			&i.Project.UpdatedAt,
+			&i.Project.RisksDecisions,
 		); err != nil {
 			return nil, err
 		}

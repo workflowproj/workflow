@@ -95,4 +95,11 @@ describe("templates", () => {
     expect(namedStatuses(template("pr-opened-review"))).toEqual(["In Review"]);
     expect(namedStatuses(template("subtasks-done"))).toEqual([]);
   });
+
+  it("remind risk owners of reviews due within a week", () => {
+    const t = RULE_TEMPLATES.find((x) => x.id === "risk-reviews")!;
+    expect(t.needsRisks).toBe(true);
+    expect(t.rule.trigger).toEqual({ type: "schedule", cron: "0 8 * * 1", jql: "kind = risk AND statusCategory != Done AND due <= 7d AND assignee is not EMPTY" });
+    expect(t.rule.actions).toEqual([{ type: "notify", recipients: "assignee" }]);
+  });
 });

@@ -218,6 +218,9 @@ var linkLabels = map[string][2]string{
 	"relates":    {"relates to", "relates to"},
 	"duplicates": {"duplicates", "is duplicated by"},
 	"clones":     {"clones", "is cloned by"},
+	"mitigates":  {"mitigates", "is mitigated by"},
+	"implements": {"implements", "is implemented by"},
+	"supersedes": {"supersedes", "is superseded by"},
 }
 
 func LinkLabel(linkType string, outward bool) string {
@@ -248,6 +251,9 @@ func (s *Service) CreateLink(ctx context.Context, actor *authz.Actor, ref, linkT
 	from, to := src, target
 	if inward {
 		from, to = target, src
+	}
+	if err := checkLinkKinds(ctx, s.Q, linkType, from, to); err != nil {
+		return dbq.IssueLink{}, src, err
 	}
 	var l dbq.IssueLink
 	err = s.tx(ctx, func(tx pgx.Tx, q *dbq.Queries) error {

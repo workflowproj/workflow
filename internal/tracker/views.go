@@ -26,7 +26,7 @@ func StatusView(s dbq.Status) api.Status {
 }
 
 func TypeRef(t dbq.IssueType) api.IssueTypeRef {
-	return api.IssueTypeRef{Id: t.ID, Key: t.Key, Name: t.Name, Icon: t.Icon, Color: t.Color, Level: int(t.Level)}
+	return api.IssueTypeRef{Id: t.ID, Key: t.Key, Name: t.Name, Icon: t.Icon, Color: t.Color, Level: int(t.Level), Kind: api.IssueTypeKind(cmpOr(t.Kind, KindWork))}
 }
 
 func dateView(t *time.Time) *openapi_types.Date {
@@ -55,7 +55,7 @@ func ReleaseView(r dbq.Release, issueCount, doneCount int) api.Release {
 func (s *Service) ProjectView(ctx context.Context, p dbq.Project, access authz.Access) (api.Project, error) {
 	v := api.Project{
 		Id: p.ID, Key: p.Key, Name: p.Name, Description: p.Description, Template: p.Template,
-		Access: api.ProjectAccessPrivate, CreatedAt: p.CreatedAt, MyPermissions: access.List(),
+		Access: api.ProjectAccessPrivate, RisksDecisions: p.RisksDecisions, CreatedAt: p.CreatedAt, MyPermissions: access.List(),
 	}
 	if v.MyPermissions == nil {
 		v.MyPermissions = []string{}

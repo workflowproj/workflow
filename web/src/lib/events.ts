@@ -36,7 +36,7 @@ export function useLiveEvents(scope: LiveScope, { onEvent, debounceMs = 150 }: {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const pending = new Set<string>();
     const flush = () => {
-      for (const k of ["board", "backlog", "search", "sprints", "releases", "timeline", "metrics"]) qc.invalidateQueries({ queryKey: [k] });
+      for (const k of ["board", "backlog", "search", "sprints", "releases", "timeline", "metrics", "risks", "decisions"]) qc.invalidateQueries({ queryKey: [k] });
       for (const key of pending) {
         qc.invalidateQueries({ queryKey: ["issue", key] });
         qc.invalidateQueries({ queryKey: ["issue-comments", key] });

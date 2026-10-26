@@ -51,6 +51,17 @@
   --color-chart-todo: #5d6573;
   --color-chart-progress: #2563eb;
   --color-chart-done: #15803d;
+
+  /* Risk ratings: a tint to fill (the matrix, badges) and an ink to write on it, at 4.5:1 or
+     better in both themes. The rating is always written out too, never shown by colour alone. */
+  --color-risk-low: #166534;
+  --color-risk-low-soft: #dcfce7;
+  --color-risk-medium: #854d0e;
+  --color-risk-medium-soft: #fef3c7;
+  --color-risk-high: #9a3412;
+  --color-risk-high-soft: #ffedd5;
+  --color-risk-critical: #991b1b;
+  --color-risk-critical-soft: #fee2e2;
 }
 
 :root {
@@ -98,6 +109,14 @@
   --color-chart-todo: #6b7280;
   --color-chart-progress: #4c8dff;
   --color-chart-done: #2f9e5c;
+  --color-risk-low: #86efac;
+  --color-risk-low-soft: #14301f;
+  --color-risk-medium: #fcd34d;
+  --color-risk-medium-soft: #332c0b;
+  --color-risk-high: #fdba74;
+  --color-risk-high-soft: #46200e;
+  --color-risk-critical: #fca5a5;
+  --color-risk-critical-soft: #431717;
 }
 
 html,

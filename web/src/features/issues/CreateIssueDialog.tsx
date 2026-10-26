@@ -2,22 +2,34 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react"
 import { Link, useNavigate } from "@tanstack/react-router";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, ChevronDown, Search, X } from "lucide-react";
-import { api, ApiError, unwrap } from "@/api/client";
+import { api, ApiError, unwrap, type Schemas } from "@/api/client";
 import { issueTypesQuery, labelsQuery, projectsQuery } from "@/api/queries";
 import { PRIORITIES, type Issue, type IssueType, type Priority, type User } from "@/api/types";
-import { Button, Checkbox, Field, Input, Modal, Popover, Select, Spinner, useToast } from "@/components/ui";
+import { Button, Checkbox, Field, Input, Modal, Popover, Select, Spinner, Textarea, useToast } from "@/components/ui";
 import { ErrorBox } from "@/components/ErrorBox";
 import { IssueTypeIcon, PriorityIcon, priorityLabel, StatusBadge } from "@/components/issue-bits";
 import { MarkdownEditor } from "@/components/MarkdownEditor";
 import { UserPicker } from "@/components/UserPicker";
+import { RatingBadge } from "@/features/risks/bits";
+import { DECISION_FIELDS, impactLabel, likelihoodLabel, RESPONSES, RISK_FIELDS, riskRating } from "@/features/risks/model";
 import { cn } from "@/lib/cn";
 
-type Defaults = { typeKey?: string; sprintId?: string; parentKey?: string; statusId?: string };
+type Defaults = {
+  typeKey?: string;
+  sprintId?: string;
+  parentKey?: string;
+  statusId?: string;
+  summary?: string;
+  /** Link the new issue to another once created, e.g. work that mitigates a risk. */
+  link?: { type: Schemas["LinkType"]; direction: Schemas["LinkDirection"]; key: string };
+};
 type ParentRef = Pick<Issue, "key" | "summary" | "type" | "status">;
 
 /**
  * CreateIssueDialog creates an issue. Opened from the top bar ("Create"), boards and backlogs.
  * `projectKey` preselects the project; `defaults` pre-fills fields (e.g. sprintId, parentKey).
+ * Risks and decisions ask for their own fields instead of the planning ones (epic, sprint,
+ * story points); their types are offered when the project has the section on.
  */
 export function CreateIssueDialog(props: {
   open: boolean;
@@ -46,7 +58,8 @@ function CreateIssueForm({ onClose, projectKey: initialProject, defaults, onCrea
   const project = creatable.find((p) => p.key === projectKey) ?? creatable.find((p) => p.key === initialProject) ?? creatable[0];
   const key = project?.key ?? "";
 
-  const { data: types = [] } = useQuery({ ...issueTypesQuery(key), enabled: !!key });
+  const { data: allTypes = [] } = useQuery({ ...issueTypesQuery(key), enabled: !!key });
+  const types = allTypes.filter((t) => t.kind === "work" || project?.risksDecisions || t.key === defaults?.typeKey);
   const { data: sprints = [] } = useQuery({
     queryKey: ["sprints", key],
     queryFn: () => unwrap(api.GET("/projects/{projectKey}/sprints", { params: { path: { projectKey: key } } })),
@@ -56,7 +69,7 @@ function CreateIssueForm({ onClose, projectKey: initialProject, defaults, onCrea
   const { data: knownLabels = [] } = useQuery({ ...labelsQuery(key), enabled: !!key });
 
   const [typeKey, setTypeKey] = useState(defaults?.typeKey ?? "");
-  const [summary, setSummary] = useState("");
+  const [summary, setSummary] = useState(defaults?.summary ?? "");
   const [description, setDescription] = useState("");
   const [assignee, setAssignee] = useState<User | null>(null);
   const [priority, setPriority] = useState<Priority>("medium");
@@ -65,11 +78,19 @@ function CreateIssueForm({ onClose, projectKey: initialProject, defaults, onCrea
   const [dueDate, setDueDate] = useState("");
   const [sprintId, setSprintId] = useState(defaults?.sprintId ?? "");
   const [parent, setParent] = useState<ParentRef | null>(null);
+  // Risks and decisions (custom fields with reserved keys).
+  const [likelihood, setLikelihood] = useState("");
+  const [impact, setImpact] = useState("");
+  const [response, setResponse] = useState("");
+  const [mitigation, setMitigation] = useState("");
+  const [adr, setAdr] = useState({ context: "", options: "", outcome: "", consequences: "", date: "" });
   const [another, setAnother] = useState(false);
   const [lastCreated, setLastCreated] = useState<string | null>(null);
   const summaryRef = useRef<HTMLInputElement>(null);
 
-  const type = types.find((t) => t.key === typeKey) ?? types.find((t) => t.key === "story") ?? types.find((t) => t.level === 0) ?? types[0];
+  const type =
+    types.find((t) => t.key === typeKey) ?? types.find((t) => t.key === "story") ?? types.find((t) => t.level === 0 && t.kind === "work") ?? types.find((t) => t.kind === "work") ?? types[0];
+  const kind = type?.kind ?? "work";
   const openSprints = sprints.filter((s) => s.state !== "closed");
 
   // The default parent (e.g. "add sub-task" from an issue) is looked up once for its summary.
@@ -101,9 +122,26 @@ function CreateIssueForm({ onClose, projectKey: initialProject, defaults, onCrea
     if (parent && parent.type.level !== t.level + 1) setParent(null);
   };
 
+  const fields = (): Record<string, unknown> | undefined => {
+    const out: Record<string, unknown> = {};
+    if (kind === "risk") {
+      if (likelihood) out[RISK_FIELDS.likelihood] = Number(likelihood);
+      if (impact) out[RISK_FIELDS.impact] = Number(impact);
+      if (response) out[RISK_FIELDS.response] = response;
+      if (mitigation.trim()) out[RISK_FIELDS.mitigation] = mitigation.trim();
+    } else if (kind === "decision") {
+      for (const [k, field] of Object.entries(DECISION_FIELDS)) {
+        const v = adr[k as keyof typeof adr].trim();
+        if (v) out[field] = v;
+      }
+    }
+    return Object.keys(out).length ? out : undefined;
+  };
+
   const create = useMutation({
     mutationFn: async () => {
       const level = type!.level;
+      const planned = kind === "work";
       const issue = await unwrap(
         api.POST("/issues", {
           body: {
@@ -113,14 +151,21 @@ function CreateIssueForm({ onClose, projectKey: initialProject, defaults, onCrea
             description: description.trim() || undefined,
             priority,
             assigneeId: assignee?.id,
-            parentKey: level <= 0 ? parent?.key : undefined,
-            sprintId: level === 0 && sprintId ? sprintId : undefined,
-            storyPoints: points === "" ? undefined : Number(points),
-            dueDate: dueDate || undefined,
+            parentKey: planned && level <= 0 ? parent?.key : undefined,
+            sprintId: planned && level === 0 && sprintId ? sprintId : undefined,
+            storyPoints: planned && points !== "" ? Number(points) : undefined,
+            dueDate: kind !== "decision" && dueDate ? dueDate : undefined,
             labels: labels.length ? labels : undefined,
+            fields: fields(),
           },
         }),
       );
+      const link = defaults?.link;
+      if (link) {
+        await unwrap(api.POST("/issues/{issueKey}/links", { params: { path: { issueKey: issue.key } }, body: { type: link.type, direction: link.direction, targetKey: link.key } })).catch(() =>
+          toast.info(`${issue.key} was created but couldn't be linked to ${link.key}; link it from the issue.`),
+        );
+      }
       // A board column's "create here" asks for a status; creation itself always starts in the initial one.
       if (defaults?.statusId && issue.status.id !== defaults.statusId) {
         await unwrap(api.POST("/issues/{issueKey}/move", { params: { path: { issueKey: issue.key } }, body: { statusId: defaults.statusId } })).catch(() =>
@@ -130,12 +175,15 @@ function CreateIssueForm({ onClose, projectKey: initialProject, defaults, onCrea
       return issue;
     },
     onSuccess: (issue) => {
-      for (const k of [["board"], ["backlog"], ["search"], ["labels", key], ["releases", key]]) qc.invalidateQueries({ queryKey: k });
+      for (const k of [["board"], ["backlog"], ["search"], ["labels", key], ["releases", key], ["risks", key], ["decisions", key]]) qc.invalidateQueries({ queryKey: k });
+      if (defaults?.link) qc.invalidateQueries({ queryKey: ["issue", defaults.link.key] });
       toast.success(`${issue.key} created`, { label: "Open", onClick: () => navigate({ to: "/browse/$issueKey", params: { issueKey: issue.key } }) });
       onCreated?.({ key: issue.key });
       if (another) {
         setSummary("");
         setDescription("");
+        setMitigation("");
+        setAdr({ context: "", options: "", outcome: "", consequences: "", date: "" });
         setLastCreated(issue.key);
         create.reset();
         summaryRef.current?.focus();
@@ -144,9 +192,12 @@ function CreateIssueForm({ onClose, projectKey: initialProject, defaults, onCrea
   });
 
   const fe = create.error instanceof ApiError ? create.error.fieldErrors() : {};
-  const shownFields = ["projectKey", "typeKey", "summary", "parentKey", "assigneeId", "priority", "sprintId", "storyPoints", "dueDate", "labels"];
+  const shownFields = ["projectKey", "typeKey", "summary", "parentKey", "assigneeId", "priority", "sprintId", "storyPoints", "dueDate", "labels", ...Object.values(RISK_FIELDS), ...Object.values(DECISION_FIELDS)].map(
+    (f) => (f.includes("_") ? `fields.${f}` : f),
+  );
   const otherError = create.error && !Object.keys(fe).some((f) => shownFields.includes(f));
   const canSubmit = !!project && !!type && summary.trim() !== "" && !(type.level < 0 && !parent);
+  const score = likelihood && impact ? Number(likelihood) * Number(impact) : undefined;
   const submit = () => canSubmit && !create.isPending && create.mutate();
   const onKeyDown = (e: KeyboardEvent) => {
     if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
@@ -211,7 +262,7 @@ function CreateIssueForm({ onClose, projectKey: initialProject, defaults, onCrea
           )}
         </Field>
       </div>
-      {type && type.level <= 0 && (
+      {type && type.level <= 0 && kind === "work" && (
         <Field
           label={type.level < 0 ? "Parent issue" : "Epic"}
           required={type.level < 0}
@@ -222,15 +273,102 @@ function CreateIssueForm({ onClose, projectKey: initialProject, defaults, onCrea
         </Field>
       )}
       <Field label="Summary" required error={fe.summary}>
-        {(id) => <Input id={id} ref={summaryRef} autoFocus value={summary} maxLength={255} onChange={(e) => setSummary(e.target.value)} invalid={!!fe.summary} placeholder="What needs to be done?" />}
+        {(id) => (
+          <Input
+            id={id}
+            ref={summaryRef}
+            autoFocus
+            value={summary}
+            maxLength={255}
+            onChange={(e) => setSummary(e.target.value)}
+            invalid={!!fe.summary}
+            placeholder={kind === "risk" ? "What might happen?" : kind === "decision" ? "What is being decided?" : "What needs to be done?"}
+          />
+        )}
       </Field>
       <div className="flex flex-col gap-1.5">
         <span className="text-[13px] font-medium">Description</span>
-        <MarkdownEditor value={description} onChange={setDescription} onSubmit={submit} placeholder="Add more detail, steps to reproduce, acceptance criteria…" minHeight={110} />
+        <MarkdownEditor
+          label="Description"
+          value={description}
+          onChange={setDescription}
+          onSubmit={submit}
+          placeholder={kind === "work" ? "Add more detail, steps to reproduce, acceptance criteria…" : "Add more detail…"}
+          minHeight={kind === "work" ? 110 : 70}
+        />
       </div>
+      {kind === "risk" && (
+        <fieldset className="flex flex-col gap-3 rounded-md border border-line p-3">
+          <legend className="px-1 text-[13px] font-medium">Assessment</legend>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Field label="Likelihood" error={fe[`fields.${RISK_FIELDS.likelihood}`]}>
+              {(id) => (
+                <Select id={id} value={likelihood} onChange={(e) => setLikelihood(e.target.value)}>
+                  <option value="">Not assessed</option>
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <option key={n} value={n}>
+                      {likelihoodLabel(n)}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </Field>
+            <Field label="Impact" error={fe[`fields.${RISK_FIELDS.impact}`]}>
+              {(id) => (
+                <Select id={id} value={impact} onChange={(e) => setImpact(e.target.value)}>
+                  <option value="">Not assessed</option>
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <option key={n} value={n}>
+                      {impactLabel(n)}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </Field>
+            <Field label="Response" error={fe[`fields.${RISK_FIELDS.response}`]}>
+              {(id) => (
+                <Select id={id} value={response} onChange={(e) => setResponse(e.target.value)}>
+                  <option value="">Not decided</option>
+                  {RESPONSES.map((r) => (
+                    <option key={r} value={r}>
+                      {r}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </Field>
+          </div>
+          <p className="flex items-center gap-2 text-[13px] text-muted" aria-live="polite">
+            Score <RatingBadge score={score} rating={score ? riskRating(score) : undefined} />
+          </p>
+          <Field label="Mitigation plan" error={fe[`fields.${RISK_FIELDS.mitigation}`]}>
+            {(id) => <Textarea id={id} rows={2} value={mitigation} onChange={(e) => setMitigation(e.target.value)} placeholder="What reduces the likelihood or the impact?" />}
+          </Field>
+        </fieldset>
+      )}
+      {kind === "decision" && (
+        <fieldset className="flex flex-col gap-3 rounded-md border border-line p-3">
+          <legend className="px-1 text-[13px] font-medium">Decision record</legend>
+          {(
+            [
+              ["context", "Context", "The situation and the forces at play."],
+              ["options", "Options considered", "The alternatives and their trade-offs."],
+              ["outcome", "Decision", "What was decided, and why."],
+              ["consequences", "Consequences", "What becomes easier or harder."],
+            ] as const
+          ).map(([k, label, placeholder]) => (
+            <Field key={k} label={label} error={fe[`fields.${DECISION_FIELDS[k]}`]}>
+              {(id) => <Textarea id={id} rows={2} value={adr[k]} onChange={(e) => setAdr((a) => ({ ...a, [k]: e.target.value }))} placeholder={placeholder} />}
+            </Field>
+          ))}
+          <Field label="Decided on" error={fe[`fields.${DECISION_FIELDS.date}`]} hint="Set when the decision is accepted or rejected, unless you give a date." className="max-w-48">
+            {(id) => <Input id={id} type="date" value={adr.date} onChange={(e) => setAdr((a) => ({ ...a, date: e.target.value }))} />}
+          </Field>
+        </fieldset>
+      )}
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Assignee" error={fe.assigneeId}>
-          {() => <UserPicker value={assignee} onChange={setAssignee} project={project.key} label="Assignee" />}
+        <Field label={kind === "risk" ? "Owner" : "Assignee"} error={fe.assigneeId}>
+          {() => <UserPicker value={assignee} onChange={setAssignee} project={project.key} label={kind === "risk" ? "Owner" : "Assignee"} />}
         </Field>
         <Field label="Priority" error={fe.priority}>
           {(id) => (
@@ -249,29 +387,36 @@ function CreateIssueForm({ onClose, projectKey: initialProject, defaults, onCrea
           )}
         </Field>
       </div>
-      <div className={cn("grid gap-4", type?.level === 0 && openSprints.length > 0 ? "sm:grid-cols-[1fr_7rem_10rem]" : "sm:grid-cols-[7rem_10rem]")}>
-        {type?.level === 0 && openSprints.length > 0 && (
-          <Field label="Sprint" error={fe.sprintId}>
-            {(id) => (
-              <Select id={id} value={sprintId} onChange={(e) => setSprintId(e.target.value)}>
-                <option value="">Backlog</option>
-                {openSprints.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                    {s.state === "active" ? " (active)" : ""}
-                  </option>
-                ))}
-              </Select>
-            )}
-          </Field>
-        )}
-        <Field label="Story points" error={fe.storyPoints}>
-          {(id) => <Input id={id} type="number" inputMode="decimal" min={0} step={0.5} value={points} onChange={(e) => setPoints(e.target.value)} invalid={!!fe.storyPoints} />}
-        </Field>
-        <Field label="Due date" error={fe.dueDate}>
+      {kind === "risk" && (
+        <Field label="Review date" error={fe.dueDate} hint="When to look at the risk again." className="max-w-48">
           {(id) => <Input id={id} type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} invalid={!!fe.dueDate} />}
         </Field>
-      </div>
+      )}
+      {kind === "work" && (
+        <div className={cn("grid gap-4", type?.level === 0 && openSprints.length > 0 ? "sm:grid-cols-[1fr_7rem_10rem]" : "sm:grid-cols-[7rem_10rem]")}>
+          {type?.level === 0 && openSprints.length > 0 && (
+            <Field label="Sprint" error={fe.sprintId}>
+              {(id) => (
+                <Select id={id} value={sprintId} onChange={(e) => setSprintId(e.target.value)}>
+                  <option value="">Backlog</option>
+                  {openSprints.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                      {s.state === "active" ? " (active)" : ""}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </Field>
+          )}
+          <Field label="Story points" error={fe.storyPoints}>
+            {(id) => <Input id={id} type="number" inputMode="decimal" min={0} step={0.5} value={points} onChange={(e) => setPoints(e.target.value)} invalid={!!fe.storyPoints} />}
+          </Field>
+          <Field label="Due date" error={fe.dueDate}>
+            {(id) => <Input id={id} type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} invalid={!!fe.dueDate} />}
+          </Field>
+        </div>
+      )}
       <Field label="Labels" error={fe.labels} hint="Press Enter or comma to add a label.">
         {(id) => <LabelsInput id={id} value={labels} onChange={setLabels} suggestions={knownLabels} />}
       </Field>

@@ -14,7 +14,7 @@ export function InlineCreate({ projectKey, sprintId }: { projectKey: string; spr
   const qc = useQueryClient();
   const toast = useToast();
   const { data: types = [] } = useQuery(issueTypesQuery(projectKey));
-  const standard = types.filter((t) => t.level === 0);
+  const standard = types.filter((t) => t.level === 0 && t.kind === "work");
   const [open, setOpen] = useState(false);
   const [typeKey, setTypeKey] = useState("");
   const [summary, setSummary] = useState("");

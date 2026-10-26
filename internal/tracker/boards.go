@@ -251,14 +251,15 @@ type BoardData struct {
 const boardIssueLimit = 2000
 
 // GetBoardData returns the board's columns with issues. Scrum boards show the active sprint;
-// Kanban boards hide done issues resolved before the retention window. Epics are not cards.
+// Kanban boards hide done issues resolved before the retention window. Epics, risks and
+// decisions are not cards.
 func (s *Service) GetBoardData(ctx context.Context, actor *authz.Actor, id uuid.UUID, quickJQL string) (BoardData, error) {
 	b, p, cols, err := s.GetBoard(ctx, actor, id)
 	if err != nil {
 		return BoardData{}, err
 	}
 	data := BoardData{Board: b, Project: p, AllCols: cols}
-	extra := []string{"(SELECT level FROM issue_types t WHERE t.id = i.type_id) <= 0"}
+	extra := []string{"(SELECT level FROM issue_types t WHERE t.id = i.type_id) <= 0", PlanningWork}
 	var extraArgs []any
 	if b.Type == "scrum" {
 		sp, err := s.Q.ActiveSprint(ctx, p.ID)
@@ -348,7 +349,8 @@ type Backlog struct {
 	BacklogTotal int
 }
 
-// GetBacklog returns active and future sprints with their issues, then unscheduled work.
+// GetBacklog returns active and future sprints with their issues, then unscheduled work (never
+// risks or decisions).
 func (s *Service) GetBacklog(ctx context.Context, actor *authz.Actor, id uuid.UUID, quickJQL string) (Backlog, error) {
 	b, p, err := s.boardFor(ctx, actor, id, authz.ProjectBrowse)
 	if err != nil {
@@ -368,7 +370,7 @@ func (s *Service) GetBacklog(ctx context.Context, actor *authz.Actor, id uuid.UU
 				continue
 			}
 			issues, total, err := s.runSearch(ctx, actor, []uuid.UUID{p.ID}, SearchQuery{
-				JQL: jql, Extra: []string{"i.sprint_id = $2::uuid", levelCond}, ExtraArgs: []any{sp.ID},
+				JQL: jql, Extra: []string{"i.sprint_id = $2::uuid", levelCond, PlanningWork}, ExtraArgs: []any{sp.ID},
 				DefaultOrder: []search.Order{{Field: "rank"}}, Limit: boardIssueLimit,
 			})
 			if err != nil {
@@ -378,7 +380,7 @@ func (s *Service) GetBacklog(ctx context.Context, actor *authz.Actor, id uuid.UU
 		}
 	}
 	backlog, total, err := s.runSearch(ctx, actor, []uuid.UUID{p.ID}, SearchQuery{
-		JQL: jql, Extra: []string{"i.sprint_id IS NULL", levelCond, notDone},
+		JQL: jql, Extra: []string{"i.sprint_id IS NULL", levelCond, notDone, PlanningWork},
 		DefaultOrder: []search.Order{{Field: "rank"}}, Limit: boardIssueLimit,
 	})
 	out.Backlog, out.BacklogTotal = backlog, total

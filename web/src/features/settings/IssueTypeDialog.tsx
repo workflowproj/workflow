@@ -16,8 +16,15 @@ export const ICONS = [
   { id: "bug", label: "Bug" },
   { id: "epic", label: "Epic" },
   { id: "subtask", label: "Sub-task" },
+  { id: "risk", label: "Risk" },
+  { id: "decision", label: "Decision" },
 ];
 const COLORS = ["#22a06b", "#1d7afc", "#e2483d", "#8b5cf6", "#5e8fff", "#f59e0b", "#0d9488", "#db2777", "#64748b"];
+export const KINDS: { value: Schemas["IssueTypeKind"]; label: string; hint: string }[] = [
+  { value: "work", label: "Work", hint: "Planned on boards, the backlog, sprints and the timeline" },
+  { value: "risk", label: "Risk", hint: "In the risk register, scored by likelihood × impact; never planned" },
+  { value: "decision", label: "Decision", hint: "In the decision log; never planned" },
+];
 export const LEVELS = [
   { value: 2, label: "Initiative", hint: "Above epics" },
   { value: 1, label: "Epic", hint: "Groups standard issues" },
@@ -46,6 +53,7 @@ export function IssueTypeDialog({ open, onClose, projectKey, type }: { open: boo
   const [icon, setIcon] = useState(type?.icon ?? "task");
   const [color, setColor] = useState(type?.color ?? COLORS[1]);
   const [level, setLevel] = useState(type?.level ?? 0);
+  const [kind, setKind] = useState<Schemas["IssueTypeKind"]>(type?.kind ?? "work");
   const [workflowId, setWorkflowId] = useState(type?.workflowId ?? "");
   const [missing, setMissing] = useState<RemovedStatus[]>([]);
   const [mapping, setMapping] = useState<Record<string, string>>({});
@@ -57,7 +65,7 @@ export function IssueTypeDialog({ open, onClose, projectKey, type }: { open: boo
   const save = useMutation({
     mutationFn: async () => {
       if (!type) {
-        const body: Schemas["IssueTypeInput"] = { key, name: name.trim(), description, icon, color, level, workflowId: wfId };
+        const body: Schemas["IssueTypeInput"] = { key, name: name.trim(), description, icon, color, level: kind === "work" ? level : 0, kind, workflowId: wfId };
         return unwrap(api.POST("/projects/{projectKey}/issue-types", { params: { path: { projectKey } }, body }));
       }
       const body: Record<string, unknown> = {};
@@ -199,9 +207,20 @@ export function IssueTypeDialog({ open, onClose, projectKey, type }: { open: boo
           </fieldset>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Hierarchy level" hint={type ? "The level is fixed once issues can exist." : LEVELS.find((l) => l.value === level)?.hint}>
+          <Field label="Kind" hint={type ? "The kind is fixed once created." : KINDS.find((k) => k.value === kind)?.hint}>
             {(id) => (
-              <Select id={id} value={level} disabled={!!type} onChange={(e) => setLevel(Number(e.target.value))}>
+              <Select id={id} value={kind} disabled={!!type} onChange={(e) => setKind(e.target.value as Schemas["IssueTypeKind"])}>
+                {KINDS.map((k) => (
+                  <option key={k.value} value={k.value}>
+                    {k.label}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+          <Field label="Hierarchy level" hint={type ? "The level is fixed once issues can exist." : kind !== "work" ? "Risks and decisions are standard issues." : LEVELS.find((l) => l.value === level)?.hint}>
+            {(id) => (
+              <Select id={id} value={kind === "work" ? level : 0} disabled={!!type || kind !== "work"} onChange={(e) => setLevel(Number(e.target.value))}>
                 {LEVELS.map((l) => (
                   <option key={l.value} value={l.value}>
                     {l.label}
@@ -210,7 +229,7 @@ export function IssueTypeDialog({ open, onClose, projectKey, type }: { open: boo
               </Select>
             )}
           </Field>
-          <Field label="Workflow" error={fe.workflowId} hint={type && wfId !== type.workflowId ? "Existing issues move to the new workflow in the background." : undefined}>
+          <Field label="Workflow" className="sm:col-span-2" error={fe.workflowId} hint={type && wfId !== type.workflowId ? "Existing issues move to the new workflow in the background." : undefined}>
             {(id) => (
               <Select
                 id={id}

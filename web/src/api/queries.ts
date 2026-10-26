@@ -10,7 +10,8 @@ import { api, unwrap } from "./client";
  *   ["boards", projectKey], ["board", boardId, ...], ["backlog", boardId], ["search", jql, ...], ["sprints", projectKey],
  *   ["releases", projectKey], ["notifications"], ["fields"], ["labels", projectKey],
  *   ["timeline", projects, jql, doneDays], ["dashboards"], ["dashboards", id],
- *   ["metrics", kind, projects, jql, ...] (dashboard gadgets; see features/dashboards/api.ts)
+ *   ["metrics", kind, projects, jql, ...] (dashboard gadgets; see features/dashboards/api.ts),
+ *   ["risks", projectKey], ["decisions", projectKey] (see features/risks/api.ts)
  */
 
 export const meQuery = queryOptions({

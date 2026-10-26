@@ -52,7 +52,7 @@ func (q *Queries) CountPublishedReleaseNotes(ctx context.Context, deskProjectID 
 
 const deskReleaseProjects = `-- name: DeskReleaseProjects :many
 
-SELECT p.id, p.key, p.name, p.description, p.lead_id, p.template, p.open_role_id, p.issue_counter, p.archived_at, p.created_at, p.updated_at FROM service_desk_release_projects s JOIN projects p ON p.id = s.project_id
+SELECT p.id, p.key, p.name, p.description, p.lead_id, p.template, p.open_role_id, p.issue_counter, p.archived_at, p.created_at, p.updated_at, p.risks_decisions FROM service_desk_release_projects s JOIN projects p ON p.id = s.project_id
 WHERE s.desk_project_id = $1
 ORDER BY lower(p.name)
 `
@@ -80,6 +80,7 @@ func (q *Queries) DeskReleaseProjects(ctx context.Context, deskProjectID uuid.UU
 			&i.ArchivedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.RisksDecisions,
 		); err != nil {
 			return nil, err
 		}

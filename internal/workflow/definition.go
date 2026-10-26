@@ -100,10 +100,20 @@ func (v *Validator) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// ScreenField accepts `resolution` or {field: resolution, required: true}.
+// ScreenField accepts `resolution` or {field: resolution, required: true}. A resolution field
+// may list the resolutions it offers instead of the usual ones.
 type ScreenField struct {
-	Field    string `json:"field"`
-	Required bool   `json:"required,omitempty"`
+	Field    string   `json:"field"`
+	Required bool     `json:"required,omitempty"`
+	Options  []string `json:"options,omitempty"`
+}
+
+// ResolutionOptions are the resolutions a screen field offers.
+func (f ScreenField) ResolutionOptions() []string {
+	if len(f.Options) > 0 {
+		return f.Options
+	}
+	return Resolutions
 }
 
 func (f *ScreenField) UnmarshalJSON(b []byte) error {
@@ -359,6 +369,14 @@ func Validate(doc *Document, ev *Evaluator) Problems {
 		for j, f := range t.Screen {
 			if !slices.Contains(SystemScreenFields, f.Field) && !fieldPattern.MatchString(f.Field) {
 				add(fmt.Sprintf("%s.screen[%d].field", p, j), "unknown field %q", f.Field)
+			}
+			if len(f.Options) > 0 && f.Field != "resolution" {
+				add(fmt.Sprintf("%s.screen[%d].options", p, j), "only a resolution field lists options")
+			}
+			for k, o := range f.Options {
+				if strings.TrimSpace(o) == "" || len(o) > 60 {
+					add(fmt.Sprintf("%s.screen[%d].options[%d]", p, j, k), "options must be 1 to 60 characters")
+				}
 			}
 		}
 		for j, pf := range t.PostFunctions {

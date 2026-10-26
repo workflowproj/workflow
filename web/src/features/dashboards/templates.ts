@@ -78,7 +78,8 @@ export const TEMPLATES: DashboardTemplate[] = [
     projects: "none",
     includes: ["Open, in progress and overdue", "My open issues", "By priority", "Resolved", "Cycle time"],
     build: () => {
-      const mine = "assignee = currentUser()";
+      // Work only: risks owned and decisions assigned are in their projects' own section.
+      const mine = "assignee = currentUser() AND kind = work";
       return {
         name: "My work",
         description: "Issues assigned to me.",

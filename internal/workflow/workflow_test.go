@@ -160,6 +160,42 @@ layout:
 	}
 }
 
+func TestResolutionOptions(t *testing.T) {
+	def, ev := compileExample(t, `
+name: risk
+statuses:
+  - { name: Open, category: todo }
+  - { name: Closed, category: done }
+transitions:
+  - name: Close
+    to: Closed
+    screen: [{ field: resolution, required: true, options: [Mitigated, Occurred] }, comment]
+  - { name: Reopen, to: Open }
+`)
+	close, _ := def.Transition("close")
+	if got := strings.Join(close.Screen[0].ResolutionOptions(), ","); got != "Mitigated,Occurred" {
+		t.Fatalf("options %s", got)
+	}
+	if got := strings.Join(close.Screen[1].ResolutionOptions(), ","); got != strings.Join(Resolutions, ",") {
+		t.Fatalf("default options %s", got)
+	}
+	doc, err := Parse([]byte(`
+name: bad
+statuses: [{ name: Open, category: todo }, { name: Closed, category: done }]
+transitions:
+  - { name: Close, to: Closed, screen: [{ field: comment, options: [x] }, { field: resolution, options: [""] }] }
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	joined := Validate(doc, ev).Error()
+	for _, want := range []string{"only a resolution field lists options", "options must be 1 to 60 characters"} {
+		if !strings.Contains(joined, want) {
+			t.Errorf("expected %q in %s", want, joined)
+		}
+	}
+}
+
 func TestUnknownKeysRejected(t *testing.T) {
 	_, err := Parse([]byte("name: x\nstatuses: []\ntransitions: []\nstatusez: []\n"))
 	if err == nil || !strings.Contains(err.Error(), "statusez") {

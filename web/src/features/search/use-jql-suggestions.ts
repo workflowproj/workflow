@@ -50,7 +50,8 @@ const DURATION_VALUES: [string, string][] = [
   ["1d 4h", ""],
   ["1w", "a working week"],
 ];
-const RESOLUTIONS = ["Unresolved", "Done", "Won't Do", "Duplicate", "Cannot Reproduce"];
+// The usual resolutions, then those of the risk and decision workflows.
+const RESOLUTIONS = ["Unresolved", "Done", "Won't Do", "Duplicate", "Cannot Reproduce", "Mitigated", "Occurred", "No longer relevant", "Accepted", "Rejected", "Superseded"];
 const DATE_VALUES: [string, string][] = [
   ["-1d", "24 hours ago"],
   ["-7d", "a week ago"],
@@ -155,6 +156,8 @@ export function useJqlSuggestions(ctx: Context | null, projectKey?: string): { i
         case "status":
         case "category":
         case "priority":
+        case "kind":
+        case "linkType":
           items = (metaField?.values ?? []).map((v) => val(v));
           break;
         case "resolution":

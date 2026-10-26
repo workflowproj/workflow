@@ -80,6 +80,10 @@ Examples:
   priority `high`, add label `needs-triage`, notify watchers.
 - *Weekly stale check*: trigger `schedule` `0 8 * * 1` with the query
   `statusCategory = "In Progress" AND updated <= -14d`, action add label `stale`.
+- *Remind risk owners about reviews due this week* (offered when the project keeps
+  [risks and decisions](risks-decisions.md)): trigger `schedule` `0 8 * * 1` with the query
+  `kind = risk AND statusCategory != Done AND due <= 7d AND assignee is not EMPTY`, action notify
+  `assignee`.
 
 ### Loops
 

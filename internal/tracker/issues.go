@@ -135,7 +135,14 @@ func (s *Service) sprintFor(ctx context.Context, q *dbq.Queries, p dbq.Project, 
 }
 
 // resolveParent loads a parent issue in the same project and enforces parent level = child level + 1.
+// Risks and decisions stay out of the hierarchy: they have no parent and no children.
 func (s *Service) resolveParent(ctx context.Context, q *dbq.Queries, p dbq.Project, child dbq.IssueType, parentKey string) (*dbq.Issue, error) {
+	if child.Kind != KindWork {
+		if parentKey != "" {
+			return nil, apperr.Invalid("parentKey", "a %s has no parent issue; link work to it instead", child.Name)
+		}
+		return nil, nil
+	}
 	if parentKey == "" {
 		if child.Level < 0 {
 			return nil, apperr.Invalid("parentKey", "a %s must have a parent issue", child.Name)
@@ -152,6 +159,9 @@ func (s *Service) resolveParent(ctx context.Context, q *dbq.Queries, p dbq.Proje
 	pt, err := q.GetIssueType(ctx, parent.TypeID)
 	if err != nil {
 		return nil, err
+	}
+	if pt.Kind != KindWork {
+		return nil, apperr.Invalid("parentKey", "a %s cannot have child issues; link work to it instead", pt.Name)
 	}
 	if pt.Level != child.Level+1 {
 		return nil, apperr.Invalid("parentKey", "a %s (level %d) cannot be the parent of a %s (level %d)", pt.Name, pt.Level, child.Name, child.Level)
@@ -211,7 +221,7 @@ func (s *Service) CreateIssue(ctx context.Context, actor *authz.Actor, in IssueI
 		switch {
 		case it.Level < 0:
 			sprintID = parent.SprintID // sub-tasks follow their parent
-		case it.Level > 0:
+		case !sprintable(it):
 			if in.SprintID != nil {
 				return apperr.Invalid("sprintId", "%s issues cannot be added to a sprint", it.Name)
 			}
@@ -365,13 +375,16 @@ func (s *Service) UpdateIssue(ctx context.Context, actor *authz.Actor, ref strin
 			if err != nil {
 				return apperr.Invalid("typeKey", "unknown issue type %q", *in.TypeKey)
 			}
-			if newType.Level != curType.Level {
+			if newType.Level != curType.Level || newType.Kind != curType.Kind {
 				n, err := q.CountChildren(ctx, &i.ID)
 				if err != nil {
 					return err
 				}
-				if n > 0 {
+				if n > 0 && newType.Level != curType.Level {
 					return apperr.Invalid("typeKey", "cannot change the hierarchy level of an issue that has children")
+				}
+				if n > 0 {
+					return apperr.Invalid("typeKey", "a %s cannot have child issues; move them first", newType.Name)
 				}
 			}
 			upd.TypeID = newType.ID
@@ -405,8 +418,8 @@ func (s *Service) UpdateIssue(ctx context.Context, actor *authz.Actor, ref strin
 				if in.ParentKey.Value != nil {
 					parentKey = *in.ParentKey.Value
 				}
-			} else if i.ParentID != nil {
-				parentKey = i.ParentID.String()
+			} else if i.ParentID != nil && newType.Kind == KindWork {
+				parentKey = i.ParentID.String() // becoming a risk or decision leaves the parent
 			}
 			parent, err := s.resolveParent(ctx, q, p, newType, parentKey)
 			if err != nil {
@@ -485,14 +498,14 @@ func (s *Service) UpdateIssue(ctx context.Context, actor *authz.Actor, ref strin
 		}
 		if in.SprintID.Set {
 			switch {
-			case newType.Level > 0 && in.SprintID.Value != nil:
+			case newType.Level >= 0 && !sprintable(newType) && in.SprintID.Value != nil:
 				return apperr.Invalid("sprintId", "%s issues cannot be added to a sprint", newType.Name)
 			case newType.Level < 0:
 				if !uuidPtrEqual(in.SprintID.Value, upd.SprintID) {
 					return apperr.Invalid("sprintId", "sub-tasks follow their parent's sprint")
 				}
 			}
-			if in.SprintID.Value != nil && newType.Level == 0 {
+			if in.SprintID.Value != nil && sprintable(newType) {
 				if _, err := s.sprintFor(ctx, q, p, *in.SprintID.Value); err != nil {
 					return err
 				}
@@ -501,7 +514,8 @@ func (s *Service) UpdateIssue(ctx context.Context, actor *authz.Actor, ref strin
 				upd.SprintID = in.SprintID.Value
 			}
 		}
-		if newType.Level > 0 {
+		// Epics, risks and decisions are never in a sprint.
+		if newType.Level >= 0 && !sprintable(newType) {
 			upd.SprintID = nil
 		}
 		if !uuidPtrEqual(upd.SprintID, i.SprintID) {
@@ -592,7 +606,7 @@ func (s *Service) UpdateIssue(ctx context.Context, actor *authz.Actor, ref strin
 			}
 			return err
 		}
-		if !uuidPtrEqual(out.SprintID, i.SprintID) && newType.Level == 0 {
+		if !uuidPtrEqual(out.SprintID, i.SprintID) && sprintable(newType) {
 			if err := q.SetChildrenSprint(ctx, dbq.SetChildrenSprintParams{ParentID: &i.ID, SprintID: out.SprintID}); err != nil {
 				return err
 			}
@@ -811,6 +825,9 @@ func (s *Service) mergeFields(ctx context.Context, q *dbq.Queries, p dbq.Project
 		if !ok || !fieldApplies(d, p, t) {
 			return nil, nil, apperr.Invalid("fields."+k, "unknown field %q for %s issues in %s", k, t.Name, p.Key)
 		}
+		if t.Kind == KindRisk && (k == FieldRiskScore || k == FieldRiskRating) {
+			return nil, nil, apperr.Invalid("fields."+k, "%s is set from the likelihood and impact", d.Name)
+		}
 		before := display(cur[k])
 		if v == nil {
 			delete(cur, k)
@@ -819,10 +836,22 @@ func (s *Service) mergeFields(ctx context.Context, q *dbq.Queries, p dbq.Project
 			if err != nil {
 				return nil, nil, err
 			}
+			if _, ok := riskLevel(cv); !ok && t.Kind == KindRisk && (k == FieldRiskLikelihood || k == FieldRiskImpact) {
+				return nil, nil, apperr.Invalid("fields."+k, "%s: expected a whole number from 1 to 5", d.Name)
+			}
 			cur[k] = cv
 		}
 		if after := display(cur[k]); !strPtrEqual(before, after) {
 			changes = append(changes, fieldChange{d.Name, before, after})
+		}
+	}
+	if t.Kind == KindRisk {
+		before := map[string]*string{FieldRiskScore: display(cur[FieldRiskScore]), FieldRiskRating: display(cur[FieldRiskRating])}
+		scoreRisk(cur)
+		for _, k := range []string{FieldRiskScore, FieldRiskRating} {
+			if d, ok := byKey[k]; ok && !strPtrEqual(before[k], display(cur[k])) {
+				changes = append(changes, fieldChange{d.Name, before[k], display(cur[k])})
+			}
 		}
 	}
 	b, err := json.Marshal(cur)

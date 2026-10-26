@@ -30,7 +30,9 @@ project and person, and exports CSV.
 
 ## Flow metrics
 
-Over any set of projects, narrowed by a query:
+Over any set of projects, narrowed by a query. Sprint reports, velocity and flow metrics count
+work only: [risks and decisions](risks-decisions.md) never join sprints and are left out of every
+metric, whatever the query says.
 
 - **Summary** — open (to do / in progress), created and resolved in the window, overdue,
   unassigned, open and resolved story points, median cycle time.

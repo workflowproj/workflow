@@ -17,7 +17,8 @@ export function ChildrenSection() {
   const { issue } = useIssue();
   const { data: project } = useProject(issue.projectKey);
   const { data: types = [] } = useQuery(issueTypesQuery(issue.projectKey));
-  const childTypes = types.filter((t) => t.level === issue.type.level - 1);
+  // Risks and decisions have no children: work links to them instead.
+  const childTypes = issue.type.kind === "work" ? types.filter((t) => t.level === issue.type.level - 1 && t.kind === "work") : [];
   const [adding, setAdding] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const canCreate = hasPermission(project, "issue.create") && childTypes.length > 0;

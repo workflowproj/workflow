@@ -56,7 +56,7 @@ At most 50 statuses.
 | `to` | Target status. |
 | `condition` | CEL expression; when false the transition is hidden and refused (HTTP 403). |
 | `validators` | CEL expressions (a string, or `{expr, message}`) checked after the screen is filled; failures answer 422 `validation_failed` with the messages. |
-| `screen` | Fields to ask for when the transition runs: a field name or `{field, required}`. Built-in fields: `resolution`, `comment`, `assignee`, `priority`, `storyPoints`, `dueDate`, `labels`, `fixVersions`; any custom field key. A transition whose screen has required fields cannot run from a drag on the board without the dialog (422 `screen_required`). |
+| `screen` | Fields to ask for when the transition runs: a field name or `{field, required}`. Built-in fields: `resolution`, `comment`, `assignee`, `priority`, `storyPoints`, `dueDate`, `labels`, `fixVersions`; any custom field key. A `resolution` field may list the resolutions it offers with `options` (`{field: resolution, required: true, options: [Mitigated, Accepted, Occurred]}`), instead of `Done`, `Won't Do`, `Duplicate` and `Cannot Reproduce`. A transition whose screen has required fields cannot run from a drag on the board without the dialog (422 `screen_required`). |
 | `postFunctions` | Run after the move, in order. Exactly one key each: |
 
 Post-functions:

@@ -48,6 +48,12 @@ or, for open projects without an explicit membership, the project's open role.
   touches one row.
 - **Optimistic locking**: every issue has a `version`; updates with a stale version answer 409.
 - **Custom fields** live in a JSONB column validated against field definitions.
+- **Issue-type kinds**: every type is `work`, `risk` or `decision`. Risks and decisions are
+  ordinary issues (history, search, notifications, automation, API) kept out of planning: board,
+  backlog, timeline, metric and queue queries add `PlanningWork` (work types only), sprints
+  refuse them, and they have no parent or children. Their fields have reserved keys
+  (`risk_*`, `decision_*`); a risk's score and rating are derived when its likelihood or impact
+  changes. See [risks-decisions.md](risks-decisions.md).
 - **Search**: `internal/search` parses the query language and compiles it to parameterised SQL. Text search uses
   a `tsvector` expression index plus `pg_trgm` for fuzzy matching. Results are always limited
   to projects the caller may browse.

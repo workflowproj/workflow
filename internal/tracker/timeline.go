@@ -37,8 +37,8 @@ type ProjectRelease struct {
 	Release    dbq.ListReleasesRow
 }
 
-// Timeline loads the given projects (all browsable ones when keys is empty). Sub-tasks are left
-// out, and so are issues resolved more than doneDays ago.
+// Timeline loads the given projects (all browsable ones when keys is empty). Sub-tasks, risks and
+// decisions are left out, and so are issues resolved more than doneDays ago.
 func (s *Service) Timeline(ctx context.Context, actor *authz.Actor, keys []string, jql string, doneDays int) (Timeline, error) {
 	var out Timeline
 	var err error
@@ -55,7 +55,7 @@ func (s *Service) Timeline(ctx context.Context, actor *authz.Actor, keys []strin
 	issues, total, err := s.runSearch(ctx, actor, projectIDs, SearchQuery{
 		JQL: jql,
 		Extra: []string{
-			"i.type_id IN (SELECT id FROM issue_types WHERE level >= 0)",
+			"i.type_id IN (SELECT id FROM issue_types WHERE level >= 0 AND kind = 'work')",
 			"(i.resolved_at IS NULL OR i.resolved_at >= now() - make_interval(days => $2::int))",
 		},
 		ExtraArgs:    []any{doneDays},

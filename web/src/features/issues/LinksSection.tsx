@@ -13,7 +13,14 @@ import { IssuePicker } from "./IssuePicker";
 type LinkType = Schemas["LinkType"];
 type Direction = Schemas["LinkDirection"];
 
-const LINK_OPTIONS: { id: string; label: string; type: LinkType; direction: Direction }[] = [
+type Kind = Schemas["IssueTypeKind"];
+
+/**
+ * The ways to link: `from` is the kind this issue must be (any when unset) and `scope` narrows
+ * the picker to the kind at the other end (work mitigates a risk, implements a decision; a
+ * decision supersedes a decision).
+ */
+const LINK_OPTIONS: { id: string; label: string; type: LinkType; direction: Direction; from?: Kind; scope?: string }[] = [
   { id: "blocks", label: "blocks", type: "blocks", direction: "outward" },
   { id: "blocked-by", label: "is blocked by", type: "blocks", direction: "inward" },
   { id: "relates", label: "relates to", type: "relates", direction: "outward" },
@@ -21,6 +28,12 @@ const LINK_OPTIONS: { id: string; label: string; type: LinkType; direction: Dire
   { id: "duplicated-by", label: "is duplicated by", type: "duplicates", direction: "inward" },
   { id: "clones", label: "clones", type: "clones", direction: "outward" },
   { id: "cloned-by", label: "is cloned by", type: "clones", direction: "inward" },
+  { id: "mitigates", label: "mitigates", type: "mitigates", direction: "outward", from: "work", scope: "kind = risk" },
+  { id: "mitigated-by", label: "is mitigated by", type: "mitigates", direction: "inward", from: "risk", scope: "kind = work" },
+  { id: "implements", label: "implements", type: "implements", direction: "outward", from: "work", scope: "kind = decision" },
+  { id: "implemented-by", label: "is implemented by", type: "implements", direction: "inward", from: "decision", scope: "kind = work" },
+  { id: "supersedes", label: "supersedes", type: "supersedes", direction: "outward", from: "decision", scope: "kind = decision" },
+  { id: "superseded-by", label: "is superseded by", type: "supersedes", direction: "inward", from: "decision", scope: "kind = decision" },
 ];
 const ORDER = LINK_OPTIONS.map((o) => o.label);
 
@@ -55,17 +68,19 @@ export function LinksSection() {
     },
   });
 
+  // A risk lists its mitigating work in its own section.
+  const links = issue.type.kind === "risk" ? issue.links.filter((l) => !(l.type === "mitigates" && l.direction === "inward")) : issue.links;
   const groups = new Map<string, Schemas["IssueLink"][]>();
-  for (const l of [...issue.links].sort((a, b) => rank(a.label) - rank(b.label))) {
+  for (const l of [...links].sort((a, b) => rank(a.label) - rank(b.label))) {
     groups.set(l.label, [...(groups.get(l.label) ?? []), l]);
   }
-  if (issue.links.length === 0 && !adding) return null;
+  if (links.length === 0 && !adding) return null;
 
   return (
     <div ref={ref} className="min-w-0 scroll-mt-16">
       <Section
         title="Linked issues"
-        count={issue.links.length}
+        count={links.length}
         actions={
           editable &&
           !adding && (
@@ -121,8 +136,9 @@ function AddLink({ onDone }: { onDone: () => void }) {
   const { issue } = useIssue();
   const qc = useQueryClient();
   const toast = useToast();
+  const options = LINK_OPTIONS.filter((o) => !o.from || o.from === issue.type.kind);
   const [kind, setKind] = useState("relates");
-  const option = LINK_OPTIONS.find((o) => o.id === kind)!;
+  const option = options.find((o) => o.id === kind) ?? options[0];
   const create = useMutation({
     mutationFn: (targetKey: string) =>
       unwrap(api.POST("/issues/{issueKey}/links", { params: { path: { issueKey: issue.key } }, body: { type: option.type, direction: option.direction, targetKey } })),
@@ -131,6 +147,7 @@ function AddLink({ onDone }: { onDone: () => void }) {
       qc.invalidateQueries({ queryKey: ["issue", issue.key] });
       qc.invalidateQueries({ queryKey: ["issue", link.issue.key] });
       qc.invalidateQueries({ queryKey: ["issue-history", issue.key] });
+      for (const k of ["risks", "decisions"]) qc.invalidateQueries({ queryKey: [k] });
       onDone();
     },
     onError: (err) => toast.error(err),
@@ -140,15 +157,15 @@ function AddLink({ onDone }: { onDone: () => void }) {
   return (
     <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md border border-line bg-surface-2/60 p-2 sm:flex-nowrap">
       <div className="w-full shrink-0 sm:w-40">
-        <Select aria-label="Link type" value={kind} onChange={(e) => setKind(e.target.value)}>
-          {LINK_OPTIONS.map((o) => (
+        <Select aria-label="Link type" value={option.id} onChange={(e) => setKind(e.target.value)}>
+          {options.map((o) => (
             <option key={o.id} value={o.id}>
               {o.label}
             </option>
           ))}
         </Select>
       </div>
-      <IssuePicker autoFocus exclude={[issue.key, ...linked]} onPick={(i) => create.mutate(i.key)} onCancel={onDone} />
+      <IssuePicker autoFocus scope={option.scope} exclude={[issue.key, ...linked]} onPick={(i) => create.mutate(i.key)} onCancel={onDone} />
       <Button size="md" variant="ghost" onClick={onDone} loading={create.isPending}>
         Cancel
       </Button>

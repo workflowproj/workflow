@@ -86,7 +86,7 @@ describe("helpers", () => {
 
 describe("timesheetCsv", () => {
   it("writes a row per person and issue, totals, and defuses formulas", () => {
-    const issue = (key: string, summary: string) => ({ id: key, key, summary, type: { id: "t", key: "task", name: "Task", icon: "", color: "", level: 0 }, status: { id: "s", name: "To Do", category: "todo" as const } });
+    const issue = (key: string, summary: string) => ({ id: key, key, summary, type: { id: "t", key: "task", name: "Task", icon: "", color: "", level: 0, kind: "work" as const }, status: { id: "s", name: "To Do", category: "todo" as const } });
     const ts: Schemas["Timesheet"] = {
       from: "2026-10-19",
       to: "2026-10-20",
