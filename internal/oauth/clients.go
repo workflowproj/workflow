@@ -412,12 +412,12 @@ func (s *Server) fetchMetadata(ctx context.Context, id string) (*registration, t
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, id, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, id, nil) // #nosec G704 -- id passed checkMetadataURL; HTTPClient is the netguard client (no private addresses, no redirects)
 	if err != nil {
 		return nil, 0, err
 	}
 	req.Header.Set("Accept", "application/json")
-	res, err := s.HTTPClient.Do(req)
+	res, err := s.HTTPClient.Do(req) // #nosec G704 -- see above: an SSRF-guarded client
 	if err != nil {
 		return nil, 0, err
 	}

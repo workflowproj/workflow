@@ -93,7 +93,7 @@ func inlineMarkdown(line string) htmltemplate.HTML {
 		}
 	}
 	b.WriteString(esc(line[last:]))
-	return htmltemplate.HTML(b.String())
+	return htmltemplate.HTML(b.String()) // #nosec G203 -- every piece of text is escaped; only fixed tags and http(s) links are added
 }
 
 //go:embed templates/email.html
@@ -187,7 +187,7 @@ func pill(category string) htmltemplate.CSS {
 	case "done":
 		bg, fg = "#e1f4e7", "#15803d"
 	}
-	return htmltemplate.CSS("background-color:" + bg + ";color:" + fg + ";")
+	return htmltemplate.CSS("background-color:" + bg + ";color:" + fg + ";") // #nosec G203 -- fixed colours, no input
 }
 
 // quote marks text as an email quotation.

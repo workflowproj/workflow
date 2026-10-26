@@ -113,7 +113,7 @@ func scopeLabel(scope string) string {
 func (s *Service) HandleUnsubscribe(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
 	if r.Method == http.MethodPost {
-		_ = r.ParseMultipartForm(64 << 10) // also parses urlencoded bodies
+		_ = r.ParseMultipartForm(64 << 10) // #nosec G120 -- the body is capped by MaxBytesReader above; also parses urlencoded bodies
 	}
 	tok, ok := s.parseToken(r.FormValue("t"))
 	if !ok {

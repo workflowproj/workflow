@@ -3,7 +3,7 @@ package local
 import (
 	"crypto/hmac"
 	"crypto/rand"
-	"crypto/sha1"
+	"crypto/sha1" // #nosec G505 -- RFC 6238 TOTP is HMAC-SHA1, which authenticator apps expect
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base32"

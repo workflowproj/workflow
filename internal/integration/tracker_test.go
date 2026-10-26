@@ -83,6 +83,8 @@ func TestIssueHierarchyFieldsAndConcurrency(t *testing.T) {
 	eq(t, fmt.Sprint(story["labels"]), "[payments web-app]", "labels normalised")
 	sub := c.createIssue("PLAT", "subtask", "Card form", obj{"parentKey": story["key"]})
 	eq(t, str(sub, "parent", "key"), str(story, "key"), "subtask parent")
+	// A number past int32 is no issue, rather than wrapping round to PLAT-1 (2^32 + 1).
+	c.must("GET", "/api/v1/issues/PLAT-4294967297", nil, 404, nil)
 
 	// Hierarchy rules: parent level = child level + 1.
 	c.must("POST", "/api/v1/issues", obj{"projectKey": "PLAT", "typeKey": "subtask", "summary": "orphan"}, 400, nil)

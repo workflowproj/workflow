@@ -145,7 +145,7 @@ func (s *Service) CreateConnection(ctx context.Context, actor *authz.Actor, in C
 	if in.WebhookSecret == "" {
 		in.WebhookSecret = secure.Token("", 24)
 	}
-	raw, _ := json.Marshal(secrets{PrivateKey: in.PrivateKey, Token: in.Token, WebhookSecret: in.WebhookSecret})
+	raw, _ := json.Marshal(secrets{PrivateKey: in.PrivateKey, Token: in.Token, WebhookSecret: in.WebhookSecret}) // #nosec G117 -- sealed (encrypted) before it's stored
 	c, err := s.Q.CreateScmConnection(ctx, dbq.CreateScmConnectionParams{
 		Provider: in.Provider, Name: strings.TrimSpace(in.Name), ApiUrl: strings.TrimRight(in.APIURL, "/"), WebUrl: strings.TrimRight(in.WebURL, "/"),
 		AppID: in.AppID, AppSlug: in.AppSlug, SecretsEnc: s.Box.Seal(raw), ManageHooks: in.ManageHooks, WriteBack: in.WriteBack, CreatedBy: actor.UserID(),
@@ -193,7 +193,7 @@ func (s *Service) UpdateConnection(ctx context.Context, actor *authz.Actor, id u
 	if in.WebhookSecret != nil && *in.WebhookSecret != "" {
 		sec.WebhookSecret = *in.WebhookSecret
 	}
-	raw, _ := json.Marshal(sec)
+	raw, _ := json.Marshal(sec) // #nosec G117 -- sealed (encrypted) before it's stored
 	params := dbq.UpdateScmConnectionParams{ID: id, Name: c.Name, SecretsEnc: s.Box.Seal(raw), ManageHooks: c.ManageHooks, WriteBack: c.WriteBack}
 	if in.Name != nil {
 		params.Name = *in.Name

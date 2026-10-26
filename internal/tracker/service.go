@@ -181,7 +181,11 @@ func (s *Service) ResolveIssue(ctx context.Context, q *dbq.Queries, ref string) 
 	if err != nil {
 		return dbq.Issue{}, apperr.NotFound("issue")
 	}
-	n, _ := strconv.Atoi(m[2])
+	// Issue numbers are int32; a longer number would wrap round to another issue.
+	n, err := strconv.ParseInt(m[2], 10, 32)
+	if err != nil {
+		return dbq.Issue{}, apperr.NotFound("issue")
+	}
 	i, err := q.GetIssueByNumber(ctx, dbq.GetIssueByNumberParams{ProjectID: p.ID, Number: int32(n)})
 	if err != nil {
 		return i, apperr.NotFound("issue")

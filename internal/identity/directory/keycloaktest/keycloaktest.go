@@ -101,7 +101,7 @@ type token struct {
 
 // New starts a fake Keycloak with realm "wfm" and the sync client "workflow-sync".
 func New() *Server {
-	s := &Server{
+	s := &Server{ // #nosec G101 -- a test double's fixed credentials
 		Realm: "wfm", ClientID: "workflow-sync", ClientSecret: "workflow-sync-secret",
 		TokenTTL: 5 * time.Minute, Now: time.Now,
 		users: map[string]*User{}, groups: map[string]*Group{}, tokens: map[string]*token{},

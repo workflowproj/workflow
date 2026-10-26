@@ -26,7 +26,7 @@ const (
 )
 
 // DefaultDatabaseURL suits local development (`make db-up`).
-const DefaultDatabaseURL = "postgres://wfm:wfm@localhost:5432/wfm?sslmode=disable"
+const DefaultDatabaseURL = "postgres://wfm:wfm@localhost:5432/wfm?sslmode=disable" // #nosec G101 -- the local development database
 
 // OIDCProvider is a generic OpenID Connect sign-in provider. Google is one instance.
 type OIDCProvider struct {

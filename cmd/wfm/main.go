@@ -271,7 +271,7 @@ func readSource(file string) (string, error) {
 	if file == "-" {
 		b, err = io.ReadAll(os.Stdin)
 	} else {
-		b, err = os.ReadFile(file)
+		b, err = os.ReadFile(file) // #nosec G304 G703 -- the file the user named on the command line
 	}
 	return string(b), err
 }
@@ -300,13 +300,13 @@ func (c *apiClient) call(method, path string, body, out any) error {
 		}
 		rdr = bytes.NewReader(b)
 	}
-	req, err := http.NewRequest(method, c.base+path, rdr)
+	req, err := http.NewRequest(method, c.base+path, rdr) // #nosec G704 -- the CLI talks to the server its user configured (WFM_SERVER)
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Content-Type", "application/json")
-	res, err := c.http.Do(req)
+	res, err := c.http.Do(req) // #nosec G704 -- the server its user configured
 	if err != nil {
 		return err
 	}

@@ -49,7 +49,7 @@ func localErr(ctx context.Context, err error) error {
 }
 
 func (s *Server) challengeCookie(w http.ResponseWriter, token string, maxAge int) {
-	http.SetCookie(w, &http.Cookie{
+	http.SetCookie(w, &http.Cookie{ // #nosec G124 -- Secure follows WFM_PUBLIC_URL (https), so plain-http development works
 		Name: local.ChallengeCookie, Value: token, Path: local.ChallengeCookiePath, MaxAge: maxAge, HttpOnly: true,
 		Secure: strings.HasPrefix(s.Cfg.PublicURL, "https://"), SameSite: http.SameSiteStrictMode,
 	})

@@ -91,7 +91,7 @@ func loadKey(v string) ([]byte, error) {
 	if b, err := base64.StdEncoding.DecodeString(v); err == nil && strings.HasPrefix(strings.TrimSpace(string(b)), "{") {
 		return b, nil
 	}
-	b, err := os.ReadFile(v)
+	b, err := os.ReadFile(v) // #nosec G304 -- a key file path from the server's own configuration
 	if err != nil {
 		return nil, fmt.Errorf("read service account key: %w", err)
 	}
