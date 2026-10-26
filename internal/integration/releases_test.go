@@ -417,11 +417,14 @@ func TestReleaseTags(t *testing.T) {
 	e.DrainJobs()
 	eq(t, str(releaseNamed(admin, "SHOP", "3.8.0"), "tagName"), "v3.8.0", "manual link kept")
 
-	// Unlinking.
-	var unlinked obj
-	admin.must("PATCH", "/api/v1/releases/"+str(prev, "id"), obj{"tagRepositoryId": nil, "tagName": nil}, 200, &unlinked)
-	if _, ok := unlinked["tagName"]; ok {
-		t.Fatalf("tag not unlinked: %v", unlinked)
+	// Unlinking: clearing either half of the tag.
+	for _, body := range []obj{{"tagRepositoryId": nil, "tagName": nil}, {"tagName": nil}, {"tagRepositoryId": nil}} {
+		admin.must("PATCH", "/api/v1/releases/"+str(prev, "id"), obj{"tagRepositoryId": repoID, "tagName": "v3.8.0"}, 200, nil)
+		var unlinked obj
+		admin.must("PATCH", "/api/v1/releases/"+str(prev, "id"), body, 200, &unlinked)
+		if _, ok := unlinked["tagName"]; ok {
+			t.Fatalf("%v did not unlink the tag: %v", body, unlinked)
+		}
 	}
 }
 

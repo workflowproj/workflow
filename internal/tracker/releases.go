@@ -98,7 +98,8 @@ func (s *Service) setReleaseExtras(ctx context.Context, q *dbq.Queries, p dbq.Pr
 			name = strings.TrimSpace(*in.TagName.Value)
 		}
 	}
-	if name == "" && (repoID == nil || in.TagRepositoryID.Set && in.TagRepositoryID.Value == nil) {
+	// Clearing either half unlinks the tag.
+	if in.TagName.Set && name == "" || in.TagRepositoryID.Set && in.TagRepositoryID.Value == nil {
 		return q.SetReleaseTag(ctx, dbq.SetReleaseTagParams{ID: r.ID})
 	}
 	if name == "" {
