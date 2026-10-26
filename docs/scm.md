@@ -11,7 +11,8 @@ even when its title never mentions the issue.
 What you get on each issue:
 
 - **Development panel**: branches, commits, pull/merge requests (state and review), latest
-  pipeline status; summarised on board cards.
+  pipeline status; summarised on board cards. A service project's requests show it only once a
+  repository is connected to the project or something is linked.
 - **Smart commits** — commands in commit messages, run as the committer (matched by
   email to an active account, with that person's permissions; unknown committers are linked
   but cannot change issues):

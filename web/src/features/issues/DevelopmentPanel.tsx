@@ -8,6 +8,7 @@ import { Badge, Button, Field, Input, Modal, Select, useToast, type Tone } from 
 import { ErrorBox } from "@/components/ErrorBox";
 import { cn } from "@/lib/cn";
 import { formatDateTime, relativeTime } from "@/lib/format";
+import { showDevelopment } from "./development";
 import { repositoriesQuery } from "./issue-api";
 import { Section, useIssue } from "./issue-context";
 
@@ -19,7 +20,10 @@ const prIcon: Record<string, string> = { open: "text-success", draft: "text-mute
 
 const byRecent = (a: DevLink, b: DevLink) => b.updatedAt.localeCompare(a.updatedAt);
 
-/** DevelopmentPanel summarises branches, commits, pull requests and pipelines linked to the issue. */
+/**
+ * DevelopmentPanel summarises branches, commits, pull requests and pipelines linked to the issue
+ * (nothing on a service request while its project has no repository and nothing is linked).
+ */
 export function DevelopmentPanel() {
   const { issue } = useIssue();
   const { data: project } = useProject(issue.projectKey);
@@ -34,6 +38,7 @@ export function DevelopmentPanel() {
   const deployments = issue.deployments ?? [];
   const hasRepos = (repos?.length ?? 0) > 0;
   const canBranch = issue.permissions.edit && hasRepos;
+  if (!showDevelopment({ service: project?.template === "service", repositories: repos?.length, linked: dev.length + deployments.length })) return null;
 
   return (
     <Section
