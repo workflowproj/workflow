@@ -5,7 +5,7 @@ import { api, ApiError, unwrap } from "@/api/client";
 import { Button, Field, Input, Modal, Select, Textarea, useToast } from "@/components/ui";
 import { ErrorBox } from "@/components/ErrorBox";
 import { sprintsQuery, type Sprint } from "@/features/board/queries";
-import { addDays, daysBetween, todayISO } from "./dates";
+import { addDays, daysBetween, sprintDatesProblem, todayISO } from "./dates";
 
 function useInvalidateSprints(projectKey: string) {
   const qc = useQueryClient();
@@ -146,6 +146,9 @@ export function StartSprintDialog({
     },
   });
   const fe = fieldErrors(run.error);
+  // Dates that can't start a sprint disable the button; the field says why.
+  const problem = sprintDatesProblem(start, end);
+  const dateError = (field: "startDate" | "endDate") => fe[field] ?? (problem?.field === field ? problem.message : undefined);
   return (
     <Modal
       open={open}
@@ -154,7 +157,7 @@ export function StartSprintDialog({
       footer={
         <>
           <Button onClick={onClose}>Cancel</Button>
-          <Button variant="primary" type="submit" form="start-sprint" loading={run.isPending} disabled={!start || !end || end <= start}>
+          <Button variant="primary" type="submit" form="start-sprint" loading={run.isPending} disabled={!!problem}>
             Start sprint
           </Button>
         </>
@@ -187,15 +190,19 @@ export function StartSprintDialog({
               </Select>
             )}
           </Field>
-          <Field label="Start date" required error={fe.startDate}>
-            {(id) => <Input id={id} type="date" value={start} onChange={(e) => changeStart(e.target.value)} />}
+          <Field label="Start date" required error={dateError("startDate")}>
+            {(id) => (
+              <Input id={id} type="date" value={start} invalid={!!dateError("startDate")} aria-invalid={!!dateError("startDate")} onChange={(e) => changeStart(e.target.value)} />
+            )}
           </Field>
-          <Field label="End date" required error={fe.endDate}>
+          <Field label="End date" required error={dateError("endDate")}>
             {(id) => (
               <Input
                 id={id}
                 type="date"
                 value={end}
+                invalid={!!dateError("endDate")}
+                aria-invalid={!!dateError("endDate")}
                 min={start ? addDays(start, 1) : undefined}
                 onChange={(e) => {
                   setEnd(e.target.value);

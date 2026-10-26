@@ -127,7 +127,7 @@ function BacklogScreen({ project, boards, board, onSelect, onOpen }: { project: 
   };
 
   const toggle = (id: string) => setCollapsed((s) => (s.has(id) ? new Set([...s].filter((x) => x !== id)) : new Set(s).add(id)));
-  const hasActive = !!data?.sprints.some((s) => s.sprint.state === "active");
+  const activeSprint = data?.sprints.find((s) => s.sprint.state === "active")?.sprint;
   const lists = [...(data?.sprints ?? []).map((s) => s.sprint), null];
 
   // Menu alternative to drag and drop: send an issue to the top or bottom of any list.
@@ -227,8 +227,18 @@ function BacklogScreen({ project, boards, board, onSelect, onOpen }: { project: 
                         <Button size="sm" onClick={() => setDialog({ kind: "complete", sprint })}>
                           Complete sprint
                         </Button>
+                      ) : activeSprint ? (
+                        // Only one sprint runs at a time: say so next to the disabled button.
+                        <>
+                          <span id={`start-${sprint.id}-blocked`} className="text-xs text-muted">
+                            Complete {activeSprint.name} first
+                          </span>
+                          <Button size="sm" disabled aria-describedby={`start-${sprint.id}-blocked`}>
+                            Start sprint
+                          </Button>
+                        </>
                       ) : (
-                        <Button size="sm" variant={hasActive ? "secondary" : "primary"} disabled={hasActive} title={hasActive ? "Complete the active sprint before starting another" : undefined} onClick={() => setDialog({ kind: "start", sprint })}>
+                        <Button size="sm" variant="primary" onClick={() => setDialog({ kind: "start", sprint })}>
                           Start sprint
                         </Button>
                       )}
