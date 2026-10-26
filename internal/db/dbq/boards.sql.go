@@ -807,6 +807,50 @@ func (q *Queries) SetBoardCardFields(ctx context.Context, arg SetBoardCardFields
 	return err
 }
 
+const showMappedStatusOnBoards = `-- name: ShowMappedStatusOnBoards :many
+WITH target AS (
+    SELECT DISTINCT ON (bc.board_id) bc.id
+    FROM board_columns bc JOIN boards b ON b.id = bc.board_id
+    WHERE b.project_id = ANY($1::uuid[]) AND $2::uuid = ANY(bc.status_ids)
+      AND NOT EXISTS (SELECT 1 FROM board_columns o WHERE o.board_id = bc.board_id AND $3::uuid = ANY(o.status_ids))
+    ORDER BY bc.board_id, bc.position
+), changed AS (
+    UPDATE board_columns c SET status_ids = array_append(c.status_ids, $3::uuid)
+    FROM target WHERE c.id = target.id
+    RETURNING c.board_id
+)
+SELECT DISTINCT b.project_id FROM boards b JOIN changed ON changed.board_id = b.id
+`
+
+type ShowMappedStatusOnBoardsParams struct {
+	ProjectIds []uuid.UUID
+	OldStatus  uuid.UUID
+	NewStatus  uuid.UUID
+}
+
+// A workflow change maps @old_status to @new_status: on the projects' boards, the first column
+// showing the old status also shows the new one, unless the board has a column for it already.
+// Returns the projects whose boards changed.
+func (q *Queries) ShowMappedStatusOnBoards(ctx context.Context, arg ShowMappedStatusOnBoardsParams) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, showMappedStatusOnBoards, arg.ProjectIds, arg.OldStatus, arg.NewStatus)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var project_id uuid.UUID
+		if err := rows.Scan(&project_id); err != nil {
+			return nil, err
+		}
+		items = append(items, project_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const sprintDoneEvents = `-- name: SprintDoneEvents :many
 SELECT h.issue_id, min(h.created_at)::timestamptz AS done_at
 FROM issue_history h JOIN statuses s ON s.id::text = h.to_ref
@@ -1033,4 +1077,29 @@ func (q *Queries) UpdateSprint(ctx context.Context, arg UpdateSprintParams) (Spr
 		&i.CreatedAt,
 	)
 	return i, err
+}
+
+const workflowWorkProjects = `-- name: WorkflowWorkProjects :many
+SELECT DISTINCT project_id FROM issue_types WHERE workflow_id = $1 AND kind = 'work'
+`
+
+// Projects whose work issue types (the ones boards show) use a workflow.
+func (q *Queries) WorkflowWorkProjects(ctx context.Context, workflowID uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, workflowWorkProjects, workflowID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var project_id uuid.UUID
+		if err := rows.Scan(&project_id); err != nil {
+			return nil, err
+		}
+		items = append(items, project_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

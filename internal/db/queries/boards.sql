@@ -26,6 +26,27 @@ DELETE FROM board_columns WHERE board_id = $1;
 -- name: CreateBoardColumn :one
 INSERT INTO board_columns (board_id, name, position, status_ids, wip_limit) VALUES ($1, $2, $3, $4, $5) RETURNING *;
 
+-- name: ShowMappedStatusOnBoards :many
+-- A workflow change maps @old_status to @new_status: on the projects' boards, the first column
+-- showing the old status also shows the new one, unless the board has a column for it already.
+-- Returns the projects whose boards changed.
+WITH target AS (
+    SELECT DISTINCT ON (bc.board_id) bc.id
+    FROM board_columns bc JOIN boards b ON b.id = bc.board_id
+    WHERE b.project_id = ANY(@project_ids::uuid[]) AND @old_status::uuid = ANY(bc.status_ids)
+      AND NOT EXISTS (SELECT 1 FROM board_columns o WHERE o.board_id = bc.board_id AND @new_status::uuid = ANY(o.status_ids))
+    ORDER BY bc.board_id, bc.position
+), changed AS (
+    UPDATE board_columns c SET status_ids = array_append(c.status_ids, @new_status::uuid)
+    FROM target WHERE c.id = target.id
+    RETURNING c.board_id
+)
+SELECT DISTINCT b.project_id FROM boards b JOIN changed ON changed.board_id = b.id;
+
+-- name: WorkflowWorkProjects :many
+-- Projects whose work issue types (the ones boards show) use a workflow.
+SELECT DISTINCT project_id FROM issue_types WHERE workflow_id = $1 AND kind = 'work';
+
 -- ---------------------------------------------------------------------------
 -- Sprints
 

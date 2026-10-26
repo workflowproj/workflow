@@ -9,6 +9,7 @@ import {
   fromDefinition,
   normalize,
   parseWorkflowYaml,
+  renamedStatuses,
   removeEdge,
   slug,
   targetOfPath,
@@ -256,5 +257,16 @@ describe("diffDocs", () => {
     expect(d.changedTransitions).toContain("Start work");
     expect(d.layoutChanged).toBe(true); // the layout key moved with the rename
     expect(diffDocs(before, before)).toMatchObject({ addedStatuses: [], changedTransitions: [], layoutChanged: false });
+  });
+});
+
+describe("renamedStatuses", () => {
+  it("maps renamed statuses that are gone to their new names", () => {
+    const before = withLayout(blankWorkflow("W"));
+    const after = updateStatus(before, "In Progress", { name: "Doing" });
+    expect(renamedStatuses(before, after, { "In Progress": "Doing" })).toEqual({ "In Progress": "Doing" });
+    // A rename that was undone, or whose target no longer exists, maps nothing.
+    expect(renamedStatuses(before, before, { "In Progress": "Doing" })).toEqual({});
+    expect(renamedStatuses(before, deleteStatus(after, "Doing"), { "In Progress": "Doing" })).toEqual({});
   });
 });

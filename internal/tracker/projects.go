@@ -574,6 +574,7 @@ func (s *Service) UpdateIssueType(ctx context.Context, actor *authz.Actor, ref s
 		}
 		remap := in.WorkflowID != nil && *in.WorkflowID != t.WorkflowID
 		statusMap := map[string]string{}
+		var moves statusMoves
 		if remap {
 			if err := s.checkWorkflowForProject(ctx, q, p, *in.WorkflowID); err != nil {
 				return err
@@ -581,6 +582,15 @@ func (s *Service) UpdateIssueType(ctx context.Context, actor *authz.Actor, ref s
 			def, _, err := currentVersion(ctx, q, *in.WorkflowID)
 			if err != nil {
 				return err
+			}
+			// Boards follow the mapping for the old workflow's statuses the new one lacks.
+			moves = statusMoves{def: def, mapping: in.StatusMapping}
+			old, _, err := currentVersion(ctx, q, t.WorkflowID)
+			if err != nil {
+				return err
+			}
+			for _, st := range old.Statuses {
+				moves.add(st.ID, st.Name)
 			}
 			missing := apperr.New(http.StatusUnprocessableEntity, "status_mapping_required", "Some issues are in statuses the new workflow does not have; map them")
 			rows, err := tx.Query(ctx, `SELECT i.status_id, s.name, count(*) FROM issues i JOIN statuses s ON s.id = i.status_id WHERE i.type_id = $1 GROUP BY 1, 2`, t.ID)
@@ -612,6 +622,7 @@ func (s *Service) UpdateIssueType(ctx context.Context, actor *authz.Actor, ref s
 					continue
 				}
 				statusMap[u.id.String()] = target.ID.String()
+				moves.add(u.id, u.name)
 			}
 			if len(missing.Fields) > 0 {
 				return missing
@@ -621,6 +632,12 @@ func (s *Service) UpdateIssueType(ctx context.Context, actor *authz.Actor, ref s
 		out, err = q.UpdateIssueType(ctx, params)
 		if err != nil {
 			return err
+		}
+		// Boards show work only, so a risk or decision type's statuses never need a column.
+		if remap && t.Kind == KindWork {
+			if err := s.showMovedStatuses(ctx, tx, q, actor, []uuid.UUID{p.ID}, moves.list); err != nil {
+				return err
+			}
 		}
 		if remap && s.Jobs != nil {
 			if _, err := s.Jobs.InsertTx(ctx, tx, jobs.WorkflowMigrate{WorkflowID: params.WorkflowID, Mapping: statusMap}, nil); err != nil {
