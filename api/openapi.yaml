@@ -4665,6 +4665,9 @@ components:
         endDate: { type: [string, 'null'], format: date }
     SprintReport:
       type: object
+      description: |
+        Issue counts and story points are of standard issues: sub-tasks count as part of their
+        parent. Seconds include sub-tasks. For a future sprint, committed is what it holds now.
       required: [sprint, committedPoints, completedPoints, committedIssues, completedIssues, addedPoints, removedPoints, addedIssues, removedIssues, burndown, committedSeconds, completedSeconds, addedSeconds, removedSeconds]
       properties:
         sprint: { $ref: '#/components/schemas/Sprint' }

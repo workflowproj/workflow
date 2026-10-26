@@ -17,6 +17,15 @@ issue view and returned by `GET /api/v1/issues/{key}/metrics`:
 
 ## Sprint reports
 
+**What counts as an issue of a sprint**: stories, tasks, bugs and other standard issues.
+Sub-tasks always follow their parent's sprint and count as part of it, not on their own:
+the backlog, the start and complete sprint dialogs, sprint reports, velocity and the sprint
+gadgets all count issues and story points this way, so their numbers agree. Completing a sprint
+moves each unfinished issue on with its sub-tasks (done or not), and a done issue keeps its
+sub-tasks in the completed sprint. Hours are the exception: they include the estimates of
+sub-tasks and the time logged on them. Counts labelled *at sprint start* (committed) are the
+sprint as it started; scope added or removed since then is shown next to them.
+
 The burndown replays the sprint day by day: the issues committed when it started, then each
 issue added or taken out, each re-estimate and each completion. So the line steps up when scope
 is added, and the report lists committed, completed, added and removed work. The burnup draws

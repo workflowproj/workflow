@@ -638,6 +638,9 @@ func (s *Service) SprintReport(ctx context.Context, actor *authz.Actor, id uuid.
 // sprintReport replays the sprint from its start: which issues were in it (the commitment
 // snapshot, then sprint changes from history), their story points and whether they were done,
 // at the end of each day. Scope added after the start raises the line; removed scope lowers it.
+// Sub-tasks belong to their parent's sprint and are not counted as issues of their own (as on
+// the backlog): issue counts and story points leave them out, while hours include their
+// estimates and the time logged on them.
 func (s *Service) sprintReport(ctx context.Context, sp dbq.Sprint) (SprintReport, error) {
 	rep := SprintReport{Sprint: sp, CommittedPoints: sp.CommittedPoints, CommittedIssues: len(sp.CommittedIssueIds)}
 	if sp.State == "future" || sp.StartDate == nil {
@@ -668,6 +671,18 @@ func (s *Service) sprintReport(ctx context.Context, sp dbq.Sprint) (SprintReport
 	if err != nil {
 		return rep, err
 	}
+	typeIDs := make([]uuid.UUID, 0, len(issues))
+	for _, i := range issues {
+		typeIDs = append(typeIDs, i.TypeID)
+	}
+	types, err := s.Q.GetIssueTypesByIDs(ctx, typeIDs)
+	if err != nil {
+		return rep, err
+	}
+	subtaskType := map[uuid.UUID]bool{}
+	for _, t := range types {
+		subtaskType[t.ID] = t.Level < 0
+	}
 	start := *sp.StartDate
 	end := s.Now()
 	if sp.CompletedAt != nil {
@@ -685,6 +700,7 @@ func (s *Service) sprintReport(ctx context.Context, sp dbq.Sprint) (SprintReport
 	// without history, so nothing after `end` is replayed.
 	type member struct {
 		issue    dbq.Issue
+		sub      bool // a sub-task: hours only
 		from     time.Time
 		initial  bool
 		changes  []historyRow
@@ -693,7 +709,12 @@ func (s *Service) sprintReport(ctx context.Context, sp dbq.Sprint) (SprintReport
 	}
 	members := make([]member, 0, len(issues))
 	for _, i := range issues {
-		m := member{issue: i, from: start, initial: committed[i.ID], timeline: statusTimeline(i.CreatedAt, i.StatusID, hist[i.ID])}
+		m := member{issue: i, sub: subtaskType[i.TypeID], from: start, initial: committed[i.ID], timeline: statusTimeline(i.CreatedAt, i.StatusID, hist[i.ID])}
+		if m.sub && committed[i.ID] {
+			// The commitment snapshot holds every issue in the sprint, sub-tasks included.
+			rep.CommittedIssues--
+			rep.CommittedPoints -= pointsAt(i.StoryPoints, hist[i.ID], start)
+		}
 		for _, h := range hist[i.ID] {
 			if h.Field == "sprint" && h.CreatedAt.After(start) && (deref(h.ToRef) == sprintRef || deref(h.FromRef) == sprintRef) {
 				m.changes = append(m.changes, h)
@@ -772,14 +793,19 @@ func (s *Service) sprintReport(ctx context.Context, sp dbq.Sprint) (SprintReport
 			if !inAt(m, at) {
 				continue
 			}
+			done := doneAt(m, at)
+			if !done {
+				pt.RemainingSeconds += remainingAt(m.issue.RemainingEstimateSeconds, hist[m.issue.ID], at)
+			}
+			if m.sub {
+				continue
+			}
 			pts := pointsAt(m.issue.StoryPoints, hist[m.issue.ID], at)
 			pt.Scope += pts
 			pt.ScopeIssues++
-			if doneAt(m, at) {
+			if done {
 				pt.Completed += pts
 				pt.DoneIssues++
-			} else {
-				pt.RemainingSeconds += remainingAt(m.issue.RemainingEstimateSeconds, hist[m.issue.ID], at)
 			}
 		}
 		pt.Remaining, pt.RemainingIssues = pt.Scope-pt.Completed, pt.ScopeIssues-pt.DoneIssues
@@ -806,14 +832,18 @@ func (s *Service) sprintReport(ctx context.Context, sp dbq.Sprint) (SprintReport
 		if sp.State != "closed" && inEnd && doneAt(m, end) {
 			completedSet[id] = true
 		}
-		if completedSet[id] {
+		// counted: issues and points (not sub-tasks); hours count every member.
+		counted := !m.sub
+		if completedSet[id] && counted {
 			rep.CompletedIssues++
 			rep.CompletedPoints += pts
 		}
 		everIn := committed[id] || m.initial || slices.ContainsFunc(m.changes, func(h historyRow) bool { return deref(h.ToRef) == sprintRef })
 		if !committed[id] && everIn && !m.from.After(end) {
-			rep.AddedIssues++
-			rep.AddedPoints += pts
+			if counted {
+				rep.AddedIssues++
+				rep.AddedPoints += pts
+			}
 			joined := m.from
 			if !m.initial {
 				if k := slices.IndexFunc(m.changes, func(h historyRow) bool { return deref(h.ToRef) == sprintRef }); k >= 0 {
@@ -823,8 +853,10 @@ func (s *Service) sprintReport(ctx context.Context, sp dbq.Sprint) (SprintReport
 			rep.AddedSeconds += remainingAt(m.issue.RemainingEstimateSeconds, hist[id], joined)
 		}
 		if everIn && !inEnd && !completedSet[id] {
-			rep.RemovedIssues++
-			rep.RemovedPoints += pts
+			if counted {
+				rep.RemovedIssues++
+				rep.RemovedPoints += pts
+			}
 			left := end
 			for _, h := range m.changes {
 				if deref(h.FromRef) == sprintRef && !h.CreatedAt.After(end) {

@@ -74,18 +74,32 @@ GROUP BY h.issue_id;
 -- name: DeleteSprint :exec
 DELETE FROM sprints WHERE id = $1;
 
--- name: MoveOpenSprintIssues :execrows
--- Unfinished issues (not in a done status) leave a completed sprint.
-UPDATE issues SET sprint_id = sqlc.narg(target_sprint_id), version = version + 1, updated_at = now()
-WHERE sprint_id = @sprint_id AND status_id IN (SELECT id FROM statuses WHERE category <> 'done');
+-- name: MoveOpenSprintIssues :one
+-- Unfinished issues (not in a done status) leave a completed sprint. Sub-tasks go with their
+-- parent whatever their own status, since they always follow its sprint. Returns how many
+-- issues moved, not counting sub-tasks.
+WITH open_issues AS (
+    SELECT i.id FROM issues i
+    JOIN issue_types t ON t.id = i.type_id
+    JOIN statuses s ON s.id = i.status_id
+    WHERE i.sprint_id = @sprint_id AND t.level >= 0 AND s.category <> 'done'
+), moved AS (
+    UPDATE issues SET sprint_id = sqlc.narg(target_sprint_id), version = version + 1, updated_at = now()
+    WHERE issues.id IN (SELECT id FROM open_issues)
+       OR (issues.sprint_id = @sprint_id AND issues.parent_id IN (SELECT id FROM open_issues)
+           AND issues.type_id IN (SELECT id FROM issue_types WHERE level < 0))
+    RETURNING issues.id
+)
+SELECT count(*)::int FROM moved WHERE moved.id IN (SELECT id FROM open_issues);
 
 -- name: SprintIssueStats :one
+-- A sprint's issues and story points now; sub-tasks count as part of their parent.
 SELECT count(*)::int AS issues,
        count(*) FILTER (WHERE s.category = 'done')::int AS done_issues,
        coalesce(sum(i.story_points), 0)::float8 AS points,
        coalesce(sum(i.story_points) FILTER (WHERE s.category = 'done'), 0)::float8 AS done_points
-FROM issues i JOIN statuses s ON s.id = i.status_id
-WHERE i.sprint_id = $1;
+FROM issues i JOIN statuses s ON s.id = i.status_id JOIN issue_types t ON t.id = i.type_id
+WHERE i.sprint_id = $1 AND t.level >= 0;
 
 -- ---------------------------------------------------------------------------
 -- Releases

@@ -408,14 +408,14 @@ func TestRisksAndDecisionsStayOutOfPlanning(t *testing.T) {
 	// The sprint's commitment, report and velocity count work only.
 	var rep obj
 	c.get("/api/v1/sprints/"+sprint+"/report", &rep)
-	// The story and its sub-task.
-	eq(t, fmt.Sprint(rep["committedIssues"], " ", rep["committedPoints"]), "2 3", "sprint commitment")
+	// The story (its sub-task counts as part of it).
+	eq(t, fmt.Sprint(rep["committedIssues"], " ", rep["committedPoints"]), "1 3", "sprint commitment")
 	c.transition(story, "start-work", 200)
 	c.must("POST", "/api/v1/sprints/"+sprint+"/complete", obj{}, 200, nil)
 	var vel obj
 	c.get("/api/v1/projects/PLN/velocity", &vel)
 	v := vel["sprints"].([]any)[0].(obj)
-	eq(t, fmt.Sprint(v["committedIssues"]), "2", "velocity")
+	eq(t, fmt.Sprint(v["committedIssues"]), "1", "velocity")
 
 	// The timeline draws work only.
 	var tl obj

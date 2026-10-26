@@ -738,23 +738,35 @@ func (q *Queries) MoveOpenReleaseIssues(ctx context.Context, arg MoveOpenRelease
 	return err
 }
 
-const moveOpenSprintIssues = `-- name: MoveOpenSprintIssues :execrows
-UPDATE issues SET sprint_id = $1, version = version + 1, updated_at = now()
-WHERE sprint_id = $2 AND status_id IN (SELECT id FROM statuses WHERE category <> 'done')
+const moveOpenSprintIssues = `-- name: MoveOpenSprintIssues :one
+WITH open_issues AS (
+    SELECT i.id FROM issues i
+    JOIN issue_types t ON t.id = i.type_id
+    JOIN statuses s ON s.id = i.status_id
+    WHERE i.sprint_id = $1 AND t.level >= 0 AND s.category <> 'done'
+), moved AS (
+    UPDATE issues SET sprint_id = $2, version = version + 1, updated_at = now()
+    WHERE issues.id IN (SELECT id FROM open_issues)
+       OR (issues.sprint_id = $1 AND issues.parent_id IN (SELECT id FROM open_issues)
+           AND issues.type_id IN (SELECT id FROM issue_types WHERE level < 0))
+    RETURNING issues.id
+)
+SELECT count(*)::int FROM moved WHERE moved.id IN (SELECT id FROM open_issues)
 `
 
 type MoveOpenSprintIssuesParams struct {
-	TargetSprintID *uuid.UUID
 	SprintID       *uuid.UUID
+	TargetSprintID *uuid.UUID
 }
 
-// Unfinished issues (not in a done status) leave a completed sprint.
-func (q *Queries) MoveOpenSprintIssues(ctx context.Context, arg MoveOpenSprintIssuesParams) (int64, error) {
-	result, err := q.db.Exec(ctx, moveOpenSprintIssues, arg.TargetSprintID, arg.SprintID)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
+// Unfinished issues (not in a done status) leave a completed sprint. Sub-tasks go with their
+// parent whatever their own status, since they always follow its sprint. Returns how many
+// issues moved, not counting sub-tasks.
+func (q *Queries) MoveOpenSprintIssues(ctx context.Context, arg MoveOpenSprintIssuesParams) (int32, error) {
+	row := q.db.QueryRow(ctx, moveOpenSprintIssues, arg.SprintID, arg.TargetSprintID)
+	var column_1 int32
+	err := row.Scan(&column_1)
+	return column_1, err
 }
 
 const releaseIDsOfIssues = `-- name: ReleaseIDsOfIssues :many
@@ -833,8 +845,8 @@ SELECT count(*)::int AS issues,
        count(*) FILTER (WHERE s.category = 'done')::int AS done_issues,
        coalesce(sum(i.story_points), 0)::float8 AS points,
        coalesce(sum(i.story_points) FILTER (WHERE s.category = 'done'), 0)::float8 AS done_points
-FROM issues i JOIN statuses s ON s.id = i.status_id
-WHERE i.sprint_id = $1
+FROM issues i JOIN statuses s ON s.id = i.status_id JOIN issue_types t ON t.id = i.type_id
+WHERE i.sprint_id = $1 AND t.level >= 0
 `
 
 type SprintIssueStatsRow struct {
@@ -844,6 +856,7 @@ type SprintIssueStatsRow struct {
 	DonePoints float64
 }
 
+// A sprint's issues and story points now; sub-tasks count as part of their parent.
 func (q *Queries) SprintIssueStats(ctx context.Context, sprintID *uuid.UUID) (SprintIssueStatsRow, error) {
 	row := q.db.QueryRow(ctx, sprintIssueStats, sprintID)
 	var i SprintIssueStatsRow

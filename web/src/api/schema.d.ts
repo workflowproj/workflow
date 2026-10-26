@@ -3924,6 +3924,10 @@ export interface components {
             /** Format: date */
             endDate?: string | null;
         };
+        /**
+         * @description Issue counts and story points are of standard issues: sub-tasks count as part of their
+         *     parent. Seconds include sub-tasks. For a future sprint, committed is what it holds now.
+         */
         SprintReport: {
             sprint: components["schemas"]["Sprint"];
             /**

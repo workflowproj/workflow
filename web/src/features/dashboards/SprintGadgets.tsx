@@ -93,7 +93,7 @@ function SprintHealth({ report, sprint }: { report: SprintReport; sprint: Sprint
   const done = last ? m.done(last) : m.completed;
   const pct = scope > 0 ? Math.round((done / scope) * 100) : null;
   const left = sprint.state === "active" ? remainingLabel(sprint.endDate) : null;
-  const byStatus = useQuery(breakdownQuery({ projectKeys: [gadget.config.projectKey!], jql: `sprint = "${sprint.id}"` }, "statusCategory"));
+  const byStatus = useQuery(breakdownQuery({ projectKeys: [gadget.config.projectKey!], jql: `sprint = "${sprint.id}" AND level >= 0` }, "statusCategory"));
   // The status bar counts issues when the sprint is measured in hours (estimates are per issue, not per status).
   const values = Object.fromEntries((byStatus.data?.groups ?? []).map((g) => [g.key, measure === "points" ? g.points : g.count]));
   const unit = m.unit;

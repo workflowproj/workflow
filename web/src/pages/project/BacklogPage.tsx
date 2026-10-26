@@ -11,7 +11,7 @@ import { ErrorBox } from "@/components/ErrorBox";
 import { IssueDrawer } from "@/features/issues/IssueDrawer";
 import { BoardSwitcher } from "@/features/board/BoardSwitcher";
 import { hasFilters, NO_FILTERS, quickFilterJql, type QuickFilters } from "@/features/board/jql";
-import { BACKLOG, findContainer, sumPoints, type Containers } from "@/features/board/model";
+import { BACKLOG, findContainer, type Containers } from "@/features/board/model";
 import { filterBacklog, peopleOf } from "@/features/board/people";
 import { QuickFilterBar } from "@/features/board/QuickFilterBar";
 import { backlogQuery, useBoardSelection, type Board, type Sprint } from "@/features/board/queries";
@@ -268,20 +268,10 @@ function BacklogScreen({ project, boards, board, onSelect, onOpen }: { project: 
         <DragOverlay dropAnimation={{ duration: 160, easing: "cubic-bezier(0.2, 0, 0, 1)" }}>{active ? <IssueRow issue={active} lifted /> : null}</DragOverlay>
       </DndContext>
       <EditSprintDialog open={dialog?.kind === "edit"} onClose={() => setDialog(null)} sprint={dialog?.sprint ?? null} projectKey={project.key} />
-      <StartSprintDialog
-        open={dialog?.kind === "start"}
-        onClose={() => setDialog(null)}
-        sprint={dialog?.sprint ?? null}
-        projectKey={project.key}
-        {...startStats(data.sprints.find((s) => s.sprint.id === dialog?.sprint.id)?.issues ?? [])}
-      />
+      <StartSprintDialog open={dialog?.kind === "start"} onClose={() => setDialog(null)} sprint={dialog?.sprint ?? null} projectKey={project.key} />
       <CompleteSprintDialog open={dialog?.kind === "complete"} onClose={() => setDialog(null)} sprint={dialog?.sprint ?? null} projectKey={project.key} />
     </>
   );
-}
-
-function startStats(issues: Issue[]) {
-  return { issueCount: issues.length, points: sumPoints(issues).total };
 }
 
 function SprintMenu({ sprint, onEdit, onDelete }: { sprint: Sprint; onEdit: () => void; onDelete: () => void }) {
