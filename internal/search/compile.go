@@ -349,22 +349,45 @@ func (b *builder) clause(c Clause) (string, error) {
 	case "participant", "participants", "requestparticipants":
 		return b.participantField(c)
 	}
-	if cf, ok := b.customField(c.Field); ok {
+	cf, ok, err := b.customField(c)
+	if err != nil {
+		return "", err
+	}
+	if ok {
 		return b.customClause(c, cf)
 	}
 	return "", errAt(c.Pos, "unknown field %q", c.Field)
 }
 
-func (b *builder) customField(name string) (CustomField, bool) {
+// customField finds the custom field a clause names: by key first (bare, or as cf[key]), then by
+// name. Names need not be unique, so a name two fields share is an error that asks for the key.
+func (b *builder) customField(c Clause) (CustomField, bool, error) {
+	name := c.Field
 	if m := cfPattern.FindStringSubmatch(strings.ToLower(name)); m != nil {
 		name = m[1]
 	}
 	for _, f := range b.env.CustomFields {
-		if strings.EqualFold(f.Key, name) || strings.EqualFold(f.Name, name) {
-			return f, true
+		if strings.EqualFold(f.Key, name) {
+			return f, true, nil
 		}
 	}
-	return CustomField{}, false
+	var found []CustomField
+	for _, f := range b.env.CustomFields {
+		if strings.EqualFold(f.Name, name) {
+			found = append(found, f)
+		}
+	}
+	switch len(found) {
+	case 0:
+		return CustomField{}, false, nil
+	case 1:
+		return found[0], true, nil
+	}
+	keys := make([]string, len(found))
+	for i, f := range found {
+		keys[i] = "cf[" + f.Key + "]"
+	}
+	return CustomField{}, false, errAt(c.Pos, "%d custom fields are called %q: use %s", len(found), c.Field, strings.Join(keys, " or "))
 }
 
 // setField composes =, !=, in, not in, is [not] EMPTY from a per-value condition.

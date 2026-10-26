@@ -1,6 +1,7 @@
 package search
 
 import (
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -248,6 +249,24 @@ func TestTimeTrackingFields(t *testing.T) {
 	for _, src := range []string{`timeSpent > lots`, `originalEstimate = currentUser()`, `worklogDate > soon`} {
 		if _, err := CompileString(src, env, 0, nil); err == nil {
 			t.Errorf("%q should fail to compile", src)
+		}
+	}
+}
+
+// Names needn't be unique: a key wins, and a name two fields share asks for the key.
+func TestCustomFieldNamesAndKeys(t *testing.T) {
+	env := Env{Now: time.Date(2026, 10, 21, 15, 0, 0, 0, time.UTC), CustomFields: []CustomField{
+		{Key: "risk", Name: "Risk score", Type: "number"},
+		{Key: "risk_score", Name: "Risk score", Type: "number"},
+		{Key: "team", Name: "risk", Type: "text"},
+	}}
+	if _, err := CompileString(`"Risk score" > 3`, env, 0, nil); err == nil || !strings.Contains(err.Error(), "cf[risk] or cf[risk_score]") {
+		t.Fatalf("ambiguous name: err = %v", err)
+	}
+	for src, key := range map[string]string{`cf[risk_score] > 3`: "risk_score", `risk_score > 3`: "risk_score", `risk > 3`: "risk"} {
+		c := mustCompile(t, src, env)
+		if !slices.Contains(c.Args, any(key)) {
+			t.Errorf("%q: args %v lack the key %q", src, c.Args, key)
 		}
 	}
 }

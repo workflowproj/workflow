@@ -55,7 +55,7 @@ fixVersion = "2026.11" AND statusCategory != Done
 | `"Request type"` (`requestType`) | `=` `!=` `in` `not in` `is [not] EMPTY` | request type name or id; `EMPTY` for issues not shown in the help centre |
 | `approval` | `=` `!=` `is [not] EMPTY` | `pending()`, `approved()`, `declined()`, `pendingBy(currentUser())` |
 | `participant` | `=` `!=` `in` `not in` `is [not] EMPTY` | people a request is shared with (as for `assignee`) |
-| custom fields | depends on type | by key or name (`severity = High`), or `cf[key]` |
+| custom fields | depends on type | by key or name (`severity = High`), or `cf[key]`; a name two fields share needs the key |
 
 Custom fields by type: `text`/`url` support `~`, `=`, `is EMPTY`; `number` and `date` support
 comparisons; `select` and `multiselect` support `=`, `in`; `user` accepts the user values above;
