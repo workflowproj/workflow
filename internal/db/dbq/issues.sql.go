@@ -1430,6 +1430,55 @@ func (q *Queries) PutBlob(ctx context.Context, arg PutBlobParams) error {
 	return err
 }
 
+const releasesOfIssues = `-- name: ReleasesOfIssues :many
+SELECT ir.issue_id, r.id, r.project_id, r.name, r.description, r.start_date, r.release_date, r.state, r.released_at, r.position, r.created_at, r.notes, r.notes_published_at, r.tag_repository_id, r.tag_name, r.tag_sha, r.tag_linked_at FROM releases r JOIN issue_releases ir ON ir.release_id = r.id
+WHERE ir.issue_id = ANY($1::uuid[]) ORDER BY ir.issue_id, r.position, r.name
+`
+
+type ReleasesOfIssuesRow struct {
+	IssueID uuid.UUID
+	Release Release
+}
+
+// IssueReleases for many issues at once.
+func (q *Queries) ReleasesOfIssues(ctx context.Context, issueIds []uuid.UUID) ([]ReleasesOfIssuesRow, error) {
+	rows, err := q.db.Query(ctx, releasesOfIssues, issueIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ReleasesOfIssuesRow{}
+	for rows.Next() {
+		var i ReleasesOfIssuesRow
+		if err := rows.Scan(
+			&i.IssueID,
+			&i.Release.ID,
+			&i.Release.ProjectID,
+			&i.Release.Name,
+			&i.Release.Description,
+			&i.Release.StartDate,
+			&i.Release.ReleaseDate,
+			&i.Release.State,
+			&i.Release.ReleasedAt,
+			&i.Release.Position,
+			&i.Release.CreatedAt,
+			&i.Release.Notes,
+			&i.Release.NotesPublishedAt,
+			&i.Release.TagRepositoryID,
+			&i.Release.TagName,
+			&i.Release.TagSha,
+			&i.Release.TagLinkedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const removeWatcher = `-- name: RemoveWatcher :exec
 DELETE FROM watchers WHERE issue_id = $1 AND user_id = $2
 `

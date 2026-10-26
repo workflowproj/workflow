@@ -136,27 +136,44 @@ func (s *Service) moveOpenReleaseIssues(ctx context.Context, q *dbq.Queries, act
 	if err != nil {
 		return err
 	}
-	before := map[uuid.UUID][]dbq.Release{}
+	var open []uuid.UUID
 	for _, i := range issues {
-		if statuses[i.StatusID].Category == "done" {
-			continue
+		if statuses[i.StatusID].Category != "done" {
+			open = append(open, i.ID)
 		}
-		if before[i.ID], err = q.IssueReleases(ctx, i.ID); err != nil {
-			return err
+	}
+	if len(open) == 0 {
+		return nil
+	}
+	// The open issues' releases before and after, two queries however big the release.
+	releasesOf := func() (map[uuid.UUID][]dbq.Release, error) {
+		rows, err := q.ReleasesOfIssues(ctx, open)
+		if err != nil {
+			return nil, err
 		}
+		out := make(map[uuid.UUID][]dbq.Release, len(open))
+		for _, r := range rows {
+			out[r.IssueID] = append(out[r.IssueID], r.Release)
+		}
+		return out, nil
+	}
+	before, err := releasesOf()
+	if err != nil {
+		return err
 	}
 	if err := q.MoveOpenReleaseIssues(ctx, dbq.MoveOpenReleaseIssuesParams{ReleaseID: releaseID, TargetReleaseID: moveTo}); err != nil {
 		return err
 	}
-	for id, prev := range before {
-		after, err := q.IssueReleases(ctx, id)
-		if err != nil {
-			return err
-		}
-		if releaseRefs(prev) == releaseRefs(after) {
+	after, err := releasesOf()
+	if err != nil {
+		return err
+	}
+	for _, id := range open {
+		prev, now := before[id], after[id]
+		if releaseRefs(prev) == releaseRefs(now) {
 			continue
 		}
-		if err := s.history(ctx, q, id, actor, "fixVersions", strp(releaseNames(prev)), strp(releaseNames(after)), strp(releaseRefs(prev)), strp(releaseRefs(after))); err != nil {
+		if err := s.history(ctx, q, id, actor, "fixVersions", strp(releaseNames(prev)), strp(releaseNames(now)), strp(releaseRefs(prev)), strp(releaseRefs(now))); err != nil {
 			return err
 		}
 	}

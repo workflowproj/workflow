@@ -185,6 +185,11 @@ DELETE FROM blobs WHERE key = $1;
 -- name: IssueReleases :many
 SELECT r.* FROM releases r JOIN issue_releases ir ON ir.release_id = r.id WHERE ir.issue_id = $1 ORDER BY r.position, r.name;
 
+-- name: ReleasesOfIssues :many
+-- IssueReleases for many issues at once.
+SELECT ir.issue_id, sqlc.embed(r) FROM releases r JOIN issue_releases ir ON ir.release_id = r.id
+WHERE ir.issue_id = ANY(@issue_ids::uuid[]) ORDER BY ir.issue_id, r.position, r.name;
+
 -- name: ClearIssueReleases :exec
 DELETE FROM issue_releases WHERE issue_id = $1;
 
