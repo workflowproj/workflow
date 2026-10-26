@@ -5,6 +5,7 @@ import { meQuery, projectQuery } from "@/api/queries";
 import { AppShell } from "@/layout/AppShell";
 import { NotFound } from "@/layout/NotFound";
 import { PageSpinner } from "@/components/ui";
+import { projectHome } from "@/lib/project";
 import { LoginPage } from "@/pages/LoginPage";
 import { ProjectsPage } from "@/pages/ProjectsPage";
 import { ProjectLayout } from "@/pages/project/ProjectLayout";
@@ -150,7 +151,7 @@ const projectIndexRoute = createRoute({
   beforeLoad: async ({ context, params }) => {
     // Service projects open on their queues.
     const p = await context.queryClient.ensureQueryData(projectQuery(params.projectKey)).catch(() => null);
-    throw redirect({ to: p?.template === "service" ? "/projects/$projectKey/queues" : "/projects/$projectKey/board", params });
+    throw redirect({ to: projectHome(p ?? { template: "" }), params });
   },
 });
 const boardRoute = createRoute({ getParentRoute: () => projectRoute, path: "/board", validateSearch: issueSearch, component: BoardPage });

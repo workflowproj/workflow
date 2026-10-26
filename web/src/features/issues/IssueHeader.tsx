@@ -21,7 +21,7 @@ export function IssueTopBar() {
     <div className={cn("flex h-12 items-center gap-2 px-4 sm:px-6", variant === "drawer" && "sticky top-0 z-20 border-b border-line bg-surface/95 backdrop-blur")}>
       <nav aria-label="Breadcrumb" className="flex min-w-0 flex-1 items-center gap-1 text-[13px] text-muted">
         <Link
-          to="/projects/$projectKey/board"
+          to="/projects/$projectKey"
           params={{ projectKey: issue.project.key }}
           className="flex min-w-0 items-center gap-1.5 rounded px-1 py-0.5 hover:bg-surface-2 hover:text-ink"
         >

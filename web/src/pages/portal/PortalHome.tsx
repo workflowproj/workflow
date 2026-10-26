@@ -5,6 +5,7 @@ import { useMe } from "@/api/queries";
 import { EmptyState, PageSpinner } from "@/components/ui";
 import { ErrorBox } from "@/components/ErrorBox";
 import { portalDesksQuery, portalRequestsQuery } from "@/features/servicedesk/api";
+import { plural } from "@/lib/format";
 import { RequestRow } from "./parts";
 
 /** PortalHome is the help centre: the desks the person may ask for help, and their open requests. */
@@ -49,7 +50,7 @@ export function PortalHome() {
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block font-medium group-hover:text-accent">{d.name}</span>
-                    <span className="mt-0.5 line-clamp-2 block text-[13px] text-muted">{d.description || `${d.requestTypeCount} kinds of request`}</span>
+                    <span className="mt-0.5 line-clamp-2 block text-[13px] text-muted">{d.description || plural(d.requestTypeCount, "kind of request", "kinds of request")}</span>
                   </span>
                   <ChevronRight aria-hidden className="mt-2.5 size-4 shrink-0 text-faint" />
                 </Link>

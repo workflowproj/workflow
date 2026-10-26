@@ -6,6 +6,7 @@ import { Button, EmptyState, Field, IconButton, Input, Modal, table, useConfirm,
 import { ErrorBox } from "@/components/ErrorBox";
 import { CopyField, SecretOnce, SettingsSection, When } from "@/features/settings/common";
 import { cn } from "@/lib/cn";
+import { plural } from "@/lib/format";
 
 type ScimStatus = Schemas["ScimStatus"];
 type Created = Schemas["ScimConnectionCreated"];
@@ -73,7 +74,7 @@ export function ScimSection({ scim }: { scim: ScimStatus }) {
                       <code className="font-mono text-xs text-muted">{c.prefix}…</code>
                     </td>
                     <td className="text-muted">
-                      {c.userCount ?? 0} people · {c.groupCount ?? 0} groups
+                      {plural(c.userCount ?? 0, "person", "people")} · {plural(c.groupCount ?? 0, "group")}
                     </td>
                     <td className="text-muted">
                       <When iso={c.createdAt} />

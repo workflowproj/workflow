@@ -9,6 +9,7 @@ import { ErrorBox } from "@/components/ErrorBox";
 import { UserAvatar } from "@/components/UserAvatar";
 import { ProjectAvatar } from "@/layout/AppShell";
 import { cn } from "@/lib/cn";
+import { projectHome } from "@/lib/project";
 
 export function ProjectsPage() {
   const { data: projects, isLoading, error } = useQuery(projectsQuery);
@@ -61,7 +62,7 @@ export function ProjectsPage() {
                 {shown.map((p) => (
                   <tr key={p.id} className="hover:bg-surface-2">
                     <td>
-                      <Link to="/projects/$projectKey/board" params={{ projectKey: p.key }} className="flex items-center gap-2.5 font-medium hover:text-accent">
+                      <Link to={projectHome(p)} params={{ projectKey: p.key }} className="flex items-center gap-2.5 font-medium hover:text-accent">
                         <ProjectAvatar projectKey={p.key} size={24} />
                         {p.name}
                       </Link>
@@ -122,7 +123,7 @@ function CreateProjectDialog({ open, onClose }: { open: boolean; onClose: () => 
     onSuccess: (p) => {
       qc.invalidateQueries({ queryKey: ["projects"] });
       onClose();
-      navigate({ to: p.template === "service" ? "/projects/$projectKey/queues" : "/projects/$projectKey/board", params: { projectKey: p.key } });
+      navigate({ to: projectHome(p), params: { projectKey: p.key } });
     },
   });
   const fe = create.error instanceof ApiError ? create.error.fieldErrors() : {};

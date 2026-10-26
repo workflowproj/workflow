@@ -5,6 +5,7 @@ import { api, unwrap, type Schemas } from "@/api/client";
 import { providersQuery } from "@/api/queries";
 import { Badge, Button, Checkbox, MenuItem, MenuLabel, Modal, useConfirm, useToast } from "@/components/ui";
 import { isDirectoryManaged } from "@/features/admin/badges";
+import { invitationSent, resetSent } from "@/features/admin/invitations";
 import { SecretOnce } from "@/features/settings/common";
 import { cn } from "@/lib/cn";
 import { relativeTime } from "@/lib/format";
@@ -62,36 +63,35 @@ export function LockedBadge({ user }: { user: AdminUser }) {
 
 type Action = "invite" | "revoke" | "temporary" | "reset" | "unlock" | "resetTotp" | "removePassword";
 
-async function perform(user: AdminUser, action: Action): Promise<string | null> {
+/** Performed is what an action produced: a temporary password, or whether a link was emailed. */
+type Performed = { password?: string; emailed?: boolean };
+
+async function perform(user: AdminUser, action: Action): Promise<Performed> {
   const params = { path: { userId: user.id } };
   switch (action) {
     case "invite":
-      await unwrap(api.POST("/admin/users/{userId}/invitation", { params }));
-      return null;
+      return { emailed: (await unwrap(api.POST("/admin/users/{userId}/invitation", { params }))).emailed };
     case "revoke":
       await unwrap(api.DELETE("/admin/users/{userId}/invitation", { params }));
-      return null;
+      return {};
     case "temporary":
-      return (await unwrap(api.POST("/admin/users/{userId}/temporary-password", { params }))).password;
+      return { password: (await unwrap(api.POST("/admin/users/{userId}/temporary-password", { params }))).password };
     case "reset":
-      await unwrap(api.POST("/admin/users/{userId}/password-reset", { params }));
-      return null;
+      return { emailed: (await unwrap(api.POST("/admin/users/{userId}/password-reset", { params }))).emailed };
     case "unlock":
       await unwrap(api.POST("/admin/users/{userId}/unlock", { params }));
-      return null;
+      return {};
     case "resetTotp":
       await unwrap(api.DELETE("/admin/users/{userId}/totp", { params }));
-      return null;
+      return {};
     case "removePassword":
       await unwrap(api.DELETE("/admin/users/{userId}/password", { params }));
-      return null;
+      return {};
   }
 }
 
-const done: Record<Exclude<Action, "temporary">, (u: AdminUser) => string> = {
-  invite: (u) => `Invitation sent to ${u.email}`,
+const done: Record<Exclude<Action, "temporary" | "invite" | "reset">, (u: AdminUser) => string> = {
   revoke: () => "Invitation revoked",
-  reset: (u) => `Password reset link sent to ${u.email}`,
   unlock: (u) => `${u.displayName} can sign in again`,
   resetTotp: (u) => `Two-factor authentication turned off for ${u.displayName}`,
   removePassword: (u) => `${u.displayName} now signs in with single sign-on only`,
@@ -110,10 +110,15 @@ export function useLocalAccountActions() {
   const [temp, setTemp] = useState<{ user: AdminUser; password: string } | null>(null);
   const run = useMutation({
     mutationFn: ({ user, action }: { user: AdminUser; action: Action }) => perform(user, action),
-    onSuccess: (password, { user, action }) => {
+    onSuccess: ({ password, emailed = false }, { user, action }) => {
       qc.invalidateQueries({ queryKey: ["admin-users"] });
-      if (action === "temporary" && password) setTemp({ user, password });
-      else if (action !== "temporary") toast.success(done[action](user));
+      if (action === "temporary") {
+        if (password) setTemp({ user, password });
+      } else if (action === "invite" || action === "reset") {
+        const text = (action === "invite" ? invitationSent : resetSent)(user.displayName, user.email, emailed);
+        if (emailed) toast.success(text);
+        else toast.warning(text);
+      } else toast.success(done[action](user));
     },
     onError: toast.error,
   });
@@ -256,10 +261,13 @@ export function GroupChoice({ value, onChange }: { value: string[]; onChange: (i
   );
 }
 
-/** startSignIn sends the invitation or sets the temporary password for a new person. */
-export async function startSignIn(userId: string, method: SignInMethod): Promise<string | null> {
+/**
+ * startSignIn sends a new person their invitation (saying whether it could be emailed) or sets
+ * their temporary password.
+ */
+export async function startSignIn(userId: string, method: SignInMethod): Promise<Performed> {
   const params = { path: { userId } };
-  if (method === "invite") await unwrap(api.POST("/admin/users/{userId}/invitation", { params }));
-  if (method === "temporary") return (await unwrap(api.POST("/admin/users/{userId}/temporary-password", { params }))).password;
-  return null;
+  if (method === "invite") return { emailed: (await unwrap(api.POST("/admin/users/{userId}/invitation", { params }))).emailed };
+  if (method === "temporary") return { password: (await unwrap(api.POST("/admin/users/{userId}/temporary-password", { params }))).password };
+  return {};
 }

@@ -3,6 +3,7 @@ package scm
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -448,11 +449,12 @@ func (s *Service) CreateBranch(ctx context.Context, actor *authz.Actor, issueRef
 		return dbq.UpsertDevLinkRow{}, err
 	}
 	cl, err := s.client(ctx, c)
-	if err != nil {
-		return dbq.UpsertDevLinkRow{}, err
+	if err == nil {
+		err = cl.CreateBranch(ctx, repoRef(repo), name, from)
 	}
-	if err := cl.CreateBranch(ctx, repoRef(repo), name, from); err != nil {
-		return dbq.UpsertDevLinkRow{}, apperr.New(http.StatusBadGateway, "scm_error", "%s refused to create the branch: %v", c.Provider, err)
+	if err != nil {
+		s.Log.Warn("create branch failed", "provider", c.Provider, "connection", c.Name, "repository", repo.FullPath, "branch", name, "from", from, "error", err)
+		return dbq.UpsertDevLinkRow{}, branchFailure(c.Provider, repo.FullPath, name, from, err)
 	}
 	link, err := s.Q.UpsertDevLink(ctx, dbq.UpsertDevLinkParams{
 		IssueID: issue.ID, RepositoryID: repo.ID, Kind: "branch", ExternalID: name, Title: name,
@@ -462,6 +464,50 @@ func (s *Service) CreateBranch(ctx context.Context, actor *authz.Actor, issueRef
 		tracker.Audit(ctx, s.Q, actor, "scm.branch_create", "issue", key, &p.ID, map[string]any{"branch": name, "repository": repo.FullPath})
 	}
 	return link, err
+}
+
+// providerTitle names a provider for people.
+func providerTitle(provider string) string {
+	if provider == "gitlab" {
+		return "GitLab"
+	}
+	return "GitHub"
+}
+
+// branchFailure tells the person who asked for a branch what went wrong in words they can act
+// on: what failed, the provider's HTTP status and what to check. The provider's own answer goes
+// to the server log only (it can be long, or not meant for them).
+func branchFailure(provider, repo, name, from string, err error) error {
+	host := providerTitle(provider)
+	if errors.Is(err, ErrNoBaseBranch) {
+		return apperr.Invalid("fromRef", "%s has no branch %q to create the branch from. Check the branch name.", repo, from)
+	}
+	var e *APIError
+	if !errors.As(err, &e) {
+		return apperr.New(http.StatusBadGateway, "scm_error",
+			"Could not create the branch: %s did not answer as expected. Try again later; if it keeps failing, an administrator can find the details in the server log.", host)
+	}
+	status := fmt.Sprintf("%d %s", e.Status, http.StatusText(e.Status))
+	access := "the GitHub App has Contents: Read & write permission on " + repo
+	if provider == "gitlab" {
+		access = "the access token has the api scope and at least the Developer role in " + repo
+	}
+	switch {
+	case strings.HasSuffix(e.Path, "/access_tokens"):
+		return apperr.New(http.StatusBadGateway, "scm_error",
+			"Could not create the branch: %s refused the connection's credentials (%s). An administrator should check the App id and private key in Administration → GitHub & GitLab.", host, status)
+	case e.Status == http.StatusUnauthorized || e.Status == http.StatusForbidden:
+		return apperr.New(http.StatusBadGateway, "scm_error", "%s refused to create the branch (%s). Check that %s.", host, status, access)
+	case e.Status == http.StatusNotFound:
+		return apperr.New(http.StatusBadGateway, "scm_error",
+			"%s could not find %s (%s). Check that the repository still exists and that %s.", host, repo, status, access)
+	case e.Status == http.StatusBadRequest || e.Status == http.StatusConflict || e.Status == http.StatusUnprocessableEntity:
+		return apperr.New(http.StatusBadGateway, "scm_error",
+			"%s refused to create the branch (%s): a branch called %q may already exist in %s, or the name is not allowed there.", host, status, name, repo)
+	default:
+		return apperr.New(http.StatusBadGateway, "scm_error",
+			"%s answered %s when asked to create the branch. Try again later; if it keeps failing, an administrator can find the details in the server log.", host, status)
+	}
 }
 
 func branchURL(provider string, repo dbq.ScmRepository, branch string) string {

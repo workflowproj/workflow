@@ -157,6 +157,10 @@ func (e *APIError) Error() string {
 	return fmt.Sprintf("%s %s %s: HTTP %d: %s", e.Provider, e.Method, e.Path, e.Status, e.Body)
 }
 
+// ErrNoBaseBranch is a provider's answer that the branch to create a new branch from does not
+// exist.
+var ErrNoBaseBranch = errors.New("the branch to start from does not exist")
+
 // apiError builds an APIError from a response body (trimmed to what a log line needs).
 func apiError(provider, method, path string, status int, raw []byte) error {
 	return &APIError{Provider: provider, Method: method, Path: path, Status: status, Body: strings.TrimSpace(string(raw[:min(len(raw), 300)]))}

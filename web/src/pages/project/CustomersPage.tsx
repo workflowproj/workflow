@@ -7,6 +7,7 @@ import { hasPermission, useProject } from "@/api/queries";
 import { Badge, Button, EmptyState, Field, IconButton, Input, Modal, PageHeader, PageSpinner, table, useConfirm, useToast } from "@/components/ui";
 import { ErrorBox } from "@/components/ErrorBox";
 import { UserAvatar } from "@/components/UserAvatar";
+import { customerAdded } from "@/features/admin/invitations";
 import { Callout, useDebounced, When } from "@/features/settings/common";
 import { customersQuery, serviceDeskQuery, type ServiceCustomer } from "@/features/servicedesk/api";
 
@@ -168,7 +169,9 @@ function AddCustomerDialog({ projectKey, open, onClose }: { projectKey: string; 
     onSuccess: (r) => {
       qc.invalidateQueries({ queryKey: ["customers", projectKey] });
       qc.invalidateQueries({ queryKey: ["service-desk", projectKey] });
-      toast.success(r.invited ? `Invitation sent to ${r.customer.user.email}` : `${r.customer.user.displayName} can now raise requests`);
+      // An invitation on a server without email reaches nobody: say so.
+      if (r.invited && !r.emailed) toast.warning(customerAdded(r));
+      else toast.success(customerAdded(r));
       close();
     },
   });

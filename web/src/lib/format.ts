@@ -28,6 +28,14 @@ export function formatDateTime(iso: string | undefined | null): string {
   return iso ? dateTimeFmt.format(new Date(iso)) : "";
 }
 
+/**
+ * plural formats a count with the right form of its noun: "1 warning", "2 warnings", and with
+ * the plural given, "1 person", "3 people".
+ */
+export function plural(n: number, one: string, many = `${one}s`): string {
+  return `${n} ${n === 1 ? one : many}`;
+}
+
 export function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;

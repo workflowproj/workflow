@@ -1182,14 +1182,16 @@ func (q *Queries) OpenRequestIDs(ctx context.Context, projectID uuid.UUID) ([]uu
 }
 
 const pendingApprovalRequests = `-- name: PendingApprovalRequests :many
-SELECT DISTINCT ON (i.updated_at, i.id) i.id, i.project_id, i.number, i.type_id, i.parent_id, i.summary, i.description, i.status_id, i.workflow_version_id, i.priority, i.assignee_id, i.reporter_id, i.sprint_id, i.story_points, i.start_date, i.due_date, i.labels, i.resolution, i.resolved_at, i.fields, i.rank, i.version, i.created_at, i.updated_at, i.status_changed_at, i.original_estimate_seconds, i.remaining_estimate_seconds, sr.request_type_id
-FROM approval_approvers aa
-JOIN request_approvals ra ON ra.id = aa.approval_id AND ra.status = 'pending'
-JOIN issues i ON i.id = ra.issue_id
+SELECT i.id, i.project_id, i.number, i.type_id, i.parent_id, i.summary, i.description, i.status_id, i.workflow_version_id, i.priority, i.assignee_id, i.reporter_id, i.sprint_id, i.story_points, i.start_date, i.due_date, i.labels, i.resolution, i.resolved_at, i.fields, i.rank, i.version, i.created_at, i.updated_at, i.status_changed_at, i.original_estimate_seconds, i.remaining_estimate_seconds, sr.request_type_id
+FROM issues i
 JOIN statuses st ON st.id = i.status_id AND lower(st.name) = 'pending approval'
 JOIN service_requests sr ON sr.issue_id = i.id
-WHERE aa.user_id = $1 AND aa.decision IS NULL AND sr.request_type_id IS NOT NULL
-ORDER BY i.updated_at DESC, i.id
+WHERE sr.request_type_id IS NOT NULL
+  AND EXISTS (
+    SELECT 1 FROM approval_approvers aa
+    JOIN request_approvals ra ON ra.id = aa.approval_id AND ra.status = 'pending'
+    WHERE ra.issue_id = i.id AND aa.user_id = $1 AND aa.decision IS NULL)
+ORDER BY request_public_activity(i.id, i.created_at) DESC, i.id
 LIMIT $2
 `
 
@@ -1204,7 +1206,7 @@ type PendingApprovalRequestsRow struct {
 }
 
 // Requests waiting for a person's decision (still in Pending approval: one that has moved on no
-// longer waits for it).
+// longer waits for it), latest public activity first.
 func (q *Queries) PendingApprovalRequests(ctx context.Context, arg PendingApprovalRequestsParams) ([]PendingApprovalRequestsRow, error) {
 	rows, err := q.db.Query(ctx, pendingApprovalRequests, arg.UserID, arg.Lim)
 	if err != nil {
@@ -1263,7 +1265,7 @@ WHERE sr.request_type_id IS NOT NULL
   AND (i.reporter_id = $1 OR EXISTS (SELECT 1 FROM request_participants rp WHERE rp.issue_id = i.id AND rp.user_id = $1))
   AND ($2::uuid IS NULL OR i.project_id = $2)
   AND ($3::boolean IS NULL OR (s.category = 'done') = $3)
-ORDER BY i.updated_at DESC
+ORDER BY request_public_activity(i.id, i.created_at) DESC, i.id
 LIMIT $4
 `
 
@@ -1280,7 +1282,8 @@ type PortalRequestsRow struct {
 }
 
 // Requests a person follows in the portal: they reported them or they are shared with them.
-// Issues without a request type are never shown there.
+// Issues without a request type are never shown there. Latest public activity first (see
+// RequestPublicActivity).
 func (q *Queries) PortalRequests(ctx context.Context, arg PortalRequestsParams) ([]PortalRequestsRow, error) {
 	rows, err := q.db.Query(ctx, portalRequests,
 		arg.UserID,
@@ -1367,6 +1370,40 @@ func (q *Queries) RemoveServiceCustomer(ctx context.Context, arg RemoveServiceCu
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const requestPublicActivity = `-- name: RequestPublicActivity :many
+SELECT i.id, request_public_activity(i.id, i.created_at)::timestamptz AS at
+FROM issues i
+WHERE i.id = ANY($1::uuid[])
+`
+
+type RequestPublicActivityRow struct {
+	ID uuid.UUID
+	At time.Time
+}
+
+// When each request last changed in a way its customer can see: raised, a reply they can see, a
+// status change or a file added in the help centre (never an internal note). The help centre
+// shows it as the request's last update.
+func (q *Queries) RequestPublicActivity(ctx context.Context, ids []uuid.UUID) ([]RequestPublicActivityRow, error) {
+	rows, err := q.db.Query(ctx, requestPublicActivity, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []RequestPublicActivityRow{}
+	for rows.Next() {
+		var i RequestPublicActivityRow
+		if err := rows.Scan(&i.ID, &i.At); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const serviceRequestsFor = `-- name: ServiceRequestsFor :many

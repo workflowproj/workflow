@@ -273,6 +273,7 @@ func TestPortalConversation(t *testing.T) {
 	var added obj
 	agent.must("POST", "/api/v1/projects/HELP/customers", obj{"email": "Carol@Customer.test", "displayName": "Carol Customer"}, 201, &added)
 	eq(t, added["invited"], any(true), "invited")
+	eq(t, added["emailed"], any(false), "no SMTP server: the invitation is not emailed (only kept in memory)")
 	eq(t, str(added, "customer", "account"), "customer", "a customer account")
 	msgs := e.mailTo("carol@customer.test")
 	eq(t, len(msgs), 1, "invitation email")
@@ -946,4 +947,155 @@ func TestSelfSignupLeavesStaffAndSignInDomainsAlone(t *testing.T) {
 			t.Fatal("a staff account was added to the desk's customers")
 		}
 	}
+}
+
+// TestPortalLastUpdate: a request's last update in the help centre is its latest activity the
+// customer can see (replies either way, status changes, files they see), never an internal note
+// or an edit agents keep to themselves. Lists put the latest first.
+func TestPortalLastUpdate(t *testing.T) {
+	e := newEnv(t)
+	admin, agent := serviceDesk(t, e, "HELP")
+	carol := admin.addCustomer("HELP", "carol@customer.test", "Carol Customer")
+	rt := str(admin.requestType("HELP", "Get IT help"), "id")
+	older := str(carol.raise("HELP", rt, obj{"summary": "Printer jam"}), "key")
+	key := str(carol.raise("HELP", rt, obj{"summary": "VPN drops"}), "key")
+
+	// age moves everything that happened to a request a day further into the past.
+	age := func(key string) {
+		t.Helper()
+		id := uuid.MustParse(str(agent.issue(key), "id"))
+		for _, q := range []string{
+			`UPDATE issues SET created_at = created_at - interval '1 day', updated_at = updated_at - interval '1 day' WHERE id = $1`,
+			`UPDATE comments SET created_at = created_at - interval '1 day' WHERE issue_id = $1`,
+			`UPDATE issue_history SET created_at = created_at - interval '1 day' WHERE issue_id = $1`,
+			`UPDATE attachments SET created_at = created_at - interval '1 day' WHERE issue_id = $1`,
+		} {
+			if _, err := e.Pool.Exec(context.Background(), q, id); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	updated := func(key string) time.Time {
+		t.Helper()
+		var r obj
+		carol.get("/api/v1/portal/requests/"+key, &r)
+		at, err := time.Parse(time.RFC3339Nano, str(r, "updatedAt"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var list []obj
+		carol.get("/api/v1/portal/requests", &list)
+		for _, x := range list {
+			if str(x, "key") == key {
+				eq(t, str(x, "updatedAt"), str(r, "updatedAt"), "the list and the request agree")
+			}
+		}
+		return at
+	}
+	order := func() []string {
+		var list []obj
+		carol.get("/api/v1/portal/requests", &list)
+		return keys(list)
+	}
+	moved := func(what string, since time.Time) {
+		t.Helper()
+		if at := updated(key); at.Before(since) {
+			t.Fatalf("%s: last update %v, want after %v", what, at, since)
+		}
+	}
+	stayed := func(what string) {
+		t.Helper()
+		if at := updated(key); time.Since(at) < 12*time.Hour {
+			t.Fatalf("%s moved the last update to %v", what, at)
+		}
+	}
+
+	age(key)
+	age(key)
+	age(older)
+	sameStrings(t, order(), []string{older, key}, "the request raised later but aged more is older")
+	if at := updated(key); time.Since(at) < 47*time.Hour {
+		t.Fatalf("a new request's last update is when it was raised: %v", at)
+	}
+
+	// What agents keep to themselves does not count.
+	agent.must("POST", "/api/v1/issues/"+key+"/comments", obj{"body": "INTERNAL: check the gateway"}, 201, nil)
+	agent.must("PATCH", "/api/v1/issues/"+key, obj{"priority": "high", "assigneeId": agent.id()}, 200, nil)
+	agent.upload("/api/v1/issues/"+key+"/attachments", "trace.txt", "agents only")
+	stayed("an internal note, an edit or an agent's file")
+	sameStrings(t, order(), []string{older, key}, "internal activity does not reorder the list")
+
+	// A reply to the customer does, and so does theirs, and a status change.
+	before := time.Now().Add(-time.Second)
+	agent.must("POST", "/api/v1/issues/"+key+"/comments", obj{"body": "Could you try the new client?", "visibility": "public"}, 201, nil)
+	moved("the team's reply", before)
+	sameStrings(t, order(), []string{key, older}, "the request with the reply comes first")
+	age(key)
+	stayed("time")
+	carol.must("POST", "/api/v1/portal/requests/"+key+"/comments", obj{"body": "Still dropping"}, 201, nil)
+	moved("the customer's reply", time.Now().Add(-time.Minute))
+	age(key)
+	carol.upload("/api/v1/portal/requests/"+key+"/attachments", "screenshot.txt", "a screenshot")
+	moved("the customer's file", time.Now().Add(-time.Minute))
+	age(key)
+	agent.transitionTo(key, "wait-for-customer", nil)
+	moved("a status change", time.Now().Add(-time.Minute))
+}
+
+// TestCustomersAreNeverOfferedAsAgents: the people searched for assignees and for new project
+// members leave customers out, however many there are, and a customer cannot lead a project or
+// become an agent other than by an admin changing their own role.
+func TestCustomersAreNeverOfferedAsAgents(t *testing.T) {
+	e := newEnv(t)
+	admin, agent := serviceDesk(t, e, "HELP")
+	carol := admin.addCustomer("HELP", "carol@customer.test", "Carol Customer")
+	// A busy help desk: more customers than the candidates an assignee search checks, all
+	// sorting before the agents.
+	if _, err := e.Pool.Exec(context.Background(), `INSERT INTO users (kind, email, username, display_name, org_role, source, active)
+		SELECT 'human', 'c' || g || '@customer.test', 'c' || g || '@customer.test', 'Aa customer ' || lpad(g::text, 3, '0'), 'customer', 'admin', true
+		FROM generate_series(1, 150) g`); err != nil {
+		t.Fatal(err)
+	}
+	names := func(c *Client, path string) []string {
+		t.Helper()
+		var users []obj
+		c.get(path, &users)
+		out := []string{}
+		for _, u := range users {
+			out = append(out, str(u, "displayName"))
+		}
+		return out
+	}
+
+	// Assignees: the agents are found, and no customer is.
+	sameStrings(t, names(agent, "/api/v1/users?project=HELP&limit=20"), []string{"Aaron Agent", "Ada Admin"}, "assignable in HELP")
+	sameStrings(t, names(agent, "/api/v1/users?project=HELP&q=carol"), []string{}, "Carol is not assignable")
+	request := str(carol.raise("HELP", str(admin.requestType("HELP", "Get IT help"), "id"), obj{"summary": "Printer jam"}), "key")
+	agent.must("PATCH", "/api/v1/issues/"+request, obj{"assigneeId": carol.id()}, 400, nil)
+
+	// New project members: customers are left out on request; other people pickers (approvers,
+	// the audit log) still find them.
+	for _, n := range names(admin, "/api/v1/users?customers=false&limit=200") {
+		if strings.Contains(n, "ustomer") {
+			t.Fatalf("the member picker offers the customer %s", n)
+		}
+	}
+	sameStrings(t, names(admin, "/api/v1/users?customers=false&q=carol"), []string{}, "Carol is not offered as a member")
+	sameStrings(t, names(admin, "/api/v1/users?q=carol"), []string{"Carol Customer"}, "approver pickers find customers")
+	admin.must("POST", "/api/v1/projects/HELP/members", obj{"userId": carol.id(), "roleKey": "member"}, 400, nil)
+
+	// Project lead.
+	admin.must("PATCH", "/api/v1/projects/HELP", obj{"leadId": carol.id()}, 400, nil)
+	admin.must("PATCH", "/api/v1/projects/HELP", obj{"leadId": agent.id()}, 200, nil)
+
+	// The organisation role: service accounts are never customers; a person becomes an agent
+	// (or a customer) only by an admin changing their own role.
+	var bot obj
+	admin.must("POST", "/api/v1/admin/users", obj{"kind": "service", "displayName": "Deploy bot"}, 201, &bot)
+	admin.must("PATCH", "/api/v1/admin/users/"+str(bot, "id"), obj{"orgRole": "customer"}, 400, nil)
+	var updated obj
+	admin.must("PATCH", "/api/v1/admin/users/"+carol.id(), obj{"orgRole": "member"}, 200, &updated)
+	eq(t, str(updated, "orgRole"), "member", "Carol is now a member")
+	admin.must("POST", "/api/v1/projects/HELP/members", obj{"userId": carol.id(), "roleKey": "member"}, 201, nil)
+	sameStrings(t, names(agent, "/api/v1/users?project=HELP&q=carol"), []string{"Carol Customer"}, "a member of HELP can be assigned")
 }

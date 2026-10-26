@@ -545,7 +545,13 @@ paths:
       tags: [users]
       parameters:
         - { name: q, in: query, schema: { type: string } }
-        - { name: project, in: query, description: Only users who can be assigned in this project, schema: { type: string } }
+        - { name: project, in: query, description: Only users who can be assigned in this project (never customers), schema: { type: string } }
+        - name: customers
+          in: query
+          description: |
+            false leaves out customers (people who only use a help centre), for pickers of people
+            who can become project members. Customers are never listed with project.
+          schema: { type: boolean, default: true }
         - { $ref: '#/components/parameters/Limit' }
       responses:
         "200":
@@ -696,18 +702,22 @@ paths:
       operationId: adminInviteUser
       tags: [admin]
       summary: Email a person an invitation to choose a password (makes them a local account)
-      description: A new invitation replaces any open one. Refused for people managed by SCIM or Google directory sync.
+      description: |
+        A new invitation replaces any open one. Refused for people managed by SCIM or Google
+        directory sync. emailed is false when the server has no SMTP server: the invitation exists
+        but nobody receives it (set a temporary password instead, or set up email and resend it).
       parameters: [{ $ref: '#/components/parameters/UserId' }]
       responses:
         "200":
-          description: Sent
+          description: Created, and emailed when the server can send email
           content:
             application/json:
               schema:
                 type: object
-                required: [expiresAt]
+                required: [expiresAt, emailed]
                 properties:
                   expiresAt: { type: string, format: date-time }
+                  emailed: { $ref: '#/components/schemas/Emailed' }
         default: { $ref: '#/components/responses/Problem' }
     delete:
       operationId: adminRevokeInvitation
@@ -738,9 +748,18 @@ paths:
       operationId: adminSendPasswordReset
       tags: [admin]
       summary: Email a local account a password-reset link
+      description: emailed is false when the server has no SMTP server, so the link reaches nobody.
       parameters: [{ $ref: '#/components/parameters/UserId' }]
       responses:
-        "202": { description: Sent }
+        "202":
+          description: Created, and emailed when the server can send email
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [emailed]
+                properties:
+                  emailed: { $ref: '#/components/schemas/Emailed' }
         default: { $ref: '#/components/responses/Problem' }
   /admin/users/{userId}/unlock:
     post:
@@ -3299,8 +3318,9 @@ paths:
       summary: Add a customer by email
       description: |
         Someone new gets a customer account and an email invitation to choose a password (local
-        accounts); an existing account (a customer of another project, an organisation member,
-        a single sign-on user) is added as it is. Needs the customer.manage permission.
+        accounts; emailed says whether it was sent); an existing account (a customer of another
+        project, an organisation member, a single sign-on user) is added as it is. Needs the
+        customer.manage permission.
       parameters: [{ $ref: '#/components/parameters/ProjectKey' }]
       requestBody:
         required: true
@@ -5429,6 +5449,11 @@ components:
         timeZone: { type: string }
         paused: { type: boolean }
     EmailTransport: { type: string, enum: [smtp, memory] }
+    Emailed:
+      type: boolean
+      description: |
+        Whether the email was queued for delivery through the SMTP server. False when the server
+        has none (WFM_SMTP_HOST unset): the message is only logged and kept in memory.
     EmailStatus:
       type: object
       required: [transport, from, publicUrl, unsubscribeUrl, batchWindowSeconds]
@@ -6150,10 +6175,11 @@ components:
         displayName: { type: string, maxLength: 120 }
     ServiceCustomerAdded:
       type: object
-      required: [customer, invited]
+      required: [customer, invited, emailed]
       properties:
         customer: { $ref: '#/components/schemas/ServiceCustomer' }
-        invited: { type: boolean, description: A new customer account was created and emailed an invitation }
+        invited: { type: boolean, description: A new customer account was created with an invitation to choose a password }
+        emailed: { $ref: '#/components/schemas/Emailed' }
     Queue:
       type: object
       required: [id, name, jql, position, count]
@@ -6363,7 +6389,13 @@ components:
         reporter: { $ref: '#/components/schemas/PortalPerson' }
         resolution: { type: string }
         createdAt: { type: string, format: date-time }
-        updatedAt: { type: string, format: date-time }
+        updatedAt:
+          type: string
+          format: date-time
+          description: |
+            The latest activity the caller can see: the request was raised, a reply they can see, a
+            status change or a file added in the help centre. Internal notes and other changes
+            agents make do not count.
         role: { type: string, enum: [reporter, participant, approver], description: Why the caller sees it }
     PortalFieldValue:
       type: object

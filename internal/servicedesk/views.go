@@ -2,6 +2,7 @@ package servicedesk
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -30,12 +31,15 @@ type portalLookups struct {
 	users    map[uuid.UUID]dbq.User
 	requests map[uuid.UUID]dbq.ServiceRequest
 	types    map[uuid.UUID]dbq.RequestType
+	// activity is each request's latest public activity, shown as its last update.
+	activity map[uuid.UUID]time.Time
 }
 
 func (s *Service) loadPortal(ctx context.Context, issues []dbq.Issue) (*portalLookups, error) {
 	l := &portalLookups{
 		projects: map[uuid.UUID]dbq.Project{}, desks: map[uuid.UUID]dbq.ServiceDesk{}, statuses: map[uuid.UUID]dbq.Status{},
 		users: map[uuid.UUID]dbq.User{}, requests: map[uuid.UUID]dbq.ServiceRequest{}, types: map[uuid.UUID]dbq.RequestType{},
+		activity: map[uuid.UUID]time.Time{},
 	}
 	var projectIDs, statusIDs, userIDs, issueIDs []uuid.UUID
 	for _, i := range issues {
@@ -74,6 +78,13 @@ func (s *Service) loadPortal(ctx context.Context, issues []dbq.Issue) (*portalLo
 	if err != nil {
 		return nil, err
 	}
+	acts, err := s.Q.RequestPublicActivity(ctx, issueIDs)
+	if err != nil {
+		return nil, err
+	}
+	for _, a := range acts {
+		l.activity[a.ID] = a.At
+	}
 	for _, sr := range srs {
 		l.requests[sr.IssueID] = sr
 		if sr.RequestTypeID != nil {
@@ -92,8 +103,13 @@ func (l *portalLookups) request(i dbq.Issue, role string) api.PortalRequest {
 	v := api.PortalRequest{
 		Key: tracker.IssueKey(p, i), Summary: i.Summary, Status: tracker.StatusView(l.statuses[i.StatusID]),
 		Desk: api.PortalDeskRef{ProjectKey: p.Key, Name: l.desks[p.ID].PortalName}, Resolution: i.Resolution,
-		CreatedAt: i.CreatedAt, UpdatedAt: i.UpdatedAt, Role: api.PortalRequestRole(role),
+		CreatedAt: i.CreatedAt, UpdatedAt: i.CreatedAt, Role: api.PortalRequestRole(role),
 		Reporter: api.PortalPerson{DisplayName: "Unknown"},
+	}
+	// Not the issue's updated_at: replies don't move it, and edits the customer never sees (the
+	// assignee, labels) do.
+	if at, ok := l.activity[i.ID]; ok {
+		v.UpdatedAt = at
 	}
 	if v.Desk.Name == "" {
 		v.Desk.Name = p.Name

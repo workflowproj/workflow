@@ -202,7 +202,8 @@ func (s *Server) ListUsers(ctx context.Context, req api.ListUsersRequestObject) 
 		if a.OrgRole == "guest" {
 			return nil, apperr.Forbidden("guests can only search people within a project")
 		}
-		users, err = s.Q.SearchUsers(ctx, dbq.SearchUsersParams{Q: deref(req.Params.Q), Lim: int32(limit)})
+		exclude := req.Params.Customers != nil && !*req.Params.Customers
+		users, err = s.Q.SearchUsers(ctx, dbq.SearchUsersParams{Q: deref(req.Params.Q), ExcludeCustomers: exclude, Lim: int32(limit)})
 	}
 	if err != nil {
 		return nil, err
