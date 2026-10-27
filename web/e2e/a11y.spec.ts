@@ -27,6 +27,7 @@ test("accessibility: main pages in light and dark mode", async ({ page, browser 
   await anon.goto("/login");
   await audit(anon, "login");
   await anon.goto("/forgot-password");
+  await expect(anon.getByRole("heading", { name: "Reset your password" })).toBeVisible();
   await audit(anon, "forgot password");
   await ctx.close();
 
@@ -159,7 +160,8 @@ test("accessibility: main pages in light and dark mode", async ({ page, browser 
     await visitor.goto("/login");
     await visitor.evaluate((t) => localStorage.setItem("wfm.theme", t), theme);
     await visitor.goto(`/portal/signup/${sd}`);
-    await expect(visitor.getByRole("heading", { name: /Get help from/ })).toBeVisible();
+    // The form, or (on a server without email, as in development) why sign-up isn't available.
+    await expect(visitor.getByRole("heading", { name: /Get help from|Sign-up is not available/ })).toBeVisible();
     await audit(visitor, `portal sign-up (${theme})`);
   }
   await anonDesk.close();
