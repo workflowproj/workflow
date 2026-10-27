@@ -184,9 +184,25 @@ Findings show under the repository's Security tab. Dependabot (`.github/dependab
 grouped weekly updates for Go modules, npm packages, GitHub Actions and the Dockerfile's base
 images. Run the quick scans locally with `make security-tools security`.
 
-`.github/workflows/release.yml` runs on a `vX.Y.Z` tag: a multi-arch image signed with Cosign
-(keyless) with an attested SBOM, the Helm chart as a signed OCI artifact, offline bundles for
-amd64 and arm64, and a GitHub release.
+### Releases
+
+Versions follow [semantic versioning](https://semver.org) and come from
+[conventional commit](https://www.conventionalcommits.org) messages on `main` (for a squash merge,
+the pull request title):
+
+| Commit | Next version |
+|---|---|
+| `fix: ...` | patch: 0.1.0 → 0.1.1 |
+| `feat: ...` | minor: 0.1.0 → 0.2.0 |
+| `feat!: ...` or a `BREAKING CHANGE:` footer | major (minor while the version is 0.x) |
+| `docs:`, `chore:`, `ci:`, `refactor:`, `test:` ... | no release on their own |
+
+`.github/workflows/release-please.yml` keeps a release pull request open with the next version,
+the `CHANGELOG.md` entries and the chart's `version` and `appVersion`. Merging it tags `vX.Y.Z`,
+creates the GitHub release with the changelog, and starts `.github/workflows/release.yml`: a
+multi-arch image signed with Cosign (keyless) with an attested SBOM, the Helm chart as a signed
+OCI artifact, and offline bundles for amd64 and arm64, attached to the release. To force a
+version, add a `Release-As: 1.0.0` footer to a commit.
 
 ## Documentation
 
