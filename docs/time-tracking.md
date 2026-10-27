@@ -76,7 +76,8 @@ boards and open issue views refresh live and automation rules on field changes c
 ## Sprint report in hours
 
 The sprint report (Reports page, and the sprint burndown, burnup and health dashboard gadgets)
-has an **Hours** measure next to story points and issues:
+has an **Hours** measure next to story points and issues. Unlike issue counts and story points,
+hours include sub-tasks: their estimates and the time logged on them are part of the sprint's work.
 
 - **Committed** — the remaining estimate of the sprint's open issues when it started.
 - **Remaining** each day — the remaining estimate of the issues in the sprint that are not done,

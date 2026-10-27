@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"encoding/json"
+	"math"
 
 	"github.com/google/uuid"
 
@@ -19,7 +20,7 @@ func (s *Server) ListProjectTemplates(ctx context.Context, _ api.ListProjectTemp
 	}
 	out := api.ListProjectTemplates200JSONResponse{}
 	for _, t := range tracker.Templates() {
-		v := api.ProjectTemplate{Id: t.ID, Name: t.Name, Description: t.Description, BoardType: api.BoardType(t.BoardType), IssueTypes: []api.TemplateIssueType{}, Workflows: []string{}}
+		v := api.ProjectTemplate{Id: t.ID, Name: t.Name, Description: t.Description, BoardType: api.BoardType(t.BoardType), IssueTypes: []api.TemplateIssueType{}, Workflows: []string{}, RisksDecisions: t.RisksDecisions}
 		for _, it := range t.IssueTypes {
 			v.IssueTypes = append(v.IssueTypes, api.TemplateIssueType{Key: it.Key, Name: it.Name, Level: it.Level})
 		}
@@ -83,7 +84,7 @@ func (s *Server) CreateProject(ctx context.Context, req api.CreateProjectRequest
 	if b.Access != nil && *b.Access == api.ProjectAccessPrivate {
 		openRole = ""
 	}
-	p, err := s.Tracker.CreateProject(ctx, a, tracker.ProjectInput{Key: b.Key, Name: b.Name, Description: deref(b.Description), Template: b.Template, OpenRoleKey: openRole})
+	p, err := s.Tracker.CreateProject(ctx, a, tracker.ProjectInput{Key: b.Key, Name: b.Name, Description: deref(b.Description), Template: b.Template, OpenRoleKey: openRole, RisksDecisions: b.RisksDecisions})
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +102,7 @@ func (s *Server) UpdateProject(ctx context.Context, req api.UpdateProjectRequest
 		return nil, err
 	}
 	b := req.Body
-	patch := tracker.ProjectPatch{Key: b.Key, Name: b.Name, Description: b.Description}
+	patch := tracker.ProjectPatch{Key: b.Key, Name: b.Name, Description: b.Description, RisksDecisions: b.RisksDecisions}
 	if b.LeadId.IsSpecified() {
 		var lead *uuid.UUID
 		if !b.LeadId.IsNull() {
@@ -229,7 +230,7 @@ func (s *Server) ListProjectLabels(ctx context.Context, req api.ListProjectLabel
 
 func issueTypeView(t dbq.IssueType, workflowName string) api.IssueType {
 	return api.IssueType{Id: t.ID, Key: t.Key, Name: t.Name, Description: t.Description, Icon: t.Icon, Color: t.Color,
-		Level: int(t.Level), Position: int(t.Position), WorkflowId: t.WorkflowID, WorkflowName: workflowName}
+		Level: int(t.Level), Kind: api.IssueTypeKind(t.Kind), Position: int(t.Position), WorkflowId: t.WorkflowID, WorkflowName: workflowName}
 }
 
 func (s *Server) workflowName(ctx context.Context, id uuid.UUID) string {
@@ -255,7 +256,7 @@ func (s *Server) ListIssueTypes(ctx context.Context, req api.ListIssueTypesReque
 	}
 	out := api.ListIssueTypes200JSONResponse{}
 	for _, r := range rows {
-		t := dbq.IssueType{ID: r.ID, ProjectID: r.ProjectID, Key: r.Key, Name: r.Name, Description: r.Description, Icon: r.Icon, Color: r.Color, Level: r.Level, Position: r.Position, WorkflowID: r.WorkflowID}
+		t := dbq.IssueType{ID: r.ID, ProjectID: r.ProjectID, Key: r.Key, Name: r.Name, Description: r.Description, Icon: r.Icon, Color: r.Color, Level: r.Level, Position: r.Position, WorkflowID: r.WorkflowID, Kind: r.Kind}
 		out = append(out, issueTypeView(t, r.WorkflowName))
 	}
 	return out, nil
@@ -267,9 +268,13 @@ func (s *Server) CreateIssueType(ctx context.Context, req api.CreateIssueTypeReq
 		return nil, err
 	}
 	b := req.Body
-	t, err := s.Tracker.CreateIssueType(ctx, a, req.ProjectKey, tracker.IssueTypeInput{
+	in := tracker.IssueTypeInput{
 		Key: b.Key, Name: b.Name, Description: deref(b.Description), Icon: deref(b.Icon), Color: deref(b.Color), Level: b.Level, WorkflowID: b.WorkflowId,
-	})
+	}
+	if b.Kind != nil {
+		in.Kind = string(*b.Kind)
+	}
+	t, err := s.Tracker.CreateIssueType(ctx, a, req.ProjectKey, in)
 	if err != nil {
 		return nil, err
 	}
@@ -300,6 +305,30 @@ func (s *Server) DeleteIssueType(ctx context.Context, req api.DeleteIssueTypeReq
 		return nil, err
 	}
 	return api.DeleteIssueType204Response{}, nil
+}
+
+func (s *Server) GetRiskRegister(ctx context.Context, req api.GetRiskRegisterRequestObject) (api.GetRiskRegisterResponseObject, error) {
+	a, err := actor(ctx)
+	if err != nil {
+		return nil, err
+	}
+	r, err := s.Tracker.RiskRegister(ctx, a, req.ProjectKey)
+	if err != nil {
+		return nil, err
+	}
+	return api.GetRiskRegister200JSONResponse(r), nil
+}
+
+func (s *Server) GetDecisionLog(ctx context.Context, req api.GetDecisionLogRequestObject) (api.GetDecisionLogResponseObject, error) {
+	a, err := actor(ctx)
+	if err != nil {
+		return nil, err
+	}
+	l, err := s.Tracker.DecisionLog(ctx, a, req.ProjectKey)
+	if err != nil {
+		return nil, err
+	}
+	return api.GetDecisionLog200JSONResponse(l), nil
 }
 
 func (s *Server) GetCycleTimeReport(ctx context.Context, req api.GetCycleTimeReportRequestObject) (api.GetCycleTimeReportResponseObject, error) {
@@ -355,7 +384,12 @@ func definitionView(def *workflow.Definition) api.WorkflowDefinition {
 			sc := []api.ScreenField{}
 			for _, f := range t.Screen {
 				req := f.Required
-				sc = append(sc, api.ScreenField{Field: f.Field, Required: &req})
+				sf := api.ScreenField{Field: f.Field, Required: &req}
+				if len(f.Options) > 0 {
+					opts := f.Options
+					sf.Options = &opts
+				}
+				sc = append(sc, sf)
 			}
 			tv.Screen = &sc
 		}
@@ -598,6 +632,9 @@ func (s *Server) GetWorkflowVersion(ctx context.Context, req api.GetWorkflowVers
 	}
 	if _, err := s.Tracker.GetWorkflow(ctx, a, req.WorkflowId); err != nil {
 		return nil, err
+	}
+	if req.Version < 1 || req.Version > math.MaxInt32 {
+		return nil, apperr.NotFound("workflow version")
 	}
 	wv, err := s.Q.GetWorkflowVersion(ctx, dbq.GetWorkflowVersionParams{WorkflowID: req.WorkflowId, Version: int32(req.Version)})
 	if err != nil {

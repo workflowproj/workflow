@@ -4,11 +4,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FolderPlus, Globe, Lock } from "lucide-react";
 import { api, ApiError, unwrap } from "@/api/client";
 import { projectsQuery } from "@/api/queries";
-import { Badge, Button, EmptyState, Field, Input, Modal, PageHeader, PageSpinner, Select, Textarea, table } from "@/components/ui";
+import { Badge, Button, Checkbox, EmptyState, Field, Input, Modal, PageHeader, PageSpinner, Select, Textarea, table } from "@/components/ui";
 import { ErrorBox } from "@/components/ErrorBox";
 import { UserAvatar } from "@/components/UserAvatar";
 import { ProjectAvatar } from "@/layout/AppShell";
 import { cn } from "@/lib/cn";
+import { projectHome } from "@/lib/project";
 
 export function ProjectsPage() {
   const { data: projects, isLoading, error } = useQuery(projectsQuery);
@@ -61,7 +62,7 @@ export function ProjectsPage() {
                 {shown.map((p) => (
                   <tr key={p.id} className="hover:bg-surface-2">
                     <td>
-                      <Link to="/projects/$projectKey/board" params={{ projectKey: p.key }} className="flex items-center gap-2.5 font-medium hover:text-accent">
+                      <Link to={projectHome(p)} params={{ projectKey: p.key }} className="flex items-center gap-2.5 font-medium hover:text-accent">
                         <ProjectAvatar projectKey={p.key} size={24} />
                         {p.name}
                       </Link>
@@ -114,12 +115,15 @@ function CreateProjectDialog({ open, onClose }: { open: boolean; onClose: () => 
   const [template, setTemplate] = useState("scrum");
   const [access, setAccess] = useState<"open" | "private">("open");
   const [description, setDescription] = useState("");
+  // Risks and decisions follow the template unless changed here.
+  const [risks, setRisks] = useState<boolean | null>(null);
+  const risksDecisions = risks ?? templates.find((t) => t.id === template)?.risksDecisions ?? false;
   const create = useMutation({
-    mutationFn: () => unwrap(api.POST("/projects", { body: { name, key, template, access, description } })),
+    mutationFn: () => unwrap(api.POST("/projects", { body: { name, key, template, access, description, risksDecisions } })),
     onSuccess: (p) => {
       qc.invalidateQueries({ queryKey: ["projects"] });
       onClose();
-      navigate({ to: p.template === "service" ? "/projects/$projectKey/queues" : "/projects/$projectKey/board", params: { projectKey: p.key } });
+      navigate({ to: projectHome(p), params: { projectKey: p.key } });
     },
   });
   const fe = create.error instanceof ApiError ? create.error.fieldErrors() : {};
@@ -208,6 +212,10 @@ function CreateProjectDialog({ open, onClose }: { open: boolean; onClose: () => 
           )}
         </Field>
         <Field label="Description">{(id) => <Textarea id={id} rows={2} value={description} onChange={(e) => setDescription(e.target.value)} />}</Field>
+        <div>
+          <Checkbox label="Keep a risk register and a decision log" checked={risksDecisions} onChange={(e) => setRisks(e.target.checked)} />
+          <p className="mt-1 ml-6 text-xs text-muted">Risks and decisions get their own tabs and stay out of sprints, boards and reports. You can change this in the project's settings.</p>
+        </div>
         {create.error && Object.keys(fe).length === 0 && <ErrorBox error={create.error} />}
       </form>
     </Modal>

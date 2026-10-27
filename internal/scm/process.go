@@ -77,6 +77,11 @@ func (s *Service) scopeFor(ctx context.Context, c dbq.ScmConnection, ref RepoRef
 	if err != nil {
 		return nil, err
 	}
+	return s.scopeOf(ctx, c, repo)
+}
+
+// scopeOf is a stored repository's scope.
+func (s *Service) scopeOf(ctx context.Context, c dbq.ScmConnection, repo dbq.ScmRepository) (*scope, error) {
 	projects, err := s.Q.RepositoryProjects(ctx, repo.ID)
 	if err != nil {
 		return nil, err
@@ -149,6 +154,10 @@ func (s *Service) apply(ctx context.Context, c dbq.ScmConnection, e any, live bo
 		return len(links), nil
 	case PipelineEvent:
 		return s.applyPipeline(ctx, c, ev, live)
+	case TagEvent:
+		return s.applyTag(ctx, c, ev)
+	case DeploymentEvent:
+		return s.applyDeployment(ctx, c, ev)
 	}
 	return 0, nil
 }
@@ -304,7 +313,7 @@ func (s *Service) runSmartCommits(ctx context.Context, sc *scope, key string, cm
 		}
 		switch cmd.Command {
 		case "comment":
-			if _, err := s.Tracker.AddComment(ctx, actor, issue.ID.String(), cmd.Arg+fmt.Sprintf("\n\n<sub>via commit %s</sub>", shortSHA(cm.SHA))); err != nil {
+			if _, err := s.Tracker.AddComment(ctx, actor, issue.ID.String(), cmd.Arg+"\n\n"+commitFooter(cm)); err != nil {
 				s.Log.Warn("smart commit comment failed", "issue", key, "error", err)
 			}
 		default:
@@ -316,6 +325,17 @@ func (s *Service) runSmartCommits(ctx context.Context, sc *scope, key string, cm
 			}
 		}
 	}
+}
+
+// commitFooter names the commit a smart-commit comment came from, in Markdown that every
+// renderer shows (comments render no HTML): a link to the commit when the host gave a usable
+// URL, else the short SHA as code.
+func commitFooter(cm Commit) string {
+	sha := shortSHA(cm.SHA)
+	if u := webURL(cm.URL); u != "" && !strings.ContainsAny(u, " ()[]<>") {
+		return fmt.Sprintf("Via commit [%s](%s)", sha, u)
+	}
+	return fmt.Sprintf("Via commit `%s`", sha)
 }
 
 func containsKey(keys []string, key string) bool {
@@ -476,6 +496,20 @@ func (s *Service) Reconcile(ctx context.Context, connectionID *uuid.UUID) error 
 		if err := s.reconcileConnection(ctx, c); err != nil {
 			s.Log.Warn("reconcile failed", "connection", c.Name, "error", err)
 			errs = append(errs, fmt.Sprintf("%s: %v", c.Name, err))
+			continue
+		}
+		// Syncing one connection (Sync now) also updates the hooks Workflow manages, so hooks
+		// created by earlier versions subscribe to the events handled now (tags, deployments).
+		if connectionID != nil && c.ManageHooks && c.Provider == "gitlab" && s.Jobs != nil {
+			linked, err := s.Q.LinkedRepositories(ctx, c.ID)
+			if err != nil {
+				return err
+			}
+			for _, r := range linked {
+				if _, err := s.Jobs.Insert(ctx, jobs.SCMEnsureHook{RepositoryID: r.ID}, nil); err != nil {
+					return err
+				}
+			}
 		}
 	}
 	if len(errs) > 0 {

@@ -99,12 +99,12 @@ internal ingress, like the UI and API; assistants must be able to reach that add
 | `get_sprint_report` | a sprint's commitment, completion, scope change and day-by-day burndown |
 | `get_metrics` | `summary`, `breakdown`, `cycle_time`, `created_resolved`, `cumulative_flow` or `velocity` over projects and a query |
 | `find_users` | people by name or email |
-| `create_issue` | create an issue (type, summary, Markdown description, priority, assignee by email or `me`, parent, labels, points, sprint, dates) |
-| `update_issue` | change fields; `clear` empties them |
+| `create_issue` | create an issue (type, summary, Markdown description, priority, assignee by email or `me`, parent, labels, points, sprint, dates, custom `fields` by key such as a risk's `risk_likelihood` and `risk_impact`) |
+| `update_issue` | change fields (custom ones in `fields`, where `null` clears one); `clear` empties them |
 | `transition_issue` | run a workflow transition by id, name or target status, with screen fields and a comment |
 | `add_comment` | comment (Markdown); on service requests an internal note unless `visibility` is `public` (a reply the customer is emailed) |
 | `log_work` | log time spent (`2h`, `1d 4h`), when it was done, a description; the remaining estimate goes down by the time logged unless `remainingEstimate` sets it or `leaveEstimate` keeps it |
-| `link_issues` | `blocks`, `relates`, `duplicates` or `clones` |
+| `link_issues` | `blocks`, `relates`, `duplicates`, `clones`, `mitigates` (work → risk), `implements` (work → decision) or `supersedes` (decision → decision), or the inward wording (`is mitigated by`, …); see [risks-decisions.md](risks-decisions.md) |
 
 Read tools are annotated read-only; nothing deletes. An app you allowed only to read is offered
 only the read tools. Errors (the position of a query error, a validator refusing a transition, a
@@ -114,7 +114,8 @@ itself.
 Things to ask: *"What's in progress on PLAT and who's on it?"*, *"File a bug in PLAT for the
 Safari checkout crash, high priority, assign it to me and put it in the active sprint"*, *"Move
 PLAT-42 to review with a comment summarising the PR"*, *"How is the sprint going — is scope
-creeping?"*, *"Which bugs took longest to fix this month?"*.
+creeping?"*, *"Which bugs took longest to fix this month?"*, *"Which critical risks in PLAT have
+no mitigating work?"*.
 
 ## How sign-in works
 

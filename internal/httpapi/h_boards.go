@@ -303,7 +303,11 @@ func (s *Server) GetSprintReport(ctx context.Context, req api.GetSprintReportReq
 // Releases
 
 func releaseInput(b api.ReleaseInput) tracker.ReleaseInput {
-	in := tracker.ReleaseInput{Name: b.Name, Description: b.Description, StartDate: dateOpt(b.StartDate, b.StartDate.MustGet), ReleaseDate: dateOpt(b.ReleaseDate, b.ReleaseDate.MustGet)}
+	in := tracker.ReleaseInput{
+		Name: b.Name, Description: b.Description, StartDate: dateOpt(b.StartDate, b.StartDate.MustGet), ReleaseDate: dateOpt(b.ReleaseDate, b.ReleaseDate.MustGet),
+		Notes: b.Notes, NotesPublished: b.NotesPublished,
+		TagRepositoryID: opt(b.TagRepositoryId), TagName: opt(b.TagName),
+	}
 	if b.State != nil {
 		st := string(*b.State)
 		in.State = &st
@@ -322,9 +326,7 @@ func (s *Server) ListReleases(ctx context.Context, req api.ListReleasesRequestOb
 	}
 	out := api.ListReleases200JSONResponse{}
 	for _, r := range rows {
-		rel := dbq.Release{ID: r.ID, ProjectID: r.ProjectID, Name: r.Name, Description: r.Description, StartDate: r.StartDate, ReleaseDate: r.ReleaseDate,
-			State: r.State, ReleasedAt: r.ReleasedAt, Position: r.Position, CreatedAt: r.CreatedAt}
-		out = append(out, tracker.ReleaseView(rel, int(r.IssueCount), int(r.DoneCount)))
+		out = append(out, tracker.ReleaseView(r.Release, int(r.IssueCount), int(r.DoneCount)))
 	}
 	return out, nil
 }
@@ -416,9 +418,7 @@ func (s *Server) GetTimeline(ctx context.Context, req api.GetTimelineRequestObje
 	}
 	for _, pr := range tl.Releases {
 		r := pr.Release
-		rel := dbq.Release{ID: r.ID, ProjectID: r.ProjectID, Name: r.Name, Description: r.Description, StartDate: r.StartDate, ReleaseDate: r.ReleaseDate,
-			State: r.State, ReleasedAt: r.ReleasedAt, Position: r.Position, CreatedAt: r.CreatedAt}
-		out.Releases = append(out.Releases, api.TimelineRelease{ProjectKey: pr.ProjectKey, Release: tracker.ReleaseView(rel, int(r.IssueCount), int(r.DoneCount))})
+		out.Releases = append(out.Releases, api.TimelineRelease{ProjectKey: pr.ProjectKey, Release: tracker.ReleaseView(r.Release, int(r.IssueCount), int(r.DoneCount))})
 	}
 	return out, nil
 }

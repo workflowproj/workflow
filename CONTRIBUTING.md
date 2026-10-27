@@ -168,6 +168,22 @@ WFM_TEST_KEYCLOAK_URL=http://127.0.0.1:8180 go test ./internal/integration -run 
 | Image | The container image builds |
 | End to end | An ephemeral k3d cluster with CloudNativePG and the Keycloak realm: the chart is installed and upgraded, the ingress split is checked through Traefik, sign-in redirects to Keycloak, a directory sync provisions the realm's access group, and the Playwright suite runs against it. On pull requests it runs when the `e2e` label is added |
 
+`.github/workflows/security.yml` runs on every push and pull request, and weekly:
+
+| Job | What runs |
+| --- | --- |
+| Go vulnerabilities | `govulncheck` with the Go release the image is built with: known vulnerabilities in code the binary can reach |
+| Go static analysis | `gosec`; a reviewed false positive carries a `#nosec <rule> -- reason` comment |
+| CodeQL | Go, TypeScript and the GitHub Actions workflows, with the `security-extended` queries |
+| Secrets | `gitleaks` over the whole history; `.gitleaks.toml` allows the test fixtures by path |
+| UI dependencies | `npm audit`, failing on anything that ships in the UI bundle |
+| Trivy | Vulnerabilities in `go.mod` and `package-lock.json`, misconfigurations in the Dockerfile and the Helm chart, and the built image; accepted findings go in `.trivyignore` with a reason |
+| Dependency review | On pull requests, any new dependency with a known high or critical vulnerability |
+
+Findings show under the repository's Security tab. Dependabot (`.github/dependabot.yml`) proposes
+grouped weekly updates for Go modules, npm packages, GitHub Actions and the Dockerfile's base
+images. Run the quick scans locally with `make security-tools security`.
+
 `.github/workflows/release.yml` runs on a `vX.Y.Z` tag: a multi-arch image signed with Cosign
 (keyless) with an attested SBOM, the Helm chart as a signed OCI artifact, offline bundles for
 amd64 and arm64, and a GitHub release.
@@ -191,6 +207,7 @@ For a large change, open an issue to discuss it before starting on a pull reques
 ## Pull requests
 
 - Keep each pull request to one change, with its tests and documentation.
-- Run `make lint`, `make test` and `cd web && npm test` before pushing; add the `e2e` label when
+- Run `make lint`, `make test` and `cd web && npm test` before pushing (and `make security` when
+  you add a dependency or touch sign-in, tokens or outbound requests); add the `e2e` label when
   the change touches the UI, sign-in or the chart.
 - Commit generated code with the change that caused it.

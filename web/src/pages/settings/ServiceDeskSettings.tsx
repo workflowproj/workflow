@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { getRouteApi, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowDown, ArrowUp, ListFilter, Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, ListFilter, Megaphone, Pencil, Plus, Trash2 } from "lucide-react";
 import { api, ApiError, unwrap } from "@/api/client";
-import { Button, EmptyState, Field, IconButton, Input, Modal, PageHeader, PageSpinner, Textarea, useConfirm, useToast } from "@/components/ui";
+import { projectsQuery, providersQuery } from "@/api/queries";
+import { Button, EmptyState, Field, IconButton, Input, Modal, PageHeader, PageSpinner, Select, Textarea, useConfirm, useToast } from "@/components/ui";
 import { ErrorBox } from "@/components/ErrorBox";
 import { Callout, CopyField, SettingsSection, Switch } from "@/features/settings/common";
 import { queuesQuery, serviceDeskQuery, type Queue, type ServiceDesk } from "@/features/servicedesk/api";
@@ -21,8 +22,91 @@ export function PortalSettings() {
     <div className="flex max-w-3xl flex-col gap-5">
       <PageHeader title="Help centre" subtitle="What customers see when they raise requests, and who may raise them." />
       {desk.error && <ErrorBox error={desk.error} />}
-      {desk.isLoading ? <PageSpinner /> : desk.data && <PortalForm key={desk.data.projectKey} desk={desk.data} />}
+      {desk.isLoading ? (
+        <PageSpinner />
+      ) : (
+        desk.data && (
+          <>
+            <PortalForm key={desk.data.projectKey} desk={desk.data} />
+            <WhatsNewSection desk={desk.data} />
+          </>
+        )
+      )}
     </div>
+  );
+}
+
+/**
+ * WhatsNewSection chooses the software projects whose published release notes the help centre's
+ * What's new page shows. Changes save at once.
+ */
+function WhatsNewSection({ desk }: { desk: ServiceDesk }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const { data: projects = [] } = useQuery(projectsQuery);
+  const [adding, setAdding] = useState("");
+  const chosen = desk.releaseNotesProjects;
+  const candidates = projects.filter((p) => p.template !== "service" && !chosen.some((c) => c.key === p.key));
+  const save = useMutation({
+    mutationFn: (keys: string[]) => unwrap(api.PATCH("/projects/{projectKey}/service-desk", { params: { path: { projectKey: desk.projectKey } }, body: { releaseNotesProjectKeys: keys } })),
+    onSuccess: (d) => {
+      qc.setQueryData(["service-desk", desk.projectKey], d);
+      qc.invalidateQueries({ queryKey: ["portal"] });
+      setAdding("");
+      toast.success("What's new saved");
+    },
+    onError: toast.error,
+  });
+  const keys = chosen.map((c) => c.key);
+  return (
+    <SettingsSection
+      title="What's new"
+      description="Customers read the release notes that these projects publish on the help centre's What's new page: only the notes, never the issues."
+    >
+      {chosen.length === 0 ? (
+        <p className="px-4 pt-4 text-sm text-muted">No projects yet. The What's new page appears once a chosen project publishes release notes.</p>
+      ) : (
+        <ul className="divide-y divide-line">
+          {chosen.map((p) => (
+            <li key={p.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
+              <Megaphone aria-hidden className="size-4 text-faint" />
+              <span className="min-w-0 flex-1">
+                <Link to="/projects/$projectKey/releases" params={{ projectKey: p.key }} className="font-medium hover:text-accent hover:underline">
+                  {p.name}
+                </Link>{" "}
+                <span className="font-mono text-xs text-muted">{p.key}</span>
+              </span>
+              <IconButton label={`Stop showing ${p.name}'s release notes`} size="sm" disabled={save.isPending} onClick={() => save.mutate(keys.filter((k) => k !== p.key))}>
+                <Trash2 className="size-4" />
+              </IconButton>
+            </li>
+          ))}
+        </ul>
+      )}
+      <form
+        className="flex flex-wrap items-end gap-2 border-t border-line p-4 first:border-t-0"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (adding) save.mutate([...keys, adding]);
+        }}
+      >
+        <Field label="Show release notes of" className="min-w-56 flex-1">
+          {(id) => (
+            <Select id={id} value={adding} onChange={(e) => setAdding(e.target.value)}>
+              <option value="">Choose a project…</option>
+              {candidates.map((p) => (
+                <option key={p.id} value={p.key}>
+                  {p.name} ({p.key})
+                </option>
+              ))}
+            </Select>
+          )}
+        </Field>
+        <Button type="submit" icon={<Plus className="size-4" />} disabled={!adding} loading={save.isPending}>
+          Add
+        </Button>
+      </form>
+    </SettingsSection>
   );
 }
 
@@ -50,6 +134,7 @@ function PortalForm({ desk }: { desk: ServiceDesk }) {
   const errs = save.error instanceof ApiError ? save.error.fieldErrors() : {};
   const dirty = name !== desk.portalName || description !== desk.portalDescription || access !== desk.portalAccess || selfSignup !== desk.selfSignup;
   const signupUrl = new URL(`/portal/signup/${desk.projectKey}`, desk.portalUrl).toString();
+  const emailDelivery = useQuery(providersQuery).data?.emailDelivery;
   return (
     <>
       {desk.openProject && (
@@ -110,6 +195,11 @@ function PortalForm({ desk }: { desk: ServiceDesk }) {
               <p className="text-[13px] text-muted">
                 Anyone with the sign-up link can create a customer account after confirming their email address. Needs password sign-in (local accounts) to be enabled.
               </p>
+              {selfSignup && emailDelivery === false && (
+                <Callout tone="warning" title="Sign-up needs email">
+                  Signing up emails a link to choose a password, and this server doesn't send email (WFM_SMTP_HOST isn't set). The sign-up page says so and asks people for an invitation instead.
+                </Callout>
+              )}
               {desk.selfSignup && <CopyField value={signupUrl} label="Copy sign-up link" />}
             </div>
           </div>

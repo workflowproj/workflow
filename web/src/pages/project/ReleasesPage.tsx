@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
-import { getRouteApi } from "@tanstack/react-router";
+import { getRouteApi, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Archive, ArchiveRestore, CalendarDays, ChevronRight, MoreHorizontal, Package, Pencil, Plus, Rocket, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, CalendarDays, ChevronRight, Megaphone, MoreHorizontal, Package, Pencil, Plus, Rocket, Tag, Trash2 } from "lucide-react";
 import { api, unwrap } from "@/api/client";
 import { hasPermission, useProject } from "@/api/queries";
 import type { Project } from "@/api/types";
@@ -126,7 +126,6 @@ function Releases({ project, onOpen }: { project: Project; onOpen: (key: string)
         release={dialog?.kind === "ship" ? dialog.release : null}
         others={releases.filter((r) => r.state === "unreleased" && r.id !== dialog?.release?.id)}
         openCount={dialog?.kind === "ship" ? dialog.release.issueCount - dialog.release.doneCount : 0}
-        projectKey={project.key}
       />
     </>
   );
@@ -183,17 +182,39 @@ function ReleaseItem({
   return (
     <li className="border-b border-line last:border-b-0">
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2 px-3 py-3 sm:flex-nowrap">
-        <button type="button" onClick={onToggle} aria-expanded={open} className="flex min-w-0 flex-1 items-center gap-2 rounded text-left focus-visible:outline-2 focus-visible:outline-accent">
-          <ChevronRight className={cn("size-4 shrink-0 text-faint transition-transform", open && "rotate-90")} />
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-expanded={open}
+            aria-label={`${open ? "Hide" : "Show"} the issues of ${r.name}`}
+            className="rounded p-0.5 text-faint hover:bg-surface-2 hover:text-ink focus-visible:outline-2 focus-visible:outline-accent"
+          >
+            <ChevronRight className={cn("size-4 shrink-0 transition-transform", open && "rotate-90")} />
+          </button>
           <span className="min-w-0">
             <span className="flex flex-wrap items-center gap-2">
-              <span className="font-semibold">{r.name}</span>
+              <Link to="/projects/$projectKey/releases/$releaseId" params={{ projectKey: project.key, releaseId: r.id }} className="font-semibold hover:text-accent hover:underline">
+                {r.name}
+              </Link>
               <StateBadge release={r} />
               {overdue && <Badge tone="warning">Overdue</Badge>}
+              {r.tagName && (
+                <span className="inline-flex items-center gap-1 font-mono text-xs text-muted" title="Git tag">
+                  <Tag aria-hidden className="size-3" />
+                  {r.tagName}
+                </span>
+              )}
+              {r.notesPublished && (
+                <span className="inline-flex items-center gap-1 text-xs text-muted" title="Release notes shown in help centres">
+                  <Megaphone aria-hidden className="size-3" />
+                  Notes published
+                </span>
+              )}
             </span>
             {r.description && <span className="mt-0.5 block truncate text-xs text-muted">{r.description}</span>}
           </span>
-        </button>
+        </div>
         <Progress done={r.doneCount} total={r.issueCount} />
         <div className="w-44 shrink-0 text-xs text-muted" title={r.releasedAt ? `Released ${formatDateTime(r.releasedAt)}` : undefined}>
           {r.startDate || r.releaseDate ? (

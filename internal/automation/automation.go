@@ -55,7 +55,7 @@ func New(pool *pgxpool.Pool, tr *tracker.Service, eval *workflow.Evaluator, enq 
 // ---------------------------------------------------------------------------
 // Rules
 
-var TriggerTypes = []string{"issue.created", "issue.transitioned", "issue.field_changed", "pr.opened", "pr.merged", "commit.pushed", "branch.created", "pipeline.completed", "schedule", "sla.breached"}
+var TriggerTypes = []string{"issue.created", "issue.transitioned", "issue.field_changed", "pr.opened", "pr.merged", "commit.pushed", "branch.created", "pipeline.completed", "deployment.completed", "schedule", "sla.breached"}
 var ActionTypes = []string{"transition", "assign", "set_field", "comment", "add_label", "webhook", "notify", "rollup_dates", "chat"}
 
 // ActionTargets are the issues an action can apply to, relative to the one that triggered the rule.
@@ -71,6 +71,10 @@ type Trigger struct {
 
 	Cron string `json:"cron,omitempty"`
 	JQL  string `json:"jql,omitempty"`
+
+	// deployment.completed: only this environment (any case) and outcome (success or failed).
+	Environment string `json:"environment,omitempty"`
+	Status      string `json:"status,omitempty"`
 }
 
 type Action struct {
@@ -108,6 +112,9 @@ func (s *Service) validate(ctx context.Context, actor *authz.Actor, projectID uu
 	}
 	if in.Trigger.ToCategory != "" && !slices.Contains(categories, in.Trigger.ToCategory) {
 		return nil, apperr.Invalid("trigger.toCategory", "must be todo, in_progress or done")
+	}
+	if in.Trigger.Status != "" && !slices.Contains([]string{"success", "failed"}, in.Trigger.Status) {
+		return nil, apperr.Invalid("trigger.status", "must be success or failed")
 	}
 	var next *time.Time
 	if in.Trigger.Type == "schedule" {
@@ -283,6 +290,7 @@ var triggerForEvent = map[string]string{
 	"issue.created": "issue.created", "issue.transitioned": "issue.transitioned", "issue.updated": "issue.field_changed",
 	"pr.opened": "pr.opened", "pr.merged": "pr.merged", "commit.pushed": "commit.pushed",
 	"branch.created": "branch.created", "pipeline.completed": "pipeline.completed", "sla.breached": "sla.breached",
+	"deployment.completed": "deployment.completed",
 }
 
 // HandleDomainEvent is the worker entry point for jobs.DomainEvent.
@@ -325,6 +333,12 @@ func (s *Service) runRules(ctx context.Context, ev jobs.DomainEvent, data map[st
 			continue
 		}
 		if t.Field != "" && !changedAny(data, t.Field) {
+			continue
+		}
+		if t.Environment != "" && !strings.EqualFold(fmt.Sprint(data["environment"]), strings.TrimSpace(t.Environment)) {
+			continue
+		}
+		if t.Status != "" && fmt.Sprint(data["status"]) != t.Status {
 			continue
 		}
 		if ev.Depth >= s.Cfg.AutomationMaxDepth {
@@ -741,7 +755,7 @@ func (s *Service) HandlePostFunction(ctx context.Context, pf jobs.PostFunction) 
 // ---------------------------------------------------------------------------
 // Outbound webhooks
 
-var WebhookEvents = []string{"*", "issue.created", "issue.updated", "issue.transitioned", "issue.deleted", "comment.created", "sprint.started", "sprint.completed", "release.released", "sla.breached"}
+var WebhookEvents = []string{"*", "issue.created", "issue.updated", "issue.transitioned", "issue.deleted", "comment.created", "sprint.started", "sprint.completed", "release.released", "sla.breached", "deployment.completed"}
 
 func (s *Service) dispatchWebhooks(ctx context.Context, ev jobs.DomainEvent, data map[string]any) error {
 	if !slices.Contains(WebhookEvents[1:], ev.Event) {

@@ -26,7 +26,9 @@ using Jira during the move and re-run the import to pick up what changed.
      chosen status (the Scrum template's sub-tasks have no *In Review*), its issues use the first
      status of the same category in that workflow; the dry run says so.
    - **issue types** → epic, standard and sub-task types by hierarchy level, others by name,
-     unknown ones (Spike, Initiative…) to Task.
+     unknown ones (Spike, Initiative…) to Task. Imported issues are always work: risk and
+     decision types ([risks-decisions.md](risks-decisions.md)) are not offered, so a Jira *Risk*
+     type maps to Task unless you choose another work type.
    - **priorities** → Highest … Lowest by name; Blocker/Critical → Highest, Major → High,
      Minor → Low, Trivial → Lowest, others Medium.
    - **story points** from the number field named *Story Points* or *Story point estimate* that

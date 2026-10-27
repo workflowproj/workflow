@@ -18,6 +18,12 @@ export const TRIGGERS: { type: TriggerType; label: string; group: "Issues" | "De
   { type: "commit.pushed", label: "Commit pushed", group: "Development", hint: "A commit mentioning the issue key is pushed." },
   { type: "branch.created", label: "Branch created", group: "Development", hint: "A branch named after the issue key is created." },
   { type: "pipeline.completed", label: "Pipeline completed", group: "Development", hint: "CI for a branch or commit of the issue succeeds or fails (event.status)." },
+  {
+    type: "deployment.completed",
+    label: "Deployment completed",
+    group: "Development",
+    hint: "A deployment containing the issue succeeds or fails (event.environment, event.status, event.url).",
+  },
   { type: "schedule", label: "On a schedule", group: "Schedule", hint: "Runs the actions for every issue matching a query." },
   { type: "sla.breached", label: "SLA breached", group: "Issues", hint: "Service projects: a request misses an SLA goal (event.metric, event.sla)." },
 ];
@@ -148,6 +154,10 @@ export function cleanTrigger(t: Trigger): Trigger {
     }
     case "schedule":
       return { type: t.type, cron: t.cron, jql: t.jql };
+    case "deployment.completed": {
+      const environment = t.environment?.trim();
+      return { type: t.type, ...(environment ? { environment } : {}), ...(t.status ? { status: t.status } : {}) };
+    }
     default:
       return { type: t.type };
   }

@@ -9,6 +9,7 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { isDirectoryManaged, SourceBadge, sourceLabel } from "@/features/admin/badges";
 import { CreateUserDialog, EditNameDialog, ServiceTokensDialog, type AdminUser } from "@/features/admin/UserDialogs";
 import { LockedBadge, SignInSummary, useLocalAccountActions } from "@/features/admin/LocalAccount";
+import { ORG_ROLE_LABEL, orgRoleChoices, roleChangeQuestion, withArticle } from "@/features/admin/org-roles";
 import { useDebounced, When } from "@/features/settings/common";
 
 type Kind = "" | "human" | "service";
@@ -35,7 +36,7 @@ export function UsersAdmin() {
       unwrap(api.PATCH("/admin/users/{userId}", { params: { path: { userId: user.id } }, body })),
     onSuccess: (u, { body }) => {
       qc.invalidateQueries({ queryKey: ["admin-users"] });
-      toast.success(body.active === undefined ? `${u.displayName} is now ${u.orgRole}` : `${u.displayName} ${u.active ? "reactivated" : "deactivated"}`);
+      toast.success(body.active === undefined ? `${u.displayName} is now ${withArticle(u.orgRole)}` : `${u.displayName} ${u.active ? "reactivated" : "deactivated"}`);
     },
     onError: toast.error,
   });
@@ -91,7 +92,8 @@ export function UsersAdmin() {
           <EmptyState title="No users match" body="Try another search or filter." />
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-line bg-surface">
+        // relative: the screen-reader-only header text is positioned, and must scroll with the table rather than widen the page.
+        <div className="relative overflow-x-auto rounded-lg border border-line bg-surface">
           <table className={table}>
             <thead>
               <tr>
@@ -114,14 +116,16 @@ export function UsersAdmin() {
                     <td>
                       <span className="flex items-center gap-2.5">
                         <UserAvatar user={u} size={28} />
-                        <span className="min-w-0">
+                        <span className="max-w-72 min-w-0">
                           <span className="flex items-center gap-1.5 font-medium">
                             {u.displayName}
                             {self && <Badge>You</Badge>}
                             {u.kind === "service" && <Badge tone="accent">Service</Badge>}
                             {managed && <Lock className="size-3 text-faint" aria-label={`Profile managed by ${sourceLabel(u.source)}`} />}
                           </span>
-                          <span className="block truncate text-xs text-muted">{u.email}</span>
+                          <span className="block truncate text-xs text-muted" title={u.email}>
+                            {u.email}
+                          </span>
                         </span>
                       </span>
                     </td>
@@ -137,18 +141,17 @@ export function UsersAdmin() {
                         title={self ? "You cannot change your own role" : undefined}
                         onChange={async (e) => {
                           const orgRole = e.target.value as Schemas["OrgRole"];
-                          if (
-                            orgRole === "admin" &&
-                            !(await confirm({ title: `Make ${u.displayName} an admin?`, body: "Admins can change every project and the organisation's settings.", confirmLabel: "Make admin" }))
-                          )
-                            return;
+                          const question = roleChangeQuestion(u.displayName, u.orgRole, orgRole);
+                          if (question && !(await confirm(question))) return;
                           update.mutate({ user: u, body: { orgRole } });
                         }}
                         className="!h-8 min-w-28"
                       >
-                        {u.kind !== "service" && <option value="admin">Admin</option>}
-                        <option value="member">Member</option>
-                        <option value="guest">Guest</option>
+                        {orgRoleChoices(u).map((r) => (
+                          <option key={r} value={r}>
+                            {ORG_ROLE_LABEL[r]}
+                          </option>
+                        ))}
                       </Select>
                       {u.effectiveOrgRole && u.effectiveOrgRole !== u.orgRole && <p className="mt-0.5 text-[11px] text-muted">Effective: {u.effectiveOrgRole} (via a group)</p>}
                     </td>

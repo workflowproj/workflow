@@ -26,7 +26,7 @@ const (
 )
 
 // DefaultDatabaseURL suits local development (`make db-up`).
-const DefaultDatabaseURL = "postgres://wfm:wfm@localhost:5432/wfm?sslmode=disable"
+const DefaultDatabaseURL = "postgres://wfm:wfm@localhost:5432/wfm?sslmode=disable" // #nosec G101 -- the local development database
 
 // OIDCProvider is a generic OpenID Connect sign-in provider. Google is one instance.
 type OIDCProvider struct {
@@ -198,6 +198,10 @@ type SMTP struct {
 	Port                           int
 	TLS                            string // starttls, tls or none
 }
+
+// Delivers reports whether email goes out through an SMTP server. Without one (WFM_SMTP_HOST
+// unset) messages are only logged and kept in memory, so nobody receives them.
+func (c SMTP) Delivers() bool { return c.Host != "" }
 
 type env struct {
 	get  func(string) string

@@ -179,7 +179,7 @@ func (s *Service) validateRequestType(ctx context.Context, q *dbq.Queries, p dbq
 	if err != nil {
 		return out, apperr.Invalid("issueTypeKey", "unknown issue type %q in %s", in.IssueTypeKey, p.Key)
 	}
-	if it.Level != 0 {
+	if it.Level != 0 || it.Kind != tracker.KindWork {
 		return out, apperr.Invalid("issueTypeKey", "requests are standard issues, not %ss", it.Name)
 	}
 	defs, err := q.ListFieldDefinitions(ctx)
@@ -205,6 +205,9 @@ func (s *Service) validateRequestType(ctx context.Context, q *dbq.Queries, p dbq
 	group := strings.TrimSpace(deref(in.Group))
 	if len(group) > 60 {
 		return out, apperr.Invalid("group", "group names are at most 60 characters")
+	}
+	if in.Position != nil && (*in.Position < 0 || *in.Position > maxPosition) {
+		return out, apperr.Invalid("position", "positions are between 0 and %d", maxPosition)
 	}
 	out.params = dbq.CreateRequestTypeParams{
 		ProjectID: p.ID, Name: name, Description: strings.TrimSpace(deref(in.Description)), Icon: icon,

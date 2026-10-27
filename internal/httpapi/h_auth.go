@@ -18,7 +18,7 @@ func meView(u dbq.User, orgRole string) api.Me {
 }
 
 func (s *Server) ListAuthProviders(ctx context.Context, _ api.ListAuthProvidersRequestObject) (api.ListAuthProvidersResponseObject, error) {
-	out := api.ListAuthProviders200JSONResponse{Providers: []api.AuthProvider{}, DevLogin: s.Cfg.DevLogin, LocalLogin: s.Cfg.Local.Enabled}
+	out := api.ListAuthProviders200JSONResponse{Providers: []api.AuthProvider{}, DevLogin: s.Cfg.DevLogin, LocalLogin: s.Cfg.Local.Enabled, EmailDelivery: s.Cfg.SMTP.Delivers()}
 	for _, p := range s.Cfg.OIDCProviders {
 		out.Providers = append(out.Providers, api.AuthProvider{Id: p.ID, Name: p.DisplayName, LoginUrl: "/auth/" + p.ID + "/login"})
 	}
@@ -202,7 +202,8 @@ func (s *Server) ListUsers(ctx context.Context, req api.ListUsersRequestObject) 
 		if a.OrgRole == "guest" {
 			return nil, apperr.Forbidden("guests can only search people within a project")
 		}
-		users, err = s.Q.SearchUsers(ctx, dbq.SearchUsersParams{Q: deref(req.Params.Q), Lim: int32(limit)})
+		exclude := req.Params.Customers != nil && !*req.Params.Customers
+		users, err = s.Q.SearchUsers(ctx, dbq.SearchUsersParams{Q: deref(req.Params.Q), ExcludeCustomers: exclude, Lim: int32(limit)})
 	}
 	if err != nil {
 		return nil, err
@@ -318,7 +319,7 @@ func (s *Server) fieldView(ctx context.Context, f dbq.FieldDefinition) api.Field
 	if opts == nil {
 		opts = []string{}
 	}
-	v := api.FieldDefinition{Id: f.ID, Key: f.Key, Name: f.Name, Description: f.Description, Type: api.FieldType(f.Type), Options: opts}
+	v := api.FieldDefinition{Id: f.ID, Key: f.Key, Name: f.Name, Description: f.Description, Type: api.FieldType(f.Type), Options: opts, Reserved: tracker.IsReservedField(f.Key)}
 	if f.ProjectIds != nil {
 		ps, _ := s.Q.ListProjectsByIDs(ctx, f.ProjectIds)
 		keys := []string{}

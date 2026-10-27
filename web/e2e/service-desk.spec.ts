@@ -80,8 +80,12 @@ test("service desk: customer request, public reply and internal note, approval a
   await add.getByLabel("Email").fill(customerEmail);
   await add.getByLabel("Name").fill(customerName);
   await add.getByRole("button", { name: "Add customer" }).click();
-  await expect(page.getByText(`Invitation sent to ${customerEmail}`)).toBeVisible();
+  // The development server has no SMTP server: the agent is told the invitation was not emailed.
+  await expect(page.getByText(`Added ${customerName}, but their invitation was not emailed`, { exact: false })).toBeVisible();
   await expect(page.getByRole("row", { name: new RegExp(customerName) }).getByText("Invited")).toBeVisible();
+  // The project list opens the desk on its queues, like the sidebar.
+  await page.goto("/projects");
+  await expect(page.getByRole("table").getByRole("link", { name: deskName })).toHaveAttribute("href", `/projects/${key}/queues`);
 
   // The customer follows the invitation, chooses a password and signs in to the help centre.
   const invite = await mailLink(page.request, customerEmail, "account", /https?:\/\/\S+\/invite\?token=\S+/);
@@ -122,6 +126,8 @@ test("service desk: customer request, public reply and internal note, approval a
   await expect(panel.getByText("Time to first response", { exact: true })).toBeVisible();
   await expect(panel.getByText("Time to resolution", { exact: true })).toBeVisible();
   await expect(panel.getByLabel("Request type")).toHaveValue(/.+/);
+  // No repository is connected to the desk: no Development section asking for one.
+  await expect(page.getByRole("heading", { name: "Development" })).toHaveCount(0);
   await page.getByRole("button", { name: "Reply to customer" }).click();
   await page.locator(".tiptap").last().click();
   await page.keyboard.type("Please hold the power button for ten seconds.");

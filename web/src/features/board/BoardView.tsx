@@ -95,6 +95,9 @@ export function BoardView({
         action={columnTools && <Button onClick={columnTools.configure}>Configure columns</Button>}
       />
     );
+  // Columns share the width evenly, at least 14.5rem each; with more than fit, the board
+  // scrolls sideways. Cells and headers contain their inline size (`contained`), so a long summary
+  // or column name wraps or truncates instead of widening the columns.
   const grid = { gridTemplateColumns: `repeat(${columns.length}, minmax(14.5rem, 1fr))` };
   const lanesOn = mode !== "none";
 
@@ -141,7 +144,7 @@ export function BoardView({
           <>
             <div className="sticky top-0 z-10 grid gap-3 bg-canvas pb-1" style={grid}>
               {columns.map((c, i) => (
-                <div key={c.id} className={cn("rounded-lg px-1.5", c.overLimit ? "bg-danger-soft" : "bg-surface-2")}>
+                <div key={c.id} className={cn(contained, "rounded-lg px-1.5", c.overLimit ? "bg-danger-soft" : "bg-surface-2")}>
                   {header(c, i)}
                 </div>
               ))}
@@ -183,6 +186,9 @@ export function BoardView({
 /** Cards drawn per cell at first, and added per "Show more". */
 const CARDS = 50;
 
+/** A grid cell whose content never sets the column's width (see `grid`). */
+const contained = "min-w-0 contain-inline-size";
+
 function Cell({
   id,
   label,
@@ -212,6 +218,7 @@ function Cell({
       role="group"
       aria-label={label}
       className={cn(
+        contained,
         "flex flex-col rounded-lg transition-[opacity,box-shadow]",
         danger ? "bg-danger-soft" : "bg-surface-2",
         fill ? "min-h-64" : "min-h-20",

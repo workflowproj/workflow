@@ -1,0 +1,27 @@
+# Weekly dependency updates, grouped so minor and patch bumps arrive as one pull request per
+# ecosystem. Security updates are separate and immediate (enable Dependabot security updates in
+# the repository settings).
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule: { interval: weekly, day: monday }
+    groups:
+      go-minor-and-patch:
+        update-types: [minor, patch]
+  - package-ecosystem: npm
+    directory: /web
+    schedule: { interval: weekly, day: monday }
+    groups:
+      npm-minor-and-patch:
+        update-types: [minor, patch]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly, day: monday }
+    groups:
+      actions:
+        patterns: ["*"]
+  # The Dockerfile's base images are pinned by digest; Dependabot bumps tag and digest together.
+  - package-ecosystem: docker
+    directory: /
+    schedule: { interval: weekly, day: monday }

@@ -1,14 +1,14 @@
 import { useState } from "react";
 import { getRouteApi, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Globe, Lock, Trash2 } from "lucide-react";
+import { Globe, Lock, Scale, ShieldAlert, Trash2 } from "lucide-react";
 import { api, ApiError, unwrap, type Schemas } from "@/api/client";
 import { useProject } from "@/api/queries";
 import type { User } from "@/api/types";
 import { Badge, Button, Field, Input, Modal, PageHeader, PageSpinner, Select, Textarea, useToast } from "@/components/ui";
 import { ErrorBox } from "@/components/ErrorBox";
 import { UserPicker } from "@/components/UserPicker";
-import { Callout, SettingsSection } from "@/features/settings/common";
+import { Callout, SettingsSection, Switch } from "@/features/settings/common";
 import { rolesQuery } from "@/features/settings/queries";
 import { cn } from "@/lib/cn";
 
@@ -179,6 +179,8 @@ function GeneralForm({ project }: { project: Project }) {
         </div>
       </form>
 
+      <RisksDecisionsSection project={project} />
+
       <SettingsSection title={<span className="text-danger">Danger zone</span>} className="border-danger/30">
         <div className="flex flex-wrap items-center justify-between gap-3 p-4">
           <div>
@@ -192,6 +194,58 @@ function GeneralForm({ project }: { project: Project }) {
       </SettingsSection>
       <DeleteProjectDialog open={deleting} onClose={() => setDeleting(false)} project={project} />
     </div>
+  );
+}
+
+/**
+ * RisksDecisionsSection turns the project's risk register and decision log on or off. Turning it
+ * on sets up the Risk and Decision issue types, workflows and fields (anything missing); turning
+ * it off hides the section and keeps the risks and decisions.
+ */
+function RisksDecisionsSection({ project }: { project: Project }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const toggle = useMutation({
+    mutationFn: (on: boolean) => unwrap(api.PATCH("/projects/{projectKey}", { params: { path: { projectKey: project.key } }, body: { risksDecisions: on } })),
+    onSuccess: (p) => {
+      qc.setQueryData(["project", p.key], p);
+      for (const k of [["projects"], ["issue-types", p.key], ["workflows"], ["fields"]]) qc.invalidateQueries({ queryKey: k });
+      toast.success(p.risksDecisions ? "Risks and decisions are on: see the Risks and Decisions tabs" : "Risks and decisions are off; their issues are kept");
+    },
+  });
+  return (
+    <SettingsSection
+      title="Risks and decisions"
+      description="A risk register and a decision log, in their own tabs and out of sprints, boards, the timeline and reports."
+      actions={<Switch label="Risks and decisions" hideLabel checked={project.risksDecisions} disabled={toggle.isPending} onChange={(on) => toggle.mutate(on)} />}
+    >
+      <div className="grid gap-3 p-4 text-[13px] text-muted sm:grid-cols-2">
+        <p className="flex gap-2.5">
+          <ShieldAlert aria-hidden className="mt-0.5 size-4 shrink-0 text-accent" />
+          <span>
+            <span className="block font-medium text-ink">Risks</span>
+            Scored by likelihood × impact, with an owner, a response, a mitigation plan, a review date and the work that mitigates them.
+          </span>
+        </p>
+        <p className="flex gap-2.5">
+          <Scale aria-hidden className="mt-0.5 size-4 shrink-0 text-accent" />
+          <span>
+            <span className="block font-medium text-ink">Decisions</span>
+            Records of the context, the options, the decision and its consequences, linked to the work implementing them and to the decisions that supersede them.
+          </span>
+        </p>
+        <p className="sm:col-span-2">
+          {project.risksDecisions
+            ? "Turning this off hides the tabs; existing risks and decisions stay searchable."
+            : "Turning this on adds the Risk and Decision issue types, their workflows and fields to the project."}
+        </p>
+        {toggle.error && (
+          <div className="sm:col-span-2">
+            <ErrorBox error={toggle.error} />
+          </div>
+        )}
+      </div>
+    </SettingsSection>
   );
 }
 

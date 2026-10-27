@@ -5,6 +5,7 @@ import { meQuery, projectQuery } from "@/api/queries";
 import { AppShell } from "@/layout/AppShell";
 import { NotFound } from "@/layout/NotFound";
 import { PageSpinner } from "@/components/ui";
+import { projectHome } from "@/lib/project";
 import { LoginPage } from "@/pages/LoginPage";
 import { ProjectsPage } from "@/pages/ProjectsPage";
 import { ProjectLayout } from "@/pages/project/ProjectLayout";
@@ -129,6 +130,7 @@ const portalApprovalsRoute = createRoute({ getParentRoute: () => portalRoute, pa
 const portalProfileRoute = createRoute({ getParentRoute: () => portalRoute, path: "/profile", component: lazyRouteComponent(() => import("@/pages/portal/PortalProfilePage"), "PortalProfilePage") });
 const portalDeskRoute = createRoute({ getParentRoute: () => portalRoute, path: "/$projectKey", component: lazyRouteComponent(() => import("@/pages/portal/PortalDeskPage"), "PortalDeskPage") });
 const portalCreateRoute = createRoute({ getParentRoute: () => portalRoute, path: "/$projectKey/new/$requestTypeId", component: lazyRouteComponent(() => import("@/pages/portal/PortalCreatePage"), "PortalCreatePage") });
+const portalWhatsNewRoute = createRoute({ getParentRoute: () => portalRoute, path: "/$projectKey/whats-new", component: lazyRouteComponent(() => import("@/pages/portal/PortalWhatsNewPage"), "PortalWhatsNewPage") });
 // Self sign-up (signed out), for desks that allow it.
 const portalSignupRoute = createRoute({ getParentRoute: () => rootRoute, path: "/portal/signup/$projectKey", component: lazyRouteComponent(() => import("@/pages/portal/PortalSignupPage"), "PortalSignupPage") });
 
@@ -149,7 +151,7 @@ const projectIndexRoute = createRoute({
   beforeLoad: async ({ context, params }) => {
     // Service projects open on their queues.
     const p = await context.queryClient.ensureQueryData(projectQuery(params.projectKey)).catch(() => null);
-    throw redirect({ to: p?.template === "service" ? "/projects/$projectKey/queues" : "/projects/$projectKey/board", params });
+    throw redirect({ to: projectHome(p ?? { template: "" }), params });
   },
 });
 const boardRoute = createRoute({ getParentRoute: () => projectRoute, path: "/board", validateSearch: issueSearch, component: BoardPage });
@@ -175,6 +177,26 @@ const queuesRoute = createRoute({
   component: lazyRouteComponent(() => import("@/pages/project/QueuesPage"), "QueuesPage"),
 });
 const releasesRoute = createRoute({ getParentRoute: () => projectRoute, path: "/releases", validateSearch: issueSearch, component: lazyRouteComponent(() => import("@/pages/project/ReleasesPage"), "ReleasesPage") });
+const releaseRoute = createRoute({
+  getParentRoute: () => projectRoute,
+  path: "/releases/$releaseId",
+  validateSearch: issueSearch,
+  component: lazyRouteComponent(() => import("@/pages/project/ReleasePage"), "ReleasePage"),
+});
+// Risks and decisions: the project's own section, outside planning (shown when it is turned on).
+export type RisksSearch = { cell?: string; status?: "closed" | "all"; issue?: string };
+const risksRoute = createRoute({
+  getParentRoute: () => projectRoute,
+  path: "/risks",
+  validateSearch: (s: Record<string, unknown>): RisksSearch => ({ cell: str(s.cell), status: s.status === "closed" || s.status === "all" ? s.status : undefined, issue: str(s.issue) }),
+  component: lazyRouteComponent(() => import("@/pages/project/RisksPage"), "RisksPage"),
+});
+const decisionsRoute = createRoute({
+  getParentRoute: () => projectRoute,
+  path: "/decisions",
+  validateSearch: (s: Record<string, unknown>): { status?: string; issue?: string } => ({ status: str(s.status), issue: str(s.issue) }),
+  component: lazyRouteComponent(() => import("@/pages/project/DecisionsPage"), "DecisionsPage"),
+});
 const reportsRoute = createRoute({ getParentRoute: () => projectRoute, path: "/reports", component: lazyRouteComponent(() => import("@/pages/project/ReportsPage"), "ReportsPage") });
 
 const customersRoute = createRoute({ getParentRoute: () => projectRoute, path: "/customers", component: lazyRouteComponent(() => import("@/pages/project/CustomersPage"), "CustomersPage") });
@@ -189,6 +211,7 @@ const repositoriesRoute = createRoute({ getParentRoute: () => settingsRoute, pat
 const automationRoute = createRoute({ getParentRoute: () => settingsRoute, path: "/automation", component: lazyRouteComponent(() => import("@/pages/settings/AutomationSettings"), "AutomationSettings") });
 const chatSettingsRoute = createRoute({ getParentRoute: () => settingsRoute, path: "/chat", component: lazyRouteComponent(() => import("@/pages/settings/ChatSettings"), "ChatSettings") });
 const projectWebhooksRoute = createRoute({ getParentRoute: () => settingsRoute, path: "/webhooks", component: lazyRouteComponent(() => import("@/pages/settings/WebhooksSettings"), "WebhooksSettings") });
+const releaseSettingsRoute = createRoute({ getParentRoute: () => settingsRoute, path: "/releases", component: lazyRouteComponent(() => import("@/pages/settings/ReleasesSettings"), "ReleasesSettings") });
 const portalSettingsRoute = createRoute({ getParentRoute: () => settingsRoute, path: "/portal", component: lazyRouteComponent(() => import("@/pages/settings/ServiceDeskSettings"), "PortalSettings") });
 const requestTypesRoute = createRoute({ getParentRoute: () => settingsRoute, path: "/request-types", component: lazyRouteComponent(() => import("@/pages/settings/RequestTypesSettings"), "RequestTypesSettings") });
 const queuesSettingsRoute = createRoute({ getParentRoute: () => settingsRoute, path: "/queues", component: lazyRouteComponent(() => import("@/pages/settings/ServiceDeskSettings"), "QueuesSettings") });
@@ -254,7 +277,7 @@ export const routeTree = rootRoute.addChildren([
   inviteRoute,
   resetPasswordRoute,
   portalSignupRoute,
-  portalRoute.addChildren([portalHomeRoute, portalRequestsRoute, portalRequestRoute, portalApprovalsRoute, portalProfileRoute, portalDeskRoute, portalCreateRoute]),
+  portalRoute.addChildren([portalHomeRoute, portalRequestsRoute, portalRequestRoute, portalApprovalsRoute, portalProfileRoute, portalDeskRoute, portalCreateRoute, portalWhatsNewRoute]),
   appRoute.addChildren([
     indexRoute,
     projectsRoute,
@@ -267,6 +290,9 @@ export const routeTree = rootRoute.addChildren([
       queuesRoute,
       customersRoute,
       releasesRoute,
+      releaseRoute,
+      risksRoute,
+      decisionsRoute,
       reportsRoute,
       settingsRoute.addChildren([
         settingsIndexRoute,
@@ -279,6 +305,7 @@ export const routeTree = rootRoute.addChildren([
         automationRoute,
         chatSettingsRoute,
         projectWebhooksRoute,
+        releaseSettingsRoute,
         portalSettingsRoute,
         requestTypesRoute,
         queuesSettingsRoute,

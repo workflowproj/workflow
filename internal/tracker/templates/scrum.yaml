@@ -2,6 +2,7 @@ id: scrum
 name: Scrum
 description: Plan work in sprints from a ranked backlog. Stories go through code review; epics group related work.
 boardType: scrum
+risksDecisions: true
 workflows:
   - name: Software development
     description: To Do → In Progress → In Review → Done, with rework and reopen paths.

@@ -186,10 +186,7 @@ export const LEVEL_LABEL: Record<number, string> = { 1: "Epic level", 0: "Standa
 
 export const CATEGORY_LABEL: Record<string, string> = { todo: "To do", in_progress: "In progress", done: "Done" };
 
-/** plural formats a count with a singular or plural noun ("1 warning", "2 warnings"). */
-export function plural(n: number, noun: string): string {
-  return `${n} ${noun}${n === 1 ? "" : "s"}`;
-}
+export { plural } from "@/lib/format";
 
 /** siteName is a short name for a Jira site URL. */
 export function siteName(url: string): string {

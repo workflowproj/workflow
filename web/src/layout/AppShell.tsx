@@ -10,6 +10,7 @@ import { CreateIssueDialog } from "@/features/issues/CreateIssueDialog";
 import { portalDesksQuery } from "@/features/servicedesk/api";
 import { ThemeMenu } from "./ThemeMenu";
 import { cn } from "@/lib/cn";
+import { projectHome } from "@/lib/project";
 
 const ISSUE_KEY = /^[A-Za-z][A-Za-z0-9_]{1,9}-\d+$/;
 
@@ -118,7 +119,7 @@ function Sidebar({ className }: { className?: string }) {
         {projects.map((p) => (
           <Link
             key={p.id}
-            to={p.template === "service" ? "/projects/$projectKey/queues" : "/projects/$projectKey/board"}
+            to={projectHome(p)}
             params={{ projectKey: p.key }}
             className={cn(navItem, "py-1", params.projectKey === p.key && "bg-surface-2 text-ink")}
           >

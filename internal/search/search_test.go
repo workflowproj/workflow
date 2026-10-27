@@ -1,6 +1,7 @@
 package search
 
 import (
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -96,6 +97,8 @@ func TestCompileFields(t *testing.T) {
 		`labels is EMPTY`:                              {"cardinality(i.labels) = 0"},
 		`sprint in openSprints()`:                      {"sprints WHERE state = $2::text"},
 		`fixVersion in unreleasedVersions()`:           {"r.state = $2::text"},
+		`deployedTo = production`:                      {"deployment_issues di", "d.status = 'success'", "lower(d.environment) = lower($2::text)"},
+		`deployedTo is EMPTY`:                          {"NOT EXISTS (SELECT 1 FROM deployment_issues di"},
 		`parent = PLAT-1`:                              {"i.parent_id IN (SELECT x.id FROM issues x WHERE x.number = $2::int"},
 		`key > PLAT-10`:                                {"i.number > $3::int"},
 		`text ~ "login bug"`:                           {"websearch_to_tsquery('simple', $2::text)", "issue_search_document_english(i.summary, i.description) @@ websearch_to_tsquery('english', $2::text)"},
@@ -109,6 +112,9 @@ func TestCompileFields(t *testing.T) {
 		`"Severity score" >= 7`:                        {"(i.fields->>$2::text)::numeric >= $3::numeric"},
 		`cf[platforms] = ios`:                          {"jsonb_exists"},
 		`level <= 0`:                                   {"SELECT level FROM issue_types"},
+		`kind in (risk, Decision)`:                     {"issue_types WHERE kind = $2::text", "kind = $3::text"},
+		`issueLinkType = "is mitigated by"`:            {"l.target_id = i.id AND l.link_type = $2::text"},
+		`issue in linkedIssues("ADR-1", supersedes)`:   {"SELECT l.target_id FROM issue_links l WHERE l.link_type = $4::text AND l.source_id IN"},
 		`watcher = currentUser()`:                      {"watchers w"},
 		`resolution = Unresolved`:                      {"i.resolution IS NULL"},
 	}
@@ -118,6 +124,23 @@ func TestCompileFields(t *testing.T) {
 			if !strings.Contains(c.Where, w) {
 				t.Errorf("%q compiled to\n  %s\nmissing %q", src, c.Where, w)
 			}
+		}
+	}
+}
+
+func TestKindsAndLinkTypes(t *testing.T) {
+	for _, src := range []string{`kind = chore`, `kind > risk`, `issueLinkType = mitigated`} {
+		if _, err := CompileString(src, Env{}, 1, nil); err == nil {
+			t.Errorf("%q compiled", src)
+		}
+	}
+	for phrase, want := range map[string]linkDescription{
+		"mitigates": {"mitigates", "source"}, "is mitigated by": {"mitigates", "target"},
+		"implements": {"implements", "source"}, "is implemented by": {"implements", "target"},
+		"supersedes": {"supersedes", "source"}, "is superseded by": {"supersedes", "target"},
+	} {
+		if got := linkDescriptions[normalize(phrase)]; got != want {
+			t.Errorf("%q = %+v, want %+v", phrase, got, want)
 		}
 	}
 }
@@ -226,6 +249,24 @@ func TestTimeTrackingFields(t *testing.T) {
 	for _, src := range []string{`timeSpent > lots`, `originalEstimate = currentUser()`, `worklogDate > soon`} {
 		if _, err := CompileString(src, env, 0, nil); err == nil {
 			t.Errorf("%q should fail to compile", src)
+		}
+	}
+}
+
+// Names needn't be unique: a key wins, and a name two fields share asks for the key.
+func TestCustomFieldNamesAndKeys(t *testing.T) {
+	env := Env{Now: time.Date(2026, 10, 21, 15, 0, 0, 0, time.UTC), CustomFields: []CustomField{
+		{Key: "risk", Name: "Risk score", Type: "number"},
+		{Key: "risk_score", Name: "Risk score", Type: "number"},
+		{Key: "team", Name: "risk", Type: "text"},
+	}}
+	if _, err := CompileString(`"Risk score" > 3`, env, 0, nil); err == nil || !strings.Contains(err.Error(), "cf[risk] or cf[risk_score]") {
+		t.Fatalf("ambiguous name: err = %v", err)
+	}
+	for src, key := range map[string]string{`cf[risk_score] > 3`: "risk_score", `risk_score > 3`: "risk_score", `risk > 3`: "risk"} {
+		c := mustCompile(t, src, env)
+		if !slices.Contains(c.Args, any(key)) {
+			t.Errorf("%q: args %v lack the key %q", src, c.Args, key)
 		}
 	}
 }

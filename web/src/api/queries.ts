@@ -6,11 +6,12 @@ import { api, unwrap } from "./client";
  * invalidate by prefix and live events (lib/events.ts) invalidate the same prefixes:
  *
  *   ["me"], ["projects"], ["project", key], ["issue-types", projectKey], ["statuses"],
- *   ["users", q, project], ["issue", key], ["issue-comments", key], ["issue-history", key],
+ *   ["users", q, project, customers], ["issue", key], ["issue-comments", key], ["issue-history", key],
  *   ["boards", projectKey], ["board", boardId, ...], ["backlog", boardId], ["search", jql, ...], ["sprints", projectKey],
  *   ["releases", projectKey], ["notifications"], ["fields"], ["labels", projectKey],
  *   ["timeline", projects, jql, doneDays], ["dashboards"], ["dashboards", id],
- *   ["metrics", kind, projects, jql, ...] (dashboard gadgets; see features/dashboards/api.ts)
+ *   ["metrics", kind, projects, jql, ...] (dashboard gadgets; see features/dashboards/api.ts),
+ *   ["risks", projectKey], ["decisions", projectKey] (see features/risks/api.ts)
  */
 
 export const meQuery = queryOptions({
@@ -69,14 +70,22 @@ export function useMe() {
   return useQuery(meQuery);
 }
 
+/**
+ * useProject loads a project; with an empty key (a dialog kept mounted before it has an issue,
+ * say) it waits instead of requesting /projects/.
+ */
 export function useProject(key: string) {
-  return useQuery(projectQuery(key));
+  return useQuery({ ...projectQuery(key), enabled: key !== "" });
 }
 
-export function useUsers(q: string, project?: string) {
+/**
+ * useUsers searches people: with a project, those who can be assigned there; with customers
+ * false, only people who can become project members (customers only use the help centre).
+ */
+export function useUsers(q: string, project?: string, customers = true) {
   return useQuery({
-    queryKey: ["users", q, project ?? ""],
-    queryFn: () => unwrap(api.GET("/users", { params: { query: { q: q || undefined, project } } })),
+    queryKey: ["users", q, project ?? "", customers],
+    queryFn: () => unwrap(api.GET("/users", { params: { query: { q: q || undefined, project, customers: customers ? undefined : false } } })),
     placeholderData: keepPreviousData,
     staleTime: 30_000,
   });

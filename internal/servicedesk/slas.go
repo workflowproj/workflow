@@ -206,6 +206,17 @@ func (s *Service) recompute(ctx context.Context, tx pgx.Tx, q *dbq.Queries, issu
 	} else if err != nil {
 		return err
 	}
+	// Risks and decisions are not requests: they have no SLA clocks.
+	if t, err := q.GetIssueType(ctx, i.TypeID); err != nil {
+		return err
+	} else if t.Kind != tracker.KindWork {
+		for _, m := range sla.Metrics {
+			if err := q.DeleteIssueSLA(ctx, dbq.DeleteIssueSLAParams{IssueID: i.ID, Metric: string(m)}); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
 	cfg, err := loadSLAConfig(ctx, q, i.ProjectID)
 	if err != nil {
 		return err

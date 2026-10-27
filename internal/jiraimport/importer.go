@@ -189,6 +189,9 @@ func (r *run) projectCtx(ctx context.Context, idx int) (*projectCtx, error) {
 		return nil, err
 	}
 	for _, it := range types {
+		if it.Kind != tracker.KindWork {
+			continue // never a target (see projectTarget)
+		}
 		def, wv, err := r.s.workflowDef(ctx, it.WorkflowID)
 		if err != nil {
 			return nil, err
@@ -1113,7 +1116,7 @@ func (r *run) localIssue(ctx context.Context, ref IssueRef) (*dbq.Issue, error) 
 		return nil, nil
 	}
 	k := strings.LastIndexByte(ref.Key, '-')
-	n, err := strconv.Atoi(ref.Key[k+1:])
+	n, err := strconv.ParseInt(ref.Key[k+1:], 10, 32) // issue numbers are int32
 	if k <= 0 || err != nil {
 		return nil, nil
 	}

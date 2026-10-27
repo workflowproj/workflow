@@ -1,5 +1,5 @@
 import { getRouteApi, Link, Outlet, useMatchRoute } from "@tanstack/react-router";
-import { Bot, CalendarClock, FolderGit2, GitBranch, Inbox, KanbanSquare, Layers, LifeBuoy, ListFilter, MessagesSquare, Settings, Users, Webhook } from "lucide-react";
+import { Bot, CalendarClock, FolderGit2, GitBranch, Inbox, KanbanSquare, Layers, LifeBuoy, ListFilter, MessagesSquare, Package, Settings, Users, Webhook } from "lucide-react";
 import { hasPermission, useProject } from "@/api/queries";
 import { EmptyState } from "@/components/ui";
 
@@ -12,6 +12,7 @@ const sections = [
   { label: "Workflows", to: "/projects/$projectKey/settings/workflows" as const, icon: GitBranch },
   { label: "Boards", to: "/projects/$projectKey/settings/boards" as const, icon: KanbanSquare },
   { label: "Repositories", to: "/projects/$projectKey/settings/repositories" as const, icon: FolderGit2 },
+  { label: "Releases", to: "/projects/$projectKey/settings/releases" as const, icon: Package, software: true },
   { label: "Automation", to: "/projects/$projectKey/settings/automation" as const, icon: Bot },
   { label: "Chat", to: "/projects/$projectKey/settings/chat" as const, icon: MessagesSquare },
   { label: "Webhooks", to: "/projects/$projectKey/settings/webhooks" as const, icon: Webhook },
@@ -43,7 +44,7 @@ export function SettingsLayout() {
   return (
     <div className="flex flex-col gap-6 p-6 md:flex-row">
       <nav aria-label="Project settings" className="flex shrink-0 gap-1 overflow-x-auto md:w-48 md:flex-col">
-        {(project?.template === "service" ? [sections[0], ...serviceSections, ...sections.slice(1)] : sections).map((s) => (
+        {(project?.template === "service" ? [sections[0], ...serviceSections, ...sections.slice(1).filter((s) => !("software" in s))] : sections).map((s) => (
           <Link
             key={s.to}
             to={s.to}

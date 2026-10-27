@@ -227,7 +227,7 @@ export function TransitionPanel({ doc, index, apply, onDelete, errors }: { doc: 
                   label="Required"
                   checked={!!f.required}
                   disabled={readOnly}
-                  onChange={(e) => set({ screen: t.screen!.map((x, k) => (k === j ? { field: x.field, ...(e.target.checked ? { required: true } : {}) } : x)) })}
+                  onChange={(e) => set({ screen: t.screen!.map((x, k) => (k === j ? { field: x.field, ...(e.target.checked ? { required: true } : {}), ...(x.options ? { options: x.options } : {}) } : x)) })}
                 />
                 {!readOnly && (
                   <IconButton label="Remove field" size="sm" onClick={() => set({ screen: t.screen!.filter((_, k) => k !== j) })}>
@@ -235,6 +235,20 @@ export function TransitionPanel({ doc, index, apply, onDelete, errors }: { doc: 
                   </IconButton>
                 )}
               </div>
+              {f.field === "resolution" && (
+                <Input
+                  aria-label={`Resolutions offered by screen field ${j + 1}`}
+                  value={(f.options ?? []).join(", ")}
+                  disabled={readOnly}
+                  placeholder="Done, Won't Do, Duplicate, Cannot Reproduce"
+                  title="The resolutions this screen offers, separated by commas; empty offers the usual ones"
+                  className="mt-1 !h-7.5 text-[12px]"
+                  onChange={(e) => {
+                    const options = e.target.value.split(",").map((o) => o.trim());
+                    set({ screen: t.screen!.map((x, k) => (k === j ? { ...x, options: options.some(Boolean) ? options : undefined } : x)) }, `o${j}`);
+                  }}
+                />
+              )}
               <FieldError message={errorAt(errors, prefix, `.screen[${j}]`)} />
             </div>
           ))}

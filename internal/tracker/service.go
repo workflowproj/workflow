@@ -68,18 +68,21 @@ func (s *Service) tx(ctx context.Context, fn func(tx pgx.Tx, q *dbq.Queries) err
 var templateFS embed.FS
 
 type Template struct {
-	ID          string              `yaml:"id"`
-	Name        string              `yaml:"name"`
-	Description string              `yaml:"description"`
-	BoardType   string              `yaml:"boardType"`
-	Workflows   []yaml.Node         `yaml:"workflows"`
-	IssueTypes  []TemplateIssueType `yaml:"issueTypes"`
-	Boards      []TemplateBoard     `yaml:"boards"`
+	ID          string `yaml:"id"`
+	Name        string `yaml:"name"`
+	Description string `yaml:"description"`
+	BoardType   string `yaml:"boardType"`
+	// RisksDecisions turns the Risks and decisions section on in new projects.
+	RisksDecisions bool                `yaml:"risksDecisions"`
+	Workflows      []yaml.Node         `yaml:"workflows"`
+	IssueTypes     []TemplateIssueType `yaml:"issueTypes"`
+	Boards         []TemplateBoard     `yaml:"boards"`
 }
 
 type TemplateIssueType struct {
 	Key      string `yaml:"key"`
 	Name     string `yaml:"name"`
+	Kind     string `yaml:"kind"`
 	Level    int    `yaml:"level"`
 	Icon     string `yaml:"icon"`
 	Color    string `yaml:"color"`
@@ -181,7 +184,11 @@ func (s *Service) ResolveIssue(ctx context.Context, q *dbq.Queries, ref string) 
 	if err != nil {
 		return dbq.Issue{}, apperr.NotFound("issue")
 	}
-	n, _ := strconv.Atoi(m[2])
+	// Issue numbers are int32; a longer number would wrap round to another issue.
+	n, err := strconv.ParseInt(m[2], 10, 32)
+	if err != nil {
+		return dbq.Issue{}, apperr.NotFound("issue")
+	}
 	i, err := q.GetIssueByNumber(ctx, dbq.GetIssueByNumberParams{ProjectID: p.ID, Number: int32(n)})
 	if err != nil {
 		return i, apperr.NotFound("issue")

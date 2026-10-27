@@ -4,18 +4,28 @@ import { ApiError } from "@/api/client";
 import type { Issue } from "@/api/types";
 import { useToast } from "@/components/ui";
 import { TransitionScreenDialog } from "@/features/issues/TransitionScreenDialog";
-import { neighbours, placeOnBoard, type RankHint } from "./model";
+import { needsScreen, neighbours, placeOnBoard, planDrop, type RankHint } from "./model";
 import { moveError, moveIssue, type MoveRequest } from "./moveIssue";
 import { boardDataQuery, transitionsQuery, type AvailableTransition, type BoardColumnData, type BoardData } from "./queries";
 import { TransitionChooser } from "./TransitionChooser";
 
-type Pending = { issue: Issue; column: BoardColumnData; hint: RankHint; rollback: () => void };
+type Pending = {
+  issue: Issue;
+  column: BoardColumnData;
+  hint: RankHint;
+  /** place shows the card in the target column (with its new status, when known). */
+  place: (status?: Issue["status"]) => void;
+  /** rollback puts a placed card back where it was; it does nothing when the card wasn't placed. */
+  rollback: () => void;
+};
 
 /**
  * useBoardMove handles a card dropped on a board: it picks the transition into the target
- * column (asking when several statuses there are reachable), moves the card optimistically,
- * calls POST /issues/{key}/move and rolls back with a toast if the workflow refuses. A move
- * that needs a transition screen opens TransitionScreenDialog, then re-applies the rank.
+ * column (asking when several statuses there are reachable), calls POST /issues/{key}/move
+ * and rolls back with a toast if the workflow refuses. A plain move shows the card in its new
+ * place straight away; a move that needs a choice or a transition screen leaves the card where
+ * it was until the user confirms (TransitionScreenDialog runs the transition, then the rank is
+ * re-applied), so cancelling changes nothing.
  */
 export function useBoardMove(boardId: string, jql: string) {
   const qc = useQueryClient();
@@ -29,6 +39,11 @@ export function useBoardMove(boardId: string, jql: string) {
     qc.invalidateQueries({ queryKey: ["board", boardId] });
     qc.invalidateQueries({ queryKey: ["backlog"] });
     qc.invalidateQueries({ queryKey: ["issue", issueKey] });
+  };
+
+  const openScreen = (p: Pending, transition: AvailableTransition) => {
+    screenRef.current = { ...p, transition };
+    setScreen(screenRef.current);
   };
 
   const run = async (p: Pending, transition: AvailableTransition | null | undefined) => {
@@ -46,8 +61,9 @@ export function useBoardMove(boardId: string, jql: string) {
         const list = await qc.fetchQuery(transitionsQuery(p.issue.key)).catch(() => []);
         const t = list.find((x) => x.id === id) ?? transition;
         if (t) {
-          screenRef.current = { ...p, transition: t };
-          setScreen(screenRef.current);
+          // The card waits in its old place while the screen is open.
+          p.rollback();
+          openScreen(p, t);
           return;
         }
       }
@@ -64,21 +80,40 @@ export function useBoardMove(boardId: string, jql: string) {
     const column = data?.columns.find((c) => c.id === toColumnId);
     const issue = from?.issues.find((i) => i.id === issueId);
     if (!data || !from || !column || !issue) return;
-    const hint = neighbours(list, issueId);
-    const statusChange = !column.statusIds.includes(issue.status.id);
-    const known = qc.getQueryData<AvailableTransition[]>(transitionsQuery(issue.key).queryKey);
-    const options = statusChange && known ? known.filter((t) => column.statusIds.includes(t.to.id)) : [];
-    if (statusChange && known && options.length === 0) {
+    const plan = planDrop(issue.status.id, column.statusIds, qc.getQueryData<AvailableTransition[]>(transitionsQuery(issue.key).queryKey));
+    if (plan.kind === "refuse") {
       toast.error(new Error(`${issue.key} can't move from ${issue.status.name} to ${column.name}: the workflow has no transition there for you.`));
       return;
     }
+    const hint = neighbours(list, issueId);
     const back = neighbours(from.issues.map((i) => i.id), issueId);
-    const rollback = () => qc.setQueryData<BoardData>(key, (d) => (d ? placeOnBoard(d, issueId, from.id, back, issue.status) : d));
-    qc.cancelQueries({ queryKey: ["board", boardId] });
-    qc.setQueryData<BoardData>(key, placeOnBoard(data, issueId, column.id, hint, options.length === 1 ? options[0].to : undefined));
-    const pending: Pending = { issue, column, hint, rollback };
-    if (options.length > 1) setChoice({ ...pending, options });
-    else void run(pending, statusChange ? (options[0] ?? null) : undefined);
+    let placed = false;
+    const place = (status?: Issue["status"]) => {
+      placed = true;
+      qc.cancelQueries({ queryKey: ["board", boardId] });
+      qc.setQueryData<BoardData>(key, (d) => (d ? placeOnBoard(d, issueId, column.id, hint, status) : d));
+    };
+    const rollback = () => {
+      if (!placed) return;
+      placed = false;
+      qc.setQueryData<BoardData>(key, (d) => (d ? placeOnBoard(d, issueId, from.id, back, issue.status) : d));
+    };
+    const pending: Pending = { issue, column, hint, place, rollback };
+    switch (plan.kind) {
+      case "choose":
+        setChoice({ ...pending, options: plan.options });
+        return;
+      case "screen":
+        openScreen(pending, plan.transition);
+        return;
+      case "rank":
+        place();
+        void run(pending, undefined);
+        return;
+      case "move":
+        place(plan.transition?.to);
+        void run(pending, plan.transition);
+    }
   };
 
   const closeScreen = (done: boolean, moved?: Issue) => {
@@ -106,10 +141,13 @@ export function useBoardMove(boardId: string, jql: string) {
         onPick={(t) => {
           const c = choice;
           setChoice(null);
-          if (c) {
-            qc.setQueryData<BoardData>(key, (d) => (d ? placeOnBoard(d, c.issue.id, c.column.id, c.hint, t.to) : d));
-            void run(c, t);
+          if (!c) return;
+          if (needsScreen(t)) {
+            openScreen(c, t);
+            return;
           }
+          c.place(t.to);
+          void run(c, t);
         }}
         onCancel={() => {
           choice?.rollback();

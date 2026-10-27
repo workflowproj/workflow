@@ -110,6 +110,7 @@ func TestLocalAccountLifecycle(t *testing.T) {
 	var providers obj
 	e.anon().get("/api/v1/auth/providers", &providers)
 	eq(t, providers["localLogin"], any(true), "local login advertised")
+	eq(t, providers["emailDelivery"], any(false), "no SMTP server: reset and sign-up pages say no email is sent")
 
 	// An admin adds a person (with a group) and invites them.
 	var group obj
@@ -128,6 +129,7 @@ func TestLocalAccountLifecycle(t *testing.T) {
 	if d := time.Until(exp); d < 167*time.Hour || d > 169*time.Hour {
 		t.Fatalf("invitation expires in %s", d)
 	}
+	eq(t, inv["emailed"], any(false), "no SMTP server: the invitation is not emailed (only kept in memory)")
 	listed := admin.adminUser("carla@contractor.test")
 	eq(t, str(listed, "localAccount", "status"), "invited", "listed as invited")
 	msgs := e.mailTo("carla@contractor.test")
@@ -316,7 +318,9 @@ func TestLocalAccountAdministration(t *testing.T) {
 
 	// Invitations are for people without a password; resets for those with one.
 	admin.must("POST", "/api/v1/admin/users/"+id+"/invitation", nil, 409, nil)
-	admin.must("POST", "/api/v1/admin/users/"+id+"/password-reset", nil, 202, nil)
+	var reset obj
+	admin.must("POST", "/api/v1/admin/users/"+id+"/password-reset", nil, 202, &reset)
+	eq(t, reset["emailed"], any(false), "no SMTP server: the reset link is not emailed")
 	msgs := e.mailTo("dan@example.com")
 	linkToken(t, msgs[len(msgs)-1], "reset-password")
 
@@ -403,6 +407,30 @@ func TestLocalAccountAdministration(t *testing.T) {
 			t.Errorf("audit lacks %s", a)
 		}
 	}
+}
+
+// TestInvitationsSayWhetherTheyWereEmailed: with an SMTP server, invitations (an admin's, and a
+// new help desk customer's) are on their way by email. Without one the same answers say they
+// are not (TestLocalAccountLifecycle, TestPortalConversation), so nobody is told they were sent.
+func TestInvitationsSayWhetherTheyWereEmailed(t *testing.T) {
+	// Nothing is delivered: the test runs no jobs.
+	e := newEnv(t, withEnv("WFM_SMTP_HOST", "127.0.0.1"), withEnv("WFM_SMTP_PORT", "9"))
+	var providers obj
+	e.anon().get("/api/v1/auth/providers", &providers)
+	eq(t, providers["emailDelivery"], any(true), "the sign-in pages know email is sent")
+	admin, agent := serviceDesk(t, e, "HELP")
+	var u, inv obj
+	admin.must("POST", "/api/v1/admin/users", obj{"displayName": "Ivy Invitee", "email": "ivy@example.com"}, 201, &u)
+	admin.must("POST", "/api/v1/admin/users/"+str(u, "id")+"/invitation", nil, 200, &inv)
+	eq(t, inv["emailed"], any(true), "invitation emailed")
+	var added obj
+	agent.must("POST", "/api/v1/projects/HELP/customers", obj{"email": "cy@customer.test"}, 201, &added)
+	eq(t, added["invited"], any(true), "a new customer is invited")
+	eq(t, added["emailed"], any(true), "by email")
+	agent.must("POST", "/api/v1/projects/HELP/customers", obj{"email": "ivy@example.com"}, 201, &added)
+	eq(t, added["invited"], any(false), "an existing account is just added")
+	eq(t, added["emailed"], any(false), "and not emailed")
+	eq(t, e.JobsOfKind("email_send"), 2, "two invitations queued")
 }
 
 func TestLocalSignInThrottling(t *testing.T) {

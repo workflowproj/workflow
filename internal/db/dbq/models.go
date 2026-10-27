@@ -177,6 +177,30 @@ type Dashboard struct {
 	UpdatedAt   time.Time
 }
 
+type Deployment struct {
+	ID             uuid.UUID
+	RepositoryID   uuid.UUID
+	ExternalID     string
+	Environment    string
+	Ref            string
+	Sha            string
+	Status         string
+	Url            string
+	Deployer       string
+	StatusAt       time.Time
+	ResolvedAt     *time.Time
+	BaseSha        *string
+	CommitCount    int32
+	Truncated      bool
+	NotifiedStatus *string
+	CreatedAt      time.Time
+}
+
+type DeploymentIssue struct {
+	DeploymentID uuid.UUID
+	IssueID      uuid.UUID
+}
+
 type DevLink struct {
 	ID           uuid.UUID
 	IssueID      uuid.UUID
@@ -334,6 +358,7 @@ type IssueType struct {
 	Position    int32
 	WorkflowID  uuid.UUID
 	CreatedAt   time.Time
+	Kind        string
 }
 
 type JiraImport struct {
@@ -470,17 +495,18 @@ type OauthToken struct {
 }
 
 type Project struct {
-	ID           uuid.UUID
-	Key          string
-	Name         string
-	Description  string
-	LeadID       *uuid.UUID
-	Template     string
-	OpenRoleID   *uuid.UUID
-	IssueCounter int32
-	ArchivedAt   *time.Time
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	ID             uuid.UUID
+	Key            string
+	Name           string
+	Description    string
+	LeadID         *uuid.UUID
+	Template       string
+	OpenRoleID     *uuid.UUID
+	IssueCounter   int32
+	ArchivedAt     *time.Time
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	RisksDecisions bool
 }
 
 type ProjectKeyAlias struct {
@@ -498,6 +524,13 @@ type ProjectMember struct {
 	CreatedAt time.Time
 }
 
+type ProjectReleaseSetting struct {
+	ProjectID      uuid.UUID
+	CreateFromTags bool
+	ReleaseOnTag   bool
+	UpdatedAt      time.Time
+}
+
 type ProjectRepository struct {
 	ProjectID    uuid.UUID
 	RepositoryID uuid.UUID
@@ -512,16 +545,22 @@ type RecoveryCode struct {
 }
 
 type Release struct {
-	ID          uuid.UUID
-	ProjectID   uuid.UUID
-	Name        string
-	Description string
-	StartDate   *time.Time
-	ReleaseDate *time.Time
-	State       string
-	ReleasedAt  *time.Time
-	Position    int32
-	CreatedAt   time.Time
+	ID               uuid.UUID
+	ProjectID        uuid.UUID
+	Name             string
+	Description      string
+	StartDate        *time.Time
+	ReleaseDate      *time.Time
+	State            string
+	ReleasedAt       *time.Time
+	Position         int32
+	CreatedAt        time.Time
+	Notes            string
+	NotesPublishedAt *time.Time
+	TagRepositoryID  *uuid.UUID
+	TagName          *string
+	TagSha           *string
+	TagLinkedAt      *time.Time
 }
 
 type RequestApproval struct {
@@ -635,6 +674,13 @@ type ServiceDesk struct {
 	SelfSignup        bool
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
+}
+
+type ServiceDeskReleaseProject struct {
+	DeskProjectID uuid.UUID
+	ProjectID     uuid.UUID
+	AddedBy       *uuid.UUID
+	CreatedAt     time.Time
 }
 
 type ServiceQueue struct {

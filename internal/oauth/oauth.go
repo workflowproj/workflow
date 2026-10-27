@@ -37,7 +37,7 @@ import (
 	"github.com/workflowproj/workflow/internal/tracker"
 )
 
-const (
+const ( // #nosec G101 -- token prefixes, not credentials
 	// AccessTokenPrefix marks OAuth access tokens; they are accepted by /mcp only.
 	AccessTokenPrefix  = "wfm_oat_"
 	RefreshTokenPrefix = "wfm_ort_"

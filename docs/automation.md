@@ -16,6 +16,7 @@ outcome (success, skipped, failed) and message.
 | `pr.opened`, `pr.merged` | a linked pull/merge request opens (or leaves draft) / merges | |
 | `commit.pushed`, `branch.created` | a commit or branch mentioning the issue is first seen | |
 | `pipeline.completed` | a linked pipeline/workflow run succeeds or fails | |
+| `deployment.completed` | a deployment containing the issue succeeds or fails (see [scm.md](scm.md#deployments)); once per outcome | `environment`: only this environment (any case); `status`: `success` or `failed` |
 | `schedule` | on a cron schedule (UTC, 5 fields) | `cron`, `jql`: the issues to act on (up to 100 per run) |
 | `sla.breached` | a service request's SLA clock passes its goal (once per clock; see [service-desk.md](service-desk.md#slas)) | `event.sla` is the SLA's name, `event.metric` `first_response` or `resolution` |
 
@@ -23,7 +24,8 @@ outcome (success, skipped, failed) and message.
 
 CEL, with the same variables as workflow conditions plus `event` — the trigger's data, e.g.
 `event.to` (status entered), `event.fields` (changed fields), `event.number`/`event.title`/`event.url`
-(pull requests), `event.status` (pipelines). See [workflows.md](workflows.md#cel-reference).
+(pull requests), `event.status` (pipelines), `event.environment`/`event.status`/`event.url`/`event.ref`/
+`event.sha`/`event.deployer`/`event.repository` (deployments). See [workflows.md](workflows.md#cel-reference).
 
 ```cel
 issue.type == "bug" && issue.priority in ["highest", "high"]
@@ -70,10 +72,18 @@ Examples:
   `startDate, dueDate, parent`, action `rollup_dates` target `parent`.
 - *Move to In Review when a PR opens*: trigger `pr.opened`, action transition → `In Review`.
 - *Close when merged*: trigger `pr.merged`, actions transition → `Done`, comment `Merged in #{{event.number}}`.
+- *Move issues to Done when they reach production* (a template, created turned off so you can
+  check the environment's name first): trigger `deployment.completed` with environment
+  `production` and status `success`, actions transition category `done`, comment
+  `Deployed to {{event.environment}}: {{event.url}}`.
 - *Triage new bugs*: trigger `issue.created`, condition `issue.type == "bug"`, actions set
   priority `high`, add label `needs-triage`, notify watchers.
 - *Weekly stale check*: trigger `schedule` `0 8 * * 1` with the query
   `statusCategory = "In Progress" AND updated <= -14d`, action add label `stale`.
+- *Remind risk owners about reviews due this week* (offered when the project keeps
+  [risks and decisions](risks-decisions.md)): trigger `schedule` `0 8 * * 1` with the query
+  `kind = risk AND statusCategory != Done AND due <= 7d AND assignee is not EMPTY`, action notify
+  `assignee`.
 
 ### Loops
 
@@ -85,7 +95,10 @@ skipped.
 
 Project settings → Webhooks (or Administration → Webhooks for all projects) sends events to
 other systems: `issue.created`, `issue.updated`, `issue.transitioned`, `issue.deleted`,
-`comment.created`, `sprint.started`, `sprint.completed`, `release.released`, `sla.breached`, or `*`.
+`comment.created`, `sprint.started`, `sprint.completed`, `release.released`, `sla.breached`,
+`deployment.completed`, or `*`. `deployment.completed` is delivered once for each issue the
+deployment contains, with the deployment in `data` (`environment`, `status`, `url`, `ref`, `sha`,
+`deployer`, `repository`, `provider`, `deploymentId`).
 In service projects, `comment.created` carries `data.visibility` (`public` for replies to the
 customer, `internal` for notes), and comments added by automation rules are internal notes.
 

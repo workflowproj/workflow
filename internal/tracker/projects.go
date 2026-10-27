@@ -28,6 +28,8 @@ type ProjectInput struct {
 	Template    string
 	// OpenRoleKey: role every org member gets; "" makes the project private.
 	OpenRoleKey string
+	// RisksDecisions turns the Risks and decisions section on or off; nil follows the template.
+	RisksDecisions *bool
 }
 
 // ProjectWithAccess pairs a project with the caller's permissions in it.
@@ -132,6 +134,15 @@ func (s *Service) CreateProject(ctx context.Context, actor *authz.Actor, in Proj
 		if err := s.applyTemplate(ctx, tx, q, actor, project, tpl); err != nil {
 			return err
 		}
+		on := tpl.RisksDecisions
+		if in.RisksDecisions != nil {
+			on = *in.RisksDecisions
+		}
+		if on {
+			if project, err = s.installRisksDecisions(ctx, tx, q, actor, project); err != nil {
+				return err
+			}
+		}
 		if s.AfterCreateProject != nil {
 			if err := s.AfterCreateProject(ctx, tx, q, actor, project); err != nil {
 				return err
@@ -167,7 +178,7 @@ func (s *Service) applyTemplate(ctx context.Context, tx pgx.Tx, q *dbq.Queries, 
 		}
 		if _, err := q.CreateIssueType(ctx, dbq.CreateIssueTypeParams{
 			ProjectID: p.ID, Key: t.Key, Name: t.Name, Icon: t.Icon, Color: t.Color,
-			Level: int32(t.Level), Position: int32(i), WorkflowID: wf.Workflow.ID,
+			Level: int32(t.Level), Position: int32(i), WorkflowID: wf.Workflow.ID, Kind: cmpOr(t.Kind, KindWork),
 		}); err != nil {
 			return err
 		}
@@ -212,6 +223,8 @@ type ProjectPatch struct {
 	LeadID      **uuid.UUID
 	// OpenRoleKey: nil = unchanged, "" = private.
 	OpenRoleKey *string
+	// RisksDecisions turns the Risks and decisions section on (installing what is missing) or off.
+	RisksDecisions *bool
 }
 
 func (s *Service) UpdateProject(ctx context.Context, actor *authz.Actor, ref string, in ProjectPatch) (dbq.Project, error) {
@@ -232,6 +245,13 @@ func (s *Service) UpdateProject(ctx context.Context, actor *authz.Actor, ref str
 			params.Description = *in.Description
 		}
 		if in.LeadID != nil {
+			if id := *in.LeadID; id != nil {
+				if u, err := q.GetUser(ctx, *id); err != nil || u.DeletedAt != nil {
+					return apperr.Invalid("leadId", "user not found")
+				} else if u.OrgRole == authz.OrgCustomer {
+					return apperr.Invalid("leadId", "%s is a customer: customers use the help centre and cannot lead a project", u.DisplayName)
+				}
+			}
 			params.LeadID = *in.LeadID
 		}
 		if in.OpenRoleKey != nil {
@@ -264,6 +284,11 @@ func (s *Service) UpdateProject(ctx context.Context, actor *authz.Actor, ref str
 			}
 			params.Key = newKey
 			Audit(ctx, q, actor, "project.rename_key", "project", p.ID.String(), &p.ID, map[string]any{"from": p.Key, "to": newKey})
+		}
+		if in.RisksDecisions != nil {
+			if err := s.setRisksDecisions(ctx, tx, q, actor, p, *in.RisksDecisions); err != nil {
+				return err
+			}
 		}
 		var err error
 		out, err = q.UpdateProject(ctx, params)
@@ -368,13 +393,15 @@ func (s *Service) RemoveMember(ctx context.Context, actor *authz.Actor, ref stri
 	return nil
 }
 
-// AssignableUsers lists people who can browse the project (for assignee pickers).
+// AssignableUsers lists people who can browse the project (for assignee pickers). Customers
+// are left out in the query, so that a help desk's many customers never crowd agents out of
+// the candidates checked.
 func (s *Service) AssignableUsers(ctx context.Context, actor *authz.Actor, ref, q string, limit int) ([]dbq.User, error) {
 	p, _, err := s.ProjectFor(ctx, actor, ref, authz.ProjectBrowse)
 	if err != nil {
 		return nil, err
 	}
-	candidates, err := s.Q.SearchUsers(ctx, dbq.SearchUsersParams{Q: q, Lim: int32(max(limit*4, 100))})
+	candidates, err := s.Q.SearchUsers(ctx, dbq.SearchUsersParams{Q: q, ExcludeCustomers: true, Lim: int32(max(limit*4, 100))})
 	if err != nil {
 		return nil, err
 	}
@@ -451,7 +478,9 @@ type IssueTypeInput struct {
 	Icon        string
 	Color       string
 	Level       int
-	WorkflowID  uuid.UUID
+	// Kind is work (the default), risk or decision; fixed once created.
+	Kind       string
+	WorkflowID uuid.UUID
 }
 
 func (s *Service) checkWorkflowForProject(ctx context.Context, q *dbq.Queries, p dbq.Project, workflowID uuid.UUID) error {
@@ -476,9 +505,15 @@ func (s *Service) CreateIssueType(ctx context.Context, actor *authz.Actor, ref s
 	if err := s.checkWorkflowForProject(ctx, s.Q, p, in.WorkflowID); err != nil {
 		return dbq.IssueType{}, err
 	}
-	existing, err := s.Q.ListIssueTypes(ctx, p.ID)
-	if err != nil {
-		return dbq.IssueType{}, err
+	in.Kind = cmpOr(in.Kind, KindWork)
+	if !slices.Contains(issueTypeKinds, in.Kind) {
+		return dbq.IssueType{}, apperr.Invalid("kind", "kind must be work, risk or decision")
+	}
+	if in.Level < -1 || in.Level > 2 {
+		return dbq.IssueType{}, apperr.Invalid("level", "levels are -1 (sub-task), 0 (standard), 1 (epic) or 2")
+	}
+	if in.Kind != KindWork && in.Level != 0 {
+		return dbq.IssueType{}, apperr.Invalid("level", "risk and decision types are standard issue types (level 0)")
 	}
 	if in.Icon == "" {
 		in.Icon = "task"
@@ -486,13 +521,30 @@ func (s *Service) CreateIssueType(ctx context.Context, actor *authz.Actor, ref s
 	if in.Color == "" {
 		in.Color = "#4f7cff"
 	}
-	t, err := s.Q.CreateIssueType(ctx, dbq.CreateIssueTypeParams{
-		ProjectID: p.ID, Key: in.Key, Name: in.Name, Description: in.Description, Icon: in.Icon, Color: in.Color,
-		Level: int32(in.Level), Position: int32(len(existing)), WorkflowID: in.WorkflowID,
+	var t dbq.IssueType
+	err = s.tx(ctx, func(tx pgx.Tx, q *dbq.Queries) error {
+		existing, err := q.ListIssueTypes(ctx, p.ID)
+		if err != nil {
+			return err
+		}
+		if slices.ContainsFunc(existing, func(e dbq.ListIssueTypesRow) bool { return e.Key == in.Key }) {
+			return apperr.Conflict("duplicate_type", "an issue type with key %q already exists", in.Key)
+		}
+		t, err = q.CreateIssueType(ctx, dbq.CreateIssueTypeParams{
+			ProjectID: p.ID, Key: in.Key, Name: in.Name, Description: in.Description, Icon: in.Icon, Color: in.Color,
+			Level: int32(in.Level), Position: int32(len(existing)), WorkflowID: in.WorkflowID, Kind: in.Kind,
+		})
+		if db.IsUniqueViolation(err) {
+			return apperr.Conflict("duplicate_type", "an issue type with key %q already exists", in.Key)
+		} else if err != nil {
+			return err
+		}
+		// Risk and decision types get their kind's fields.
+		if in.Kind != KindWork {
+			return s.ensureKindFields(ctx, q, p, in.Kind, in.Key)
+		}
+		return nil
 	})
-	if db.IsUniqueViolation(err) {
-		return t, apperr.Conflict("duplicate_type", "an issue type with key %q already exists", in.Key)
-	}
 	return t, err
 }
 
@@ -531,6 +583,7 @@ func (s *Service) UpdateIssueType(ctx context.Context, actor *authz.Actor, ref s
 		}
 		remap := in.WorkflowID != nil && *in.WorkflowID != t.WorkflowID
 		statusMap := map[string]string{}
+		var moves statusMoves
 		if remap {
 			if err := s.checkWorkflowForProject(ctx, q, p, *in.WorkflowID); err != nil {
 				return err
@@ -538,6 +591,15 @@ func (s *Service) UpdateIssueType(ctx context.Context, actor *authz.Actor, ref s
 			def, _, err := currentVersion(ctx, q, *in.WorkflowID)
 			if err != nil {
 				return err
+			}
+			// Boards follow the mapping for the old workflow's statuses the new one lacks.
+			moves = statusMoves{def: def, mapping: in.StatusMapping}
+			old, _, err := currentVersion(ctx, q, t.WorkflowID)
+			if err != nil {
+				return err
+			}
+			for _, st := range old.Statuses {
+				moves.add(st.ID, st.Name)
 			}
 			missing := apperr.New(http.StatusUnprocessableEntity, "status_mapping_required", "Some issues are in statuses the new workflow does not have; map them")
 			rows, err := tx.Query(ctx, `SELECT i.status_id, s.name, count(*) FROM issues i JOIN statuses s ON s.id = i.status_id WHERE i.type_id = $1 GROUP BY 1, 2`, t.ID)
@@ -565,10 +627,11 @@ func (s *Service) UpdateIssueType(ctx context.Context, actor *authz.Actor, ref s
 				}
 				target, ok := def.StatusByName(lookupMapping(in.StatusMapping, u.name))
 				if !ok {
-					missing.Fields = append(missing.Fields, apperr.FieldError{Field: u.name, Message: fmt.Sprintf("%d issue(s) are in %q", u.n, u.name)})
+					missing.Fields = append(missing.Fields, apperr.FieldError{Field: u.name, Message: fmt.Sprintf("%s in %q", plural(u.n, "issue is", "issues are"), u.name)})
 					continue
 				}
 				statusMap[u.id.String()] = target.ID.String()
+				moves.add(u.id, u.name)
 			}
 			if len(missing.Fields) > 0 {
 				return missing
@@ -578,6 +641,12 @@ func (s *Service) UpdateIssueType(ctx context.Context, actor *authz.Actor, ref s
 		out, err = q.UpdateIssueType(ctx, params)
 		if err != nil {
 			return err
+		}
+		// Boards show work only, so a risk or decision type's statuses never need a column.
+		if remap && t.Kind == KindWork {
+			if err := s.showMovedStatuses(ctx, tx, q, actor, []uuid.UUID{p.ID}, moves.list); err != nil {
+				return err
+			}
 		}
 		if remap && s.Jobs != nil {
 			if _, err := s.Jobs.InsertTx(ctx, tx, jobs.WorkflowMigrate{WorkflowID: params.WorkflowID, Mapping: statusMap}, nil); err != nil {
@@ -604,7 +673,7 @@ func (s *Service) DeleteIssueType(ctx context.Context, actor *authz.Actor, ref s
 		return err
 	}
 	if n > 0 {
-		return apperr.Conflict("type_in_use", "%d issue(s) use this type; change their type first", n)
+		return apperr.Conflict("type_in_use", "%s this type; change their type first", plural(int(n), "issue uses", "issues use"))
 	}
 	if err := s.Q.DeleteIssueType(ctx, t.ID); db.IsForeignKeyViolation(err) {
 		return apperr.Conflict("type_in_use", "request types create issues of this type; change them first")
@@ -614,8 +683,8 @@ func (s *Service) DeleteIssueType(ctx context.Context, actor *authz.Actor, ref s
 	return nil
 }
 
-// projectStatuses returns the statuses used by the project's workflows, ordered by category
-// then by their order in the workflows.
+// projectStatuses returns the statuses used by the workflows of the project's work types,
+// ordered by category then by their order in the workflows.
 func (s *Service) projectStatuses(ctx context.Context, q *dbq.Queries, projectID uuid.UUID) ([]workflow.Status, error) {
 	types, err := q.ListIssueTypes(ctx, projectID)
 	if err != nil {
@@ -627,7 +696,8 @@ func (s *Service) projectStatuses(ctx context.Context, q *dbq.Queries, projectID
 	// Standard types first so their workflow defines the column order.
 	slices.SortStableFunc(types, func(a, b dbq.ListIssueTypesRow) int { return absLevel(a.Level) - absLevel(b.Level) })
 	for _, t := range types {
-		if seenWf[t.WorkflowID] {
+		// Risks and decisions are never on a board, so their statuses are not columns.
+		if seenWf[t.WorkflowID] || t.Kind != KindWork {
 			continue
 		}
 		seenWf[t.WorkflowID] = true

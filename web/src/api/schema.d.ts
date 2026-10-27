@@ -602,7 +602,9 @@ export interface paths {
         put?: never;
         /**
          * Email a person an invitation to choose a password (makes them a local account)
-         * @description A new invitation replaces any open one. Refused for people managed by SCIM or Google directory sync.
+         * @description A new invitation replaces any open one. Refused for people managed by SCIM or Google
+         *     directory sync. emailed is false when the server has no SMTP server: the invitation exists
+         *     but nobody receives it (set a temporary password instead, or set up email and resend it).
          */
         post: operations["adminInviteUser"];
         delete: operations["adminRevokeInvitation"];
@@ -637,7 +639,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Email a local account a password-reset link */
+        /**
+         * Email a local account a password-reset link
+         * @description emailed is false when the server has no SMTP server, so the link reaches nobody.
+         */
         post: operations["adminSendPasswordReset"];
         delete?: never;
         options?: never;
@@ -1386,6 +1391,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{projectKey}/risks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description The project's risk register: every issue of a risk type (newest first, up to 2000), how
+         *     each is scored and how much of the work linked to it with `mitigates` is done, with
+         *     totals and the likelihood × impact matrix of open risks.
+         */
+        get: operations["getRiskRegister"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{projectKey}/decisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description The project's decision log: every issue of a decision type (newest first, up to 2000),
+         *     with the decisions it supersedes and is superseded by and the work implementing it.
+         */
+        get: operations["getDecisionLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/projects/{projectKey}/velocity": {
         parameters: {
             query?: never;
@@ -1674,7 +1720,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** A release with its progress, notes, Git tag and the environments it reached */
+        get: operations["getRelease"];
         put?: never;
         post?: never;
         delete: operations["deleteRelease"];
@@ -1697,6 +1744,84 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/releases/{releaseId}/readiness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What stands in the way of shipping the release
+         * @description Warnings, each with the issues concerned: issues that are not done, issues with open
+         *     (unmerged) pull or merge requests, issues whose latest pipeline failed, and a release date
+         *     that has passed. Shipping stays possible whatever they say.
+         */
+        get: operations["getReleaseReadiness"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/releases/{releaseId}/burnup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Done work against the release's scope, day by day */
+        get: operations["getReleaseBurnup"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/releases/{releaseId}/notes/generated": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Release notes generated from the release's done issues (not saved)
+         * @description Markdown with a section per issue type (Features from stories, Bug fixes from bugs,
+         *     Improvements from tasks, else the type's plural name) and a line "summary (KEY)" per done
+         *     issue, sub-tasks left out. Save it with `PATCH /releases/{releaseId}` (`notes`).
+         */
+        get: operations["generateReleaseNotes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{projectKey}/release-settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What new Git tags do to the project's releases */
+        get: operations["getReleaseSettings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["updateReleaseSettings"];
         trace?: never;
     };
     "/timeline": {
@@ -2118,6 +2243,27 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["createIssueLink"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/issues/{issueKey}/supersede": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Marks a decision as superseded by a newer one in one step: links the newer decision to it
+         *     with `supersedes` (unless already linked) and runs the transition to Superseded. Both must
+         *     be decisions; the workflow decides from which statuses that is allowed (Accepted, by default).
+         */
+        post: operations["supersedeDecision"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2548,8 +2694,9 @@ export interface paths {
         /**
          * Add a customer by email
          * @description Someone new gets a customer account and an email invitation to choose a password (local
-         *     accounts); an existing account (a customer of another project, an organisation member,
-         *     a single sign-on user) is added as it is. Needs the customer.manage permission.
+         *     accounts; emailed says whether it was sent); an existing account (a customer of another
+         *     project, an organisation member, a single sign-on user) is added as it is. Needs the
+         *     customer.manage permission.
          */
         post: operations["addServiceCustomer"];
         delete?: never;
@@ -2736,6 +2883,27 @@ export interface paths {
         };
         /** A desk's request types and their forms */
         get: operations["getPortalDesk"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portal/projects/{projectKey}/whats-new": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What's new - the published release notes of the software projects the desk shows
+         * @description Only the notes themselves, with the product's and the release's names and dates: never
+         *     issues. Answers 404 to anyone who may not raise requests in the desk.
+         */
+        get: operations["listPortalReleaseNotes"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2944,8 +3112,11 @@ export interface components {
         Priority: "highest" | "high" | "medium" | "low" | "lowest";
         /** @enum {string} */
         LinkDirection: "outward" | "inward";
-        /** @enum {string} */
-        LinkType: "blocks" | "relates" | "duplicates" | "clones";
+        /**
+         * @description mitigates: work → the risk it mitigates; implements: work → the decision it implements; supersedes: a decision → the decision it replaces
+         * @enum {string}
+         */
+        LinkType: "blocks" | "relates" | "duplicates" | "clones" | "mitigates" | "implements" | "supersedes";
         /**
          * @description read = GET only; write = all project and issue operations; admin = organisation administration (if the owner is an admin).
          * @enum {string}
@@ -2956,6 +3127,11 @@ export interface components {
             devLogin: boolean;
             /** @description Email and password sign-in for local accounts (WFM_LOCAL_LOGIN) */
             localLogin: boolean;
+            /**
+             * @description The server sends email (WFM_SMTP_HOST is set). Without it, password reset links and help
+             *     centre sign-up links reach nobody, so those pages say to ask an administrator or the team.
+             */
+            emailDelivery: boolean;
         };
         AuthProvider: {
             id: string;
@@ -3222,6 +3398,8 @@ export interface components {
             name: string;
             description: string;
             boardType: components["schemas"]["BoardType"];
+            /** @description Whether new projects from this template start with the Risks and decisions section on */
+            risksDecisions: boolean;
             issueTypes: components["schemas"]["TemplateIssueType"][];
             workflows: string[];
         };
@@ -3241,6 +3419,8 @@ export interface components {
             access: components["schemas"]["ProjectAccess"];
             openRoleKey?: string;
             keyAliases?: string[];
+            /** @description The Risks and decisions section is on (risk register and decision log) */
+            risksDecisions: boolean;
             /** Format: date-time */
             createdAt: string;
             myPermissions: string[];
@@ -3255,6 +3435,8 @@ export interface components {
             access?: components["schemas"]["ProjectAccess"];
             /** @default member */
             openRoleKey?: string;
+            /** @description Turn the Risks and decisions section on or off; defaults to the template's setting */
+            risksDecisions?: boolean;
         };
         ProjectPatch: {
             /** @description Renaming keeps the old key as an alias */
@@ -3265,6 +3447,11 @@ export interface components {
             leadId?: string | null;
             access?: components["schemas"]["ProjectAccess"];
             openRoleKey?: string;
+            /**
+             * @description On installs the Risk and Decision issue types, their workflows and fields (again if
+             *     anything is missing) and shows the section; off hides it and keeps the issues.
+             */
+            risksDecisions?: boolean;
         };
         ProjectMember: {
             /** Format: uuid */
@@ -3283,6 +3470,7 @@ export interface components {
             color: string;
             /** @description Hierarchy level: epic 1, standard 0, sub-task -1 */
             level: number;
+            kind: components["schemas"]["IssueTypeKind"];
             position: number;
             /** Format: uuid */
             workflowId: string;
@@ -3295,9 +3483,17 @@ export interface components {
             icon?: string;
             color?: string;
             level: number;
+            /** @description Defaults to work; risk and decision types must be standard (level 0) */
+            kind?: components["schemas"]["IssueTypeKind"];
             /** Format: uuid */
             workflowId: string;
         };
+        /**
+         * @description work: planned work (boards, backlog, sprints, timeline, delivery metrics). risk and decision:
+         *     the project's risk register and decision log, kept out of planning. Fixed once created.
+         * @enum {string}
+         */
+        IssueTypeKind: "work" | "risk" | "decision";
         CycleTimeReport: {
             days: number;
             /** Format: double */
@@ -3603,6 +3799,8 @@ export interface components {
             /** @description resolution */
             field: string;
             required?: boolean;
+            /** @description resolution only: the resolutions this screen offers, instead of Done, Won't Do, Duplicate and Cannot Reproduce */
+            options?: string[];
         };
         /** @description Exactly one key is set. */
         PostFunction: {
@@ -3725,6 +3923,11 @@ export interface components {
         /** @enum {string} */
         SprintState: "future" | "active" | "closed";
         SprintInput: {
+            /**
+             * @description Creating a sprint without a name continues the project's numbering: the latest
+             *     sprint's name with its trailing number plus one ("Sprint 24" → "Sprint 25"), else
+             *     "<KEY> Sprint <n>".
+             */
             name?: string;
             goal?: string;
             /** Format: date */
@@ -3732,6 +3935,10 @@ export interface components {
             /** Format: date */
             endDate?: string | null;
         };
+        /**
+         * @description Issue counts and story points are of standard issues: sub-tasks count as part of their
+         *     parent. Seconds include sub-tasks. For a future sprint, committed is what it holds now.
+         */
         SprintReport: {
             sprint: components["schemas"]["Sprint"];
             /**
@@ -3837,6 +4044,14 @@ export interface components {
             position: number;
             issueCount: number;
             doneCount: number;
+            /** @description The release notes are shown on the What's new page of the help centres that chose this project */
+            notesPublished: boolean;
+            /** Format: date-time */
+            notesPublishedAt?: string;
+            /** @description The Git tag the release ships as */
+            tagName?: string;
+            /** Format: uuid */
+            tagRepositoryId?: string;
         };
         /** @enum {string} */
         ReleaseState: "unreleased" | "released" | "archived";
@@ -3848,6 +4063,134 @@ export interface components {
             /** Format: date */
             releaseDate?: string | null;
             state?: components["schemas"]["ReleaseState"];
+            /** @description Release notes (Markdown) */
+            notes?: string;
+            /** @description Publish the notes to the What's new page of the help centres that chose this project */
+            notesPublished?: boolean;
+            /**
+             * Format: uuid
+             * @description The repository of the release's Git tag (one connected to the project); null, with tagName null, unlinks the tag
+             */
+            tagRepositoryId?: string | null;
+            /** @description The Git tag the release ships as */
+            tagName?: string | null;
+        };
+        ReleaseDetail: components["schemas"]["Release"] & {
+            projectKey: string;
+            /** @description Release notes (Markdown) */
+            notes: string;
+            tag?: components["schemas"]["ReleaseTag"];
+            progress: components["schemas"]["ReleaseProgress"];
+            environments: components["schemas"]["ReleaseEnvironment"][];
+            /** @description The caller holds release.manage in the project */
+            canManage: boolean;
+        };
+        ReleaseTag: {
+            name: string;
+            sha?: string;
+            repository: components["schemas"]["RepositoryRef"];
+            /** @description The tag's page at the provider */
+            url: string;
+            /** @description The tag of the previous release with one in the same repository */
+            previousTag?: string;
+            /** @description The changes between the previous release's tag and this one */
+            compareUrl?: string;
+            /** Format: date-time */
+            linkedAt?: string;
+        };
+        ReleaseProgress: {
+            issues: components["schemas"]["CategoryCounts"];
+            points: components["schemas"]["CategoryCounts"];
+            /** @description Issues without story points */
+            unestimated: number;
+        };
+        CategoryCounts: {
+            /** Format: double */
+            todo: number;
+            /** Format: double */
+            inProgress: number;
+            /** Format: double */
+            done: number;
+            /** Format: double */
+            total: number;
+        };
+        ReleaseEnvironment: {
+            environment: string;
+            /** Format: date-time */
+            reachedAt: string;
+            /**
+             * @description tag: the release's tag was deployed there; issues: every done issue of the release was
+             * @enum {string}
+             */
+            via: "tag" | "issues";
+            /** @description The deployment (tag only) */
+            url?: string;
+        };
+        ReleaseBurnup: {
+            /** Format: date */
+            from: string;
+            /**
+             * Format: date
+             * @description Today
+             */
+            to: string;
+            /** Format: date */
+            releaseDate?: string;
+            /**
+             * @description history: scope follows the fix version changes recorded in issue history; current: there are none, so scope is the release's current issues, each from its creation
+             * @enum {string}
+             */
+            scopeSource: "history" | "current";
+            days: components["schemas"]["ReleaseBurnupDay"][];
+        };
+        /** @description The release at the end of a day. */
+        ReleaseBurnupDay: {
+            /** Format: date */
+            date: string;
+            scopeIssues: number;
+            doneIssues: number;
+            /** Format: double */
+            scopePoints: number;
+            /** Format: double */
+            donePoints: number;
+        };
+        ReleaseReadiness: {
+            /** @description There are no warnings */
+            ready: boolean;
+            warnings: components["schemas"]["ReadinessWarning"][];
+        };
+        ReadinessWarning: {
+            /** @enum {string} */
+            kind: "not_done" | "open_pull_requests" | "failed_pipelines" | "overdue";
+            message: string;
+            issues: components["schemas"]["ReadinessIssue"][];
+        };
+        ReadinessIssue: {
+            issue: components["schemas"]["IssueRef"];
+            /** @description The open pull requests or the failed pipeline */
+            links: components["schemas"]["ReadinessLink"][];
+        };
+        ReadinessLink: {
+            title: string;
+            url: string;
+            state: string;
+            repository: string;
+        };
+        GeneratedReleaseNotes: {
+            /** @description Markdown */
+            notes: string;
+            /** @description The done issues listed */
+            issueCount: number;
+        };
+        ReleaseSettings: {
+            /** @description A new tag in a connected repository without a release of its name creates one */
+            createFromTags: boolean;
+            /** @description Pushing a release's tag marks the release released */
+            releaseOnTag: boolean;
+        };
+        ReleaseSettingsPatch: {
+            createFromTags?: boolean;
+            releaseOnTag?: boolean;
         };
         IssueTypeRef: {
             /** Format: uuid */
@@ -3857,6 +4200,7 @@ export interface components {
             icon: string;
             color: string;
             level: number;
+            kind: components["schemas"]["IssueTypeKind"];
         };
         IssueRef: {
             /** Format: uuid */
@@ -3873,6 +4217,8 @@ export interface components {
             openPullRequests: number;
             mergedPullRequests: number;
             pipelineState?: string;
+            /** @description Environments a successful deployment containing the issue reached */
+            deployedTo?: string[];
         };
         Issue: {
             /** Format: uuid */
@@ -3925,6 +4271,8 @@ export interface components {
             progress?: components["schemas"]["IssueProgress"];
             links: components["schemas"]["IssueLink"][];
             development: components["schemas"]["DevLink"][];
+            /** @description One per environment the issue was deployed to - the latest successful deployment containing it, else the latest one that failed */
+            deployments: components["schemas"]["IssueDeployment"][];
             attachments: components["schemas"]["Attachment"][];
             watching: boolean;
             watcherCount: number;
@@ -4232,6 +4580,24 @@ export interface components {
         };
         /** @enum {string} */
         DevLinkKind: "branch" | "commit" | "pull_request" | "pipeline";
+        IssueDeployment: {
+            /** Format: uuid */
+            id: string;
+            environment: string;
+            status: components["schemas"]["DeploymentStatus"];
+            /**
+             * Format: date-time
+             * @description When the provider reported the status
+             */
+            deployedAt: string;
+            url: string;
+            ref: string;
+            sha: string;
+            deployer: string;
+            repository: components["schemas"]["RepositoryRef"];
+        };
+        /** @enum {string} */
+        DeploymentStatus: "pending" | "running" | "success" | "failed" | "canceled";
         /** @enum {string} */
         ScmProvider: "github" | "gitlab";
         RepositoryRef: {
@@ -4254,6 +4620,79 @@ export interface components {
             url: string;
             /** @description Service projects: public = added by a customer in the portal (the only files the portal shows) */
             visibility?: components["schemas"]["Visibility"];
+        };
+        /**
+         * @description From the score (likelihood × impact): 1–4 low, 5–9 medium, 10–16 high, 20–25 critical
+         * @enum {string}
+         */
+        RiskRating: "low" | "medium" | "high" | "critical";
+        LinkedWork: {
+            /** @description Issues linked to this one (mitigating or implementing work) */
+            total: number;
+            /** @description Of those */
+            done: number;
+        };
+        RiskEntry: {
+            issue: components["schemas"]["Issue"];
+            /** @description 1 Rare, 2 Unlikely, 3 Possible, 4 Likely, 5 Almost certain */
+            likelihood?: number;
+            /** @description 1 Negligible, 2 Minor, 3 Moderate, 4 Major, 5 Severe */
+            impact?: number;
+            /** @description Likelihood × impact */
+            score?: number;
+            rating?: components["schemas"]["RiskRating"];
+            /** @enum {string} */
+            response?: "Avoid" | "Reduce" | "Transfer" | "Accept";
+            mitigation: components["schemas"]["LinkedWork"];
+        };
+        RiskCell: {
+            likelihood: number;
+            impact: number;
+            score: number;
+            rating: components["schemas"]["RiskRating"];
+            /** @description Open risks with this likelihood and impact */
+            count: number;
+        };
+        RiskSummary: {
+            /** @description Risks not in a done status */
+            open: number;
+            /** @description Open risks rated high or critical */
+            highOrCritical: number;
+            /** @description Open risks whose review date (due date) has passed */
+            reviewsOverdue: number;
+            /** @description Open risks without a likelihood or an impact */
+            unassessed: number;
+        };
+        RiskRegister: {
+            summary: components["schemas"]["RiskSummary"];
+            /** @description All 25 cells */
+            matrix: components["schemas"]["RiskCell"][];
+            risks: components["schemas"]["RiskEntry"][];
+            /** @description The project has more risks than the register returns (2000) */
+            truncated: boolean;
+        };
+        DecisionEntry: {
+            issue: components["schemas"]["Issue"];
+            /** Format: date */
+            decidedOn?: string;
+            /** @description Earlier decisions this one replaces */
+            supersedes: components["schemas"]["IssueRef"][];
+            /** @description Later decisions that replace this one */
+            supersededBy: components["schemas"]["IssueRef"][];
+            implementation: components["schemas"]["LinkedWork"];
+        };
+        DecisionLog: {
+            decisions: components["schemas"]["DecisionEntry"][];
+            /** @description The project has more decisions than the log returns (2000) */
+            truncated: boolean;
+        };
+        SupersedeRequest: {
+            /** @description The newer decision */
+            supersededByKey: string;
+            /** @description Expected current version of the superseded decision (optimistic locking) */
+            version?: number;
+            /** @description Optional comment added with the transition */
+            comment?: string;
         };
         Timeline: {
             projects: components["schemas"]["ProjectRef"][];
@@ -4323,6 +4762,8 @@ export interface components {
             description: string;
             type: components["schemas"]["FieldType"];
             options: string[];
+            /** @description A field of risks and decisions (risk_*, decision_*): set up by the project setting and not changed or deleted here */
+            reserved: boolean;
             /** @description Omitted = all projects */
             projectKeys?: string[];
             /** @description Omitted = all issue types */
@@ -4402,6 +4843,11 @@ export interface components {
         };
         /** @enum {string} */
         EmailTransport: "smtp" | "memory";
+        /**
+         * @description Whether the email was queued for delivery through the SMTP server. False when the server
+         *     has none (WFM_SMTP_HOST unset): the message is only logged and kept in memory.
+         */
+        Emailed: boolean;
         EmailStatus: {
             transport: components["schemas"]["EmailTransport"];
             host?: string;
@@ -4765,7 +5211,7 @@ export interface components {
         };
         AutomationTrigger: {
             /** @enum {string} */
-            type: "issue.created" | "issue.transitioned" | "issue.field_changed" | "pr.opened" | "pr.merged" | "commit.pushed" | "branch.created" | "pipeline.completed" | "schedule" | "sla.breached";
+            type: "issue.created" | "issue.transitioned" | "issue.field_changed" | "pr.opened" | "pr.merged" | "commit.pushed" | "branch.created" | "pipeline.completed" | "deployment.completed" | "schedule" | "sla.breached";
             /** @description issue.transitioned: only when entering this status (name) */
             toStatus?: string;
             /** @description issue.transitioned: only when entering a status of this category */
@@ -4776,6 +5222,13 @@ export interface components {
             cron?: string;
             /** @description schedule: issues to run the actions against */
             jql?: string;
+            /** @description deployment.completed: only deployments to this environment (case-insensitive) */
+            environment?: string;
+            /**
+             * @description deployment.completed: only deployments that succeeded, or that failed
+             * @enum {string}
+             */
+            status?: "success" | "failed";
         };
         AutomationAction: {
             /**
@@ -4861,7 +5314,7 @@ export interface components {
             name: string;
             /** Format: uri */
             url: string;
-            events: ("*" | "issue.created" | "issue.updated" | "issue.transitioned" | "issue.deleted" | "comment.created" | "sprint.started" | "sprint.completed" | "release.released" | "sla.breached")[];
+            events: ("*" | "issue.created" | "issue.updated" | "issue.transitioned" | "issue.deleted" | "comment.created" | "sprint.started" | "sprint.completed" | "release.released" | "sla.breached" | "deployment.completed")[];
             /** @default true */
             active?: boolean;
         };
@@ -5011,12 +5464,16 @@ export interface components {
             customerCount: number;
             /** @description The project is open: every organisation member can browse it as an agent, internal notes included */
             openProject: boolean;
+            /** @description Software projects whose published release notes the help centre shows on its What's new page */
+            releaseNotesProjects: components["schemas"]["ProjectRef"][];
         };
         ServiceDeskPatch: {
             portalName?: string;
             portalDescription?: string;
             portalAccess?: components["schemas"]["PortalAccess"];
             selfSignup?: boolean;
+            /** @description Software projects (ones you can browse) whose published release notes the help centre shows; replaces the list */
+            releaseNotesProjectKeys?: string[];
         };
         /** @enum {string} */
         FormFieldType: "text" | "textarea" | "select" | "multiselect" | "number" | "date" | "checkbox" | "url";
@@ -5102,8 +5559,9 @@ export interface components {
         };
         ServiceCustomerAdded: {
             customer: components["schemas"]["ServiceCustomer"];
-            /** @description A new customer account was created and emailed an invitation */
+            /** @description A new customer account was created with an invitation to choose a password */
             invited: boolean;
+            emailed: components["schemas"]["Emailed"];
         };
         Queue: {
             /** Format: uuid */
@@ -5287,6 +5745,23 @@ export interface components {
             name: string;
             description: string;
             requestTypes: components["schemas"]["PortalRequestType"][];
+            /** @description The desk's What's new page has release notes */
+            whatsNew: boolean;
+        };
+        PortalReleaseNote: {
+            /** Format: uuid */
+            id: string;
+            /** @description The software project's name */
+            product: string;
+            /** @description The release's name */
+            name: string;
+            /**
+             * Format: date
+             * @description When it was released
+             */
+            date?: string;
+            /** @description Markdown */
+            notes: string;
         };
         PortalRequestCreate: {
             /** Format: uuid */
@@ -5306,7 +5781,12 @@ export interface components {
             resolution?: string;
             /** Format: date-time */
             createdAt: string;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @description The latest activity the caller can see: the request was raised, a reply they can see, a
+             *     status change or a file added in the help centre. Internal notes and other changes
+             *     agents make do not count.
+             */
             updatedAt: string;
             /**
              * @description Why the caller sees it
@@ -5391,7 +5871,7 @@ export interface components {
         DashboardId: string;
         /** @description Comma-separated project keys; omit for every project you can browse */
         MetricProjects: string;
-        /** @description Optional query the issues must also match */
+        /** @description Optional query the issues must also match. Metrics count work only: never risks or decisions. */
         MetricJql: string;
         /** @description Window in days */
         MetricDays: number;
@@ -6115,8 +6595,13 @@ export interface operations {
         parameters: {
             query?: {
                 q?: string;
-                /** @description Only users who can be assigned in this project */
+                /** @description Only users who can be assigned in this project (never customers) */
                 project?: string;
+                /**
+                 * @description false leaves out customers (people who only use a help centre), for pickers of people
+                 *     who can become project members. Customers are never listed with project.
+                 */
+                customers?: boolean;
                 limit?: components["parameters"]["Limit"];
             };
             header?: never;
@@ -6345,7 +6830,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Sent */
+            /** @description Created, and emailed when the server can send email */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -6354,6 +6839,7 @@ export interface operations {
                     "application/json": {
                         /** Format: date-time */
                         expiresAt: string;
+                        emailed: components["schemas"]["Emailed"];
                     };
                 };
             };
@@ -6417,12 +6903,16 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Sent */
+            /** @description Created, and emailed when the server can send email */
             202: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        emailed: components["schemas"]["Emailed"];
+                    };
+                };
             };
             default: components["responses"]["Problem"];
         };
@@ -7961,6 +8451,54 @@ export interface operations {
             default: components["responses"]["Problem"];
         };
     };
+    getRiskRegister: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project key (or id) */
+                projectKey: components["parameters"]["ProjectKey"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Risk register */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RiskRegister"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getDecisionLog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project key (or id) */
+                projectKey: components["parameters"]["ProjectKey"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Decision log */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DecisionLog"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
     getVelocity: {
         parameters: {
             query?: {
@@ -8365,7 +8903,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Columns with issues (Scrum boards show the active sprint) */
+            /** @description Columns with issues (Scrum boards show the active sprint). Risks and decisions are never on a board. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -8390,7 +8928,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Active and future sprints with their issues, then the backlog */
+            /** @description Active and future sprints with their issues, then the backlog (work only, never risks or decisions) */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -8645,6 +9183,29 @@ export interface operations {
             default: components["responses"]["Problem"];
         };
     };
+    getRelease: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                releaseId: components["parameters"]["ReleaseId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Release */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReleaseDetail"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
     deleteRelease: {
         parameters: {
             query?: never;
@@ -8726,6 +9287,127 @@ export interface operations {
             default: components["responses"]["Problem"];
         };
     };
+    getReleaseReadiness: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                releaseId: components["parameters"]["ReleaseId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Readiness */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReleaseReadiness"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getReleaseBurnup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                releaseId: components["parameters"]["ReleaseId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Burnup */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReleaseBurnup"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    generateReleaseNotes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                releaseId: components["parameters"]["ReleaseId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Generated notes */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GeneratedReleaseNotes"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getReleaseSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project key (or id) */
+                projectKey: components["parameters"]["ProjectKey"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Settings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReleaseSettings"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    updateReleaseSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project key (or id) */
+                projectKey: components["parameters"]["ProjectKey"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReleaseSettingsPatch"];
+            };
+        };
+        responses: {
+            /** @description Updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReleaseSettings"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
     getTimeline: {
         parameters: {
             query?: {
@@ -8742,7 +9424,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Timeline data. Sub-tasks are not included. */
+            /** @description Timeline data. Sub-tasks, risks and decisions are not included. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -8876,7 +9558,7 @@ export interface operations {
             query?: {
                 /** @description Comma-separated project keys; omit for every project you can browse */
                 projects?: components["parameters"]["MetricProjects"];
-                /** @description Optional query the issues must also match */
+                /** @description Optional query the issues must also match. Metrics count work only: never risks or decisions. */
                 jql?: components["parameters"]["MetricJql"];
                 /** @description Window in days */
                 days?: components["parameters"]["MetricDays"];
@@ -8904,7 +9586,7 @@ export interface operations {
             query?: {
                 /** @description Comma-separated project keys; omit for every project you can browse */
                 projects?: components["parameters"]["MetricProjects"];
-                /** @description Optional query the issues must also match */
+                /** @description Optional query the issues must also match. Metrics count work only: never risks or decisions. */
                 jql?: components["parameters"]["MetricJql"];
                 /** @description Window in days */
                 days?: components["parameters"]["MetricDays"];
@@ -8933,7 +9615,7 @@ export interface operations {
             query?: {
                 /** @description Comma-separated project keys; omit for every project you can browse */
                 projects?: components["parameters"]["MetricProjects"];
-                /** @description Optional query the issues must also match */
+                /** @description Optional query the issues must also match. Metrics count work only: never risks or decisions. */
                 jql?: components["parameters"]["MetricJql"];
                 /** @description Window in days */
                 days?: components["parameters"]["MetricDays"];
@@ -8962,7 +9644,7 @@ export interface operations {
             query: {
                 /** @description Comma-separated project keys; omit for every project you can browse */
                 projects?: components["parameters"]["MetricProjects"];
-                /** @description Optional query the issues must also match */
+                /** @description Optional query the issues must also match. Metrics count work only: never risks or decisions. */
                 jql?: components["parameters"]["MetricJql"];
                 by: components["schemas"]["BreakdownBy"];
             };
@@ -8989,7 +9671,7 @@ export interface operations {
             query?: {
                 /** @description Comma-separated project keys; omit for every project you can browse */
                 projects?: components["parameters"]["MetricProjects"];
-                /** @description Optional query the issues must also match */
+                /** @description Optional query the issues must also match. Metrics count work only: never risks or decisions. */
                 jql?: components["parameters"]["MetricJql"];
                 /** @description Window in days */
                 days?: components["parameters"]["MetricDays"];
@@ -9668,6 +10350,34 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["IssueLink"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    supersedeDecision: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Issue key such as PLAT-12 (or id) */
+                issueKey: components["parameters"]["IssueKey"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SupersedeRequest"];
+            };
+        };
+        responses: {
+            /** @description The superseded decision */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssueDetail"];
                 };
             };
             default: components["responses"]["Problem"];
@@ -11016,6 +11726,30 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PortalDeskDetail"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listPortalReleaseNotes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project key (or id) */
+                projectKey: components["parameters"]["ProjectKey"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Release notes, newest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalReleaseNote"][];
                 };
             };
             default: components["responses"]["Problem"];

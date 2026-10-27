@@ -42,7 +42,7 @@ export function DescriptionSection() {
     >
       {draft !== null ? (
         <div>
-          <MarkdownEditor value={draft} onChange={setDraft} autoFocus onSubmit={save} minHeight={140} placeholder="Describe the work, steps to reproduce, acceptance criteria…" />
+          <MarkdownEditor label="Description" value={draft} onChange={setDraft} autoFocus onSubmit={save} minHeight={140} placeholder="Describe the work, steps to reproduce, acceptance criteria…" />
           <div className="mt-2 flex items-center gap-2">
             <Button size="sm" variant="primary" onClick={save} loading={saving}>
               Save

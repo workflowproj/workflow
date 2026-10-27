@@ -137,7 +137,7 @@ func (a *Auth) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		ReturnTo: SafeReturnTo(r.URL.Query().Get("returnTo")), Expires: time.Now().Add(10 * time.Minute).Unix(),
 	}
 	raw, _ := json.Marshal(st)
-	http.SetCookie(w, &http.Cookie{
+	http.SetCookie(w, &http.Cookie{ // #nosec G124 -- Secure follows WFM_PUBLIC_URL (https), so plain-http development sign-in works
 		Name: stateCookie, Value: a.Box.Sign(base64.RawURLEncoding.EncodeToString(raw)), Path: "/auth/",
 		HttpOnly: true, Secure: a.secureCookies(), SameSite: http.SameSiteLaxMode, MaxAge: 600,
 	})
@@ -154,7 +154,7 @@ func (a *Auth) HandleCallback(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			a.Log.Warn("sign-in failed", "code", code, "error", err)
 		}
-		http.SetCookie(w, &http.Cookie{Name: stateCookie, Path: "/auth/", MaxAge: -1})
+		http.SetCookie(w, &http.Cookie{Name: stateCookie, Path: "/auth/", MaxAge: -1, HttpOnly: true, Secure: a.secureCookies(), SameSite: http.SameSiteLaxMode}) // #nosec G124 -- Secure follows WFM_PUBLIC_URL (https), so plain-http development sign-in works
 		http.Redirect(w, r, "/login?error="+code, http.StatusFound)
 	}
 	id := r.PathValue("provider")
@@ -244,7 +244,7 @@ func (a *Auth) HandleCallback(w http.ResponseWriter, r *http.Request) {
 		fail("server_error", err)
 		return
 	}
-	http.SetCookie(w, &http.Cookie{Name: stateCookie, Path: "/auth/", MaxAge: -1})
+	http.SetCookie(w, &http.Cookie{Name: stateCookie, Path: "/auth/", MaxAge: -1, HttpOnly: true, Secure: a.secureCookies(), SameSite: http.SameSiteLaxMode}) // #nosec G124 -- Secure follows WFM_PUBLIC_URL (https), so plain-http development sign-in works
 	tracker.Audit(r.Context(), a.Q, authz.UserActor(user, user.OrgRole), "user.login", "user", user.ID.String(), nil, map[string]any{"provider": id})
 	http.Redirect(w, r, st.ReturnTo, http.StatusFound)
 }
@@ -270,7 +270,7 @@ func (a *Auth) startSession(w http.ResponseWriter, r *http.Request, user dbq.Use
 	if err := a.Q.TouchUserLogin(r.Context(), user.ID); err != nil {
 		return err
 	}
-	http.SetCookie(w, &http.Cookie{
+	http.SetCookie(w, &http.Cookie{ // #nosec G124 -- Secure follows WFM_PUBLIC_URL (https), so plain-http development sign-in works
 		Name: SessionCookie, Value: token, Path: "/", HttpOnly: true, Secure: a.secureCookies(),
 		SameSite: http.SameSiteLaxMode, Expires: expires,
 	})
@@ -281,7 +281,7 @@ func (a *Auth) EndSession(w http.ResponseWriter, r *http.Request) {
 	if c, err := r.Cookie(SessionCookie); err == nil {
 		_ = a.Q.DeleteSession(r.Context(), secure.Hash(c.Value))
 	}
-	http.SetCookie(w, &http.Cookie{Name: SessionCookie, Path: "/", MaxAge: -1, HttpOnly: true, Secure: a.secureCookies(), SameSite: http.SameSiteLaxMode})
+	http.SetCookie(w, &http.Cookie{Name: SessionCookie, Path: "/", MaxAge: -1, HttpOnly: true, Secure: a.secureCookies(), SameSite: http.SameSiteLaxMode}) // #nosec G124 -- Secure follows WFM_PUBLIC_URL (https), so plain-http development sign-in works
 }
 
 // clientIP is the client address the HTTP layer resolved (X-Forwarded-For counts only from

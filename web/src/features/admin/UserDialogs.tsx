@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bot, Plus, UserRound } from "lucide-react";
+import { Bot, KeyRound, Plus, UserRound } from "lucide-react";
 import { api, ApiError, unwrap, type Schemas } from "@/api/client";
 import { providersQuery } from "@/api/queries";
 import { Button, Field, Input, Modal, PageSpinner, Select, useToast } from "@/components/ui";
 import { ErrorBox } from "@/components/ErrorBox";
-import { CodeBlock } from "@/features/settings/common";
+import { CopyableCode } from "@/features/settings/tokens/ConnectSnippets";
 import { CreateTokenDialog, TokenTable } from "@/features/settings/tokens/Tokens";
+import { NO_EMAIL } from "@/features/admin/invitations";
 import { GroupChoice, SignInChoice, startSignIn, TemporaryPasswordDialog, type SignInMethod } from "@/features/admin/LocalAccount";
 import { cn } from "@/lib/cn";
 
@@ -27,24 +28,30 @@ export function CreateUserDialog({ onClose, initialKind = "human" }: { onClose: 
   const method: SignInMethod = !local ? "sso" : (chosen ?? (sso ? "sso" : "invite"));
   const [groupIds, setGroupIds] = useState<string[]>([]);
   const [temp, setTemp] = useState<{ user: AdminUser; password: string } | null>(null);
+  const [notEmailed, setNotEmailed] = useState<AdminUser | null>(null);
   const create = useMutation({
     mutationFn: async () => {
       const human = kind === "human";
       const u = await unwrap(
         api.POST("/admin/users", { body: { kind, displayName: displayName.trim(), orgRole, ...(email.trim() ? { email: email.trim() } : {}), ...(human && groupIds.length ? { groupIds } : {}) } }),
       );
+      let started: Awaited<ReturnType<typeof startSignIn>> = {};
       try {
-        return { u, password: human ? await startSignIn(u.id, method) : null, failed: null };
+        if (human) started = await startSignIn(u.id, method);
+        return { u, started, failed: null };
       } catch (e) {
-        return { u, password: null, failed: e };
+        return { u, started, failed: e };
       }
     },
-    onSuccess: ({ u, password, failed }) => {
+    onSuccess: ({ u, started, failed }) => {
       qc.invalidateQueries({ queryKey: ["admin-users"] });
       if (failed) {
         toast.error(new Error(`Added ${u.displayName}, but ${method === "invite" ? "the invitation" : "setting a temporary password"} failed: ${failed instanceof Error ? failed.message : failed}`));
-      } else if (password) {
-        setTemp({ user: u, password });
+      } else if (started.password) {
+        setTemp({ user: u, password: started.password });
+        return;
+      } else if (kind === "human" && method === "invite" && !started.emailed) {
+        setNotEmailed(u);
         return;
       } else {
         toast.success(
@@ -55,6 +62,7 @@ export function CreateUserDialog({ onClose, initialKind = "human" }: { onClose: 
     },
   });
   if (temp) return <TemporaryPasswordDialog user={temp.user} password={temp.password} onClose={onClose} />;
+  if (notEmailed) return <InvitationNotEmailedDialog user={notEmailed} onPassword={(password) => setTemp({ user: notEmailed, password })} onClose={onClose} />;
   const fe = create.error instanceof ApiError ? create.error.fieldErrors() : {};
   return (
     <Modal
@@ -138,6 +146,43 @@ export function CreateUserDialog({ onClose, initialKind = "human" }: { onClose: 
         )}
         {create.error && Object.keys(fe).length === 0 && <ErrorBox error={create.error} />}
       </form>
+    </Modal>
+  );
+}
+
+/**
+ * InvitationNotEmailedDialog follows adding someone by email invitation on a server that cannot
+ * send email: the invitation exists but did not reach them, so offer a temporary password.
+ */
+function InvitationNotEmailedDialog({ user, onPassword, onClose }: { user: AdminUser; onPassword: (password: string) => void; onClose: () => void }) {
+  const temporary = useMutation({
+    mutationFn: () => unwrap(api.POST("/admin/users/{userId}/temporary-password", { params: { path: { userId: user.id } } })),
+    onSuccess: (r) => onPassword(r.password),
+  });
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="Invitation not emailed"
+      footer={
+        <>
+          <Button onClick={onClose}>Done</Button>
+          <Button variant="primary" icon={<KeyRound className="size-4" />} loading={temporary.isPending} onClick={() => temporary.mutate()}>
+            Set temporary password
+          </Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-3 text-sm">
+        <p>
+          {user.displayName} is added with an invitation, but {NO_EMAIL}, so it did not reach <span className="font-medium">{user.email}</span>.
+        </p>
+        <p className="text-muted">
+          Set a temporary password now and give it to them through a channel you trust, or set up email (Administration → Email) and then choose <span className="font-medium text-ink">Resend invitation</span> in
+          their actions menu.
+        </p>
+        {temporary.error && <ErrorBox error={temporary.error} />}
+      </div>
     </Modal>
   );
 }
@@ -229,7 +274,7 @@ export function ServiceTokensDialog({ user, onClose }: { user: AdminUser; onClos
           qc.invalidateQueries({ queryKey: key });
           return t;
         }}
-        after={(token) => <CodeBlock>{`# e.g. as CI secrets\nWFM_SERVER=${window.location.origin}\nWFM_TOKEN=${token}`}</CodeBlock>}
+        after={(token) => <CopyableCode code={`# e.g. as CI secrets\nWFM_SERVER=${window.location.origin}\nWFM_TOKEN=${token}`} />}
       />
     </>
   );

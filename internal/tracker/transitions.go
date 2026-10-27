@@ -201,7 +201,7 @@ func (s *Service) screenInfo(ctx context.Context, q *dbq.Queries, screen []workf
 		info := ScreenFieldInfo{Field: f.Field, Required: f.Required}
 		switch f.Field {
 		case "resolution":
-			info.Name, info.Type, info.Options = "Resolution", "select", workflow.Resolutions
+			info.Name, info.Type, info.Options = "Resolution", "select", f.ResolutionOptions()
 		case "comment":
 			info.Name, info.Type = "Comment", "markdown"
 		case "assignee":
@@ -323,7 +323,7 @@ func isEmptyValue(v any) bool {
 // version check, condition, screen, validators, status + history, post-functions, events.
 func (s *Service) transitionTx(ctx context.Context, tx pgx.Tx, q *dbq.Queries, actor *authz.Actor, access authz.Access, p dbq.Project, i dbq.Issue, in TransitionInput) (dbq.Issue, error) {
 	key := issueKey(p, i)
-	if in.Version != nil && int32(*in.Version) != i.Version {
+	if in.Version != nil && int64(*in.Version) != int64(i.Version) {
 		return i, apperr.Conflict("version_conflict", "%s was changed by someone else; reload and try again", key)
 	}
 	def, _, err := workflowDef(ctx, q, i.WorkflowVersionID)
@@ -383,7 +383,16 @@ func (s *Service) transitionTx(ctx context.Context, tx pgx.Tx, q *dbq.Queries, a
 		if !present {
 			continue
 		}
-		if err := s.applyScreenField(ctx, q, p, i, &upd, f.Field, v, &chosenResolution, &comment, customValues, &changes); err != nil {
+		if f.Field == "resolution" {
+			str, _ := v.(string)
+			if opts := f.ResolutionOptions(); !slices.Contains(opts, str) {
+				invalid.Fields = append(invalid.Fields, apperr.FieldError{Field: f.Field, Message: "must be one of " + strings.Join(opts, ", ")})
+			} else {
+				chosenResolution = &str
+			}
+			continue
+		}
+		if err := s.applyScreenField(ctx, q, p, i, &upd, f.Field, v, &comment, customValues, &changes); err != nil {
 			if ae, ok := apperr.As(err); ok {
 				invalid.Fields = append(invalid.Fields, apperr.FieldError{Field: f.Field, Message: ae.Message})
 				continue
@@ -433,6 +442,11 @@ func (s *Service) transitionTx(ctx context.Context, tx pgx.Tx, q *dbq.Queries, a
 	// Post-functions that change the issue run here; side effects are enqueued below.
 	for _, pf := range t.PostFunctions {
 		if err := s.applyPostFunction(ctx, q, p, i, &upd, actor, pf, &changes); err != nil {
+			return i, err
+		}
+	}
+	if toSt.Category == "done" {
+		if err := s.fillDecidedOn(ctx, q, p, i, &upd, &changes); err != nil {
 			return i, err
 		}
 	}
@@ -503,14 +517,10 @@ func issueFromUpdate(i dbq.Issue, u dbq.UpdateIssueParams) dbq.Issue {
 	return i
 }
 
-func (s *Service) applyScreenField(ctx context.Context, q *dbq.Queries, p dbq.Project, i dbq.Issue, upd *dbq.UpdateIssueParams, field string, v any, resolution **string, comment *string, custom map[string]any, changes *[]change) error {
+// applyScreenField applies a screen value other than the resolution (which the screen field's
+// options govern; see transitionTx).
+func (s *Service) applyScreenField(ctx context.Context, q *dbq.Queries, p dbq.Project, i dbq.Issue, upd *dbq.UpdateIssueParams, field string, v any, comment *string, custom map[string]any, changes *[]change) error {
 	switch field {
-	case "resolution":
-		str, _ := v.(string)
-		if !slices.Contains(workflow.Resolutions, str) {
-			return apperr.Invalid(field, "must be one of %s", strings.Join(workflow.Resolutions, ", "))
-		}
-		*resolution = &str
 	case "comment":
 		str, _ := v.(string)
 		*comment = strings.TrimSpace(str)
@@ -599,11 +609,22 @@ func (s *Service) applyScreenField(ctx context.Context, q *dbq.Queries, p dbq.Pr
 			}
 			ids = append(ids, id)
 		}
+		before, err := q.IssueReleases(ctx, i.ID)
+		if err != nil {
+			return err
+		}
 		if err := q.ClearIssueReleases(ctx, i.ID); err != nil {
 			return err
 		}
 		if err := s.setReleases(ctx, q, p, i.ID, ids); err != nil {
 			return err
+		}
+		after, err := q.IssueReleases(ctx, i.ID)
+		if err != nil {
+			return err
+		}
+		if releaseRefs(before) != releaseRefs(after) {
+			*changes = append(*changes, change{"fixVersions", strp(releaseNames(before)), strp(releaseNames(after)), strp(releaseRefs(before)), strp(releaseRefs(after))})
 		}
 	default:
 		custom[field] = v
@@ -655,9 +676,8 @@ func (s *Service) applyPostFunction(ctx context.Context, q *dbq.Queries, p dbq.P
 func (s *Service) setSystemOrCustom(ctx context.Context, q *dbq.Queries, p dbq.Project, i dbq.Issue, upd *dbq.UpdateIssueParams, field string, v any, changes *[]change) error {
 	switch field {
 	case "priority", "storyPoints", "dueDate", "labels", "assignee":
-		var discard *string
 		var c string
-		return s.applyScreenField(ctx, q, p, i, upd, field, v, &discard, &c, nil, changes)
+		return s.applyScreenField(ctx, q, p, i, upd, field, v, &c, nil, changes)
 	case "resolution":
 		var next *string
 		if str, ok := v.(string); ok && str != "" {
@@ -860,8 +880,8 @@ func (s *Service) Move(ctx context.Context, actor *authz.Actor, ref string, in M
 			if err != nil {
 				return err
 			}
-			if it.Level != 0 {
-				return apperr.Invalid("sprintId", "only standard issues can be moved between sprints")
+			if !sprintable(it) {
+				return apperr.Invalid("sprintId", "only standard work can be moved between sprints")
 			}
 			if in.SprintID.Value != nil {
 				if _, err := s.sprintFor(ctx, q, p, *in.SprintID.Value); err != nil {

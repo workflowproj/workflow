@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -88,10 +90,16 @@ func (s *Service) validateBoard(ctx context.Context, actor *authz.Actor, in *Boa
 	if in.DoneRetentionDays <= 0 {
 		in.DoneRetentionDays = 14
 	}
+	if in.DoneRetentionDays > 365 {
+		return apperr.Invalid("doneRetentionDays", "done issues stay on the board for at most 365 days")
+	}
 	seen := map[uuid.UUID]string{}
 	for k, c := range in.Columns {
 		if strings.TrimSpace(c.Name) == "" {
 			return apperr.Invalid(fmt.Sprintf("columns[%d].name", k), "every column needs a name")
+		}
+		if c.WipLimit != nil && (*c.WipLimit < 0 || *c.WipLimit > 10000) {
+			return apperr.Invalid(fmt.Sprintf("columns[%d].wipLimit", k), "WIP limits are between 1 and 10000")
 		}
 		for _, id := range c.StatusIDs {
 			if other, ok := seen[id]; ok {
@@ -251,14 +259,15 @@ type BoardData struct {
 const boardIssueLimit = 2000
 
 // GetBoardData returns the board's columns with issues. Scrum boards show the active sprint;
-// Kanban boards hide done issues resolved before the retention window. Epics are not cards.
+// Kanban boards hide done issues resolved before the retention window. Epics, risks and
+// decisions are not cards.
 func (s *Service) GetBoardData(ctx context.Context, actor *authz.Actor, id uuid.UUID, quickJQL string) (BoardData, error) {
 	b, p, cols, err := s.GetBoard(ctx, actor, id)
 	if err != nil {
 		return BoardData{}, err
 	}
 	data := BoardData{Board: b, Project: p, AllCols: cols}
-	extra := []string{"(SELECT level FROM issue_types t WHERE t.id = i.type_id) <= 0"}
+	extra := []string{"(SELECT level FROM issue_types t WHERE t.id = i.type_id) <= 0", PlanningWork}
 	var extraArgs []any
 	if b.Type == "scrum" {
 		sp, err := s.Q.ActiveSprint(ctx, p.ID)
@@ -348,7 +357,8 @@ type Backlog struct {
 	BacklogTotal int
 }
 
-// GetBacklog returns active and future sprints with their issues, then unscheduled work.
+// GetBacklog returns active and future sprints with their issues, then unscheduled work (never
+// risks or decisions).
 func (s *Service) GetBacklog(ctx context.Context, actor *authz.Actor, id uuid.UUID, quickJQL string) (Backlog, error) {
 	b, p, err := s.boardFor(ctx, actor, id, authz.ProjectBrowse)
 	if err != nil {
@@ -368,7 +378,7 @@ func (s *Service) GetBacklog(ctx context.Context, actor *authz.Actor, id uuid.UU
 				continue
 			}
 			issues, total, err := s.runSearch(ctx, actor, []uuid.UUID{p.ID}, SearchQuery{
-				JQL: jql, Extra: []string{"i.sprint_id = $2::uuid", levelCond}, ExtraArgs: []any{sp.ID},
+				JQL: jql, Extra: []string{"i.sprint_id = $2::uuid", levelCond, PlanningWork}, ExtraArgs: []any{sp.ID},
 				DefaultOrder: []search.Order{{Field: "rank"}}, Limit: boardIssueLimit,
 			})
 			if err != nil {
@@ -378,7 +388,7 @@ func (s *Service) GetBacklog(ctx context.Context, actor *authz.Actor, id uuid.UU
 		}
 	}
 	backlog, total, err := s.runSearch(ctx, actor, []uuid.UUID{p.ID}, SearchQuery{
-		JQL: jql, Extra: []string{"i.sprint_id IS NULL", levelCond, notDone},
+		JQL: jql, Extra: []string{"i.sprint_id IS NULL", levelCond, notDone, PlanningWork},
 		DefaultOrder: []search.Order{{Field: "rank"}}, Limit: boardIssueLimit,
 	})
 	out.Backlog, out.BacklogTotal = backlog, total
@@ -413,11 +423,11 @@ func (s *Service) CreateSprint(ctx context.Context, actor *authz.Actor, ref stri
 		name = strings.TrimSpace(*in.Name)
 	}
 	if name == "" {
-		n, err := s.Q.CountSprints(ctx, p.ID)
+		sprints, err := s.Q.ListSprints(ctx, dbq.ListSprintsParams{ProjectID: p.ID})
 		if err != nil {
 			return dbq.Sprint{}, err
 		}
-		name = fmt.Sprintf("%s Sprint %d", p.Key, n+1)
+		name = nextSprintName(p.Key, sprints)
 	}
 	goal := ""
 	if in.Goal != nil {
@@ -433,6 +443,36 @@ func (s *Service) CreateSprint(ctx context.Context, actor *authz.Actor, ref stri
 		return s.emit(ctx, tx, actor, p, nil, "board.updated", nil)
 	})
 	return sp, err
+}
+
+var trailingNumber = regexp.MustCompile(`^(.*\D)?(\d+)$`)
+
+// nextSprintName names a sprint created without a name after the project's latest sprint:
+// its trailing number goes up by one ("Sprint 24" → "Sprint 25", "S09" → "S10"). When the
+// latest name has no number (or there are no sprints) it is "<KEY> Sprint <count+1>". Names
+// already taken are skipped.
+func nextSprintName(projectKey string, sprints []dbq.Sprint) string {
+	taken := map[string]bool{}
+	var latest *dbq.Sprint
+	for i := range sprints {
+		sp := &sprints[i]
+		taken[strings.ToLower(strings.TrimSpace(sp.Name))] = true
+		if latest == nil || sp.Position > latest.Position || (sp.Position == latest.Position && sp.CreatedAt.After(latest.CreatedAt)) {
+			latest = sp
+		}
+	}
+	prefix, n, width := projectKey+" Sprint ", len(sprints)+1, 0
+	if latest != nil {
+		if m := trailingNumber.FindStringSubmatch(strings.TrimSpace(latest.Name)); m != nil && len(m[2]) <= 9 {
+			v, _ := strconv.Atoi(m[2])
+			prefix, n, width = m[1], v+1, len(m[2])
+		}
+	}
+	name := func() string { return fmt.Sprintf("%s%0*d", prefix, width, n) }
+	for taken[strings.ToLower(name())] {
+		n++
+	}
+	return name()
 }
 
 func (s *Service) sprintForManage(ctx context.Context, actor *authz.Actor, id uuid.UUID) (dbq.Sprint, dbq.Project, error) {
@@ -598,6 +638,9 @@ func (s *Service) SprintReport(ctx context.Context, actor *authz.Actor, id uuid.
 // sprintReport replays the sprint from its start: which issues were in it (the commitment
 // snapshot, then sprint changes from history), their story points and whether they were done,
 // at the end of each day. Scope added after the start raises the line; removed scope lowers it.
+// Sub-tasks belong to their parent's sprint and are not counted as issues of their own (as on
+// the backlog): issue counts and story points leave them out, while hours include their
+// estimates and the time logged on them.
 func (s *Service) sprintReport(ctx context.Context, sp dbq.Sprint) (SprintReport, error) {
 	rep := SprintReport{Sprint: sp, CommittedPoints: sp.CommittedPoints, CommittedIssues: len(sp.CommittedIssueIds)}
 	if sp.State == "future" || sp.StartDate == nil {
@@ -628,6 +671,18 @@ func (s *Service) sprintReport(ctx context.Context, sp dbq.Sprint) (SprintReport
 	if err != nil {
 		return rep, err
 	}
+	typeIDs := make([]uuid.UUID, 0, len(issues))
+	for _, i := range issues {
+		typeIDs = append(typeIDs, i.TypeID)
+	}
+	types, err := s.Q.GetIssueTypesByIDs(ctx, typeIDs)
+	if err != nil {
+		return rep, err
+	}
+	subtaskType := map[uuid.UUID]bool{}
+	for _, t := range types {
+		subtaskType[t.ID] = t.Level < 0
+	}
 	start := *sp.StartDate
 	end := s.Now()
 	if sp.CompletedAt != nil {
@@ -645,6 +700,7 @@ func (s *Service) sprintReport(ctx context.Context, sp dbq.Sprint) (SprintReport
 	// without history, so nothing after `end` is replayed.
 	type member struct {
 		issue    dbq.Issue
+		sub      bool // a sub-task: hours only
 		from     time.Time
 		initial  bool
 		changes  []historyRow
@@ -653,7 +709,12 @@ func (s *Service) sprintReport(ctx context.Context, sp dbq.Sprint) (SprintReport
 	}
 	members := make([]member, 0, len(issues))
 	for _, i := range issues {
-		m := member{issue: i, from: start, initial: committed[i.ID], timeline: statusTimeline(i.CreatedAt, i.StatusID, hist[i.ID])}
+		m := member{issue: i, sub: subtaskType[i.TypeID], from: start, initial: committed[i.ID], timeline: statusTimeline(i.CreatedAt, i.StatusID, hist[i.ID])}
+		if m.sub && committed[i.ID] {
+			// The commitment snapshot holds every issue in the sprint, sub-tasks included.
+			rep.CommittedIssues--
+			rep.CommittedPoints -= pointsAt(i.StoryPoints, hist[i.ID], start)
+		}
 		for _, h := range hist[i.ID] {
 			if h.Field == "sprint" && h.CreatedAt.After(start) && (deref(h.ToRef) == sprintRef || deref(h.FromRef) == sprintRef) {
 				m.changes = append(m.changes, h)
@@ -732,14 +793,19 @@ func (s *Service) sprintReport(ctx context.Context, sp dbq.Sprint) (SprintReport
 			if !inAt(m, at) {
 				continue
 			}
+			done := doneAt(m, at)
+			if !done {
+				pt.RemainingSeconds += remainingAt(m.issue.RemainingEstimateSeconds, hist[m.issue.ID], at)
+			}
+			if m.sub {
+				continue
+			}
 			pts := pointsAt(m.issue.StoryPoints, hist[m.issue.ID], at)
 			pt.Scope += pts
 			pt.ScopeIssues++
-			if doneAt(m, at) {
+			if done {
 				pt.Completed += pts
 				pt.DoneIssues++
-			} else {
-				pt.RemainingSeconds += remainingAt(m.issue.RemainingEstimateSeconds, hist[m.issue.ID], at)
 			}
 		}
 		pt.Remaining, pt.RemainingIssues = pt.Scope-pt.Completed, pt.ScopeIssues-pt.DoneIssues
@@ -766,14 +832,18 @@ func (s *Service) sprintReport(ctx context.Context, sp dbq.Sprint) (SprintReport
 		if sp.State != "closed" && inEnd && doneAt(m, end) {
 			completedSet[id] = true
 		}
-		if completedSet[id] {
+		// counted: issues and points (not sub-tasks); hours count every member.
+		counted := !m.sub
+		if completedSet[id] && counted {
 			rep.CompletedIssues++
 			rep.CompletedPoints += pts
 		}
 		everIn := committed[id] || m.initial || slices.ContainsFunc(m.changes, func(h historyRow) bool { return deref(h.ToRef) == sprintRef })
 		if !committed[id] && everIn && !m.from.After(end) {
-			rep.AddedIssues++
-			rep.AddedPoints += pts
+			if counted {
+				rep.AddedIssues++
+				rep.AddedPoints += pts
+			}
 			joined := m.from
 			if !m.initial {
 				if k := slices.IndexFunc(m.changes, func(h historyRow) bool { return deref(h.ToRef) == sprintRef }); k >= 0 {
@@ -783,8 +853,10 @@ func (s *Service) sprintReport(ctx context.Context, sp dbq.Sprint) (SprintReport
 			rep.AddedSeconds += remainingAt(m.issue.RemainingEstimateSeconds, hist[id], joined)
 		}
 		if everIn && !inEnd && !completedSet[id] {
-			rep.RemovedIssues++
-			rep.RemovedPoints += pts
+			if counted {
+				rep.RemovedIssues++
+				rep.RemovedPoints += pts
+			}
 			left := end
 			for _, h := range m.changes {
 				if deref(h.FromRef) == sprintRef && !h.CreatedAt.After(end) {
@@ -854,6 +926,12 @@ type ReleaseInput struct {
 	StartDate   Opt[time.Time]
 	ReleaseDate Opt[time.Time]
 	State       *string
+	// Notes and NotesPublished set the release notes and whether help centres show them.
+	Notes          *string
+	NotesPublished *bool
+	// TagRepositoryID and TagName link the release to a Git tag; both null unlink it.
+	TagRepositoryID Opt[uuid.UUID]
+	TagName         Opt[string]
 }
 
 func (s *Service) ListReleases(ctx context.Context, actor *authz.Actor, ref string) ([]dbq.ListReleasesRow, error) {
@@ -876,9 +954,21 @@ func (s *Service) CreateRelease(ctx context.Context, actor *authz.Actor, ref str
 	if in.Description != nil {
 		desc = *in.Description
 	}
-	r, err := s.Q.CreateRelease(ctx, dbq.CreateReleaseParams{ProjectID: p.ID, Name: strings.TrimSpace(*in.Name), Description: desc, StartDate: in.StartDate.Value, ReleaseDate: in.ReleaseDate.Value})
+	var r dbq.Release
+	err = s.tx(ctx, func(_ pgx.Tx, q *dbq.Queries) error {
+		var err error
+		r, err = q.CreateRelease(ctx, dbq.CreateReleaseParams{ProjectID: p.ID, Name: strings.TrimSpace(*in.Name), Description: desc, StartDate: in.StartDate.Value, ReleaseDate: in.ReleaseDate.Value})
+		if err != nil {
+			return err
+		}
+		r, err = s.setReleaseExtras(ctx, q, p, r, in)
+		return err
+	})
 	if err != nil && isUnique(err) {
 		return r, apperr.Conflict("duplicate_release", "a release named %q already exists", *in.Name)
+	}
+	if err == nil && r.NotesPublishedAt != nil {
+		Audit(ctx, s.Q, actor, "release.notes_publish", "release", r.ID.String(), &p.ID, map[string]any{"name": r.Name, "published": true})
 	}
 	return r, err
 }
@@ -902,7 +992,7 @@ func (s *Service) releaseForManage(ctx context.Context, actor *authz.Actor, id u
 }
 
 func (s *Service) UpdateRelease(ctx context.Context, actor *authz.Actor, id uuid.UUID, in ReleaseInput) (dbq.Release, error) {
-	r, _, err := s.releaseForManage(ctx, actor, id)
+	r, p, err := s.releaseForManage(ctx, actor, id)
 	if err != nil {
 		return r, err
 	}
@@ -925,9 +1015,20 @@ func (s *Service) UpdateRelease(ctx context.Context, actor *authz.Actor, id uuid
 		}
 		params.State = *in.State
 	}
-	out, err := s.Q.UpdateRelease(ctx, params)
+	var out dbq.Release
+	err = s.tx(ctx, func(_ pgx.Tx, q *dbq.Queries) error {
+		var err error
+		if out, err = q.UpdateRelease(ctx, params); err != nil {
+			return err
+		}
+		out, err = s.setReleaseExtras(ctx, q, p, out, in)
+		return err
+	})
 	if err != nil && isUnique(err) {
 		return out, apperr.Conflict("duplicate_release", "a release with that name already exists")
+	}
+	if err == nil && in.NotesPublished != nil && *in.NotesPublished != (r.NotesPublishedAt != nil) {
+		Audit(ctx, s.Q, actor, "release.notes_publish", "release", id.String(), &p.ID, map[string]any{"name": out.Name, "published": *in.NotesPublished})
 	}
 	return out, err
 }
@@ -951,7 +1052,7 @@ func (s *Service) ShipRelease(ctx context.Context, actor *authz.Actor, id uuid.U
 				return apperr.Invalid("moveOpenIssuesTo", "release not found in %s", p.Key)
 			}
 		}
-		if err := q.MoveOpenReleaseIssues(ctx, dbq.MoveOpenReleaseIssuesParams{ReleaseID: id, TargetReleaseID: moveTo}); err != nil {
+		if err := s.moveOpenReleaseIssues(ctx, q, actor, id, moveTo); err != nil {
 			return err
 		}
 		var err error

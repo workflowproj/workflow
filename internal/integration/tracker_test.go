@@ -25,8 +25,17 @@ func TestProjectAccessAndRoles(t *testing.T) {
 	member.get("/api/v1/projects", &list)
 	sameStrings(t, keys(list), []string{"OPEN"}, "member project list")
 	member.must("GET", "/api/v1/projects/SECRET", nil, 404, nil)
-	member.createIssue("OPEN", "task", "Members can create in open projects", nil)
+	open := member.createIssue("OPEN", "task", "Members can create in open projects", nil)
 	member.must("POST", "/api/v1/issues", obj{"projectKey": "SECRET", "typeKey": "task", "summary": "x"}, 404, nil)
+	// A link to an issue in a project they can't browse doesn't show it on the issue they can.
+	hidden := admin.createIssue("SECRET", "task", "Acquire the competitor", nil)
+	admin.must("POST", "/api/v1/issues/"+str(open, "key")+"/links", obj{"type": "relates", "targetKey": str(hidden, "key")}, 201, nil)
+	if links := admin.issue(str(open, "key"))["links"].([]any); len(links) != 1 {
+		t.Fatalf("admin sees %d links, want 1", len(links))
+	}
+	if links := member.issue(str(open, "key"))["links"].([]any); len(links) != 0 {
+		t.Fatalf("a member sees a link into a private project: %v", links)
+	}
 
 	// Grant access through a group mapped to a custom role.
 	var role obj
@@ -83,6 +92,8 @@ func TestIssueHierarchyFieldsAndConcurrency(t *testing.T) {
 	eq(t, fmt.Sprint(story["labels"]), "[payments web-app]", "labels normalised")
 	sub := c.createIssue("PLAT", "subtask", "Card form", obj{"parentKey": story["key"]})
 	eq(t, str(sub, "parent", "key"), str(story, "key"), "subtask parent")
+	// A number past int32 is no issue, rather than wrapping round to PLAT-1 (2^32 + 1).
+	c.must("GET", "/api/v1/issues/PLAT-4294967297", nil, 404, nil)
 
 	// Hierarchy rules: parent level = child level + 1.
 	c.must("POST", "/api/v1/issues", obj{"projectKey": "PLAT", "typeKey": "subtask", "summary": "orphan"}, 400, nil)

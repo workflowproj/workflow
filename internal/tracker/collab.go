@@ -218,6 +218,9 @@ var linkLabels = map[string][2]string{
 	"relates":    {"relates to", "relates to"},
 	"duplicates": {"duplicates", "is duplicated by"},
 	"clones":     {"clones", "is cloned by"},
+	"mitigates":  {"mitigates", "is mitigated by"},
+	"implements": {"implements", "is implemented by"},
+	"supersedes": {"supersedes", "is superseded by"},
 }
 
 func LinkLabel(linkType string, outward bool) string {
@@ -249,6 +252,9 @@ func (s *Service) CreateLink(ctx context.Context, actor *authz.Actor, ref, linkT
 	if inward {
 		from, to = target, src
 	}
+	if err := checkLinkKinds(ctx, s.Q, linkType, from, to); err != nil {
+		return dbq.IssueLink{}, src, err
+	}
 	var l dbq.IssueLink
 	err = s.tx(ctx, func(tx pgx.Tx, q *dbq.Queries) error {
 		var err error
@@ -276,12 +282,34 @@ func (s *Service) DeleteLink(ctx context.Context, actor *authz.Actor, id uuid.UU
 	if err != nil {
 		return apperr.NotFound("link")
 	}
-	src, p, access, err := s.IssueFor(ctx, actor, l.SourceID.String(), authz.ProjectBrowse)
+	// A link is made from either end (CreateLink checks the issue it's made from), so whoever can
+	// edit either end may remove it. The removal is recorded on the source, as it was added there.
+	seen := false
+	allowed := false
+	for _, end := range []uuid.UUID{l.SourceID, l.TargetID} {
+		i, _, access, err := s.IssueFor(ctx, actor, end.String(), authz.ProjectBrowse)
+		if err != nil {
+			continue
+		}
+		seen = true
+		if canEdit(access, actor, i) {
+			allowed = true
+			break
+		}
+	}
+	switch {
+	case !seen:
+		return apperr.NotFound("link")
+	case !allowed:
+		return apperr.Forbidden("you cannot edit either issue of this link")
+	}
+	src, err := s.Q.GetIssue(ctx, l.SourceID)
 	if err != nil {
 		return err
 	}
-	if !canEdit(access, actor, src) {
-		return apperr.Forbidden("you cannot edit %s", issueKey(p, src))
+	p, err := s.Q.GetProject(ctx, src.ProjectID)
+	if err != nil {
+		return err
 	}
 	return s.tx(ctx, func(tx pgx.Tx, q *dbq.Queries) error {
 		if err := q.DeleteIssueLink(ctx, id); err != nil {

@@ -2,6 +2,7 @@ id: bug_tracking
 name: Bug tracking
 description: Triage-first flow for support and QA, with a resolution captured on close.
 boardType: kanban
+risksDecisions: true
 workflows:
   - name: Bug triage
     description: Open → Triaged → In Progress → Ready for QA → Closed, or Won't Fix from anywhere.

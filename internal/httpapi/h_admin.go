@@ -143,9 +143,14 @@ func (s *Server) AdminUpdateUser(ctx context.Context, req api.AdminUpdateUserReq
 				return err
 			}
 		}
+		// Customers become agents (and agents customers) only by this deliberate change of their
+		// own role: groups never change it, and project membership is refused to customers.
 		if b.OrgRole != nil && string(*b.OrgRole) != u.OrgRole {
 			if u.Kind == "service" && *b.OrgRole == api.OrgRoleAdmin {
 				return apperr.Invalid("orgRole", "service accounts cannot be organisation admins")
+			}
+			if u.Kind == "service" && *b.OrgRole == api.OrgRoleCustomer {
+				return apperr.Invalid("orgRole", "service accounts cannot be customers")
 			}
 			if u, err = q.SetUserOrgRole(ctx, dbq.SetUserOrgRoleParams{ID: u.ID, OrgRole: string(*b.OrgRole)}); err != nil {
 				return err

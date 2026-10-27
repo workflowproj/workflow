@@ -48,9 +48,12 @@ UPDATE users SET google_id = @google_id, updated_at = now() WHERE id = @id;
 UPDATE users SET last_login_at = now() WHERE id = $1;
 
 -- name: SearchUsers :many
+-- Active people by name or email; with exclude_customers, only those who can become project
+-- members or assignees (customers only use a help centre).
 SELECT * FROM users
 WHERE active AND deleted_at IS NULL
   AND (@q::text = '' OR display_name ILIKE '%' || @q || '%' OR email ILIKE '%' || @q || '%')
+  AND (NOT @exclude_customers::boolean OR org_role <> 'customer')
 ORDER BY display_name
 LIMIT @lim;
 

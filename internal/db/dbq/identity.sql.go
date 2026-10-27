@@ -1562,17 +1562,21 @@ const searchUsers = `-- name: SearchUsers :many
 SELECT id, kind, email, username, display_name, given_name, family_name, avatar_url, org_role, active, source, google_id, scim_connection_id, scim_external_id, deactivated_at, deleted_at, anonymized_at, last_login_at, created_at, updated_at FROM users
 WHERE active AND deleted_at IS NULL
   AND ($1::text = '' OR display_name ILIKE '%' || $1 || '%' OR email ILIKE '%' || $1 || '%')
+  AND (NOT $2::boolean OR org_role <> 'customer')
 ORDER BY display_name
-LIMIT $2
+LIMIT $3
 `
 
 type SearchUsersParams struct {
-	Q   string
-	Lim int32
+	Q                string
+	ExcludeCustomers bool
+	Lim              int32
 }
 
+// Active people by name or email; with exclude_customers, only those who can become project
+// members or assignees (customers only use a help centre).
 func (q *Queries) SearchUsers(ctx context.Context, arg SearchUsersParams) ([]User, error) {
-	rows, err := q.db.Query(ctx, searchUsers, arg.Q, arg.Lim)
+	rows, err := q.db.Query(ctx, searchUsers, arg.Q, arg.ExcludeCustomers, arg.Lim)
 	if err != nil {
 		return nil, err
 	}

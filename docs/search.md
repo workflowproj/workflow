@@ -29,6 +29,7 @@ fixVersion = "2026.11" AND statusCategory != Done
 | `status` | `=` `!=` `in` `not in` | status name |
 | `statusCategory` (`category`) | `=` `!=` `in` `not in` | `"To Do"`, `"In Progress"`, `Done` |
 | `type` (`issuetype`) | `=` `!=` `in` `not in` | issue type key or name |
+| `kind` (`typeKind`) | `=` `!=` `in` `not in` | `work`, `risk` or `decision`: the issue type's kind ([risks-decisions.md](risks-decisions.md)) |
 | `level` (`hierarchyLevel`) | `=` `!=` `<` `>` … | `1` epics, `0` standard, `-1` sub-tasks |
 | `assignee`, `reporter` | `=` `!=` `in` `not in` `is [not] EMPTY` | email, user id, `currentUser()`, `membersOf("group")` |
 | `watcher` | `=` `!=` `in` | as above |
@@ -37,9 +38,10 @@ fixVersion = "2026.11" AND statusCategory != Done
 | `labels` (`label`) | `=` `!=` `in` `not in` `is [not] EMPTY` | label |
 | `sprint` | `=` `!=` `in` `not in` `is [not] EMPTY` | sprint name or id, `openSprints()`, `futureSprints()`, `closedSprints()` |
 | `fixVersion` (`release`, `version`) | `=` `!=` `in` `not in` `is [not] EMPTY` | release name, `releasedVersions()`, `unreleasedVersions()` |
+| `deployedTo` | `=` `!=` `in` `not in` `is [not] EMPTY` | environment name (any case): issues a successful deployment there contained (see [scm.md](scm.md#deployments)); `EMPTY` for issues never deployed |
 | `parent` | `=` `!=` `in` `is [not] EMPTY` | issue key: the direct parent |
 | `epic` (`epicLink`) | `=` `!=` `in` `is [not] EMPTY` | epic key: everything under the epic, sub-tasks included |
-| `issueLinkType` | `=` `!=` `in` `not in` `is [not] EMPTY` | `blocks`, `"is blocked by"`, `relates`, `duplicates`, `"is duplicated by"`, `clones`, `"is cloned by"` — issues with such a link |
+| `issueLinkType` | `=` `!=` `in` `not in` `is [not] EMPTY` | `blocks`, `"is blocked by"`, `relates`, `duplicates`, `"is duplicated by"`, `clones`, `"is cloned by"`, `mitigates`, `"is mitigated by"`, `implements`, `"is implemented by"`, `supersedes`, `"is superseded by"` — issues with such a link |
 | `summary` (`title`), `description` | `~` `!~` `=` `!=` `is [not] EMPTY` | `~` is a case-insensitive substring match |
 | `text` | `~` `!~` | full-text search over summary and description (web-search syntax: `"exact phrase"`, `-exclude`, `or`) |
 | `comment` | `~` `!~` | text in comments |
@@ -53,11 +55,13 @@ fixVersion = "2026.11" AND statusCategory != Done
 | `"Request type"` (`requestType`) | `=` `!=` `in` `not in` `is [not] EMPTY` | request type name or id; `EMPTY` for issues not shown in the help centre |
 | `approval` | `=` `!=` `is [not] EMPTY` | `pending()`, `approved()`, `declined()`, `pendingBy(currentUser())` |
 | `participant` | `=` `!=` `in` `not in` `is [not] EMPTY` | people a request is shared with (as for `assignee`) |
-| custom fields | depends on type | by key or name (`severity = High`), or `cf[key]` |
+| custom fields | depends on type | by key or name (`severity = High`), or `cf[key]`; a name two fields share needs the key |
 
 Custom fields by type: `text`/`url` support `~`, `=`, `is EMPTY`; `number` and `date` support
 comparisons; `select` and `multiselect` support `=`, `in`; `user` accepts the user values above;
-`checkbox` accepts `true`/`false`; `version` accepts release names.
+`checkbox` accepts `true`/`false`; `version` accepts release names. Risks and decisions have
+fields with reserved keys, such as `"Risk score"` (`risk_score`) and `"Risk rating"`
+(`risk_rating`): `type = risk AND "Risk score" >= 10`.
 
 ## Links
 
@@ -73,6 +77,8 @@ Issue functions go with `issue in` (or `key in`):
 sprint in openSprints() AND issue in blockedIssues()          blocked sprint work
 epic = PLAT-1 AND statusCategory != Done                       what's left in an epic
 issue in linkedIssues("PLAT-42", "is blocked by") AND statusCategory != Done
+issue in linkedIssues("PLAT-40", "is mitigated by")           the work mitigating a risk
+kind = decision AND issueLinkType = "is superseded by"         decisions that were replaced
 ```
 
 ## Service desk

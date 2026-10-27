@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { getRouteApi, Link } from "@tanstack/react-router";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { MailCheck } from "lucide-react";
 import { api, unwrap } from "@/api/client";
+import { providersQuery } from "@/api/queries";
 import { Button, Field, Input } from "@/components/ui";
 import { ErrorBox } from "@/components/ErrorBox";
 import { AuthShell } from "@/features/auth/AuthShell";
@@ -12,6 +13,7 @@ const route = getRouteApi("/forgot-password");
 export function ForgotPasswordPage() {
   const search = route.useSearch();
   const [email, setEmail] = useState(search.email ?? "");
+  const providers = useQuery(providersQuery);
   const send = useMutation({ mutationFn: () => unwrap(api.POST("/auth/local/forgot-password", { body: { email } })) });
   const back = (
     <Link to="/login" search={{ email: email || undefined }} className="font-medium text-accent hover:underline">
@@ -31,6 +33,15 @@ export function ForgotPasswordPage() {
           </p>
           <p className="text-[13px] text-muted">The link works once, for one hour. Nothing arrived? Check your spam folder, or ask your administrator — people who sign in with single sign-on reset their password with their identity provider.</p>
         </div>
+      </AuthShell>
+    );
+  }
+  // Without an email server a reset link reaches nobody, so don't offer to send one.
+  if (providers.data && !providers.data.emailDelivery) {
+    return (
+      <AuthShell title="Reset your password" below={back}>
+        <p className="text-sm">This server doesn't send email, so it can't send you a reset link.</p>
+        <p className="mt-2 text-[13px] text-muted">Ask an administrator to set a new temporary password for you. People who sign in with single sign-on reset their password with their identity provider.</p>
       </AuthShell>
     );
   }

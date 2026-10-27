@@ -8,7 +8,8 @@ import { cn } from "@/lib/cn";
 
 /**
  * MarkdownEditor is a Tiptap rich-text editor whose value is Markdown, the format the API
- * stores for descriptions and comments. Cmd/Ctrl+Enter calls onSubmit.
+ * stores for descriptions and comments. Cmd/Ctrl+Enter calls onSubmit. `label` names the
+ * editing area for assistive technology when no visible label is tied to it.
  */
 export function MarkdownEditor({
   value,
@@ -18,6 +19,7 @@ export function MarkdownEditor({
   onSubmit,
   minHeight = 96,
   className,
+  label,
 }: {
   value: string;
   onChange: (md: string) => void;
@@ -26,6 +28,7 @@ export function MarkdownEditor({
   onSubmit?: () => void;
   minHeight?: number;
   className?: string;
+  label?: string;
 }) {
   const editor = useEditor({
     extensions: [
@@ -37,7 +40,7 @@ export function MarkdownEditor({
     contentType: "markdown",
     autofocus: autoFocus ? "end" : false,
     editorProps: {
-      attributes: { class: "prose-wfm text-sm px-3 py-2.5 tiptap", style: `min-height:${minHeight}px` },
+      attributes: { class: "prose-wfm text-sm px-3 py-2.5 tiptap", style: `min-height:${minHeight}px`, ...(label ? { "aria-label": label } : {}) },
       handleKeyDown: (_view, e) => {
         if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && onSubmit) {
           onSubmit();

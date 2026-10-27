@@ -56,7 +56,7 @@ At most 50 statuses.
 | `to` | Target status. |
 | `condition` | CEL expression; when false the transition is hidden and refused (HTTP 403). |
 | `validators` | CEL expressions (a string, or `{expr, message}`) checked after the screen is filled; failures answer 422 `validation_failed` with the messages. |
-| `screen` | Fields to ask for when the transition runs: a field name or `{field, required}`. Built-in fields: `resolution`, `comment`, `assignee`, `priority`, `storyPoints`, `dueDate`, `labels`, `fixVersions`; any custom field key. A transition whose screen has required fields cannot run from a drag on the board without the dialog (422 `screen_required`). |
+| `screen` | Fields to ask for when the transition runs: a field name or `{field, required}`. Built-in fields: `resolution`, `comment`, `assignee`, `priority`, `storyPoints`, `dueDate`, `labels`, `fixVersions`; any custom field key. A `resolution` field may list the resolutions it offers with `options` (`{field: resolution, required: true, options: [Mitigated, Accepted, Occurred]}`), instead of `Done`, `Won't Do`, `Duplicate` and `Cannot Reproduce`. A transition whose screen has required fields cannot run from a drag on the board without the dialog (422 `screen_required`). |
 | `postFunctions` | Run after the move, in order. Exactly one key each: |
 
 Post-functions:
@@ -110,6 +110,13 @@ API answers 422 `status_mapping_required` with the statuses that need one. Valid
 
 Changing an issue type's workflow (Project settings → Issue types) works the same way: statuses
 that exist in both workflows carry over; others need a mapping.
+
+Boards follow a mapping: on the boards of the projects that use the workflow, the column that
+shows a removed status also shows the status it maps to, unless the board already has a column
+for that one. So renaming *In Review* to *Code Review* (the editor sends renames as mappings, even
+when no issue is in the status) keeps that work in the same column; the old status stays in the
+column until you remove it in the board's settings. Boards show work only, so changes to the
+workflows of risk and decision types leave them alone.
 
 ## The CLI
 

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
 	"sort"
 	"strings"
 
@@ -140,7 +141,18 @@ func (s *Service) publishTx(ctx context.Context, tx pgx.Tx, q *dbq.Queries, acto
 		}
 	}
 
-	// Statuses that issues are in but the new version drops must be mapped.
+	// Statuses that issues are in but the new version drops must be mapped. Mapped statuses
+	// without issues (a renamed status, say) still tell boards where their column's work goes.
+	moves := statusMoves{def: def, mapping: mapping}
+	if wf.CurrentVersion > 0 {
+		prev, _, err := currentVersion(ctx, q, wf.ID)
+		if err != nil {
+			return PublishResult{}, err
+		}
+		for _, st := range prev.Statuses {
+			moves.add(st.ID, st.Name)
+		}
+	}
 	usage, err := q.WorkflowStatusUsage(ctx, wf.ID)
 	if err != nil {
 		return PublishResult{}, err
@@ -160,11 +172,12 @@ func (s *Service) publishTx(ctx context.Context, tx pgx.Tx, q *dbq.Queries, acto
 		if target == "" || !ok {
 			missing.Fields = append(missing.Fields, apperr.FieldError{
 				Field:   old[0].Name,
-				Message: fmt.Sprintf("%d issue(s) are in %q, which this version removes", u.N, old[0].Name),
+				Message: fmt.Sprintf("%s in %q, which this version removes", plural(int(u.N), "issue is", "issues are"), old[0].Name),
 			})
 			continue
 		}
 		statusMap[u.StatusID.String()] = ts.ID.String()
+		moves.add(u.StatusID, old[0].Name)
 	}
 	if len(missing.Fields) > 0 {
 		return PublishResult{}, missing
@@ -185,6 +198,15 @@ func (s *Service) publishTx(ctx context.Context, tx pgx.Tx, q *dbq.Queries, acto
 	}
 	wf.CurrentVersion = next
 	wf.Description = doc.Description
+	if len(moves.list) > 0 {
+		projects, err := q.WorkflowWorkProjects(ctx, wf.ID)
+		if err != nil {
+			return PublishResult{}, err
+		}
+		if err := s.showMovedStatuses(ctx, tx, q, actor, projects, moves.list); err != nil {
+			return PublishResult{}, err
+		}
+	}
 
 	res := PublishResult{Workflow: wf, Version: wv}
 	if len(usage) > 0 && next > 1 && s.Jobs != nil {
@@ -195,6 +217,63 @@ func (s *Service) publishTx(ctx context.Context, tx pgx.Tx, q *dbq.Queries, acto
 	}
 	Audit(ctx, q, actor, "workflow.publish", "workflow", wf.ID.String(), wf.ProjectID, map[string]any{"name": wf.Name, "version": next})
 	return res, nil
+}
+
+// statusMove is a status a workflow change removes and the status the mapping sends its work to.
+type statusMove struct{ from, to uuid.UUID }
+
+// statusMoves collects, in order and once each, the removed statuses that a name mapping sends
+// to a status of def.
+type statusMoves struct {
+	def     *workflow.Definition
+	mapping map[string]string
+	seen    map[uuid.UUID]bool
+	list    []statusMove
+}
+
+func (m *statusMoves) add(id uuid.UUID, name string) {
+	if m.seen == nil {
+		m.seen = map[uuid.UUID]bool{}
+	}
+	if m.seen[id] || m.def.HasStatus(id) {
+		return
+	}
+	m.seen[id] = true
+	if to, ok := m.def.StatusByName(lookupMapping(m.mapping, name)); ok {
+		m.list = append(m.list, statusMove{from: id, to: to.ID})
+	}
+}
+
+// showMovedStatuses keeps boards showing the work a workflow change moves to other statuses: on
+// the projects' boards, the column that shows an old status also shows its new one, unless the
+// board has a column for it already. The old status stays in the column: other workflows may
+// still use it, and issues only reach the new one as the migration job gets to them.
+func (s *Service) showMovedStatuses(ctx context.Context, tx pgx.Tx, q *dbq.Queries, actor *authz.Actor, projectIDs []uuid.UUID, moves []statusMove) error {
+	if len(projectIDs) == 0 {
+		return nil
+	}
+	var changed []uuid.UUID
+	for _, m := range moves {
+		ids, err := q.ShowMappedStatusOnBoards(ctx, dbq.ShowMappedStatusOnBoardsParams{ProjectIds: projectIDs, OldStatus: m.from, NewStatus: m.to})
+		if err != nil {
+			return err
+		}
+		for _, id := range ids {
+			if !slices.Contains(changed, id) {
+				changed = append(changed, id)
+			}
+		}
+	}
+	for _, id := range changed {
+		p, err := q.GetProject(ctx, id)
+		if err != nil {
+			return err
+		}
+		if err := s.emit(ctx, tx, actor, p, nil, "board.updated", map[string]any{"reason": "workflow_change"}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func lookupMapping(mapping map[string]string, name string) string {
@@ -409,7 +488,7 @@ func (s *Service) DeleteWorkflow(ctx context.Context, actor *authz.Actor, id uui
 		return err
 	}
 	if len(usage) > 0 {
-		return apperr.Conflict("workflow_in_use", "the workflow is used by %d issue type(s); map them to another workflow first", len(usage))
+		return apperr.Conflict("workflow_in_use", "the workflow is used by %s; map them to another workflow first", plural(len(usage), "issue type", "issue types"))
 	}
 	return s.tx(ctx, func(tx pgx.Tx, q *dbq.Queries) error {
 		if err := q.DeleteWorkflow(ctx, id); err != nil {

@@ -14,6 +14,8 @@ describe("router", () => {
       "/app/projects/$projectKey/board",
       "/app/projects/$projectKey/backlog",
       "/app/projects/$projectKey/issues",
+      "/app/projects/$projectKey/risks",
+      "/app/projects/$projectKey/decisions",
       "/app/projects/$projectKey/settings",
       "/app/projects/$projectKey/settings/workflows/$workflowId",
       "/app/projects/$projectKey/settings/chat",
@@ -46,6 +48,10 @@ describe("router", () => {
       "/app/projects/$projectKey/settings/request-types",
       "/app/projects/$projectKey/settings/queues",
       "/app/projects/$projectKey/settings/slas",
+      "/app/projects/$projectKey/releases",
+      "/app/projects/$projectKey/releases/$releaseId",
+      "/app/projects/$projectKey/settings/releases",
+      "/portal/$projectKey/whats-new",
     ]) {
       expect(ids).toContain(id);
     }

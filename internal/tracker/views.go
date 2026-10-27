@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 
 	"github.com/workflowproj/workflow/internal/api"
 	"github.com/workflowproj/workflow/internal/authz"
+	"github.com/workflowproj/workflow/internal/db"
 	"github.com/workflowproj/workflow/internal/db/dbq"
 )
 
@@ -25,7 +27,7 @@ func StatusView(s dbq.Status) api.Status {
 }
 
 func TypeRef(t dbq.IssueType) api.IssueTypeRef {
-	return api.IssueTypeRef{Id: t.ID, Key: t.Key, Name: t.Name, Icon: t.Icon, Color: t.Color, Level: int(t.Level)}
+	return api.IssueTypeRef{Id: t.ID, Key: t.Key, Name: t.Name, Icon: t.Icon, Color: t.Color, Level: int(t.Level), Kind: api.IssueTypeKind(cmpOr(t.Kind, KindWork))}
 }
 
 func dateView(t *time.Time) *openapi_types.Date {
@@ -47,13 +49,14 @@ func ReleaseView(r dbq.Release, issueCount, doneCount int) api.Release {
 		Id: r.ID, Name: r.Name, Description: r.Description, State: api.ReleaseState(r.State), Position: int(r.Position),
 		StartDate: dateView(r.StartDate), ReleaseDate: dateView(r.ReleaseDate), ReleasedAt: r.ReleasedAt,
 		IssueCount: issueCount, DoneCount: doneCount,
+		NotesPublished: r.NotesPublishedAt != nil, NotesPublishedAt: r.NotesPublishedAt, TagName: r.TagName, TagRepositoryId: r.TagRepositoryID,
 	}
 }
 
 func (s *Service) ProjectView(ctx context.Context, p dbq.Project, access authz.Access) (api.Project, error) {
 	v := api.Project{
 		Id: p.ID, Key: p.Key, Name: p.Name, Description: p.Description, Template: p.Template,
-		Access: api.ProjectAccessPrivate, CreatedAt: p.CreatedAt, MyPermissions: access.List(),
+		Access: api.ProjectAccessPrivate, RisksDecisions: p.RisksDecisions, CreatedAt: p.CreatedAt, MyPermissions: access.List(),
 	}
 	if v.MyPermissions == nil {
 		v.MyPermissions = []string{}
@@ -88,6 +91,7 @@ type lookups struct {
 	users    map[uuid.UUID]dbq.User
 	parents  map[uuid.UUID]dbq.Issue
 	dev      map[uuid.UUID]dbq.DevSummariesRow
+	deployed map[uuid.UUID][]string
 	spent    map[uuid.UUID]int64
 }
 
@@ -95,6 +99,7 @@ func (s *Service) loadLookups(ctx context.Context, issues []dbq.Issue) (*lookups
 	l := &lookups{
 		projects: map[uuid.UUID]dbq.Project{}, types: map[uuid.UUID]dbq.IssueType{}, statuses: map[uuid.UUID]dbq.Status{},
 		users: map[uuid.UUID]dbq.User{}, parents: map[uuid.UUID]dbq.Issue{}, dev: map[uuid.UUID]dbq.DevSummariesRow{},
+		deployed: map[uuid.UUID][]string{},
 	}
 	var projectIDs, typeIDs, statusIDs, userIDs, parentIDs, issueIDs []uuid.UUID
 	for _, i := range issues {
@@ -150,6 +155,13 @@ func (s *Service) loadLookups(ctx context.Context, issues []dbq.Issue) (*lookups
 	for _, d := range dev {
 		l.dev[d.IssueID] = d
 	}
+	envs, err := s.Q.IssueEnvironments(ctx, issueIDs)
+	if err != nil {
+		return nil, err
+	}
+	for _, e := range envs {
+		l.deployed[e.IssueID] = append(l.deployed[e.IssueID], e.Environment)
+	}
 	if l.spent, err = s.TimeSpent(ctx, s.Q, issueIDs); err != nil {
 		return nil, err
 	}
@@ -195,13 +207,19 @@ func (l *lookups) issue(i dbq.Issue) api.Issue {
 			v.Parent = &r
 		}
 	}
-	if d, ok := l.dev[i.ID]; ok {
+	d, hasDev := l.dev[i.ID]
+	envs := l.deployed[i.ID]
+	if hasDev || len(envs) > 0 {
 		ds := api.DevSummary{
 			Branches: int(d.Branches), Commits: int(d.Commits), PullRequests: int(d.PullRequests),
 			OpenPullRequests: int(d.OpenPullRequests), MergedPullRequests: int(d.MergedPullRequests),
 		}
 		if d.PipelineState != "" {
 			ds.PipelineState = &d.PipelineState
+		}
+		if len(envs) > 0 {
+			sorted := slices.Sorted(slices.Values(envs))
+			ds.DeployedTo = &sorted
 		}
 		v.Dev = &ds
 	}
@@ -276,6 +294,11 @@ func (s *Service) IssueDetail(ctx context.Context, actor *authz.Actor, i dbq.Iss
 	if err != nil {
 		return api.IssueDetail{}, err
 	}
+	// A link to an issue in a project the viewer can't browse is left out, so its key, summary,
+	// status and assignee don't leak.
+	if others, err = s.browsableIssues(ctx, actor, p.ID, others); err != nil {
+		return api.IssueDetail{}, err
+	}
 	all := append(append([]dbq.Issue{i}, children...), others...)
 	l, err := s.loadLookups(ctx, all)
 	if err != nil {
@@ -291,6 +314,7 @@ func (s *Service) IssueDetail(ctx context.Context, actor *authz.Actor, i dbq.Iss
 		Description: i.Description,
 		Project:     api.ProjectRef{Id: p.ID, Key: p.Key, Name: p.Name},
 		Children:    []api.Issue{}, Links: []api.IssueLink{}, Development: []api.DevLink{}, Attachments: []api.Attachment{}, Releases: []api.Release{},
+		Deployments: []api.IssueDeployment{},
 	}
 	for _, c := range children {
 		d.Children = append(d.Children, l.issue(c))
@@ -347,6 +371,9 @@ func (s *Service) IssueDetail(ctx context.Context, actor *authz.Actor, i dbq.Iss
 			Repository: api.RepositoryRef{Id: dl.RepositoryID, Provider: api.ScmProvider(dl.Provider), FullPath: dl.FullPath, WebUrl: dl.RepoWebUrl},
 		})
 	}
+	if d.Deployments, err = s.issueDeployments(ctx, i.ID); err != nil {
+		return d, err
+	}
 	atts, err := s.Q.ListAttachments(ctx, i.ID)
 	if err != nil {
 		return d, err
@@ -400,4 +427,32 @@ func (s *Service) IssueDetail(ctx context.Context, actor *authz.Actor, i dbq.Iss
 		Comment: access.Has(authz.IssueComment), Assign: access.Has(authz.IssueAssign),
 	}
 	return d, nil
+}
+
+// browsableIssues keeps the issues in projects the actor can browse (home is the project already
+// checked).
+func (s *Service) browsableIssues(ctx context.Context, actor *authz.Actor, home uuid.UUID, issues []dbq.Issue) ([]dbq.Issue, error) {
+	can := map[uuid.UUID]bool{home: true}
+	out := make([]dbq.Issue, 0, len(issues))
+	for _, o := range issues {
+		ok, seen := can[o.ProjectID]
+		if !seen {
+			op, err := s.Q.GetProject(ctx, o.ProjectID)
+			if err != nil && !db.IsNoRows(err) {
+				return nil, err
+			}
+			if err == nil {
+				access, err := s.Authz.Access(ctx, actor, op)
+				if err != nil {
+					return nil, err
+				}
+				ok = access.CanBrowse()
+			}
+			can[o.ProjectID] = ok
+		}
+		if ok {
+			out = append(out, o)
+		}
+	}
+	return out, nil
 }

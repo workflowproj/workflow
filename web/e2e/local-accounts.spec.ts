@@ -68,7 +68,11 @@ test("invite a local account, set a password, set up two-factor and sign in with
   await dialog.getByLabel("Email").fill(email);
   await dialog.getByRole("radio", { name: /Email invitation/ }).click();
   await dialog.getByRole("button", { name: "Create" }).click();
-  await expect(page.getByText(`Added ${name} and emailed an invitation`)).toBeVisible();
+  // Without an SMTP server the invitation exists but is not emailed, and the admin is told so.
+  const notEmailed = page.getByRole("dialog", { name: "Invitation not emailed" });
+  await expect(notEmailed).toContainText(`it did not reach ${email}`);
+  await expect(notEmailed.getByRole("button", { name: "Set temporary password" })).toBeVisible();
+  await notEmailed.getByRole("button", { name: "Done" }).click();
   const row = page.getByRole("row", { name: new RegExp(name) });
   await expect(row.getByText("Invited")).toBeVisible();
 

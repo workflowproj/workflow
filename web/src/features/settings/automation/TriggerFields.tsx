@@ -69,7 +69,7 @@ export function TriggerFields({
               </optgroup>
               <optgroup label="A specific status">
                 {trigger.toStatus && !statuses.some((s) => s.toLowerCase() === trigger.toStatus!.toLowerCase()) && (
-                  <option value={`status:${trigger.toStatus}`}>{trigger.toStatus} (not in this project)</option>
+                  <option value={`status:${trigger.toStatus}`}>{`${trigger.toStatus}${missing.has(trigger.toStatus.toLowerCase()) ? " (not in this project)" : ""}`}</option>
                 )}
                 {statuses.map((s) => (
                   <option key={s} value={`status:${s}`}>
@@ -106,6 +106,31 @@ export function TriggerFields({
           </div>
           <p className="mt-1 text-xs text-muted">{fields.length ? "The rule runs when any of these change." : "None selected: the rule runs on any edit."}</p>
         </fieldset>
+      )}
+
+      {trigger.type === "deployment.completed" && (
+        <>
+          <Field label="Environment" hint="Any case. Leave empty for every environment." error={errors["trigger.environment"]}>
+            {(id) => (
+              <Input
+                id={id}
+                value={trigger.environment ?? ""}
+                onChange={(e) => onChange({ ...trigger, environment: e.target.value })}
+                placeholder="production"
+                className="font-mono text-[13px]"
+              />
+            )}
+          </Field>
+          <Field label="Outcome" error={errors["trigger.status"]}>
+            {(id) => (
+              <Select id={id} value={trigger.status ?? ""} onChange={(e) => onChange({ ...trigger, status: (e.target.value || undefined) as Trigger["status"] })}>
+                <option value="">Succeeded or failed</option>
+                <option value="success">Succeeded</option>
+                <option value="failed">Failed</option>
+              </Select>
+            )}
+          </Field>
+        </>
       )}
 
       {trigger.type === "schedule" && (

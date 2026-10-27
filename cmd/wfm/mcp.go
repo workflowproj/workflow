@@ -66,7 +66,7 @@ func mcpBridge() error {
 
 // mcpPost sends one message and returns the JSON reply (nothing for notifications).
 func mcpPost(client *http.Client, url, token, protocol string, msg []byte) ([]byte, error) {
-	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(msg))
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(msg)) // #nosec G704 -- the CLI talks to the server its user configured (WFM_SERVER)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +76,7 @@ func mcpPost(client *http.Client, url, token, protocol string, msg []byte) ([]by
 	if protocol != "" {
 		req.Header.Set("MCP-Protocol-Version", protocol)
 	}
-	res, err := client.Do(req)
+	res, err := client.Do(req) // #nosec G704 -- the server its user configured
 	if err != nil {
 		return nil, err
 	}

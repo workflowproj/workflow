@@ -5,7 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 const EVENT_TYPES = [
   "issue.created", "issue.updated", "issue.transitioned", "issue.deleted", "comment.created",
   "board.updated", "project.updated", "sprint.started", "sprint.completed", "release.released",
-  "branch.created", "commit.pushed", "pr.opened", "pr.merged", "pr.closed", "pipeline.completed",
+  "branch.created", "commit.pushed", "pr.opened", "pr.merged", "pr.closed", "pipeline.completed", "deployment.completed",
 ];
 
 export type LiveEvent = { type: string; projectId: string; issueId?: string; issueKey?: string; actorId?: string };
@@ -36,7 +36,7 @@ export function useLiveEvents(scope: LiveScope, { onEvent, debounceMs = 150 }: {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const pending = new Set<string>();
     const flush = () => {
-      for (const k of ["board", "backlog", "search", "sprints", "releases", "timeline", "metrics"]) qc.invalidateQueries({ queryKey: [k] });
+      for (const k of ["board", "backlog", "search", "sprints", "releases", "timeline", "metrics", "risks", "decisions"]) qc.invalidateQueries({ queryKey: [k] });
       for (const key of pending) {
         qc.invalidateQueries({ queryKey: ["issue", key] });
         qc.invalidateQueries({ queryKey: ["issue-comments", key] });

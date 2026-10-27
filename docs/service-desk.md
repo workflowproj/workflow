@@ -22,8 +22,10 @@ This is a first cut. What it covers, and what it does not yet, is listed under
 3. **Customers** (a tab of the project): add the people you support by email. Someone without
    an account gets a customer account and an invitation email to choose a password (this needs
    local accounts, see [identity.md](identity.md#local-accounts)); people who already have an
-   account are just added. Agents with the `customer.manage` permission (project `member` and
-   `admin` roles) add and remove customers.
+   account are just added. Without an SMTP server the invitation is created but reaches nobody:
+   the page says so (the API's `emailed` is `false`), and an administrator can set up email or
+   give the customer a temporary password. Agents with the `customer.manage` permission
+   (project `member` and `admin` roles) add and remove customers.
 4. Share the help centre's address, `WFM_PUBLIC_URL/portal/KEY`, shown in Project settings →
    Help centre.
 
@@ -41,6 +43,9 @@ Project settings → Help centre → *Who can raise requests*:
 to them, so the address is confirmed before the account can be used; an address that already
 has an account gets an email saying so instead (the page answers the same either way, so it
 does not reveal who has an account), and only customer accounts are added to the desk that way.
+Without an email server (`WFM_SMTP_HOST` unset) that link would reach nobody, so the sign-up page
+says sign-up is not available and asks people for an invitation; the help centre settings warn
+about it next to the switch.
 Addresses in the organisation's sign-in domains (`WFM_ALLOWED_DOMAINS` or a provider's own) can't
 sign up: those people get their account from the identity provider. Sign-ups are throttled like
 password resets.
@@ -53,7 +58,12 @@ A customer is a person with the organisation role `customer`:
   outside the portal, their own profile, sign-in and email settings answers `403 portal_only`
   — search, issues, comments, history, attachments, live updates, MCP and tokens included.
 - They hold no project permissions: a group mapped to an organisation role does not raise a
-  customer's role, and a customer cannot be added as a project member.
+  customer's role, and a customer cannot be added as a project member or lead a project. People
+  pickers for assignees and new project members never offer them (`GET /api/v1/users` leaves
+  customers out with `project`, or with `customers=false`).
+- Only an administrator changing their own role (Administration → Users, which shows them as
+  *Customer* and asks for confirmation) turns a customer into an agent, or an agent into a
+  customer. Service accounts are never customers.
 - They see a request when they raised it, when an agent shared it with them (*Shared with*,
   in the issue's Service request panel), or when they are asked to approve it.
 - They sign in with a password (local accounts) or, if your identity provider lets them in,
@@ -170,14 +180,36 @@ drops off the approvers' lists, and a late decision is refused rather than movin
 
 - **Get help**: the desks you can raise requests in, then a desk's request types by group,
   then the request type's form.
-- **My requests**: what you raised or what was shared with you, open or closed.
+- **My requests**: what you raised or what was shared with you, open or closed, most recently
+  updated first. A request's *last update* is the latest thing its customer can see: a reply
+  from either side, a status change or a file added in the help centre. Internal notes and
+  other changes agents make (the assignee, labels) don't move it.
 - A **request**: status, details from the form, the conversation (replies only) with a reply
   box, files (attach yours), approvals, and who it is shared with.
 - **Approvals**: requests waiting for your decision.
 - **Profile**: your account, password and two-factor authentication, and request emails.
+- **What's new**: a desk's page of release notes, linked from the desk (below).
 
 It works on phones, follows the light/dark theme, and its pages are part of the accessibility
 checks in the end-to-end tests.
+
+### What's new
+
+A help centre can tell its customers what changed in the products behind it. In Project settings
+→ Help centre → *What's new*, a project admin of the desk chooses the software projects whose
+release notes it shows; they can only choose projects they can browse, and not service projects.
+In those projects, people with `release.manage` publish a release's notes from the release page
+(*Show on the help centres' What's new*, see [releases.md](releases.md#release-notes)).
+
+Everyone who may raise requests in the desk then finds **What's new** on the desk's page
+(`/portal/KEY/whats-new`): the published notes of the chosen projects, newest first, each with
+the product's and the release's names, its date (when it was released, else its planned date)
+and the notes rendered as Markdown (raw HTML is not rendered, and issue keys are not links).
+Nothing else about the releases reaches the help centre: no issues, no statuses, no people.
+Unpublishing the notes, or removing the project from the desk, takes them off at once. Someone who
+may not raise requests in the desk gets `404`, like every other portal page; the integration tests
+check that customers cannot read unpublished notes, notes of projects the desk did not choose, or
+another desk's notes.
 
 ## Emails
 
@@ -207,13 +239,14 @@ the normal agent notifications instead; internal notes are never in a customer's
 
 ## API
 
-Agents: `GET`/`PATCH /projects/{key}/service-desk`, `…/request-types`,
+Agents: `GET`/`PATCH /projects/{key}/service-desk` (`releaseNotesProjectKeys` chooses What's
+new's projects), `…/request-types`,
 `…/customers`, `…/queues` (and `/queues/{id}/issues`), `GET`/`PUT /projects/{key}/slas`,
 `GET`/`PATCH /issues/{key}/request` (request type, SLAs, approvals, participants),
 `POST /issues/{key}/participants`, `POST /issues/{key}/approvals/{id}`.
 
 Help centre: `GET /portal/projects`, `GET /portal/projects/{key}`,
-`POST /portal/projects/{key}/requests`, `GET /portal/requests`, `GET /portal/requests/{key}`,
+`GET /portal/projects/{key}/whats-new`, `POST /portal/projects/{key}/requests`, `GET /portal/requests`, `GET /portal/requests/{key}`,
 `POST …/comments`, `POST …/attachments`, `POST …/approval`, `GET /portal/approvals`,
 `GET /portal/attachments/{id}`, and `GET`/`POST /portal/signup/{key}` (signed out).
 [`api/openapi.yaml`](../api/openapi.yaml) has the details.
@@ -222,7 +255,7 @@ Help centre: `GET /portal/projects`, `GET /portal/projects/{key}`,
 
 Included in this first cut: service projects, request types with forms, customers (invited,
 SSO or self-signed-up), the help centre, replies and internal notes, queues, SLAs with
-calendars and breach events, approvals, and customer and approver emails.
+calendars and breach events, approvals, customer and approver emails, and What's new.
 
 Not included yet:
 

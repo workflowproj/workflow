@@ -580,6 +580,11 @@ func (s *Service) projectTarget(ctx context.Context, projectID uuid.UUID) (Targe
 	seen := map[string]bool{}
 	slices.SortStableFunc(types, func(a, b dbq.ListIssueTypesRow) int { return absLevel(int(a.Level)) - absLevel(int(b.Level)) })
 	for _, it := range types {
+		// Imported issues are work: they keep their sprints and parents, which risks and
+		// decisions never have.
+		if it.Kind != tracker.KindWork {
+			continue
+		}
 		def, _, err := s.workflowDef(ctx, it.WorkflowID)
 		if err != nil {
 			return t, err

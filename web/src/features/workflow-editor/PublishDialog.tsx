@@ -6,7 +6,7 @@ import { Badge, Button, Modal, useToast } from "@/components/ui";
 import { ErrorBox } from "@/components/ErrorBox";
 import { Callout } from "@/features/settings/common";
 import { StatusMappingFields, suggestMapping, type RemovedStatus } from "@/features/settings/StatusMapping";
-import { diffDocs, type WorkflowDoc } from "./model";
+import { diffDocs, renamedStatuses, type WorkflowDoc } from "./model";
 
 type Detail = Schemas["WorkflowDetail"];
 
@@ -14,6 +14,8 @@ type Detail = Schemas["WorkflowDetail"];
  * PublishDialog publishes the draft as a new version. When issues sit in statuses the draft
  * removes, it collects where they should go (old status -> new status) first; the API answers
  * 422 status_mapping_required otherwise, and any statuses it reports are added to the form.
+ * Statuses renamed in the editor are always sent as mappings, so boards show the new name in
+ * the old one's column even when no issues are in it.
  */
 export function PublishDialog({
   open,
@@ -58,7 +60,7 @@ export function PublishDialog({
 
   const publish = useMutation({
     mutationFn: () => {
-      const statusMapping = Object.fromEntries(all.filter((r) => mapping[r.name]).map((r) => [r.name, mapping[r.name]]));
+      const statusMapping = { ...renamedStatuses(baseline, doc, renames), ...Object.fromEntries(all.filter((r) => mapping[r.name]).map((r) => [r.name, mapping[r.name]])) };
       return unwrap(api.POST("/workflows/{workflowId}/versions", { params: { path: { workflowId: workflow.id } }, body: { yaml, statusMapping } }));
     },
     onSuccess: (d) => {

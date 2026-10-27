@@ -247,7 +247,7 @@ func NewCloud(base time.Time) *Site {
 func NewDataCenter(base time.Time) *Site {
 	base = base.UTC().Truncate(time.Hour)
 	at := func(days, hours int) time.Time { return base.Add(time.Duration(days*24+hours) * time.Hour) }
-	s := &Site{
+	s := &Site{ // #nosec G101 -- a test double's fixed credentials
 		Flavor: DataCenter, Token: "dc-personal-access-token", PageSize: 2, Content: map[string][]byte{},
 		Users: []User{
 			{Key: "JIRAUSER10100", Name: "dora", DisplayName: "Dora Explorer", EmailAddress: "dora@example.com", Active: true},

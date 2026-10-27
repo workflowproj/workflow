@@ -88,7 +88,8 @@ SELECT * FROM service_requests WHERE issue_id = ANY(@ids::uuid[]);
 
 -- name: PortalRequests :many
 -- Requests a person follows in the portal: they reported them or they are shared with them.
--- Issues without a request type are never shown there.
+-- Issues without a request type are never shown there. Latest public activity first (see
+-- RequestPublicActivity).
 SELECT sqlc.embed(i), sr.request_type_id
 FROM issues i
 JOIN service_requests sr ON sr.issue_id = i.id
@@ -97,21 +98,31 @@ WHERE sr.request_type_id IS NOT NULL
   AND (i.reporter_id = @user_id OR EXISTS (SELECT 1 FROM request_participants rp WHERE rp.issue_id = i.id AND rp.user_id = @user_id))
   AND (sqlc.narg(project_id)::uuid IS NULL OR i.project_id = sqlc.narg(project_id))
   AND (sqlc.narg(done)::boolean IS NULL OR (s.category = 'done') = sqlc.narg(done))
-ORDER BY i.updated_at DESC
+ORDER BY request_public_activity(i.id, i.created_at) DESC, i.id
 LIMIT @lim;
 
 -- name: PendingApprovalRequests :many
 -- Requests waiting for a person's decision (still in Pending approval: one that has moved on no
--- longer waits for it).
-SELECT DISTINCT ON (i.updated_at, i.id) sqlc.embed(i), sr.request_type_id
-FROM approval_approvers aa
-JOIN request_approvals ra ON ra.id = aa.approval_id AND ra.status = 'pending'
-JOIN issues i ON i.id = ra.issue_id
+-- longer waits for it), latest public activity first.
+SELECT sqlc.embed(i), sr.request_type_id
+FROM issues i
 JOIN statuses st ON st.id = i.status_id AND lower(st.name) = 'pending approval'
 JOIN service_requests sr ON sr.issue_id = i.id
-WHERE aa.user_id = @user_id AND aa.decision IS NULL AND sr.request_type_id IS NOT NULL
-ORDER BY i.updated_at DESC, i.id
+WHERE sr.request_type_id IS NOT NULL
+  AND EXISTS (
+    SELECT 1 FROM approval_approvers aa
+    JOIN request_approvals ra ON ra.id = aa.approval_id AND ra.status = 'pending'
+    WHERE ra.issue_id = i.id AND aa.user_id = @user_id AND aa.decision IS NULL)
+ORDER BY request_public_activity(i.id, i.created_at) DESC, i.id
 LIMIT @lim;
+
+-- name: RequestPublicActivity :many
+-- When each request last changed in a way its customer can see: raised, a reply they can see, a
+-- status change or a file added in the help centre (never an internal note). The help centre
+-- shows it as the request's last update.
+SELECT i.id, request_public_activity(i.id, i.created_at)::timestamptz AS at
+FROM issues i
+WHERE i.id = ANY(@ids::uuid[]);
 
 -- name: AddParticipant :exec
 INSERT INTO request_participants (issue_id, user_id, added_by) VALUES (@issue_id, @user_id, @added_by) ON CONFLICT DO NOTHING;

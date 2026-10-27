@@ -352,7 +352,7 @@ function MetricEditor({
     [goals[i], goals[i + d]] = [goals[i + d], goals[i]];
     onChange({ ...m, goals });
   };
-  const stopsAt = m.metric === "first_response" ? "the first reply to the customer from the team" : "the request is resolved (reaches a done status)";
+  const stops = m.metric === "first_response" ? "stops at the team's first reply to the customer" : "stops when the request is resolved (reaches a done status)";
   return (
     <SettingsSection
       title={
@@ -360,7 +360,7 @@ function MetricEditor({
           <CalendarClock aria-hidden className="size-4 text-muted" /> {m.name}
         </span>
       }
-      description={`Starts when the request is raised and stops at ${stopsAt}.`}
+      description={`Starts when the request is raised and ${stops}.`}
     >
       <div className="flex flex-col gap-5 p-4">
         <label className="flex max-w-sm flex-col gap-1.5">
@@ -389,7 +389,7 @@ function MetricEditor({
               Add goal
             </Button>
           </div>
-          <p className="text-[13px] text-muted">The first goal whose conditions match a request applies; a request no goal matches has no {m.name.toLowerCase()} SLA.</p>
+          <p className="text-[13px] text-muted">The first goal whose conditions match a request applies; requests that match no goal are not measured for {m.name.toLowerCase()}.</p>
           {m.goals.length === 0 && (
             <Callout tone="warning" title="No goals">
               No request is measured.

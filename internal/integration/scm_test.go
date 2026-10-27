@@ -30,8 +30,21 @@ type fakeSCM struct {
 }
 
 type fakeCall struct {
-	Method, Path, Auth string
-	Body               map[string]any
+	Method, Path, Escaped, Auth string
+	Body                        map[string]any
+}
+
+// fakeReply is a route's answer with a status other than 200.
+type fakeReply struct {
+	Status int
+	Body   any
+}
+
+// set changes a route's answer.
+func (f *fakeSCM) set(route string, resp any) {
+	f.mu.Lock()
+	f.routes[route] = resp
+	f.mu.Unlock()
 }
 
 func newFakeSCM(t *testing.T, routes map[string]any) *fakeSCM {
@@ -45,7 +58,7 @@ func newFakeSCM(t *testing.T, routes map[string]any) *fakeSCM {
 			auth = r.Header.Get("PRIVATE-TOKEN")
 		}
 		f.mu.Lock()
-		f.calls = append(f.calls, fakeCall{Method: r.Method, Path: r.URL.Path, Auth: auth, Body: body})
+		f.calls = append(f.calls, fakeCall{Method: r.Method, Path: r.URL.Path, Escaped: r.URL.EscapedPath(), Auth: auth, Body: body})
 		resp, ok := f.routes[r.Method+" "+r.URL.Path]
 		f.mu.Unlock()
 		if !ok {
@@ -58,6 +71,10 @@ func newFakeSCM(t *testing.T, routes map[string]any) *fakeSCM {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
+		if r, ok := resp.(fakeReply); ok {
+			w.WriteHeader(r.Status)
+			resp = r.Body
+		}
 		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	t.Cleanup(f.Close)
@@ -187,6 +204,8 @@ func TestGitHubIntegration(t *testing.T) {
 	if !strings.Contains(str(comments[0], "body"), "Picked this up") || str(comments[0], "author", "email") != "ada@example.com" {
 		t.Fatalf("comment = %v", comments[0])
 	}
+	// Comments render Markdown without HTML, so the commit is named in Markdown.
+	eq(t, str(comments[0], "body"), "Picked this up\n\nVia commit [bbb222](https://github.com/acme/shop/commit/bbb222)", "smart commit comment body")
 	links := devLinks(admin, "SHOP-1")
 	eq(t, len(links["branch"]), 1, "branch link")
 	eq(t, len(links["commit"]), 1, "commit link")
@@ -279,6 +298,36 @@ func TestGitHubIntegration(t *testing.T) {
 	eq(t, str(br, "kind"), "branch", "branch link returned")
 	member.must("POST", "/api/v1/issues/SHOP-2/branches", obj{"repositoryId": repoID}, 201, nil) // members can create branches
 
+	// A base branch named with a slash keeps it in the API path.
+	gh.set("GET /repos/acme/shop/git/ref/heads/release/1.0", obj{"ref": "refs/heads/release/1.0", "object": obj{"sha": "relsha"}})
+	admin.must("POST", "/api/v1/issues/SHOP-2/branches", obj{"repositoryId": repoID, "name": "SHOP-2-hotfix", "fromRef": "release/1.0"}, 201, nil)
+	refs = gh.find("POST", "/repos/acme/shop/git/refs")
+	eq(t, refs[len(refs)-1].Body["sha"], any("relsha"), "branch from release/1.0")
+	eq(t, gh.find("GET", "/repos/acme/shop/git/ref/heads/release/1.0")[0].Escaped, "/repos/acme/shop/git/ref/heads/release/1.0", "slash not escaped")
+
+	// When GitHub's answer is not a branch to start from, or it refuses, people get a plain
+	// message (the status and what to check), while the details go to the server log.
+	// No exact match: GitHub lists the refs that start with the name.
+	gh.set("GET /repos/acme/shop/git/ref/heads/develop", []obj{{"ref": "refs/heads/develop-old", "object": obj{"sha": "oldsha"}}})
+	r := admin.do("POST", "/api/v1/issues/SHOP-2/branches", obj{"repositoryId": repoID, "name": "SHOP-2-try", "fromRef": "develop"})
+	eq(t, r.Status, 400, "no branch develop")
+	errs, _ := r.JSON()["errors"].([]any)
+	if len(errs) != 1 || str(errs[0].(obj), "field") != "fromRef" || !strings.Contains(str(r.JSON(), "detail"), `acme/shop has no branch "develop"`) {
+		t.Fatalf("missing base branch: %s", r.Body)
+	}
+	eq(t, len(gh.find("POST", "/repos/acme/shop/git/refs")), len(refs), "nothing created from develop-old")
+	// The App may not write Contents.
+	gh.set("POST /repos/acme/shop/git/refs", fakeReply{Status: 403, Body: obj{"message": "Resource not accessible by integration"}})
+	r = admin.do("POST", "/api/v1/issues/SHOP-2/branches", obj{"repositoryId": repoID, "name": "SHOP-2-denied"})
+	eq(t, r.Status, 502, "GitHub refused")
+	detail := str(r.JSON(), "detail")
+	if !strings.Contains(detail, "GitHub refused to create the branch (403 Forbidden)") || !strings.Contains(detail, "Contents: Read & write") || strings.Contains(detail, "Resource not accessible") {
+		t.Fatalf("refused: %s", detail)
+	}
+	if !strings.Contains(e.Logs.String(), "Resource not accessible by integration") {
+		t.Fatal("the provider's answer is not in the server log")
+	}
+
 	// Reprocess a stored event.
 	admin.get("/api/v1/admin/scm-connections/"+str(conn, "id")+"/events", &events)
 	admin.must("POST", "/api/v1/admin/webhook-events/"+str(events[0], "id")+"/reprocess", nil, 202, nil)
@@ -354,6 +403,7 @@ func TestGitLabIntegration(t *testing.T) {
 	admin.get("/api/v1/issues/APP-1/comments", &comments)
 	eq(t, len(comments), 1, "smart commit comment")
 	eq(t, str(comments[0], "author", "id"), bob.id(), "comment by mapped user")
+	eq(t, str(comments[0], "body"), "Form done\n\nVia commit [abc](https://gitlab.example.com/grp/app/-/commit/abc)", "smart commit comment body")
 	links := devLinks(admin, "APP-1")
 	eq(t, len(links["branch"]), 1, "branch")
 	eq(t, len(links["commit"]), 1, "commit")

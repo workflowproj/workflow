@@ -3,6 +3,7 @@ import { getRouteApi, Link } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { CheckCircle2, LifeBuoy } from "lucide-react";
 import { api, ApiError, unwrap } from "@/api/client";
+import { providersQuery } from "@/api/queries";
 import { Button, Field, Input, PageSpinner } from "@/components/ui";
 import { ErrorBox } from "@/components/ErrorBox";
 import { ThemeMenu } from "@/layout/ThemeMenu";
@@ -17,6 +18,7 @@ export function PortalSignupPage() {
     queryFn: () => unwrap(api.GET("/portal/signup/{projectKey}", { params: { path: { projectKey } } })),
     retry: false,
   });
+  const providers = useQuery(providersQuery);
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const signup = useMutation({
@@ -36,12 +38,19 @@ export function PortalSignupPage() {
           </span>
         </div>
         <div className="rounded-xl border border-line bg-surface p-6 shadow-sm">
-          {info.isLoading ? (
+          {info.isLoading || providers.isLoading ? (
             <PageSpinner />
           ) : !info.data ? (
             <>
               <h1 className="text-lg font-semibold">Sign-up is not available</h1>
               <p className="mt-2 text-sm text-muted">This help centre does not let people sign up. Ask the team for an invitation.</p>
+            </>
+          ) : providers.data && !providers.data.emailDelivery ? (
+            <>
+              <h1 className="text-lg font-semibold">Sign-up is not available</h1>
+              <p className="mt-2 text-sm text-muted">
+                Signing up emails you a link to choose a password, and this server doesn't send email yet. Ask {info.data.name} for an invitation.
+              </p>
             </>
           ) : signup.isSuccess ? (
             <div role="status">

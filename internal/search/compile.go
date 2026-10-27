@@ -180,6 +180,19 @@ func (b *builder) clause(c Clause) (string, error) {
 			p := b.arg(s)
 			return fmt.Sprintf("i.type_id IN (SELECT id FROM issue_types WHERE lower(key) = lower(%[1]s::text) OR lower(name) = lower(%[1]s::text))", p), nil
 		}, "")
+	case "kind", "typekind", "issuetypekind":
+		// Work, or the risks and decisions kept out of planning.
+		return b.setField(c, func(v Value) (string, error) {
+			s, err := b.str(v)
+			if err != nil {
+				return "", err
+			}
+			k := strings.ToLower(s)
+			if !slices.Contains([]string{"work", "risk", "decision"}, k) {
+				return "", errAt(v.Pos, "unknown kind %q (use work, risk or decision)", s)
+			}
+			return fmt.Sprintf("i.type_id IN (SELECT id FROM issue_types WHERE kind = %s::text)", b.arg(k)), nil
+		}, "")
 	case "level", "hierarchylevel":
 		return b.numberField(c, "(SELECT level FROM issue_types t WHERE t.id = i.type_id)")
 	case "assignee":
@@ -250,6 +263,16 @@ func (b *builder) clause(c Clause) (string, error) {
 			}
 			return "EXISTS (SELECT 1 FROM issue_releases ir JOIN releases r ON r.id = ir.release_id WHERE ir.issue_id = i.id AND " + cond + ")", nil
 		}, "NOT EXISTS (SELECT 1 FROM issue_releases ir WHERE ir.issue_id = i.id)")
+	case "deployedto":
+		// Environments a successful deployment containing the issue reached.
+		const deployed = "SELECT 1 FROM deployment_issues di JOIN deployments d ON d.id = di.deployment_id WHERE di.issue_id = i.id AND d.status = 'success'"
+		return b.setField(c, func(v Value) (string, error) {
+			s, err := b.str(v)
+			if err != nil {
+				return "", err
+			}
+			return fmt.Sprintf("EXISTS (%s AND lower(d.environment) = lower(%s::text))", deployed, b.arg(s)), nil
+		}, "NOT EXISTS ("+deployed+")")
 	case "parent":
 		return b.setField(c, func(v Value) (string, error) {
 			sub, err := b.issueByKey(v)
@@ -275,7 +298,7 @@ func (b *builder) clause(c Clause) (string, error) {
 			}
 			l, ok := linkDescriptions[normalize(s)]
 			if !ok {
-				return "", errAt(v.Pos, "unknown link type %q (use blocks, \"is blocked by\", relates, duplicates, \"is duplicated by\", clones or \"is cloned by\")", s)
+				return "", errAt(v.Pos, "unknown link type %q (use %s)", s, linkTypeHelp)
 			}
 			return l.exists(b.arg(l.typ), "i.id"), nil
 		}, "NOT EXISTS (SELECT 1 FROM issue_links l WHERE l.source_id = i.id OR l.target_id = i.id)")
@@ -326,22 +349,45 @@ func (b *builder) clause(c Clause) (string, error) {
 	case "participant", "participants", "requestparticipants":
 		return b.participantField(c)
 	}
-	if cf, ok := b.customField(c.Field); ok {
+	cf, ok, err := b.customField(c)
+	if err != nil {
+		return "", err
+	}
+	if ok {
 		return b.customClause(c, cf)
 	}
 	return "", errAt(c.Pos, "unknown field %q", c.Field)
 }
 
-func (b *builder) customField(name string) (CustomField, bool) {
+// customField finds the custom field a clause names: by key first (bare, or as cf[key]), then by
+// name. Names need not be unique, so a name two fields share is an error that asks for the key.
+func (b *builder) customField(c Clause) (CustomField, bool, error) {
+	name := c.Field
 	if m := cfPattern.FindStringSubmatch(strings.ToLower(name)); m != nil {
 		name = m[1]
 	}
 	for _, f := range b.env.CustomFields {
-		if strings.EqualFold(f.Key, name) || strings.EqualFold(f.Name, name) {
-			return f, true
+		if strings.EqualFold(f.Key, name) {
+			return f, true, nil
 		}
 	}
-	return CustomField{}, false
+	var found []CustomField
+	for _, f := range b.env.CustomFields {
+		if strings.EqualFold(f.Name, name) {
+			found = append(found, f)
+		}
+	}
+	switch len(found) {
+	case 0:
+		return CustomField{}, false, nil
+	case 1:
+		return found[0], true, nil
+	}
+	keys := make([]string, len(found))
+	for i, f := range found {
+		keys[i] = "cf[" + f.Key + "]"
+	}
+	return CustomField{}, false, errAt(c.Pos, "%d custom fields are called %q: use %s", len(found), c.Field, strings.Join(keys, " or "))
 }
 
 // setField composes =, !=, in, not in, is [not] EMPTY from a per-value condition.
@@ -500,7 +546,14 @@ var linkDescriptions = map[string]linkDescription{
 	"relates": {"relates", "either"}, "relatesto": {"relates", "either"},
 	"duplicates": {"duplicates", "source"}, "isduplicatedby": {"duplicates", "target"},
 	"clones": {"clones", "source"}, "isclonedby": {"clones", "target"},
+	// Work mitigates a risk, work implements a decision, a decision supersedes an earlier one.
+	"mitigates": {"mitigates", "source"}, "ismitigatedby": {"mitigates", "target"}, "mitigatedby": {"mitigates", "target"},
+	"implements": {"implements", "source"}, "isimplementedby": {"implements", "target"}, "implementedby": {"implements", "target"},
+	"supersedes": {"supersedes", "source"}, "issupersededby": {"supersedes", "target"}, "supersededby": {"supersedes", "target"},
 }
+
+const linkTypeHelp = `blocks, "is blocked by", relates, duplicates, "is duplicated by", clones, "is cloned by", ` +
+	`mitigates, "is mitigated by", implements, "is implemented by", supersedes or "is superseded by"`
 
 // exists is "issue col has a link of this description".
 func (l linkDescription) exists(typ, col string) string {
@@ -534,7 +587,7 @@ func (b *builder) issueFunction(v Value) (string, error) {
 		}
 		l, ok := linkDescriptions[normalize(s)]
 		if !ok {
-			return "", errAt(v.Args[1].Pos, "unknown link type %q", s)
+			return "", errAt(v.Args[1].Pos, "unknown link type %q (use %s)", s, linkTypeHelp)
 		}
 		// "PLAT-1 blocks X": X is the target of PLAT-1's blocks links, and so on.
 		t := b.arg(l.typ)
@@ -987,6 +1040,7 @@ var Fields = []struct {
 	{"project", "project", []string{"=", "!=", "in", "not in"}},
 	{"key", "issue", []string{"=", "!=", "in", "not in", ">", ">=", "<", "<="}},
 	{"type", "type", []string{"=", "!=", "in", "not in"}},
+	{"kind", "kind", []string{"=", "!=", "in", "not in"}},
 	{"status", "status", []string{"=", "!=", "in", "not in"}},
 	{"statusCategory", "category", []string{"=", "!=", "in", "not in"}},
 	{"assignee", "user", []string{"=", "!=", "in", "not in", "is", "is not"}},
@@ -997,6 +1051,7 @@ var Fields = []struct {
 	{"labels", "label", []string{"=", "!=", "in", "not in", "is", "is not"}},
 	{"sprint", "sprint", []string{"=", "!=", "in", "not in", "is", "is not"}},
 	{"fixVersion", "release", []string{"=", "!=", "in", "not in", "is", "is not"}},
+	{"deployedTo", "environment", []string{"=", "!=", "in", "not in", "is", "is not"}},
 	{"parent", "issue", []string{"=", "!=", "in", "not in", "is", "is not"}},
 	{"epic", "issue", []string{"=", "!=", "in", "not in", "is", "is not"}},
 	{"issueLinkType", "linkType", []string{"=", "!=", "in", "not in", "is", "is not"}},

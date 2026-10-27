@@ -24,6 +24,8 @@ export interface ValidatorDoc {
 export interface ScreenFieldDoc {
   field: string;
   required?: boolean;
+  /** A resolution field may offer its own resolutions (the risk workflow's Mitigated, Accepted…). */
+  options?: string[];
 }
 /** A post-function sets exactly one of these keys. */
 export interface PostFunctionDoc {
@@ -118,6 +120,7 @@ export function normalize(raw: unknown): WorkflowDoc {
         const fo = (f ?? {}) as Record<string, unknown>;
         const out: ScreenFieldDoc = { field: str(fo.field) };
         if (fo.required === true) out.required = true;
+        if (Array.isArray(fo.options) && fo.options.length) out.options = fo.options.map(str);
         return out;
       });
     }
@@ -199,7 +202,8 @@ function cleanTransition(t: TransitionDoc): Record<string, unknown> {
   o.to = t.to;
   if (t.condition?.trim()) o.condition = t.condition.trim();
   if (t.validators?.length) o.validators = t.validators.map((v) => (v.message ? { expr: v.expr, message: v.message } : { expr: v.expr }));
-  if (t.screen?.length) o.screen = t.screen.map((f) => (f.required ? { field: f.field, required: true } : { field: f.field }));
+  if (t.screen?.length)
+    o.screen = t.screen.map((f) => ({ field: f.field, ...(f.required ? { required: true } : {}), ...(f.options?.some(Boolean) ? { options: f.options.filter(Boolean) } : {}) }));
   if (t.postFunctions?.length) {
     o.postFunctions = t.postFunctions.map((p) => {
       const k = postFunctionKind(p);
@@ -483,6 +487,22 @@ export interface DocDiff {
 }
 
 /** diffDocs summarises what a draft changes compared with the published version. */
+/**
+ * renamedStatuses is the status mapping that renames imply: each status of `before` that is gone
+ * from `after` and was renamed (`renames`: old name → new name) to a status `after` has.
+ */
+export function renamedStatuses(before: WorkflowDoc, after: WorkflowDoc, renames: Record<string, string>): Record<string, string> {
+  const key = (s: string) => s.trim().toLowerCase();
+  const removed = new Set(diffDocs(before, after).removedStatuses.map(key));
+  const names = new Map(after.statuses.map((s) => [key(s.name), s.name]));
+  const out: Record<string, string> = {};
+  for (const [from, to] of Object.entries(renames)) {
+    const target = names.get(key(to));
+    if (removed.has(key(from)) && target) out[from] = target;
+  }
+  return out;
+}
+
 export function diffDocs(before: WorkflowDoc, after: WorkflowDoc): DocDiff {
   const key = (s: string) => s.trim().toLowerCase();
   const sb = new Map(before.statuses.map((s) => [key(s.name), s]));
