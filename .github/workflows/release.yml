@@ -1,10 +1,12 @@
 name: Release
 
 # Tag vX.Y.Z -> multi-arch image (signed, SBOM attested), Helm chart (OCI, signed),
-# offline bundles (amd64 + arm64) and a GitHub release.
+# offline bundles (amd64 + arm64) and a GitHub release. release-please.yml creates the tag and the
+# release (with the changelog) and dispatches this workflow on the tag; a tag pushed by hand works too.
 on:
   push:
     tags: ["v*.*.*"]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -21,6 +23,8 @@ env:
 jobs:
   image:
     name: Image (linux/amd64, linux/arm64)
+    # Only release tags: a dispatch from a branch would publish a non-semver version.
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     permissions:
@@ -190,7 +194,8 @@ jobs:
         run: sha256sum ./* | sed 's| \./| |' > SHA256SUMS && cat SHA256SUMS
       - uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
-          generate_release_notes: true
+          # The release usually exists already, with release-please's changelog: add to it.
+          append_body: true
           files: assets/*
           body: |
             Image: `${{ env.IMAGE }}:${{ needs.image.outputs.version }}` (`${{ needs.image.outputs.digest }}`)

@@ -4,7 +4,7 @@ description: >-
   Workflow management platform: one image running as web (UI + API), hooks (internet-facing
   webhooks and SCIM) and worker (River jobs), with an optional CloudNativePG database.
 type: application
-# Chart and app versions are overwritten from the git tag by the release workflow.
+# Bumped by release-please in the release PR; the release workflow also packages with the tag.
 version: 0.1.0
 appVersion: "0.1.0"
 # preStop sleep hooks (lifecycle.preStop.sleep) need Kubernetes 1.30+.
