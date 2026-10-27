@@ -8,8 +8,10 @@
       "bump-minor-pre-major": true,
       "changelog-path": "CHANGELOG.md",
       "extra-files": [
-        { "type": "yaml", "path": "deploy/helm/wfm/Chart.yaml", "jsonpath": "$.version" },
-        { "type": "yaml", "path": "deploy/helm/wfm/Chart.yaml", "jsonpath": "$.appVersion" }
+        {
+          "type": "generic",
+          "path": "deploy/helm/wfm/Chart.yaml"
+        }
       ]
     }
   }
