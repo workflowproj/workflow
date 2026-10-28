@@ -11,6 +11,10 @@
         {
           "type": "generic",
           "path": "deploy/helm/wfm/Chart.yaml"
+        },
+        {
+          "type": "generic",
+          "path": "README.md"
         }
       ]
     }
