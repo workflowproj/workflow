@@ -40,7 +40,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       # Check against the Go release the image is built with (the Dockerfile's GO_IMAGE), since
       # standard library fixes arrive in patch releases.
       - name: Go version of the release build
@@ -61,7 +61,7 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
@@ -95,7 +95,7 @@ jobs:
           - { language: javascript-typescript, build-mode: none }
           - { language: actions, build-mode: none }
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - if: matrix.language == 'go'
         uses: actions/setup-go@v7
         with:
@@ -116,7 +116,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # the whole history: a secret removed in a later commit is still leaked
       - uses: actions/setup-go@v7
@@ -135,7 +135,7 @@ jobs:
       run:
         working-directory: web
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
           node-version: 22
@@ -152,7 +152,7 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       # Known vulnerabilities in go.mod and package-lock.json, and misconfigurations in the
       # Dockerfile and the Helm chart (rendered for the Kubernetes version in .github/trivy.yaml).
       # deploy/k3d is skipped: it holds throwaway development services (a dev Keycloak and
@@ -204,7 +204,7 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: Build the image
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
@@ -251,7 +251,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       # Fails a pull request that adds a dependency with a known high or critical vulnerability.
       - uses: actions/dependency-review-action@v5.0.0
         with:
