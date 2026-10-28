@@ -1,14 +1,48 @@
+<div align="center">
+
+<img src=".github/assets/logo.svg" alt="Workflow" width="72" height="72">
+
 # Workflow
 
-Workflow is a free, open-source issue tracker for software teams that runs on your own
-infrastructure: one container image, PostgreSQL and a Helm chart, on k3s or EKS, including networks
-with no internet access. It covers what a team tracks day to day, from the backlog to the pull
-request, plus a service desk for requests from outside the team.
+**Issue tracking built for your own infrastructure.**
 
-**Documentation: [docs.workflowproj.io](https://docs.workflowproj.io/)** · Website:
-[workflowproj.io](https://workflowproj.io/)
+A free, open-source issue tracker for software teams: one container image, PostgreSQL and a Helm
+chart, on k3s or EKS, including networks with no internet access.
 
-## What it does
+[![Latest release](https://img.shields.io/github/v/release/workflowproj/workflow?sort=semver&label=release)](https://github.com/workflowproj/workflow/releases/latest)
+[![Security](https://github.com/workflowproj/workflow/actions/workflows/security.yml/badge.svg?branch=main)](https://github.com/workflowproj/workflow/actions/workflows/security.yml)
+[![Licence: Apache-2.0](https://img.shields.io/badge/licence-Apache--2.0-blue)](LICENSE)
+[![OpenAPI 3.1](https://img.shields.io/badge/OpenAPI-3.1-6BA539)](https://docs.workflowproj.io/reference/api/)
+[![Docs](https://img.shields.io/badge/docs-docs.workflowproj.io-4F46E5)](https://docs.workflowproj.io/)
+
+[Website](https://workflowproj.io/) ·
+[Documentation](https://docs.workflowproj.io/) ·
+[Getting started](https://docs.workflowproj.io/getting-started/) ·
+[API reference](https://docs.workflowproj.io/reference/api/) ·
+[Releases](https://github.com/workflowproj/workflow/releases)
+
+</div>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset=".github/assets/board-dark.webp">
+  <img src=".github/assets/board.webp" alt="A Scrum board in Workflow: columns for To Do, In Progress, In Review and Done, with issue cards showing keys, assignees and story points">
+</picture>
+
+Workflow covers what a team tracks day to day, from the backlog to the pull request, plus a service
+desk for requests from outside the team. There is one edition, with every feature: no paid tier, no
+feature gates and no licence keys.
+
+## Contents
+
+- [Features](#features)
+- [How it runs](#how-it-runs)
+- [Quick start](#quick-start)
+- [Documentation](#documentation)
+- [Contributing](#contributing)
+- [Security](#security)
+- [Licence](#licence)
+
+## Features
 
 - **Projects and issues**: project keys and templates; epics, stories, tasks, bugs and sub-tasks;
   custom fields, links, attachments, watchers and a full history.
@@ -53,16 +87,35 @@ request, plus a service desk for requests from outside the team.
 - Prometheus metrics with a Grafana dashboard and alert rules, OpenTelemetry traces and JSON logs.
   Searches, boards and reports are measured against 100,000 issues.
 
-## Get started
+## Quick start
 
-- **Install it on a cluster**: [Getting started](https://docs.workflowproj.io/getting-started/)
-  and [Deployment](docs/deployment.md).
-- **Run it from source**: see [Contributing](CONTRIBUTING.md#run-it-from-source).
+Workflow needs Kubernetes 1.30+ and the [CloudNativePG](https://cloudnative-pg.io/) operator. With
+both in place, install the signed chart from the GitHub Container Registry:
+
+```sh
+kubectl apply --server-side -f \
+  https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.30/releases/cnpg-1.30.1.yaml
+```
+
+<!-- x-release-please-start-version -->
+```sh
+helm install wfm oci://ghcr.io/workflowproj/charts/wfm --version 0.1.0 \
+  --namespace wfm --create-namespace -f values.yaml
+```
+<!-- x-release-please-end -->
+
+Start `values.yaml` from the [k3s](deploy/helm/wfm/values-k3s.yaml) or
+[EKS](deploy/helm/wfm/values-eks.yaml) example. [Getting started](https://docs.workflowproj.io/getting-started/)
+walks through a first install, and [Deployment](docs/deployment.md) covers sign-in, TLS, backups,
+upgrades and air-gapped installs. To run Workflow from source, see
+[Contributing](CONTRIBUTING.md#run-it-from-source).
 
 ## Documentation
 
 The reference pages live in [`docs/`](docs/) and are published at
-[docs.workflowproj.io](https://docs.workflowproj.io/).
+[docs.workflowproj.io](https://docs.workflowproj.io/), with the
+[API reference](https://docs.workflowproj.io/reference/api/) generated from
+[`api/openapi.yaml`](api/openapi.yaml).
 
 | Topic | |
 |---|---|
@@ -87,14 +140,22 @@ The reference pages live in [`docs/`](docs/) and are published at
 
 ## Contributing
 
-Bug reports, ideas and pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) covers running
-Workflow from source, the code generators, migrations, the tests and the local Kubernetes loop.
+Bug reports, ideas and pull requests are welcome: use the
+[issue forms](https://github.com/workflowproj/workflow/issues/new/choose) for bugs, features and
+documentation problems. [CONTRIBUTING.md](CONTRIBUTING.md) covers running Workflow from source, the
+code generators, migrations, the tests, the local Kubernetes loop and how releases are versioned.
+
+## Security
+
+Please report vulnerabilities privately through
+[GitHub's private reporting](https://github.com/workflowproj/workflow/security/advisories/new),
+not in a public issue. [SECURITY.md](SECURITY.md) lists the supported versions and how the code is
+checked.
 
 ## Licence
 
 Workflow is free and open source under the [Apache License 2.0](LICENSE); see [NOTICE](NOTICE)
-for attributions. There is one edition, with every feature: no paid tier, no feature gates and no
-licence keys.
+for attributions.
 
 Jira is a trademark of Atlassian. GitHub, GitLab, Slack, Mattermost, Google and other names are
 trademarks of their respective owners. Workflow is not affiliated with, endorsed or sponsored by
