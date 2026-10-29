@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"golang.org/x/net/http/httpguts"
 	"io"
 	"log/slog"
 	"net/http"
@@ -90,6 +91,16 @@ type Action struct {
 	URL        string `json:"url,omitempty"`
 	Recipients string `json:"recipients,omitempty"`
 	ChannelID  string `json:"channelId,omitempty"` // chat: a chat channel of the project
+
+	// webhook: Secret signs the body (X-WFM-Signature-256) and AuthValue is sent in the AuthHeader
+	// header (default Authorization). Both are write-only: sealSecrets encrypts them into SecretEnc
+	// and AuthEnc, and the plain values are never stored or returned. nil keeps the stored value, ""
+	// removes it.
+	Secret     *string `json:"secret,omitempty"`
+	AuthHeader string  `json:"authHeader,omitempty"`
+	AuthValue  *string `json:"authValue,omitempty"`
+	SecretEnc  string  `json:"secretEnc,omitempty"`
+	AuthEnc    string  `json:"authEnc,omitempty"`
 }
 
 type RuleInput struct {
@@ -191,6 +202,9 @@ func (s *Service) validate(ctx context.Context, actor *authz.Actor, projectID uu
 			if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
 				return nil, apperr.Invalid(field, "webhook needs an http(s) URL")
 			}
+			if h := a.AuthHeader; h != "" && (!httpguts.ValidHeaderFieldName(h) || reservedHeader(h)) {
+				return nil, apperr.Invalid(field+".authHeader", "%q can't be used as the auth header", h)
+			}
 		case "notify":
 			if !slices.Contains([]string{"assignee", "reporter", "watchers"}, a.Recipients) {
 				return nil, apperr.Invalid(field, "notify recipients must be assignee, reporter or watchers")
@@ -220,7 +234,7 @@ func (s *Service) CreateRule(ctx context.Context, actor *authz.Actor, projectRef
 		return dbq.AutomationRule{}, err
 	}
 	tc, _ := json.Marshal(in.Trigger)
-	acts, _ := json.Marshal(in.Actions)
+	acts, _ := json.Marshal(s.sealSecrets(in.Actions, nil))
 	r, err := s.Q.CreateAutomationRule(ctx, dbq.CreateAutomationRuleParams{
 		ProjectID: p.ID, Name: strings.TrimSpace(in.Name), Description: in.Description, Enabled: in.Enabled, TriggerType: in.Trigger.Type,
 		TriggerConfig: tc, Condition: in.Condition, Actions: acts, CreatedBy: actor.UserID(), NextRunAt: next,
@@ -244,7 +258,7 @@ func (s *Service) ruleForAdmin(ctx context.Context, actor *authz.Actor, id uuid.
 }
 
 func (s *Service) UpdateRule(ctx context.Context, actor *authz.Actor, id uuid.UUID, in RuleInput) (dbq.AutomationRule, error) {
-	_, p, err := s.ruleForAdmin(ctx, actor, id)
+	old, p, err := s.ruleForAdmin(ctx, actor, id)
 	if err != nil {
 		return dbq.AutomationRule{}, err
 	}
@@ -252,8 +266,10 @@ func (s *Service) UpdateRule(ctx context.Context, actor *authz.Actor, id uuid.UU
 	if err != nil {
 		return dbq.AutomationRule{}, err
 	}
+	var prev []Action
+	_ = json.Unmarshal(old.Actions, &prev)
 	tc, _ := json.Marshal(in.Trigger)
-	acts, _ := json.Marshal(in.Actions)
+	acts, _ := json.Marshal(s.sealSecrets(in.Actions, prev))
 	r, err := s.Q.UpdateAutomationRule(ctx, dbq.UpdateAutomationRuleParams{
 		ID: id, Name: strings.TrimSpace(in.Name), Description: in.Description, Enabled: in.Enabled, TriggerType: in.Trigger.Type,
 		TriggerConfig: tc, Condition: in.Condition, Actions: acts, NextRunAt: next,
@@ -565,7 +581,11 @@ func (s *Service) runAction(ctx context.Context, actor *authz.Actor, p dbq.Proje
 		return "commented", err
 	case "webhook":
 		payload, _ := json.Marshal(map[string]any{"event": "automation", "issue": key, "trigger": ev.Event, "data": data, "sentAt": time.Now().UTC()})
-		return "webhook sent", s.post(ctx, a.URL, "", "automation", uuid.NewString(), payload)
+		secret, auth, err := s.openSecrets(a)
+		if err != nil {
+			return "", err
+		}
+		return "webhook sent", s.post(ctx, a.URL, secret, "automation", uuid.NewString(), payload, auth)
 	case "notify":
 		if err := s.notifyRecipients(ctx, issue, a.Recipients, nil, "automation", key+": "+issue.Summary, "Automation: "+ev.Event); err != nil {
 			return "", err
@@ -747,7 +767,7 @@ func (s *Service) HandlePostFunction(ctx context.Context, pf jobs.PostFunction) 
 			"event": "workflow.post_function", "transition": pf.Transition, "from": pf.FromStatus, "to": pf.ToStatus,
 			"issue": view, "sentAt": time.Now().UTC(),
 		})
-		return s.post(ctx, pf.Webhook, "", "workflow.post_function", uuid.NewString(), payload)
+		return s.post(ctx, pf.Webhook, "", "workflow.post_function", uuid.NewString(), payload, nil)
 	}
 	return nil
 }
@@ -813,7 +833,7 @@ func (s *Service) Deliver(ctx context.Context, deliveryID uuid.UUID) error {
 	if err != nil {
 		return err
 	}
-	err = s.post(ctx, sub.Url, string(secret), d.Event, d.ID.String(), d.Payload)
+	err = s.post(ctx, sub.Url, string(secret), d.Event, d.ID.String(), d.Payload, nil)
 	status, code, msg := "delivered", (*int32)(nil), (*string)(nil)
 	if err != nil {
 		status = "failed"
@@ -833,12 +853,84 @@ func (s *Service) Deliver(ctx context.Context, deliveryID uuid.UUID) error {
 	return err
 }
 
+// reservedHeader reports headers an automation webhook's auth header must not replace.
+func reservedHeader(h string) bool {
+	h = strings.ToLower(h)
+	return strings.HasPrefix(h, "x-wfm-") || slices.Contains([]string{"host", "content-type", "content-length", "user-agent"}, h)
+}
+
+// sealSecrets encrypts webhook actions' write-only secrets. A webhook that sends no value keeps the
+// one stored on the previous version of the rule for the same URL: changing the URL drops it, so
+// someone who can edit the rule can't redirect a secret they never knew to a server of their own.
+func (s *Service) sealSecrets(actions, prev []Action) []Action {
+	out := slices.Clone(actions)
+	used := make([]bool, len(prev))
+	for i := range out {
+		a := &out[i]
+		if a.Type != "webhook" {
+			a.Secret, a.AuthValue, a.AuthHeader, a.SecretEnc, a.AuthEnc = nil, nil, "", "", ""
+			continue
+		}
+		a.SecretEnc, a.AuthEnc = "", ""
+		for j, p := range prev {
+			if !used[j] && p.Type == "webhook" && p.URL == a.URL {
+				used[j] = true
+				a.SecretEnc, a.AuthEnc = p.SecretEnc, p.AuthEnc
+				break
+			}
+		}
+		if a.Secret != nil {
+			a.SecretEnc = s.sealOrEmpty(*a.Secret)
+		}
+		if a.AuthValue != nil {
+			a.AuthEnc = s.sealOrEmpty(*a.AuthValue)
+		}
+		if a.AuthEnc == "" {
+			a.AuthHeader = ""
+		}
+		a.Secret, a.AuthValue = nil, nil
+	}
+	return out
+}
+
+func (s *Service) sealOrEmpty(v string) string {
+	if v == "" {
+		return ""
+	}
+	return s.Box.Seal([]byte(v))
+}
+
+// openSecrets decrypts a webhook action's signing secret and auth header.
+func (s *Service) openSecrets(a Action) (string, http.Header, error) {
+	var secret string
+	if a.SecretEnc != "" {
+		b, err := s.Box.Open(a.SecretEnc)
+		if err != nil {
+			return "", nil, fmt.Errorf("open webhook secret: %w", err)
+		}
+		secret = string(b)
+	}
+	if a.AuthEnc == "" {
+		return secret, nil, nil
+	}
+	b, err := s.Box.Open(a.AuthEnc)
+	if err != nil {
+		return "", nil, fmt.Errorf("open webhook auth: %w", err)
+	}
+	name := a.AuthHeader
+	if name == "" {
+		name = "Authorization"
+	}
+	return secret, http.Header{http.CanonicalHeaderKey(name): {string(b)}}, nil
+}
+
 type statusError struct{ code int }
 
 func (e *statusError) Error() string { return fmt.Sprintf("receiver answered HTTP %d", e.code) }
 
 // post sends a JSON payload. With a secret, the body is signed: X-WFM-Signature-256: sha256=<hmac>.
-func (s *Service) post(ctx context.Context, target, secret, event, deliveryID string, body []byte) error {
+// extra headers (an automation webhook's auth header) are added as they are.
+func (s *Service) post(ctx context.Context, target, secret, event, deliveryID string, body []byte, extra http.Header) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, target, bytes.NewReader(body))
 	if err != nil {
 		return err
@@ -849,6 +941,9 @@ func (s *Service) post(ctx context.Context, target, secret, event, deliveryID st
 	req.Header.Set("X-WFM-Delivery", deliveryID)
 	if secret != "" {
 		req.Header.Set("X-WFM-Signature-256", "sha256="+secure.HMACSHA256Hex(secret, body))
+	}
+	for k, v := range extra {
+		req.Header[k] = v
 	}
 	res, err := s.HTTP.Do(req)
 	if err != nil {

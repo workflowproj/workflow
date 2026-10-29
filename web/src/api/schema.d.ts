@@ -5260,6 +5260,16 @@ export interface components {
              * @description chat: one of the project's chat channels (body is the message, Markdown with {{issue.*}} / {{trigger.*}} / {{event.*}})
              */
             channelId?: string;
+            /** @description webhook: signs the body as `X-WFM-Signature-256: sha256=<hex HMAC-SHA256>`, like outbound webhooks. Stored encrypted and never returned. Omit to keep the stored secret (dropped if `url` changes); `""` removes it */
+            secret?: string;
+            /** @description webhook: header carrying `authValue` (default `Authorization`); not `Host`, `Content-Type`, `Content-Length`, `User-Agent` or `X-WFM-*` */
+            authHeader?: string;
+            /** @description webhook: sent in `authHeader`, e.g. `Bearer <token>`. Stored encrypted and never returned. Omit to keep the stored value (dropped if `url` changes); `""` removes it */
+            authValue?: string;
+            /** @description webhook: a signing secret is stored */
+            readonly secretSet?: boolean;
+            /** @description webhook: an auth header value is stored */
+            readonly authSet?: boolean;
         };
         AutomationRule: {
             /** Format: uuid */
