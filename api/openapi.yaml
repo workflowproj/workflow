@@ -5899,6 +5899,17 @@ components:
         url: { type: string }
         recipients: { type: string, description: 'notify: assignee | reporter | watchers' }
         channelId: { type: string, format: uuid, description: 'chat: one of the project''s chat channels (body is the message, Markdown with {{issue.*}} / {{trigger.*}} / {{event.*}})' }
+        secret:
+          type: string
+          writeOnly: true
+          description: 'webhook: signs the body as `X-WFM-Signature-256: sha256=<hex HMAC-SHA256>`, like outbound webhooks. Stored encrypted and never returned. Omit to keep the stored secret (dropped if `url` changes); `""` removes it'
+        authHeader: { type: string, description: 'webhook: header carrying `authValue` (default `Authorization`); not `Host`, `Content-Type`, `Content-Length`, `User-Agent` or `X-WFM-*`' }
+        authValue:
+          type: string
+          writeOnly: true
+          description: 'webhook: sent in `authHeader`, e.g. `Bearer <token>`. Stored encrypted and never returned. Omit to keep the stored value (dropped if `url` changes); `""` removes it'
+        secretSet: { type: boolean, readOnly: true, description: 'webhook: a signing secret is stored' }
+        authSet: { type: boolean, readOnly: true, description: 'webhook: an auth header value is stored' }
     AutomationRule:
       type: object
       required: [id, name, description, enabled, trigger, condition, actions, createdAt]

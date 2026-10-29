@@ -136,7 +136,8 @@ export function cleanAction(a: Action): Action {
     case "rollup_dates":
       return { type: a.type, ...t };
     case "webhook":
-      return { type: a.type, url: a.url, ...t };
+      // secret and authValue are write-only: undefined keeps the stored value, "" removes it.
+      return { type: a.type, url: a.url, authHeader: a.authHeader, secret: a.secret, authValue: a.authValue, ...t };
     case "notify":
       return { type: a.type, recipients: a.recipients, ...t };
     case "chat":

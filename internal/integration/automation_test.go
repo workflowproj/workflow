@@ -29,6 +29,7 @@ type receiver struct {
 
 type delivery struct {
 	Event, Signature string
+	Header           http.Header
 	Body             []byte
 }
 
@@ -38,7 +39,7 @@ func newReceiver(t *testing.T) *receiver {
 		body, _ := io.ReadAll(req.Body)
 		r.mu.Lock()
 		defer r.mu.Unlock()
-		r.got = append(r.got, delivery{Event: req.Header.Get("X-WFM-Event"), Signature: req.Header.Get("X-WFM-Signature-256"), Body: body})
+		r.got = append(r.got, delivery{Event: req.Header.Get("X-WFM-Event"), Signature: req.Header.Get("X-WFM-Signature-256"), Header: req.Header.Clone(), Body: body})
 		if r.fail {
 			w.WriteHeader(http.StatusServiceUnavailable)
 		}
@@ -235,7 +236,7 @@ func TestOutboundWebhooks(t *testing.T) {
 	eq(t, str(dels[0], "status"), "failed", "failed delivery recorded")
 	eq(t, fmt.Sprint(dels[0]["responseStatus"]), "503", "response status")
 
-	// Automation webhook actions use the same signed delivery path.
+	// Automation webhook actions use the same delivery path (signed when they have a secret).
 	admin.must("POST", "/api/v1/projects/HK/automation-rules", obj{"name": "notify CI", "trigger": obj{"type": "issue.transitioned", "toStatus": "Done"},
 		"actions": []obj{{"type": "webhook", "url": rcv.URL}}}, 201, nil)
 	rcv.mu.Lock()
@@ -246,6 +247,100 @@ func TestOutboundWebhooks(t *testing.T) {
 	if !strings.Contains(strings.Join(rcv.events(), ","), "automation") {
 		t.Fatalf("automation webhook not delivered: %v", rcv.events())
 	}
+}
+
+func TestAutomationWebhookSecrets(t *testing.T) {
+	e := newEnv(t)
+	admin := e.login("ada@example.com", "Ada")
+	admin.createProject("AWS", "kanban")
+	rcv, other := newReceiver(t), newReceiver(t)
+	last := func(r *receiver) delivery {
+		t.Helper()
+		r.mu.Lock()
+		defer r.mu.Unlock()
+		if len(r.got) == 0 {
+			t.Fatal("no delivery")
+		}
+		return r.got[len(r.got)-1]
+	}
+	sign := func(secret string, body []byte) string {
+		mac := hmac.New(sha256.New, []byte(secret))
+		mac.Write(body)
+		return "sha256=" + hex.EncodeToString(mac.Sum(nil))
+	}
+	n := 0
+	fire := func() {
+		n++
+		admin.createIssue("AWS", "task", fmt.Sprintf("issue %d", n), nil)
+		e.DrainJobs()
+	}
+
+	// Reserved headers can't carry the auth value.
+	for _, h := range []string{"X-WFM-Signature-256", "Host", "Content-Type", "bad header"} {
+		admin.must("POST", "/api/v1/projects/AWS/automation-rules", obj{"name": "bad", "trigger": obj{"type": "issue.created"},
+			"actions": []obj{{"type": "webhook", "url": rcv.URL, "authHeader": h, "authValue": "x"}}}, 400, nil)
+	}
+
+	var rule obj
+	admin.must("POST", "/api/v1/projects/AWS/automation-rules", obj{"name": "to CI", "trigger": obj{"type": "issue.created"},
+		"actions": []obj{{"type": "webhook", "url": rcv.URL, "secret": "s3cret", "authHeader": "X-Api-Key", "authValue": "k1"}}}, 201, &rule)
+	id := str(rule, "id")
+
+	// Write-only: the API says they are set and never what they are, and storage holds ciphertext.
+	raw := string(admin.must("GET", "/api/v1/projects/AWS/automation-rules", nil, 200, nil).Body)
+	for _, leak := range []string{"s3cret", "k1", "secretEnc", "authEnc"} {
+		if strings.Contains(raw, leak) {
+			t.Fatalf("rule list leaks %q: %s", leak, raw)
+		}
+	}
+	act := rule["actions"].([]any)[0].(map[string]any)
+	eq(t, act["secretSet"], true, "secretSet")
+	eq(t, act["authSet"], true, "authSet")
+	var stored string
+	if err := e.Pool.QueryRow(context.Background(), `SELECT actions::text FROM automation_rules WHERE id = $1`, id).Scan(&stored); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(stored, "s3cret") || strings.Contains(stored, `"k1"`) {
+		t.Fatalf("plaintext secret stored: %s", stored)
+	}
+
+	fire()
+	d := last(rcv)
+	eq(t, d.Signature, sign("s3cret", d.Body), "signed with the secret")
+	eq(t, d.Header.Get("X-Api-Key"), "k1", "auth header")
+
+	// Saving the rule as the API returned it keeps both.
+	update := func(action obj) obj {
+		var out obj
+		admin.must("PUT", "/api/v1/automation-rules/"+id, obj{"name": "to CI", "trigger": obj{"type": "issue.created"}, "actions": []obj{action}}, 200, &out)
+		return out["actions"].([]any)[0].(map[string]any)
+	}
+	act = update(obj{"type": "webhook", "url": rcv.URL, "authHeader": "X-Api-Key"})
+	eq(t, act["secretSet"], true, "secret kept")
+	fire()
+	d = last(rcv)
+	eq(t, d.Signature, sign("s3cret", d.Body), "still signed")
+	eq(t, d.Header.Get("X-Api-Key"), "k1", "auth kept")
+
+	// "" removes the secret; the auth value stays.
+	act = update(obj{"type": "webhook", "url": rcv.URL, "authHeader": "X-Api-Key", "secret": ""})
+	eq(t, act["secretSet"], false, "secret removed")
+	eq(t, act["authSet"], true, "auth still set")
+	fire()
+	d = last(rcv)
+	eq(t, d.Signature, "", "unsigned")
+	eq(t, d.Header.Get("X-Api-Key"), "k1", "auth still sent")
+
+	// A new URL doesn't inherit stored secrets.
+	act = update(obj{"type": "webhook", "url": other.URL, "authHeader": "X-Api-Key"})
+	eq(t, act["authSet"], false, "auth dropped with the URL")
+	fire()
+	eq(t, last(other).Header.Get("X-Api-Key"), "", "no auth to the new URL")
+
+	// The default auth header is Authorization.
+	update(obj{"type": "webhook", "url": other.URL, "authValue": "Bearer t0k"})
+	fire()
+	eq(t, last(other).Header.Get("Authorization"), "Bearer t0k", "default header")
 }
 
 func TestOutboundWebhooksBlockPrivateAddresses(t *testing.T) {

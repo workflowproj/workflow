@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { ArrowDown, ArrowUp, X } from "lucide-react";
 import { IconButton, Input, Select, Textarea } from "@/components/ui";
@@ -264,12 +265,7 @@ function Options({
         />
       );
     case "webhook":
-      return (
-        <div>
-          <Input aria-label={`${label}: URL`} type="url" value={a.url ?? ""} onChange={(e) => onChange({ ...a, url: e.target.value })} placeholder="https://hooks.example.com/automation" />
-          <p className="mt-1 text-xs text-muted">Receives a JSON POST with the issue and the event.</p>
-        </div>
-      );
+      return <WebhookFields a={a} label={label} onChange={onChange} />;
     case "notify":
       return (
         <Select aria-label={`${label}: recipients`} value={a.recipients ?? "watchers"} onChange={(e) => onChange({ ...a, recipients: e.target.value })} className="max-w-xs">
@@ -279,6 +275,97 @@ function Options({
         </Select>
       );
   }
+}
+
+/** WebhookFields edits a webhook action. Secrets are write-only: the API only says whether one is
+ * stored. Leaving a secret empty keeps it, "Remove" sends "" and a new URL drops stored secrets. */
+function WebhookFields({ a, label, onChange }: { a: Action; label: string; onChange: (a: Action) => void }) {
+  const [savedUrl] = useState(a.url);
+  const urlChanged = a.url !== savedUrl;
+  const stored = (set: boolean | undefined, value: string | undefined) => !!set && !urlChanged && value === undefined;
+  const secretStored = stored(a.secretSet, a.secret);
+  const authStored = stored(a.authSet, a.authValue);
+  return (
+    <div className="space-y-2">
+      <div>
+        <Input aria-label={`${label}: URL`} type="url" value={a.url ?? ""} onChange={(e) => onChange({ ...a, url: e.target.value })} placeholder="https://hooks.example.com/automation" />
+        <p className="mt-1 text-xs text-muted">Receives a JSON POST with the issue and the event.</p>
+      </div>
+      <SecretInput
+        label={`${label}: signing secret`}
+        title="Signing secret"
+        hint="Signs the body as X-WFM-Signature-256, like outbound webhooks."
+        stored={secretStored}
+        value={a.secret}
+        onChange={(secret) => onChange({ ...a, secret })}
+      />
+      <p className="-mb-1 text-xs font-medium">Auth header</p>
+      <div className="grid gap-2 sm:grid-cols-[12rem_1fr]">
+        <Input
+          aria-label={`${label}: auth header`}
+          value={a.authHeader ?? ""}
+          onChange={(e) => onChange({ ...a, authHeader: e.target.value.trim() || undefined })}
+          placeholder="Authorization"
+          spellCheck={false}
+          className="font-mono text-[13px]"
+        />
+        <SecretInput
+          label={`${label}: auth value`}
+          stored={authStored}
+          value={a.authValue}
+          placeholder="Bearer …"
+          onChange={(authValue) => onChange({ ...a, authValue })}
+        />
+      </div>
+      <p className="text-xs text-muted">
+        Secrets are stored encrypted and never shown again.{urlChanged && (a.secretSet || a.authSet) ? " Changing the URL drops the stored secrets: enter them again to keep them." : ""}
+      </p>
+    </div>
+  );
+}
+
+function SecretInput({
+  label,
+  title,
+  hint,
+  stored,
+  value,
+  placeholder,
+  onChange,
+}: {
+  label: string;
+  title?: string;
+  hint?: string;
+  stored: boolean;
+  value: string | undefined;
+  placeholder?: string;
+  onChange: (v: string | undefined) => void;
+}) {
+  const removing = value === "";
+  return (
+    <div>
+      {title && <p className="mb-1 text-xs font-medium">{title}</p>}
+      <div className="flex items-center gap-2">
+        <Input
+          aria-label={label}
+          type="password"
+          autoComplete="off"
+          spellCheck={false}
+          value={value ?? ""}
+          disabled={removing}
+          onChange={(e) => onChange(e.target.value || undefined)}
+          placeholder={removing ? "Will be removed" : stored ? "Stored (type to replace)" : (placeholder ?? "Optional")}
+          className="font-mono text-[13px]"
+        />
+        {(stored || removing) && (
+          <button type="button" className="shrink-0 text-xs text-accent hover:underline" onClick={() => onChange(removing ? undefined : "")}>
+            {removing ? "Keep" : "Remove"}
+          </button>
+        )}
+      </div>
+      {hint && <p className="mt-1 text-xs text-muted">{hint}</p>}
+    </div>
+  );
 }
 
 function TemplateVars({ onInsert }: { onInsert: (v: string) => void }) {

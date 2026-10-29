@@ -57,6 +57,12 @@ describe("splitAnd", () => {
 });
 
 describe("cleaning", () => {
+  it("sends webhook secrets only when they change", () => {
+    const keep = JSON.parse(JSON.stringify(cleanAction({ type: "webhook", url: "https://ci", authHeader: "X-Api-Key", secretSet: true, authSet: true })));
+    expect(keep).toEqual({ type: "webhook", url: "https://ci", authHeader: "X-Api-Key" });
+    expect(cleanAction({ type: "webhook", url: "https://ci", secret: "" }).secret).toBe("");
+    expect(cleanAction({ type: "webhook", url: "https://ci", authValue: "Bearer t" }).authValue).toBe("Bearer t");
+  });
   it("keeps one transition target and drops the default target", () => {
     expect(cleanAction({ type: "transition", status: "Done", category: "done", target: "issue" })).toEqual({ type: "transition", category: "done" });
     expect(cleanAction({ type: "transition", status: "Blocked", target: "children" })).toEqual({ type: "transition", status: "Blocked", target: "children" });

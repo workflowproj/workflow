@@ -248,6 +248,15 @@ func ruleView(r dbq.AutomationRule) api.AutomationRule {
 	if v.Actions == nil {
 		v.Actions = []api.AutomationAction{}
 	}
+	// Webhook secrets are write-only: say whether they are set, never what they are.
+	var stored []automation.Action
+	_ = json.Unmarshal(r.Actions, &stored)
+	for i := range v.Actions {
+		if i < len(stored) && stored[i].Type == "webhook" {
+			v.Actions[i].SecretSet = ptr(stored[i].SecretEnc != "")
+			v.Actions[i].AuthSet = ptr(stored[i].AuthEnc != "")
+		}
+	}
 	return v
 }
 
@@ -258,7 +267,7 @@ func ruleInput(b api.AutomationRuleInput) automation.RuleInput {
 	}
 	raw, _ := json.Marshal(b.Trigger)
 	_ = json.Unmarshal(raw, &in.Trigger)
-	raw, _ = json.Marshal(b.Actions)
+	raw, _ = json.Marshal(b.Actions) // #nosec G117 -- converts the request body to automation.Action in memory; CreateRule/UpdateRule seal the secrets before storing
 	_ = json.Unmarshal(raw, &in.Actions)
 	return in
 }

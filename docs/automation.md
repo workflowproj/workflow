@@ -54,7 +54,7 @@ sub-task is done, stretch an epic's dates over its stories.
 | `comment` | `body` (Markdown); `{{issue.key}}` / `{{issue.summary}}` (the issue the action runs on), `{{trigger.key}}` / `{{trigger.summary}}` (the issue that fired the rule) and `{{event.<name>}}` are replaced |
 | `add_label` | `label` |
 | `notify` | `recipients`: `assignee`, `reporter` or `watchers` (in-app, and emailed per their [settings](notifications.md)) |
-| `webhook` | `url`: POSTs `{event: "automation", issue, trigger, data, sentAt}` (unsigned) |
+| `webhook` | `url`: POSTs `{event: "automation", issue, trigger, data, sentAt}`; optional `secret` (signs it, see [below](#automation-webhooks)), `authHeader` and `authValue` |
 | `chat` | `channelId` (one of the project's [Slack/Mattermost channels](chat.md)), `body`: message with the same templates as comments |
 | `rollup_dates` | sets the target's start and due dates to span its children's dates — typically with target `parent`, so epics on the timeline cover their stories |
 
@@ -128,6 +128,21 @@ ok := hmac.Equal([]byte(r.Header.Get("X-WFM-Signature-256")), []byte("sha256="+h
 Deliveries are queued after the change commits and retried with exponential backoff on
 network errors and non-2xx answers; the last deliveries and their status are listed per
 webhook, with *Send test*.
+
+### Automation webhooks
+
+A rule's `webhook` action can carry two secrets for the receiver:
+
+- `secret` signs the body exactly like an outbound webhook: `X-WFM-Signature-256:
+  sha256=<hex HMAC-SHA256>`, verified with the code above.
+- `authValue` is sent in the `authHeader` header (default `Authorization`), for receivers
+  that want a token, e.g. `Bearer <token>` or an API key in `X-Api-Key`. `Host`,
+  `Content-Type`, `Content-Length`, `User-Agent` and `X-WFM-*` can't be used.
+
+Both are write-only: they are stored encrypted with `WFM_SECRET_KEY`, and the API only
+reports `secretSet` and `authSet`. When saving a rule, leave a secret out to keep it, or send
+`""` to remove it. Changing a webhook's `url` drops its stored secrets, so editing a rule
+can't send them to a different server; enter them again with the new URL.
 
 **Network safety**: outbound requests (webhooks, automation and post-function webhooks) refuse
 private, loopback, link-local and other internal addresses, including after DNS resolution and
