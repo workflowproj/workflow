@@ -54,6 +54,9 @@ jobs:
       # only copies files, so no QEMU is needed for the arm64 image.
       - id: build
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        env:
+          # The build record is an artifact; the release job downloads every artifact as an asset.
+          DOCKER_BUILD_RECORD_UPLOAD: false
         with:
           context: .
           platforms: linux/amd64,linux/arm64
@@ -203,7 +206,9 @@ jobs:
           # The release usually exists already, with release-please's changelog: add to it.
           append_body: true
           files: assets/*
+          # The leading blank line separates this from release-please's changelog.
           body: |
+
             Image: `${{ env.IMAGE }}:${{ needs.image.outputs.version }}` (`${{ needs.image.outputs.digest }}`)
             Chart: `helm install wfm ${{ env.CHART_REGISTRY }}/wfm --version ${{ needs.image.outputs.version }}`
 
