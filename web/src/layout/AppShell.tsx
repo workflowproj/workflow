@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, Outlet, useNavigate, useParams, useRouterState } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bell, CalendarClock, FolderKanban, GanttChart, LayoutDashboard, LifeBuoy, LogOut, Menu, Plus, Search, Settings, Shield, UserRound } from "lucide-react";
+import { Bell, BookOpen, CalendarClock, FolderKanban, GanttChart, LayoutDashboard, LifeBuoy, LogOut, Menu, Plus, Search, Settings, Shield, UserRound } from "lucide-react";
 import { api, unwrap } from "@/api/client";
 import { projectsQuery, useMe } from "@/api/queries";
 import { Button, IconButton, MenuItem, Popover } from "@/components/ui";
@@ -263,6 +263,9 @@ function UserMenu() {
           <div className="pt-1">
             <MenuItem icon={<UserRound className="size-4" />} onClick={() => (close(), navigate({ to: "/profile" }))}>
               Profile and tokens
+            </MenuItem>
+            <MenuItem icon={<BookOpen className="size-4" />} onClick={() => (close(), navigate({ to: "/api-docs" }))}>
+              API docs
             </MenuItem>
             {me.orgRole === "admin" && (
               <MenuItem icon={<Settings className="size-4" />} onClick={() => (close(), navigate({ to: "/admin" }))}>
