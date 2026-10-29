@@ -6140,6 +6140,17 @@ components:
         required: { type: boolean }
         type: { $ref: '#/components/schemas/FormFieldType', description: Derived from the field (ignored on input) }
         options: { type: array, items: { type: string }, description: Choices of select fields (ignored on input) }
+        showWhen: { $ref: '#/components/schemas/FormCondition' }
+    FormCondition:
+      type: object
+      description: >-
+        Show the field only when an earlier select, multiselect, checkbox or priority field's answer is one of
+        `values` (any of them for a multiselect; `true` or `false` for a checkbox). `required` applies only while the
+        field is shown, and answers to hidden fields are ignored.
+      required: [field, values]
+      properties:
+        field: { type: string, description: The earlier field's key }
+        values: { type: array, minItems: 1, items: { type: string } }
     RequestApprovalConfig:
       type: object
       required: [mode, approvedStatus, declinedStatus]
@@ -6366,8 +6377,9 @@ components:
         label: { type: string }
         help: { type: string }
         type: { $ref: '#/components/schemas/FormFieldType' }
-        required: { type: boolean }
+        required: { type: boolean, description: Required while the field is shown }
         options: { type: array, items: { type: string } }
+        showWhen: { $ref: '#/components/schemas/FormCondition' }
     PortalRequestType:
       type: object
       required: [id, name, description, icon, group, fields, needsApproval]

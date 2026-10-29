@@ -83,6 +83,35 @@ the project and issue type (user and version fields are not offered: they would 
 the project's people and releases). Each question has a label, help text and *required*.
 Without a summary question, the request type's name becomes the summary.
 
+A question can be **conditional**: *Show when* an earlier select, multiselect, checkbox or
+priority question has one of the chosen answers (any of them for a multiselect; *Ticked* or
+*Not ticked* for a checkbox). The help centre shows and hides it as the customer answers, and
+conditions chain: a question that depends on a hidden question is hidden too. *Required* only
+applies while a question is shown, and the server ignores answers to hidden questions, so a
+request can't carry a value its form never asked for. For example, on *Request access*:
+
+| Question | Shown when |
+|---|---|
+| Category (Access, Hardware, Other) | always |
+| System (prod, staging) | Category is Access |
+| Justification | System is prod |
+
+Conditions are checked when the request type is saved: the question tested must come earlier
+in the form and the answers must be among its choices. If a tested question is later removed
+from the form, the question that depended on it is shown again; deleting one of its options
+drops that answer from the condition.
+
+### Tailoring by request type
+
+- **Workflow**: a request type creates issues of its issue type, and each issue type has its own
+  workflow. For a different process (*Access request*: Requested → Approved → Provisioned),
+  create the workflow (Project settings → Workflows), an issue type that uses it (Project
+  settings → Issue types), and pick that issue type on the request type.
+- **SLAs**: an SLA goal can match request types (see [SLAs](#slas)), so *Incident* can have a
+  1-hour first response and *New laptop* a 2-day resolution.
+- **Queues**: queues are searches, so a queue per request type is
+  `"Request type" = "Request access" AND statusCategory != Done`.
+
 An issue with a request type is a **service request**: its reporter and the people it is shared
 with see it in the help centre. Agents can create issues in a service project as usual; they
 are not shown to anyone in the help centre until given a request type (Service request panel →

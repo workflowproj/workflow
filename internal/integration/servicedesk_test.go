@@ -265,6 +265,117 @@ func TestRequestTypeForms(t *testing.T) {
 	admin.must("DELETE", "/api/v1/request-types/"+str(other, "id"), nil, 204, nil)
 }
 
+func TestConditionalRequestFields(t *testing.T) {
+	e := newEnv(t)
+	admin, agent := serviceDesk(t, e, "COND")
+	for _, f := range []obj{
+		{"key": "req_category", "name": "Category", "type": "select", "options": []string{"Access", "Hardware", "Other"}},
+		{"key": "req_system", "name": "System", "type": "select", "options": []string{"prod", "staging"}},
+		{"key": "req_justification", "name": "Justification", "type": "text"},
+		{"key": "req_urgent", "name": "Urgent", "type": "checkbox"},
+		{"key": "req_reason", "name": "Why urgent", "type": "text"},
+		{"key": "req_teams", "name": "Teams", "type": "multiselect", "options": []string{"Platform", "Payments"}},
+		{"key": "req_payments_ref", "name": "Payments ref", "type": "text"},
+	} {
+		admin.must("POST", "/api/v1/fields", f, 201, nil)
+	}
+	when := func(field string, values ...string) obj { return obj{"field": field, "values": values} }
+	form := []obj{
+		{"field": "summary", "label": "What do you need?", "required": true},
+		{"field": "req_category", "label": "Category", "required": true},
+		{"field": "req_system", "label": "System", "required": true, "showWhen": when("req_category", "Access")},
+		{"field": "req_justification", "label": "Justification", "required": true, "showWhen": when("req_system", "prod")},
+		{"field": "req_urgent", "label": "Urgent"},
+		{"field": "req_reason", "label": "Why urgent", "required": true, "showWhen": when("req_urgent", "true")},
+		{"field": "req_teams", "label": "Teams"},
+		{"field": "req_payments_ref", "label": "Payments ref", "required": true, "showWhen": when("req_teams", "Payments")},
+		{"field": "description", "label": "Details", "showWhen": when("priority", "highest")}, // priority isn't on the form yet
+	}
+
+	// Conditions test an earlier choice field, with values it offers.
+	bad := map[string][]obj{
+		"later field":   {{"field": "summary", "label": "S"}, {"field": "req_system", "label": "S", "showWhen": when("req_category", "Access")}, {"field": "req_category", "label": "C"}},
+		"itself":        {{"field": "req_category", "label": "C", "showWhen": when("req_category", "Access")}},
+		"text field":    {{"field": "req_justification", "label": "J"}, {"field": "req_system", "label": "S", "showWhen": when("req_justification", "x")}},
+		"unknown value": {{"field": "req_category", "label": "C"}, {"field": "req_system", "label": "S", "showWhen": when("req_category", "Software")}},
+		"no values":     {{"field": "req_category", "label": "C"}, {"field": "req_system", "label": "S", "showWhen": when("req_category")}},
+		"summary":       {{"field": "req_category", "label": "C"}, {"field": "summary", "label": "S", "showWhen": when("req_category", "Access")}},
+		"not on form":   form,
+	}
+	for name, fields := range bad {
+		if r := admin.do("POST", "/api/v1/projects/COND/request-types", obj{"name": "X " + name, "issueTypeKey": "service_request", "fields": fields}); r.Status != 400 {
+			t.Fatalf("%s: %d %s", name, r.Status, r.Body)
+		}
+	}
+	form = append(form[:8], obj{"field": "priority", "label": "Priority"}, obj{"field": "description", "label": "Details", "showWhen": when("priority", "highest", "high")})
+	var rt obj
+	admin.must("POST", "/api/v1/projects/COND/request-types", obj{"name": "Access or kit", "issueTypeKey": "service_request", "fields": form}, 201, &rt)
+	sys := rt["fields"].([]any)[2].(map[string]any)
+	eq(t, str(sys, "showWhen", "field"), "req_category", "condition returned")
+
+	// The help centre gets the conditions to show and hide fields as customers answer.
+	cust := admin.addCustomer("COND", "cara@customer.test", "Cara")
+	var desk obj
+	cust.get("/api/v1/portal/projects/COND", &desk)
+	var pf []any
+	for _, x := range desk["requestTypes"].([]any) {
+		if m := x.(map[string]any); m["name"] == "Access or kit" {
+			pf = m["fields"].([]any)
+		}
+	}
+	eq(t, str(pf[3].(map[string]any), "showWhen", "field"), "req_system", "portal condition")
+
+	id := str(rt, "id")
+	raise := func(values obj, want int) obj {
+		t.Helper()
+		var out obj
+		cust.must("POST", "/api/v1/portal/projects/COND/requests", obj{"requestTypeId": id, "values": values}, want, &out)
+		return out
+	}
+	stored := func(r obj) map[string]any {
+		t.Helper()
+		f, _ := agent.issue(str(r, "key"))["fields"].(map[string]any)
+		return f
+	}
+
+	// Hidden fields are never required, and their answers are ignored even if sent.
+	r := raise(obj{"summary": "A dock", "req_category": "Hardware", "req_system": "prod", "req_justification": "sneaky"}, 201)
+	f := stored(r)
+	if _, ok := f["req_system"]; ok {
+		t.Fatalf("hidden System stored: %v", f)
+	}
+	if _, ok := f["req_justification"]; ok {
+		t.Fatalf("Justification under a hidden field stored: %v", f)
+	}
+	eq(t, f["req_category"], any("Hardware"), "shown field stored")
+
+	// Shown fields are required, and conditions chain.
+	raise(obj{"summary": "Prod access", "req_category": "Access"}, 400)
+	raise(obj{"summary": "Prod access", "req_category": "Access", "req_system": "prod"}, 400)
+	raise(obj{"summary": "Staging access", "req_category": "Access", "req_system": "staging"}, 201)
+	r = raise(obj{"summary": "Prod access", "req_category": "Access", "req_system": "prod", "req_justification": "on call"}, 201)
+	eq(t, stored(r)["req_justification"], any("on call"), "shown chained field stored")
+
+	// Checkbox, multiselect and priority conditions.
+	raise(obj{"summary": "x", "req_category": "Other", "req_urgent": true}, 400)
+	raise(obj{"summary": "x", "req_category": "Other", "req_urgent": false}, 201)
+	raise(obj{"summary": "x", "req_category": "Other", "req_teams": []string{"Platform", "Payments"}}, 400)
+	raise(obj{"summary": "x", "req_category": "Other", "req_teams": []string{"Platform"}}, 201)
+	// An unticked checkbox (left out of the values) counts as false.
+	var off obj
+	admin.must("POST", "/api/v1/projects/COND/request-types", obj{"name": "Not urgent", "issueTypeKey": "service_request", "fields": []obj{
+		{"field": "req_urgent", "label": "Urgent"},
+		{"field": "req_reason", "label": "Why can it wait?", "required": true, "showWhen": when("req_urgent", "false")},
+	}}, 201, &off)
+	cust.must("POST", "/api/v1/portal/projects/COND/requests", obj{"requestTypeId": str(off, "id"), "values": obj{}}, 400, nil)
+	cust.must("POST", "/api/v1/portal/projects/COND/requests", obj{"requestTypeId": str(off, "id"), "values": obj{"req_urgent": true}}, 201, nil)
+
+	r = raise(obj{"summary": "x", "req_category": "Other", "priority": "low", "description": "ignored"}, 201)
+	eq(t, str(agent.issue(str(r, "key")), "description"), "", "description hidden at low priority")
+	r = raise(obj{"summary": "x", "req_category": "Other", "priority": "high", "description": "kept"}, 201)
+	eq(t, str(agent.issue(str(r, "key")), "description"), "kept", "description shown at high priority")
+}
+
 func TestPortalConversation(t *testing.T) {
 	e := newEnv(t)
 	admin, agent := serviceDesk(t, e, "HELP")
