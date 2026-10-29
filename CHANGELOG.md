@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.2.0](https://github.com/workflowproj/workflow/compare/v0.1.1...v0.2.0) (2026-10-29)
+
+
+### Features
+
+* **automation:** signing secret and auth header for webhook actions ([#19](https://github.com/workflowproj/workflow/issues/19)) ([01dcad9](https://github.com/workflowproj/workflow/commit/01dcad940add84ffd53259633440045f7e2a46de))
+* **servicedesk:** conditional questions on request type forms ([#21](https://github.com/workflowproj/workflow/issues/21)) ([175fb61](https://github.com/workflowproj/workflow/commit/175fb619db61c03904d3db61cb7b07e1aebcfe11))
+
+
+### Bug Fixes
+
+* **release:** keep the build record off the release and space out its notes ([#18](https://github.com/workflowproj/workflow/issues/18)) ([e179309](https://github.com/workflowproj/workflow/commit/e1793099b8f8ed311123c422cc5e8a78b9b9c36f))
+
 ## [0.1.1](https://github.com/workflowproj/workflow/compare/v0.1.0...v0.1.1) (2026-10-29)
 
 
