@@ -114,7 +114,19 @@ export function RequestTypesSettings() {
   );
 }
 
-type FormRow = { field: string; label: string; help: string; required: boolean };
+type Condition = { field: string; values: string[] };
+type FormRow = { field: string; label: string; help: string; required: boolean; showWhen?: Condition };
+type FormChoice = { key: string; name: string; type: string; options?: string[] };
+
+const PRIORITIES = ["highest", "high", "medium", "low", "lowest"];
+const CHOICE_TYPES = new Set(["select", "multiselect", "checkbox"]);
+
+/** choicesOf lists the answers a condition can test: select options, priorities, or ticked/unticked. */
+function choicesOf(f: FormChoice): { value: string; label: string }[] {
+  if (f.type === "checkbox") return [{ value: "true", label: "Ticked" }, { value: "false", label: "Not ticked" }];
+  if (f.key === "priority") return PRIORITIES.map((p) => ({ value: p, label: p.charAt(0).toUpperCase() + p.slice(1) }));
+  return (f.options ?? []).map((o) => ({ value: o, label: o }));
+}
 type ApprovalState = {
   on: boolean;
   mode: "any" | "all";
@@ -160,7 +172,7 @@ function RequestTypeDialog({
   const [group, setGroup] = useState(type?.group ?? "");
   const [position, setPosition] = useState(String(type?.position ?? nextPosition));
   const [rows, setRows] = useState<FormRow[]>(
-    type?.fields.map((f) => ({ field: f.field, label: f.label, help: f.help ?? "", required: f.required })) ?? [
+    type?.fields.map((f) => ({ field: f.field, label: f.label, help: f.help ?? "", required: f.required, showWhen: f.showWhen })) ?? [
       { field: "summary", label: "Summary", help: "", required: true },
       { field: "description", label: "Description", help: "", required: false },
     ],
@@ -182,8 +194,8 @@ function RequestTypeDialog({
   const available = useMemo(() => {
     const custom = defs
       .filter((d) => FORM_TYPES.has(d.type) && (!d.projectKeys || d.projectKeys.includes(projectKey)) && (!d.issueTypeKeys || d.issueTypeKeys.includes(typeKey)))
-      .map((d) => ({ key: d.key, name: d.name, type: d.type }));
-    return [...SYSTEM_FIELDS, ...custom];
+      .map((d): FormChoice => ({ key: d.key, name: d.name, type: d.type, options: d.options }));
+    return [...SYSTEM_FIELDS, ...custom] as FormChoice[];
   }, [defs, projectKey, typeKey]);
   const nameOf = (key: string) => available.find((f) => f.key === key);
   const unused = available.filter((f) => !rows.some((r) => r.field === f.key));
@@ -197,7 +209,13 @@ function RequestTypeDialog({
         issueTypeKey: typeKey,
         group: group.trim(),
         position: Number(position) || 0,
-        fields: rows.map((r) => ({ field: r.field, label: r.label.trim() || (nameOf(r.field)?.name ?? r.field), help: r.help.trim() || undefined, required: r.required })),
+        fields: rows.map((r) => ({
+          field: r.field,
+          label: r.label.trim() || (nameOf(r.field)?.name ?? r.field),
+          help: r.help.trim() || undefined,
+          required: r.required,
+          showWhen: r.showWhen?.values.length ? r.showWhen : undefined,
+        })),
       };
       if (approval.on) {
         body.approval = {
@@ -318,7 +336,12 @@ function RequestTypeDialog({
                       <IconButton size="sm" label={`Move ${f?.name ?? r.field} down`} disabled={i === rows.length - 1} onClick={() => moveRow(i, 1)}>
                         <ArrowDown className="size-4" />
                       </IconButton>
-                      <IconButton size="sm" label={`Remove ${f?.name ?? r.field}`} onClick={() => setRows((rs) => rs.filter((_, j) => j !== i))}>
+                      <IconButton
+                        size="sm"
+                        label={`Remove ${f?.name ?? r.field}`}
+                        // Conditions on the removed field go with it.
+                        onClick={() => setRows((rs) => rs.filter((_, j) => j !== i).map((x) => (x.showWhen?.field === r.field ? { ...x, showWhen: undefined } : x)))}
+                      >
                         <X className="size-4" />
                       </IconButton>
                     </span>
@@ -340,7 +363,20 @@ function RequestTypeDialog({
                     />
                     <Checkbox label="Required" checked={r.required} onChange={(e) => update(i, { required: e.target.checked })} />
                   </div>
-                  {errs[where] && <p className="mt-1 text-xs text-danger">{errs[where]}</p>}
+                  {r.field !== "summary" && (
+                    <ShowWhen
+                      name={f?.name ?? r.field}
+                      value={r.showWhen}
+                      // Only choice fields earlier in the form can be tested.
+                      earlier={rows
+                        .slice(0, i)
+                        .map((x) => nameOf(x.field))
+                        .filter((x): x is FormChoice => !!x && (CHOICE_TYPES.has(x.type) || x.key === "priority"))}
+                      later={!!r.showWhen && rows.slice(i + 1).some((x) => x.field === r.showWhen?.field)}
+                      onChange={(showWhen) => update(i, { showWhen })}
+                    />
+                  )}
+                  {(errs[where] || errs[`${where}.showWhen`]) && <p className="mt-1 text-xs text-danger">{errs[where] ?? errs[`${where}.showWhen`]}</p>}
                 </li>
               );
             })}
@@ -451,6 +487,55 @@ function RequestTypeDialog({
         {save.error && !Object.keys(errs).length ? <ErrorBox error={save.error} /> : null}
       </form>
     </Modal>
+  );
+}
+
+/** ShowWhen edits a form field's condition: always shown, or only when an earlier choice field has one of the picked answers. */
+function ShowWhen({
+  name,
+  value,
+  earlier,
+  later,
+  onChange,
+}: {
+  name: string;
+  value?: Condition;
+  earlier: FormChoice[];
+  later: boolean;
+  onChange: (c: Condition | undefined) => void;
+}) {
+  const ctl = earlier.find((x) => x.key === value?.field);
+  if (earlier.length === 0 && !value) return null;
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[13px]">
+      <label className="flex items-center gap-2">
+        <span className="text-muted">Show</span>
+        <Select
+          aria-label={`When to show ${name}`}
+          className="w-auto"
+          value={value?.field ?? ""}
+          onChange={(e) => onChange(e.target.value ? { field: e.target.value, values: [] } : undefined)}
+        >
+          <option value="">Always</option>
+          {earlier.map((x) => (
+            <option key={x.key} value={x.key}>
+              When {x.name} is…
+            </option>
+          ))}
+        </Select>
+      </label>
+      {ctl &&
+        choicesOf(ctl).map((c) => (
+          <Checkbox
+            key={c.value}
+            label={c.label}
+            checked={value!.values.includes(c.value)}
+            onChange={(e) => onChange({ field: ctl.key, values: e.target.checked ? [...value!.values, c.value] : value!.values.filter((v) => v !== c.value) })}
+          />
+        ))}
+      {ctl && value!.values.length === 0 && <span className="text-xs text-danger">Pick at least one answer</span>}
+      {later && <span className="text-xs text-danger">Move this below the field it depends on</span>}
+    </div>
   );
 }
 

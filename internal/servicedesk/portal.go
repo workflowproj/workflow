@@ -200,6 +200,7 @@ func (s *Service) PortalDesk(ctx context.Context, actor *authz.Actor, ref string
 			if f.Options != nil {
 				pf.Options = ptr(f.Options)
 			}
+			pf.ShowWhen = conditionView(f.ShowWhen)
 			v.Fields = append(v.Fields, pf)
 		}
 		out.RequestTypes = append(out.RequestTypes, v)
@@ -224,7 +225,11 @@ func formValues(fields []resolvedField, rt dbq.RequestType, values map[string]an
 			return in, apperr.Invalid("values."+k, "%q is not on this form", k)
 		}
 	}
+	shown := visibleFields(fields, values)
 	for _, f := range fields {
+		if !shown[f.Field] {
+			continue // a hidden field's answer is ignored, and it is never required
+		}
 		v, present := values[f.Field]
 		if present && isEmpty(v) {
 			present = false

@@ -19,10 +19,33 @@ export function isBlank(v: unknown) {
   return v === undefined || v === null || (typeof v === "string" && v.trim() === "") || (Array.isArray(v) && v.length === 0);
 }
 
-/** formValues prepares the form for the API: blanks are left out, numbers are numbers. */
+/** visibleFields mirrors the server: a field with showWhen is shown while the earlier field it
+ * tests is shown and answered with one of its values (any of them for a multiselect; an unticked
+ * checkbox is "false"). */
+export function visibleFields(fields: PortalFormField[], values: Values): Set<string> {
+  const shown = new Set<string>();
+  const types = new Map<string, PortalFormField["type"]>();
+  for (const f of fields) {
+    types.set(f.key, f.type);
+    const c = f.showWhen;
+    if (!c) {
+      shown.add(f.key);
+      continue;
+    }
+    let v = values[c.field];
+    if (types.get(c.field) === "checkbox") v = String(!!v);
+    const answers = Array.isArray(v) ? v : [v];
+    if (shown.has(c.field) && answers.some((a) => typeof a === "string" && c.values.includes(a))) shown.add(f.key);
+  }
+  return shown;
+}
+
+/** formValues prepares the form for the API: hidden fields and blanks are left out, numbers are numbers. */
 export function formValues(fields: PortalFormField[], values: Values): Values {
   const out: Values = {};
+  const shown = visibleFields(fields, values);
   for (const f of fields) {
+    if (!shown.has(f.key)) continue;
     const v = values[f.key];
     if (f.type === "checkbox") {
       if (v) out[f.key] = true;
@@ -61,10 +84,11 @@ export function PortalCreatePage() {
     setValues((cur) => ({ ...cur, [key]: v }));
     setMissing(({ [key]: _, ...rest }) => rest);
   };
+  const shown = visibleFields(type.fields, values);
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     const errs: Record<string, string> = {};
-    for (const f of type.fields) if (f.required && f.type !== "checkbox" && isBlank(values[f.key])) errs[f.key] = `${f.label} is required`;
+    for (const f of type.fields) if (shown.has(f.key) && f.required && f.type !== "checkbox" && isBlank(values[f.key])) errs[f.key] = `${f.label} is required`;
     setMissing(errs);
     if (Object.keys(errs).length === 0) create.mutate();
     else document.getElementById(`field-${Object.keys(errs)[0]}`)?.focus();
@@ -89,9 +113,11 @@ export function PortalCreatePage() {
       )}
       <form onSubmit={submit} noValidate className="mt-6 flex flex-col gap-5 rounded-lg border border-line bg-surface p-5">
         {create.error && !fieldErrorsShown ? <ErrorBox error={create.error} /> : null}
-        {type.fields.map((f) => (
-          <FormField key={f.key} field={f} value={values[f.key]} error={errorFor(f.key)} onChange={(v) => set(f.key, v)} />
-        ))}
+        {type.fields
+          .filter((f) => shown.has(f.key))
+          .map((f) => (
+            <FormField key={f.key} field={f} value={values[f.key]} error={errorFor(f.key)} onChange={(v) => set(f.key, v)} />
+          ))}
         {type.fields.length === 0 && <p className="text-sm text-muted">Nothing else to fill in: send the request and the team will be in touch.</p>}
         <div className="flex flex-wrap items-center gap-2 border-t border-line pt-4">
           <Button type="submit" variant="primary" loading={create.isPending} icon={<Send className="size-4" />}>

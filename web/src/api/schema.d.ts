@@ -5497,6 +5497,13 @@ export interface components {
             type?: components["schemas"]["FormFieldType"];
             /** @description Choices of select fields (ignored on input) */
             options?: string[];
+            showWhen?: components["schemas"]["FormCondition"];
+        };
+        /** @description Show the field only when an earlier select, multiselect, checkbox or priority field's answer is one of `values` (any of them for a multiselect; `true` or `false` for a checkbox). `required` applies only while the field is shown, and answers to hidden fields are ignored. */
+        FormCondition: {
+            /** @description The earlier field's key */
+            field: string;
+            values: string[];
         };
         RequestApprovalConfig: {
             /**
@@ -5737,8 +5744,10 @@ export interface components {
             label: string;
             help?: string;
             type: components["schemas"]["FormFieldType"];
+            /** @description Required while the field is shown */
             required: boolean;
             options?: string[];
+            showWhen?: components["schemas"]["FormCondition"];
         };
         PortalRequestType: {
             /** Format: uuid */

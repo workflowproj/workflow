@@ -21,10 +21,19 @@ import (
 
 // FormField is one field of a request type's portal form, mapped to an issue field.
 type FormField struct {
-	Field    string `json:"field"`
-	Label    string `json:"label"`
-	Help     string `json:"help,omitempty"`
-	Required bool   `json:"required,omitempty"`
+	Field    string     `json:"field"`
+	Label    string     `json:"label"`
+	Help     string     `json:"help,omitempty"`
+	Required bool       `json:"required,omitempty"`
+	ShowWhen *Condition `json:"showWhen,omitempty"`
+}
+
+// Condition shows a form field only when an earlier choice field's answer is one of Values (any
+// of them for a multiselect; "true" or "false" for a checkbox). Required applies only while the
+// field is shown, and answers to hidden fields are ignored.
+type Condition struct {
+	Field  string   `json:"field"`
+	Values []string `json:"values"`
 }
 
 // ApprovalConfig says who approves a request type's requests and where their decision leads.
@@ -115,6 +124,13 @@ func resolveForm(defs []dbq.FieldDefinition, p dbq.Project, t dbq.IssueType, for
 			return nil, apperr.Invalid(where, "labels are at most 120 characters and help text at most 500")
 		}
 		r := resolvedField{FormField: f}
+		if f.ShowWhen != nil {
+			c, err := resolveCondition(out, f, strict)
+			if err != nil {
+				return nil, apperr.Invalid(where+".showWhen", "%s", err.Error())
+			}
+			r.ShowWhen = c
+		}
 		if typ, ok := systemFields[f.Field]; ok {
 			r.Type = typ
 			if f.Field == "priority" {
@@ -156,6 +172,91 @@ func resolveForm(defs []dbq.FieldDefinition, p dbq.Project, t dbq.IssueType, for
 	return out, nil
 }
 
+// choiceTypes are the field types a condition can test.
+var choiceTypes = []api.FormFieldType{api.FormFieldTypeSelect, api.FormFieldTypeMultiselect, api.FormFieldTypeCheckbox}
+
+// resolveCondition checks a field's condition against the fields before it. Strict (saving a form)
+// rejects a bad condition; otherwise (a stored form whose fields changed since) values that no
+// longer exist are dropped, and so is a condition left with none, so the field is always shown.
+func resolveCondition(before []resolvedField, f FormField, strict bool) (*Condition, error) {
+	c := *f.ShowWhen
+	if f.Field == "summary" {
+		return nil, fmt.Errorf("the summary is always shown")
+	}
+	k := slices.IndexFunc(before, func(r resolvedField) bool { return r.Field == c.Field })
+	if k < 0 {
+		if strict {
+			return nil, fmt.Errorf("%q must be a field earlier in the form", c.Field)
+		}
+		return nil, nil
+	}
+	ctl := before[k]
+	options := ctl.Options
+	if ctl.Type == api.FormFieldTypeCheckbox {
+		options = []string{"true", "false"}
+	}
+	if !slices.Contains(choiceTypes, ctl.Type) {
+		return nil, fmt.Errorf("%s is a %s field; conditions can only test select, multiselect, checkbox and priority fields", ctl.Label, ctl.Type)
+	}
+	var values []string
+	for _, v := range c.Values {
+		if !slices.Contains(options, v) {
+			if strict {
+				return nil, fmt.Errorf("%q is not a choice of %s", v, ctl.Label)
+			}
+			continue
+		}
+		if !slices.Contains(values, v) {
+			values = append(values, v)
+		}
+	}
+	if len(values) == 0 {
+		if strict {
+			return nil, fmt.Errorf("pick at least one value of %s", ctl.Label)
+		}
+		return nil, nil
+	}
+	return &Condition{Field: ctl.Field, Values: values}, nil
+}
+
+// visibleFields reports which of a form's fields are shown for the given answers: a field with a
+// condition is shown when the field it tests is shown and its answer matches.
+func visibleFields(fields []resolvedField, values map[string]any) map[string]bool {
+	shown := map[string]bool{}
+	types := map[string]api.FormFieldType{}
+	for _, f := range fields {
+		types[f.Field] = f.Type
+		c := f.ShowWhen
+		if c == nil {
+			shown[f.Field] = true
+			continue
+		}
+		v := values[c.Field]
+		if types[c.Field] == api.FormFieldTypeCheckbox {
+			checked, _ := v.(bool) // an unticked checkbox is usually left out
+			v = checked
+		}
+		shown[f.Field] = shown[c.Field] && answerMatches(v, c.Values)
+	}
+	return shown
+}
+
+func answerMatches(v any, want []string) bool {
+	switch x := v.(type) {
+	case string:
+		return slices.Contains(want, x)
+	case bool:
+		return slices.Contains(want, fmt.Sprint(x))
+	case []any:
+		for _, e := range x {
+			if s, ok := e.(string); ok && slices.Contains(want, s) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // requestTypeInput is a validated request type.
 type requestTypeInput struct {
 	params   dbq.CreateRequestTypeParams
@@ -188,7 +289,11 @@ func (s *Service) validateRequestType(ctx context.Context, q *dbq.Queries, p dbq
 	}
 	var form []FormField
 	for _, f := range deref(in.Fields) {
-		form = append(form, FormField{Field: f.Field, Label: f.Label, Help: deref(f.Help), Required: f.Required})
+		ff := FormField{Field: f.Field, Label: f.Label, Help: deref(f.Help), Required: f.Required}
+		if f.ShowWhen != nil {
+			ff.ShowWhen = &Condition{Field: f.ShowWhen.Field, Values: f.ShowWhen.Values}
+		}
+		form = append(form, ff)
 	}
 	resolved, err := resolveForm(defs, p, it, form, true)
 	if err != nil {
@@ -420,6 +525,7 @@ func (s *Service) requestTypeView(ctx context.Context, p dbq.Project, rt dbq.Req
 		if f.Options != nil {
 			ff.Options = ptr(f.Options)
 		}
+		ff.ShowWhen = conditionView(f.ShowWhen)
 		v.Fields = append(v.Fields, ff)
 	}
 	if a := decodeApproval(rt.Approval); a != nil {
@@ -452,3 +558,10 @@ func deref[T any](p *T) T {
 }
 
 func ptr[T any](v T) *T { return &v }
+
+func conditionView(c *Condition) *api.FormCondition {
+	if c == nil {
+		return nil
+	}
+	return &api.FormCondition{Field: c.Field, Values: c.Values}
+}
