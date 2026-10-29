@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.0](https://github.com/workflowproj/workflow/compare/v0.2.0...v0.3.0) (2026-10-29)
+
+
+### Features
+
+* **ui:** API docs page with Swagger UI ([#23](https://github.com/workflowproj/workflow/issues/23)) ([fae3a70](https://github.com/workflowproj/workflow/commit/fae3a70c72b7467a69e0c0cd63ebdd96585d288c))
+* **ui:** show the server version in the bottom-right corner ([#22](https://github.com/workflowproj/workflow/issues/22)) ([415b218](https://github.com/workflowproj/workflow/commit/415b218eff735e904bd28bba22f07b7e09291a0b))
+
 ## [0.2.0](https://github.com/workflowproj/workflow/compare/v0.1.1...v0.2.0) (2026-10-29)
 
 

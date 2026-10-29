@@ -99,7 +99,7 @@ kubectl apply --server-side -f \
 
 <!-- x-release-please-start-version -->
 ```sh
-helm install wfm oci://ghcr.io/workflowproj/charts/wfm --version 0.2.0 \
+helm install wfm oci://ghcr.io/workflowproj/charts/wfm --version 0.3.0 \
   --namespace wfm --create-namespace -f values.yaml
 ```
 <!-- x-release-please-end -->
