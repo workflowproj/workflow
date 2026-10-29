@@ -69,6 +69,35 @@ export function AppShell() {
         </main>
       </div>
       <CreateIssueDialog open={creating} onClose={() => setCreating(false)} projectKey={params.projectKey} />
+      <VersionNote />
+    </div>
+  );
+}
+
+const RELEASE = /^\d+\.\d+\.\d+$/;
+
+/** VersionNote shows the server's version in the bottom-right corner; releases link to their notes. */
+export function VersionNote() {
+  const { data: me } = useMe();
+  const version = me?.version;
+  if (!version) return null;
+  const label = RELEASE.test(version) ? `v${version}` : version;
+  return (
+    // Clicks pass through to the page except on the link; toasts (z-60) sit above it.
+    <div className="pointer-events-none fixed right-3 bottom-2 z-10 hidden text-[11px] text-faint select-none md:block">
+      {RELEASE.test(version) ? (
+        <a
+          href={`https://github.com/workflowproj/workflow/releases/tag/v${version}`}
+          target="_blank"
+          rel="noreferrer"
+          className="pointer-events-auto rounded px-1 hover:text-muted hover:underline"
+          title="Release notes"
+        >
+          Workflow {label}
+        </a>
+      ) : (
+        <span>Workflow {label}</span>
+      )}
     </div>
   );
 }

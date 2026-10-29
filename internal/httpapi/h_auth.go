@@ -10,11 +10,12 @@ import (
 	"github.com/workflowproj/workflow/internal/apperr"
 	"github.com/workflowproj/workflow/internal/authz"
 	"github.com/workflowproj/workflow/internal/db/dbq"
+	"github.com/workflowproj/workflow/internal/telemetry"
 	"github.com/workflowproj/workflow/internal/tracker"
 )
 
 func meView(u dbq.User, orgRole string) api.Me {
-	return api.Me{Id: u.ID, DisplayName: u.DisplayName, Email: u.Email, AvatarUrl: u.AvatarUrl, Kind: api.UserKind(u.Kind), OrgRole: api.OrgRole(orgRole), Source: api.UserSource(u.Source)}
+	return api.Me{Id: u.ID, DisplayName: u.DisplayName, Email: u.Email, AvatarUrl: u.AvatarUrl, Kind: api.UserKind(u.Kind), OrgRole: api.OrgRole(orgRole), Source: api.UserSource(u.Source), Version: ptr(telemetry.Version)}
 }
 
 func (s *Server) ListAuthProviders(ctx context.Context, _ api.ListAuthProvidersRequestObject) (api.ListAuthProvidersResponseObject, error) {

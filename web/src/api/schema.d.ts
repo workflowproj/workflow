@@ -3154,6 +3154,8 @@ export interface components {
             orgRole: components["schemas"]["OrgRole"];
             /** @description Where the account is managed; scim and google profiles are read-only here */
             source: components["schemas"]["UserSource"];
+            /** @description The server's version (a release such as 0.2.0, or a development build), shown to signed-in people only */
+            version?: string;
         };
         AdminUser: components["schemas"]["User"] & {
             username: string;

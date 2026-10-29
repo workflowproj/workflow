@@ -3878,6 +3878,7 @@ components:
           properties:
             orgRole: { $ref: '#/components/schemas/OrgRole' }
             source: { $ref: '#/components/schemas/UserSource', description: 'Where the account is managed; scim and google profiles are read-only here' }
+            version: { type: string, description: 'The server''s version (a release such as 0.2.0, or a development build), shown to signed-in people only' }
     AdminUser:
       allOf:
         - $ref: '#/components/schemas/User'

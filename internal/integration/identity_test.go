@@ -92,6 +92,10 @@ func TestSCIMProvisioning(t *testing.T) {
 	janeC := e.login("jane@example.com", "Ignored")
 	eq(t, str(janeC.Me, "displayName"), "Jane Doe", "profile from SCIM")
 	eq(t, str(janeC.Me, "source"), "scim", "source on /me")
+	eq(t, str(janeC.Me, "version"), "dev", "server version on /me (signed-in only)")
+	if body := string(e.anon().must("GET", "/api/v1/auth/providers", nil, 200, nil).Body); strings.Contains(body, "version") {
+		t.Fatalf("version exposed before sign-in: %s", body)
+	}
 	var pat obj
 	janeC.must("POST", "/api/v1/me/tokens", obj{"name": "cli", "scopes": []string{"read"}, "expiresInDays": 30}, 201, &pat)
 	janeTok := e.withToken(str(pat, "token"))
