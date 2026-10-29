@@ -299,6 +299,7 @@ function WebhookFields({ a, label, onChange }: { a: Action; label: string; onCha
         value={a.secret}
         onChange={(secret) => onChange({ ...a, secret })}
       />
+      <p className="-mb-1 text-xs font-medium">Auth header</p>
       <div className="grid gap-2 sm:grid-cols-[12rem_1fr]">
         <Input
           aria-label={`${label}: auth header`}
