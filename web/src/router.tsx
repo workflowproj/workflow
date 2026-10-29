@@ -247,6 +247,7 @@ const dashboardRoute = createRoute({
 const browseRoute = createRoute({ getParentRoute: () => appRoute, path: "/browse/$issueKey", component: IssuePage });
 const notificationsRoute = createRoute({ getParentRoute: () => appRoute, path: "/notifications", component: lazyRouteComponent(() => import("@/pages/me/NotificationsPage"), "NotificationsPage") });
 const profileRoute = createRoute({ getParentRoute: () => appRoute, path: "/profile", component: lazyRouteComponent(() => import("@/pages/me/ProfilePage"), "ProfilePage") });
+const apiDocsRoute = createRoute({ getParentRoute: () => appRoute, path: "/api-docs", component: lazyRouteComponent(() => import("@/pages/me/ApiDocsPage"), "ApiDocsPage") });
 
 const adminRoute = createRoute({ getParentRoute: () => appRoute, path: "/admin", component: AdminLayout });
 const adminIndexRoute = createRoute({
@@ -320,6 +321,7 @@ export const routeTree = rootRoute.addChildren([
     browseRoute,
     notificationsRoute,
     profileRoute,
+    apiDocsRoute,
     adminRoute.addChildren([
       adminIndexRoute,
       adminUsersRoute,
