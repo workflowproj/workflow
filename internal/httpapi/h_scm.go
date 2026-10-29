@@ -267,7 +267,7 @@ func ruleInput(b api.AutomationRuleInput) automation.RuleInput {
 	}
 	raw, _ := json.Marshal(b.Trigger)
 	_ = json.Unmarshal(raw, &in.Trigger)
-	raw, _ = json.Marshal(b.Actions)
+	raw, _ = json.Marshal(b.Actions) // #nosec G117 -- converts the request body to automation.Action in memory; CreateRule/UpdateRule seal the secrets before storing
 	_ = json.Unmarshal(raw, &in.Actions)
 	return in
 }

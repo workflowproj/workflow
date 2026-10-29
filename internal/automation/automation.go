@@ -234,7 +234,7 @@ func (s *Service) CreateRule(ctx context.Context, actor *authz.Actor, projectRef
 		return dbq.AutomationRule{}, err
 	}
 	tc, _ := json.Marshal(in.Trigger)
-	acts, _ := json.Marshal(s.sealSecrets(in.Actions, nil))
+	acts, _ := json.Marshal(s.sealSecrets(in.Actions, nil)) // #nosec G117 -- sealSecrets clears Secret and AuthValue; only ciphertext is stored
 	r, err := s.Q.CreateAutomationRule(ctx, dbq.CreateAutomationRuleParams{
 		ProjectID: p.ID, Name: strings.TrimSpace(in.Name), Description: in.Description, Enabled: in.Enabled, TriggerType: in.Trigger.Type,
 		TriggerConfig: tc, Condition: in.Condition, Actions: acts, CreatedBy: actor.UserID(), NextRunAt: next,
@@ -269,7 +269,7 @@ func (s *Service) UpdateRule(ctx context.Context, actor *authz.Actor, id uuid.UU
 	var prev []Action
 	_ = json.Unmarshal(old.Actions, &prev)
 	tc, _ := json.Marshal(in.Trigger)
-	acts, _ := json.Marshal(s.sealSecrets(in.Actions, prev))
+	acts, _ := json.Marshal(s.sealSecrets(in.Actions, prev)) // #nosec G117 -- sealSecrets clears Secret and AuthValue; only ciphertext is stored
 	r, err := s.Q.UpdateAutomationRule(ctx, dbq.UpdateAutomationRuleParams{
 		ID: id, Name: strings.TrimSpace(in.Name), Description: in.Description, Enabled: in.Enabled, TriggerType: in.Trigger.Type,
 		TriggerConfig: tc, Condition: in.Condition, Actions: acts, NextRunAt: next,
