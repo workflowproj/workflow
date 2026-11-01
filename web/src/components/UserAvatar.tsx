@@ -13,21 +13,25 @@ function colorFor(name: string) {
   return palette[Math.abs(h) % palette.length];
 }
 
-/** UserAvatar shows a user's picture or initials; `undefined` renders the "unassigned" glyph. */
-export function UserAvatar({ user, size = 24, className }: { user?: U | null; size?: number; className?: string }) {
+/**
+ * UserAvatar shows a user's picture or initials; `undefined` renders the "unassigned" glyph.
+ * Pass `decorative` when the person's name is shown next to it, so the initials aren't read out too.
+ */
+export function UserAvatar({ user, size = 24, className, decorative }: { user?: U | null; size?: number; className?: string; decorative?: boolean }) {
   const style = { width: size, height: size, fontSize: Math.max(9, Math.round(size * 0.4)) };
+  const hidden = decorative || undefined;
   if (!user) {
     return (
-      <span title="Unassigned" style={style} className={cn("inline-flex shrink-0 items-center justify-center rounded-full border border-dashed border-line-strong text-faint", className)}>
+      <span title="Unassigned" aria-hidden={hidden} style={style} className={cn("inline-flex shrink-0 items-center justify-center rounded-full border border-dashed border-line-strong text-faint", className)}>
         <UserRound className="size-[60%]" />
       </span>
     );
   }
   if (user.avatarUrl) {
-    return <img src={user.avatarUrl} alt="" title={user.displayName} referrerPolicy="no-referrer" style={style} className={cn("shrink-0 rounded-full object-cover", className)} />;
+    return <img src={user.avatarUrl} alt="" title={user.displayName} aria-hidden={hidden} referrerPolicy="no-referrer" style={style} className={cn("shrink-0 rounded-full object-cover", className)} />;
   }
   return (
-    <span title={user.displayName} style={{ ...style, background: colorFor(user.displayName) }} className={cn("inline-flex shrink-0 items-center justify-center rounded-full font-semibold text-white", className)}>
+    <span title={user.displayName} aria-hidden={hidden} style={{ ...style, background: colorFor(user.displayName) }} className={cn("inline-flex shrink-0 items-center justify-center rounded-full font-semibold text-white", className)}>
       {user.kind === "service" || user.kind === "automation" ? <Bot className="size-[60%]" /> : initials(user.displayName)}
     </span>
   );

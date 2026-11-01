@@ -34,6 +34,7 @@ export function IssueRow({ issue, lifted, actions, reserve }: { issue: Issue; li
 /**
  * SortableIssueRow drags with the pointer or Space (arrows move, Space drops); click or Enter
  * opens. The actions sit beside the row's button, not inside it, so no control is nested in another.
+ * What the row shows (the key, summary and fields) is its accessible name.
  */
 export function SortableIssueRow({ issue, onOpen, disabled, actions }: { issue: Issue; onOpen: (key: string) => void; disabled?: boolean; actions?: ReactNode }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: issue.id, disabled });
@@ -57,7 +58,6 @@ export function SortableIssueRow({ issue, onOpen, disabled, actions }: { issue: 
         {...listeners}
         onKeyDown={onKeyDown}
         onClick={() => onOpen(issue.key)}
-        aria-label={`${issue.key} ${issue.summary}`}
         data-issue-key={issue.key}
         className={cn("cursor-pointer outline-none focus-visible:relative focus-visible:z-[1] focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset", !disabled && "touch-none")}
       >

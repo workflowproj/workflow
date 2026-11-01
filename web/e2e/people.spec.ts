@@ -39,7 +39,8 @@ test("people filter: board and backlog show only the picked assignees", async ({
   await page.goto(`/projects/${key}/board`);
   const people = page.getByRole("group", { name: "Filter by assignee" });
   await expect(people.getByRole("button")).toHaveCount(3);
-  await expect(people.getByRole("button").first()).toHaveAccessibleName("Ada People: 2 issues");
+  // Named by who and how many, then the initials the avatar shows.
+  await expect(people.getByRole("button").first()).toHaveAccessibleName("Ada People: 2 issues, AP");
 
   await people.getByRole("button", { name: "Ada People: 2 issues" }).click();
   await expect(people.getByRole("button", { name: "Ada People: 2 issues" })).toHaveAttribute("aria-pressed", "true");

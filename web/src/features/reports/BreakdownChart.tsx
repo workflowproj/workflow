@@ -29,6 +29,15 @@ type Shown = BreakdownRow & { other?: boolean; count?: number };
 
 const pct = (v: number, total: number) => (total > 0 ? Math.round((v / total) * 100) : 0);
 
+/**
+ * RowText is how a row reads out ("To Do: 2 issues (40%)"). It is the row's text, not an
+ * aria-label, so the name of a row that links holds what the row shows (WCAG 2.5.3); the figures
+ * shown are hidden from assistive technology instead, so they aren't read twice.
+ */
+function RowText({ name, value, unit, share }: { name: string; value: string; unit: string; share: number }) {
+  return <span className="sr-only">{`${name}: ${value} ${unit} (${share}%)`}</span>;
+}
+
 function RowLink({ jql, children, className, ...rest }: { jql?: string; children: ReactNode; className?: string } & React.HTMLAttributes<HTMLElement>) {
   if (!jql) return <div className={className} {...rest}>{children}</div>;
   return (
@@ -53,12 +62,9 @@ export function BreakdownBars({ rows, total, unit, format, byCategory, people, j
           const name = r.key === "" ? r.label : r.label || "–";
           return (
             <li key={r.key}>
-              <RowLink
-                jql={r.other ? undefined : jqlFor?.(r)}
-                aria-label={`${name}: ${format(r.value)} ${unit} (${pct(r.value, total)}%)`}
-                className="grid grid-cols-[minmax(5.5rem,38%)_1fr_auto] items-center gap-3 rounded-md px-1.5 py-1.5 text-[13px]"
-              >
-                <span className={cn("flex min-w-0 items-center gap-2", (r.key === "" || r.other) && "text-muted")}>
+              <RowLink jql={r.other ? undefined : jqlFor?.(r)} className="grid grid-cols-[minmax(5.5rem,38%)_1fr_auto] items-center gap-3 rounded-md px-1.5 py-1.5 text-[13px]">
+                <RowText name={name} value={format(r.value)} unit={unit} share={pct(r.value, total)} />
+                <span aria-hidden className={cn("flex min-w-0 items-center gap-2", (r.key === "" || r.other) && "text-muted")}>
                   {people && !r.other && <UserAvatar user={r.user ?? null} size={20} />}
                   <span className="truncate" title={name}>
                     {name}
@@ -67,7 +73,7 @@ export function BreakdownBars({ rows, total, unit, format, byCategory, people, j
                 <span className="h-2" aria-hidden>
                   <span className="block h-full rounded-r-[4px]" style={{ width: r.value > 0 ? `max(2px, ${(r.value / max) * 100}%)` : 0, background: color }} />
                 </span>
-                <span className="text-right tabular-nums">
+                <span aria-hidden className="text-right tabular-nums">
                   <span className="font-semibold">{format(r.value)}</span>
                   <span className="ml-1.5 inline-block w-9 text-xs text-muted">{pct(r.value, total)}%</span>
                 </span>
@@ -134,18 +140,24 @@ export function BreakdownDonut({ rows, total, unit, format, byCategory, people, 
             <li key={r.key}>
               <RowLink
                 jql={r.other ? undefined : jqlFor?.(r)}
-                aria-label={`${r.label}: ${format(r.value)} ${unit} (${pct(r.value, total)}%)`}
                 onPointerEnter={() => setActive(r.key)}
                 onPointerLeave={() => setActive(null)}
                 onFocus={() => setActive(r.key)}
                 onBlur={() => setActive(null)}
                 className="flex items-center gap-2 rounded-md px-1.5 py-1 text-[13px]"
               >
+                <RowText name={r.label} value={format(r.value)} unit={unit} share={pct(r.value, total)} />
                 <span aria-hidden className="size-2.5 shrink-0 rounded-[3px]" style={{ background: r.color }} />
-                {people && !r.other && <UserAvatar user={r.user ?? null} size={18} />}
-                <span className={cn("min-w-0 flex-1 truncate", (r.key === "" || r.other) && "text-muted")}>{r.label}</span>
-                <span className="font-semibold tabular-nums">{format(r.value)}</span>
-                <span className="w-9 text-right text-xs text-muted tabular-nums">{pct(r.value, total)}%</span>
+                {people && !r.other && <UserAvatar user={r.user ?? null} size={18} decorative />}
+                <span aria-hidden className={cn("min-w-0 flex-1 truncate", (r.key === "" || r.other) && "text-muted")}>
+                  {r.label}
+                </span>
+                <span aria-hidden className="font-semibold tabular-nums">
+                  {format(r.value)}
+                </span>
+                <span aria-hidden className="w-9 text-right text-xs text-muted tabular-nums">
+                  {pct(r.value, total)}%
+                </span>
               </RowLink>
             </li>
           ))}

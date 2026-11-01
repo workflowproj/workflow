@@ -50,7 +50,6 @@ export function TemplateGallery({
                   <button
                     type="button"
                     onClick={() => onPick(t)}
-                    aria-label={`Use template: ${t.title}`}
                     title={sentence(describeRule(t.rule))}
                     className={cn(
                       "flex h-full w-full flex-col gap-2 rounded-lg border bg-surface p-3.5 text-left transition-colors hover:border-accent hover:shadow-sm",
@@ -61,7 +60,11 @@ export function TemplateGallery({
                       <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-accent-soft text-accent">
                         <Icon className="size-4" />
                       </span>
-                      <span className="text-sm leading-snug font-medium">{t.title}</span>
+                      <span className="text-sm leading-snug font-medium">
+                        {/* The card is named by its text, so its name holds all it shows (WCAG 2.5.3): "Use template: <title> <description>…". */}
+                        <span className="sr-only">Use template: </span>
+                        {t.title}
+                      </span>
                     </span>
                     <span className="text-[13px] text-muted">{t.description}</span>
                     <span className="mt-auto flex flex-wrap gap-1.5 pt-1">

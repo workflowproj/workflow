@@ -9,7 +9,7 @@ import { formatDateTime, relativeTime } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { releasesQuery, sprintsQuery } from "./issue-api";
 import { IssueKeyLink, useIssue } from "./issue-context";
-import { ghost, InlineDate, InlineLabels, InlineMulti, InlineSelect, InlineText, InlineUser, MenuKeys, None } from "./inline-edit";
+import { FieldName, ghost, InlineDate, InlineLabels, InlineMulti, InlineSelect, InlineText, InlineUser, MenuKeys, None } from "./inline-edit";
 import { CustomFieldInline, fieldsFor, priorityOptions } from "./field-values";
 import { IssuePicker } from "./IssuePicker";
 import { RESERVED_FIELDS } from "@/features/risks/model";
@@ -199,7 +199,8 @@ function ParentRow() {
         <Popover
           align="end"
           trigger={({ toggle, open }) => (
-            <button type="button" className={ghost} disabled={!editable} onClick={toggle} aria-label="Parent epic" aria-haspopup="dialog" aria-expanded={open}>
+            <button type="button" className={ghost} disabled={!editable} onClick={toggle} aria-haspopup="dialog" aria-expanded={open}>
+              <FieldName label="Parent epic" />
               {parent ? (
                 <>
                   <IssueTypeIcon type={parent.type} />

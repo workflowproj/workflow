@@ -25,7 +25,6 @@ export function PeopleFilter({ people, selected, onChange, meId, max = 7 }: { pe
             key={p.id}
             type="button"
             aria-pressed={on}
-            aria-label={label(p)}
             title={label(p)}
             onClick={() => toggle(p.id)}
             className={cn(
@@ -33,6 +32,8 @@ export function PeopleFilter({ people, selected, onChange, meId, max = 7 }: { pe
               on ? "z-10 ring-accent" : "ring-surface",
             )}
           >
+            {/* Named "Ada People: 2 issues, AP", with the initials shown (WCAG 2.5.3). */}
+            <span className="sr-only">{label(p)}, </span>
             <UserAvatar user={p.user} size={28} className="pointer-events-none" />
           </button>
         );
