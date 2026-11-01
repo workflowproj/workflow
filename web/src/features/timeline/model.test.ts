@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { Issue } from "@/api/types";
-import { buildRows, dependencies, epicProgress, fromDay, isOverdue, schedules, stats, toDay, todayDay, weekday, withDates, type TimelineData } from "./model";
+import { buildProgrammeRows, buildRows, dependencies, epicProgress, externalWarnings, rollupProgress, fromDay, isOverdue, schedules, stats, toDay, todayDay, weekday, withDates, type TimelineData } from "./model";
 
-const type = (level: number) => ({ id: `t${level}`, key: level === 1 ? "epic" : "story", name: level === 1 ? "Epic" : "Story", icon: "story", color: "#000", level, kind: "work" as const });
+const typeNames = ["Story", "Epic", "Initiative"];
+const type = (level: number) => ({ id: `t${level}`, key: typeNames[level]?.toLowerCase() ?? "story", name: typeNames[level] ?? "Story", icon: "story", color: "#000", level, kind: "work" as const });
 const status = (category: "todo" | "in_progress" | "done" = "todo") => ({ id: `s-${category}`, name: category, category });
 const ref = (i: Issue) => ({ id: i.id, key: i.key, summary: i.summary, type: i.type, status: i.status });
 
@@ -128,5 +129,77 @@ describe("helpers", () => {
   it("replaces dates optimistically", () => {
     const out = withDates({ issues: [issue("P-1", { dueDate: "2026-01-01" })] }, "P-1", "2026-02-01", null, 7);
     expect(out.issues[0]).toMatchObject({ startDate: "2026-02-01", dueDate: undefined, version: 7 });
+  });
+});
+
+describe("programmes", () => {
+  const init = issue("PROG-1", { type: type(2) });
+  const appEpic = issue("APP-1", { type: type(1), parent: ref(init) });
+  const apiEpic = issue("API-1", { type: type(1), parent: ref(init), startDate: "2026-12-01", dueDate: "2026-12-20" });
+  const lone = issue("APP-3", { type: type(1) });
+  const data = {
+    projects: [
+      { id: "prog", key: "PROG", name: "Programme" },
+      { id: "app", key: "APP", name: "App" },
+      { id: "api", key: "API", name: "Api" },
+    ],
+    sprints: [],
+    issues: [
+      init,
+      appEpic,
+      issue("APP-2", { parent: ref(appEpic), startDate: "2026-11-02", dueDate: "2026-11-13" }),
+      apiEpic,
+      lone,
+      issue("APP-4", { parent: ref(lone) }),
+      issue("APP-5"),
+      issue("PROG-2"),
+    ],
+  };
+
+  it("rolls dates up from issues to epics to the initiative", () => {
+    const s = schedules(data);
+    expect(s.get("APP-1")).toMatchObject({ start: toDay("2026-11-02"), end: toDay("2026-11-13"), source: "children" });
+    // The initiative spans its epics: one derived from its story, one with its own dates.
+    expect(s.get("PROG-1")).toMatchObject({ start: toDay("2026-11-02"), end: toDay("2026-12-20"), source: "children" });
+  });
+
+  it("nests initiative, team epics and their issues, then the rest by project", () => {
+    const rows = buildProgrammeRows(data, { collapsed: new Set() });
+    expect(rows.map((r) => (r.kind === "issue" ? `${r.depth}:${r.id}` : r.kind === "project" ? `project:${r.project.key}` : `group:${r.label}`))).toEqual([
+      "0:PROG-1",
+      "1:APP-1",
+      "2:APP-2",
+      "1:API-1",
+      "project:PROG",
+      "group:No epic",
+      "2:PROG-2",
+      "project:APP",
+      "1:APP-3",
+      "2:APP-4",
+      "group:No epic",
+      "2:APP-5",
+    ]);
+    expect(rows[0]).toMatchObject({ childCount: 2 });
+    // Collapsing the initiative hides everything under it.
+    const collapsed = buildProgrammeRows(data, { collapsed: new Set(["PROG-1"]) });
+    expect(collapsed.filter((r) => r.kind === "issue" && r.depth > 0 && ["APP-1", "API-1", "APP-2"].includes(r.id))).toEqual([]);
+  });
+
+  it("fills an initiative with the work under its epics", () => {
+    const fill = rollupProgress(data.issues, new Map([["PROG-1", { done: 0, total: 2 }], ["APP-1", { done: 1, total: 4 }], ["API-1", { done: 2, total: 3 }]]));
+    expect(fill.get("PROG-1")).toEqual({ done: 3, total: 7 });
+    expect(fill.get("APP-1")).toEqual({ done: 1, total: 4 });
+  });
+
+  it("explains dependencies on issues outside the timeline, naming only visible ones", () => {
+    const w = externalWarnings({
+      externalLinks: [
+        { issueKey: "APP-2", direction: "blockedBy", open: true, other: issue("OPS-9", { summary: "PCI scan" }) },
+        { issueKey: "APP-2", direction: "blocks", open: true },
+        { issueKey: "API-1", direction: "blockedBy", open: false },
+      ],
+    });
+    expect(w.get("APP-2")).toEqual(["Blocked by OPS-9 (PCI scan), which isn't on this timeline.", "Blocks an unfinished issue in a project you can't browse."]);
+    expect(w.has("API-1")).toBe(false);
   });
 });

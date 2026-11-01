@@ -1,9 +1,10 @@
-import { ArrowDown, ArrowUp, Bookmark, Bug, ChevronsDown, ChevronsUp, CircleCheck, Equal, Layers, Scale, ShieldAlert, SquareCheck, Zap } from "lucide-react";
+import { ArrowDown, ArrowUp, Bookmark, Bug, ChevronsDown, ChevronsUp, CircleCheck, Equal, Flag, Layers, Scale, ShieldAlert, SquareCheck, Zap } from "lucide-react";
 import type { Priority, StatusCategory } from "@/api/types";
 import { cn } from "@/lib/cn";
 
 const typeIcons: Record<string, typeof Bug> = {
   epic: Zap,
+  initiative: Flag,
   story: Bookmark,
   task: SquareCheck,
   bug: Bug,

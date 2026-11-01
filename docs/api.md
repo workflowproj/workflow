@@ -79,8 +79,18 @@ curl -G $WFM/api/v1/search -H "Authorization: Bearer $T" \
 `GET /api/v1/timeline?projects=PLAT,OPS&jql=…&doneDays=90` returns what the timeline draws:
 epics and standard issues (not sub-tasks) with their dates and parents, the `blocks` dependencies
 between them (`sourceKey` blocks `targetKey`), and each project's sprints and releases. Omit
-`projects` for every project you can browse. Change dates with `PATCH /issues/{key}`
-(`startDate`, `dueDate`) and add dependencies with `POST /issues/{key}/links` (`type: blocks`).
+`projects` for every project you can browse, or pass `programme=CHK` instead for a programme's
+initiatives and the team projects you can browse. `externalLinks` lists `blocks` links to issues
+the timeline doesn't show, naming the other issue only when you can browse it. Change dates with
+`PATCH /issues/{key}` (`startDate`, `dueDate`) and add dependencies with
+`POST /issues/{key}/links` (`type: blocks`).
+
+## Programmes
+
+A programme's roadmap (`GET /projects/{key}/programme`), its team projects
+(`GET`/`POST /projects/{key}/programme/teams`, `DELETE …/teams/{teamKey}`) and the programmes a
+project belongs to (`GET /projects/{key}/programmes`). An epic joins an initiative with
+`PATCH /issues/{epicKey}` and `parentKey`. See [programmes.md](programmes.md).
 
 ## Risks and decisions
 

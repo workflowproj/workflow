@@ -1,6 +1,6 @@
 import { type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { X } from "lucide-react";
+import { EyeOff, X } from "lucide-react";
 import { fieldsQuery, useMe } from "@/api/queries";
 import type { IssueDetail, Priority, User } from "@/api/types";
 import { Popover } from "@/components/ui";
@@ -13,6 +13,7 @@ import { ghost, InlineDate, InlineLabels, InlineMulti, InlineSelect, InlineText,
 import { CustomFieldInline, fieldsFor, priorityOptions } from "./field-values";
 import { IssuePicker } from "./IssuePicker";
 import { RESERVED_FIELDS } from "@/features/risks/model";
+import { projectProgrammesQuery } from "@/features/programme/queries";
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -84,6 +85,7 @@ export function DetailsPanel() {
           />
         </Row>
         {level === 0 && planned && <ParentRow />}
+        {level === 1 && planned && <InitiativeRow />}
         {level < 0 && issue.parent && (
           <Row label="Parent">
             <div className="flex min-h-8 items-center gap-2 text-sm">
@@ -186,6 +188,83 @@ export function DetailsPanel() {
 function isOverdue(issue: IssueDetail) {
   if (!issue.dueDate || issue.status.category === "done") return false;
   return issue.dueDate < new Date().toISOString().slice(0, 10);
+}
+
+/**
+ * InitiativeRow picks the initiative an epic works toward: one in a programme the epic's project
+ * is a team of. It shows only when the project is in a programme or the epic already has an
+ * initiative (perhaps one the viewer can't see, which they can't change).
+ */
+function InitiativeRow() {
+  const { issue, update } = useIssue();
+  const { data: programmes = [] } = useQuery(projectProgrammesQuery(issue.projectKey));
+  const parent = issue.parent;
+  if (issue.parentHidden) {
+    return (
+      <Row label="Initiative">
+        <p className="flex min-h-8 items-center gap-1.5 text-sm text-muted" title="It belongs to a programme you can't browse, so only its members can change it.">
+          <EyeOff className="size-3.5 shrink-0" aria-hidden /> An initiative you can't see
+        </p>
+      </Row>
+    );
+  }
+  if (!parent && programmes.length === 0) return null;
+  const editable = issue.permissions.edit;
+  const scope = programmes.length ? `project in (${programmes.map((p) => p.key).join(", ")}) AND level = 2` : undefined;
+  return (
+    <Row label="Initiative">
+      <div className="min-w-0 [&>div]:w-full">
+        <Popover
+          align="end"
+          trigger={({ toggle, open }) => (
+            <button type="button" className={ghost} disabled={!editable || !scope} onClick={toggle} aria-label="Initiative" aria-haspopup="dialog" aria-expanded={open}>
+              {parent ? (
+                <>
+                  <IssueTypeIcon type={parent.type} />
+                  <span className="truncate">
+                    <span className="text-muted">{parent.key}</span> {parent.summary}
+                  </span>
+                </>
+              ) : (
+                <None />
+              )}
+            </button>
+          )}
+          content={(close) => (
+            <MenuKeys close={close} className="w-80">
+              {scope && (
+                <IssuePicker
+                  autoFocus
+                  inline
+                  scope={scope}
+                  exclude={parent ? [parent.key] : []}
+                  placeholder="Search initiatives…"
+                  onCancel={close}
+                  onPick={(init) => {
+                    close();
+                    update({ parentKey: init.key }, { parent: { id: init.id, key: init.key, summary: init.summary, type: init.type, status: init.status } });
+                  }}
+                />
+              )}
+              {parent && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    close();
+                    update({ parentKey: null }, { parent: undefined });
+                  }}
+                  className="mt-1 flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-sm text-muted hover:bg-surface-2 hover:text-ink"
+                >
+                  <X className="size-3.5" /> Remove from {parent.key}
+                </button>
+              )}
+            </MenuKeys>
+          )}
+        />
+      </div>
+    </Row>
+  );
 }
 
 /** ParentRow picks the epic a standard issue belongs to. */

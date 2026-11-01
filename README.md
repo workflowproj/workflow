@@ -125,6 +125,7 @@ The reference pages live in [`docs/`](docs/) and are published at
 | [Sign-in and provisioning](docs/identity.md) | OpenID Connect, SCIM, Google and Keycloak directory sync, local accounts, roles and tokens |
 | [Workflows as code](docs/workflows.md) | The YAML format, CEL reference, versioning and migration |
 | [Releases](docs/releases.md) | Release pages, readiness, release notes and What's new, tags and deployments |
+| [Programmes](docs/programmes.md) | Initiatives across team projects: the roadmap, forecasts, cross-team dependencies |
 | [Search](docs/search.md) | The query language |
 | [Risks and decisions](docs/risks-decisions.md) | The risk register, the decision log, scoring and their links |
 | [Metrics and dashboards](docs/metrics.md) | Issue timing, sprint reports, flow metrics, dashboards |

@@ -14,6 +14,9 @@ import { Segmented, StatTile, TruncatedNote } from "@/features/reports/ChartBits
 import { formatDuration } from "@/features/reports/chart-utils";
 import { CycleTimeChart } from "@/features/reports/CycleTimeChart";
 import { VelocityChart } from "@/features/reports/VelocityChart";
+import { ProgrammeReports } from "@/features/programme/ProgrammeReports";
+import { useProject } from "@/api/queries";
+import { isProgramme } from "@/lib/project";
 
 const route = getRouteApi("/app/projects/$projectKey/reports");
 
@@ -23,6 +26,13 @@ const reportQuery = (sprintId: string) => ({
 
 export function ReportsPage() {
   const { projectKey } = route.useParams();
+  const { data: project } = useProject(projectKey);
+  if (!project) return <PageSpinner label="Loading reports" />;
+  // A programme reports flow across its teams; their sprints and velocity stay with each team.
+  return isProgramme(project) ? <ProgrammeReports programmeKey={projectKey} /> : <ProjectReports projectKey={projectKey} />;
+}
+
+function ProjectReports({ projectKey }: { projectKey: string }) {
   const { data: sprints, isLoading, error } = useQuery(sprintsQuery(projectKey));
   const started = (sprints ?? []).filter((s) => s.state !== "future");
   return (

@@ -55,6 +55,15 @@ test("accessibility: main pages in light and dark mode", async ({ page, browser 
       { id: "l", type: "issue_list", width: 2, config: { projectKeys: [key] } },
     ],
   });
+  // A programme with the project as a team: an initiative with the project's epic under it, and a
+  // cross-team dependency from the programme's action to the story.
+  const prog = projectKey("AXPG");
+  await a.post("/projects", { key: prog, name: `Programme ${prog}`, template: "programme" });
+  await a.post(`/projects/${prog}/programme/teams`, { projectKey: key });
+  const initiative = await a.post("/issues", { projectKey: prog, typeKey: "initiative", summary: "Self-serve checkout", dueDate: yesterday });
+  await a.patch(`/issues/${epic.key}`, { parentKey: initiative.key });
+  const action = await a.post("/issues", { projectKey: prog, typeKey: "action", summary: "Agree the card provider" });
+  await a.post(`/issues/${action.key}/links`, { type: "blocks", targetKey: story.key });
   // A service desk with a request (a reply to the customer and an internal note) and one waiting for the admin's approval.
   const sd = projectKey("AXSD");
   await a.post("/projects", { key: sd, name: `Help ${sd}`, template: "service" });
@@ -107,6 +116,13 @@ test("accessibility: main pages in light and dark mode", async ({ page, browser 
     ["dashboards", "/dashboards"],
     ["dashboard", `/dashboards/${dashboard.id}`],
     ["big picture", "/timeline"],
+    ["programme roadmap", `/projects/${prog}/roadmap?done=true`],
+    ["programme timeline", `/projects/${prog}/timeline`],
+    ["programme dependencies", `/projects/${prog}/dependencies`],
+    ["programme reports", `/projects/${prog}/reports`],
+    ["programme teams settings", `/projects/${prog}/settings/teams`],
+    ["initiative", `/browse/${initiative.key}`],
+    ["epic with an initiative", `/browse/${epic.key}`],
     ["profile", "/profile"],
     ["timesheet", "/timesheet"],
     ["admin users", "/admin/users"],

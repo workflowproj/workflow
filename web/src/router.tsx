@@ -198,6 +198,19 @@ const decisionsRoute = createRoute({
   component: lazyRouteComponent(() => import("@/pages/project/DecisionsPage"), "DecisionsPage"),
 });
 const reportsRoute = createRoute({ getParentRoute: () => projectRoute, path: "/reports", component: lazyRouteComponent(() => import("@/pages/project/ReportsPage"), "ReportsPage") });
+// Programmes: the roadmap of initiatives across the team projects, and the dependencies between teams.
+const roadmapRoute = createRoute({
+  getParentRoute: () => projectRoute,
+  path: "/roadmap",
+  validateSearch: (s: Record<string, unknown>): { issue?: string; done?: boolean } => ({ issue: str(s.issue), done: s.done === true || s.done === "true" ? true : undefined }),
+  component: lazyRouteComponent(() => import("@/pages/project/ProgrammeRoadmapPage"), "ProgrammeRoadmapPage"),
+});
+const dependenciesRoute = createRoute({
+  getParentRoute: () => projectRoute,
+  path: "/dependencies",
+  validateSearch: issueSearch,
+  component: lazyRouteComponent(() => import("@/pages/project/ProgrammeDependenciesPage"), "ProgrammeDependenciesPage"),
+});
 
 const customersRoute = createRoute({ getParentRoute: () => projectRoute, path: "/customers", component: lazyRouteComponent(() => import("@/pages/project/CustomersPage"), "CustomersPage") });
 const settingsRoute = createRoute({ getParentRoute: () => projectRoute, path: "/settings", component: SettingsLayout });
@@ -215,6 +228,7 @@ const releaseSettingsRoute = createRoute({ getParentRoute: () => settingsRoute, 
 const portalSettingsRoute = createRoute({ getParentRoute: () => settingsRoute, path: "/portal", component: lazyRouteComponent(() => import("@/pages/settings/ServiceDeskSettings"), "PortalSettings") });
 const requestTypesRoute = createRoute({ getParentRoute: () => settingsRoute, path: "/request-types", component: lazyRouteComponent(() => import("@/pages/settings/RequestTypesSettings"), "RequestTypesSettings") });
 const queuesSettingsRoute = createRoute({ getParentRoute: () => settingsRoute, path: "/queues", component: lazyRouteComponent(() => import("@/pages/settings/ServiceDeskSettings"), "QueuesSettings") });
+const teamsSettingsRoute = createRoute({ getParentRoute: () => settingsRoute, path: "/teams", component: lazyRouteComponent(() => import("@/pages/settings/ProgrammeTeamsSettings"), "ProgrammeTeamsSettings") });
 const slaSettingsRoute = createRoute({ getParentRoute: () => settingsRoute, path: "/slas", component: lazyRouteComponent(() => import("@/pages/settings/SlaSettings"), "SlaSettings") });
 
 const searchRoute = createRoute({
@@ -295,6 +309,8 @@ export const routeTree = rootRoute.addChildren([
       risksRoute,
       decisionsRoute,
       reportsRoute,
+      roadmapRoute,
+      dependenciesRoute,
       settingsRoute.addChildren([
         settingsIndexRoute,
         membersRoute,
@@ -311,6 +327,7 @@ export const routeTree = rootRoute.addChildren([
         requestTypesRoute,
         queuesSettingsRoute,
         slaSettingsRoute,
+        teamsSettingsRoute,
       ]),
     ]),
     searchRoute,

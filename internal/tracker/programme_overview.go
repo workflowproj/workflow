@@ -3,6 +3,7 @@ package tracker
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -77,6 +78,13 @@ func (s *Service) ProgrammeOverview(ctx context.Context, actor *authz.Actor, ref
 		}
 		out.Truncated = out.Truncated || n > len(epics)
 	}
+	// Ranks are per project: list each initiative's epics team by team (the programme first,
+	// then the teams by name), in rank order within a team.
+	teamOrder := map[uuid.UUID]int{prog.ID: 0}
+	for i, t := range teams.Teams {
+		teamOrder[t.ID] = i + 1
+	}
+	slices.SortStableFunc(epics, func(a, b dbq.Issue) int { return teamOrder[a.ProjectID] - teamOrder[b.ProjectID] })
 	epicIDs := make([]uuid.UUID, len(epics))
 	for i, e := range epics {
 		epicIDs[i] = e.ID

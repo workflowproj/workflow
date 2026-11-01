@@ -12,6 +12,7 @@ import { MarkdownEditor } from "@/components/MarkdownEditor";
 import { UserPicker } from "@/components/UserPicker";
 import { RatingBadge } from "@/features/risks/bits";
 import { DECISION_FIELDS, impactLabel, likelihoodLabel, RESPONSES, RISK_FIELDS, riskRating } from "@/features/risks/model";
+import { projectProgrammesQuery } from "@/features/programme/queries";
 import { cn } from "@/lib/cn";
 
 type Defaults = {
@@ -96,6 +97,8 @@ function CreateIssueForm({ onClose, projectKey: initialProject, defaults, onCrea
     types.find((t) => t.key === typeKey) ?? types.find((t) => t.key === "story") ?? types.find((t) => t.level === 0 && t.kind === "work") ?? types.find((t) => t.kind === "work") ?? types[0];
   const kind = type?.kind ?? "work";
   const openSprints = sprints.filter((s) => s.state !== "closed");
+  // An epic in a programme's team project can work toward one of the programme's initiatives.
+  const { data: programmes = [] } = useQuery({ ...projectProgrammesQuery(key), enabled: !!key && type?.level === 1 });
 
   // The default parent (e.g. "add sub-task" from an issue) is looked up once for its summary.
   const { data: defaultParent } = useQuery({
@@ -155,7 +158,7 @@ function CreateIssueForm({ onClose, projectKey: initialProject, defaults, onCrea
             description: description.trim() || undefined,
             priority,
             assigneeId: assignee?.id,
-            parentKey: planned && level <= 0 ? parent?.key : undefined,
+            parentKey: planned && level <= 1 ? parent?.key : undefined,
             sprintId: planned && level === 0 && sprintId ? sprintId : undefined,
             storyPoints: planned && points !== "" ? Number(points) : undefined,
             dueDate: kind !== "decision" && dueDate ? dueDate : undefined,
@@ -280,6 +283,21 @@ function CreateIssueForm({ onClose, projectKey: initialProject, defaults, onCrea
           hint={type.level < 0 ? `A ${type.name.toLowerCase()} belongs to a standard issue.` : undefined}
         >
           {(id) => <ParentPicker id={id} projectKey={project.key} level={type.level + 1} value={parent} onChange={setParent} invalid={!!fe.parentKey} />}
+        </Field>
+      )}
+      {type && type.level === 1 && kind === "work" && programmes.length > 0 && (
+        <Field label="Initiative" error={fe.parentKey} hint={`The initiative of ${programmes.map((p) => p.name).join(" or ")} this ${type.name.toLowerCase()} works toward.`}>
+          {(id) => (
+            <ParentPicker
+              id={id}
+              projectKey={project.key}
+              level={2}
+              scope={`project in (${programmes.map((p) => p.key).join(", ")})`}
+              value={parent}
+              onChange={setParent}
+              invalid={!!fe.parentKey}
+            />
+          )}
         </Field>
       )}
       <Field label="Summary" required error={fe.summary}>
@@ -442,8 +460,27 @@ function CreateIssueForm({ onClose, projectKey: initialProject, defaults, onCrea
   );
 }
 
-/** ParentPicker searches the project's issues one level up (epics for standard issues, standard issues for sub-tasks). */
-function ParentPicker({ id, projectKey, level, value, onChange, invalid }: { id: string; projectKey: string; level: number; value: ParentRef | null; onChange: (p: ParentRef | null) => void; invalid?: boolean }) {
+/**
+ * ParentPicker searches issues one level up: the project's epics for standard issues, its standard
+ * issues for sub-tasks, or (with `scope`, e.g. the project's programmes) initiatives for epics.
+ */
+function ParentPicker({
+  id,
+  projectKey,
+  level,
+  scope,
+  value,
+  onChange,
+  invalid,
+}: {
+  id: string;
+  projectKey: string;
+  level: number;
+  scope?: string;
+  value: ParentRef | null;
+  onChange: (p: ParentRef | null) => void;
+  invalid?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const [debounced, setDebounced] = useState("");
@@ -452,9 +489,9 @@ function ParentPicker({ id, projectKey, level, value, onChange, invalid }: { id:
     return () => clearTimeout(t);
   }, [q]);
   const text = /^[A-Za-z][A-Za-z0-9_]{1,9}-\d+$/.test(debounced) ? `key = ${debounced.toUpperCase()}` : debounced ? `text ~ "${debounced.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"` : "";
-  const jql = `project = ${projectKey} AND level = ${level}${text ? ` AND ${text}` : ""} ORDER BY updated DESC`;
+  const jql = `${scope ?? `project = ${projectKey}`} AND level = ${level}${text ? ` AND ${text}` : ""} ORDER BY updated DESC`;
   const { data, isFetching, error } = useQuery({ queryKey: ["search", jql, "picker"], queryFn: () => search(jql), enabled: open, placeholderData: keepPreviousData });
-  const what = level >= 1 ? "epic" : "issue";
+  const what = level >= 2 ? "initiative" : level >= 1 ? "epic" : "issue";
   const results = data?.issues ?? [];
   return (
     <Popover

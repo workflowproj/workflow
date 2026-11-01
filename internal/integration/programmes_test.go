@@ -194,7 +194,7 @@ func TestProgrammeOverview(t *testing.T) {
 	for _, ep := range epics {
 		epicKeys = append(epicKeys, str(ep, "issue", "key"))
 	}
-	sameStrings(t, epicKeys, []string{appEpic, apiEpic}, "bob sees the epics in teams he can browse")
+	sameStrings(t, epicKeys, []string{apiEpic, appEpic}, "bob sees the epics in teams he can browse, team by team")
 	eq(t, num(first, "progress", "total"), 2.0, "the hidden team's work isn't counted")
 	eq(t, num(first, "progress", "inProgress"), 1.0, "one story in progress")
 	eq(t, num(first, "progress", "points"), 8.0, "points")

@@ -44,7 +44,10 @@ the count already excludes it. When several children close at the same moment, e
 Every action takes a **target**: `issue` (the issue that triggered the rule, the default),
 `parent` (a story's epic, a sub-task's story) or `children` (each child). This is how rules keep
 related work in step — start an epic when its first story starts, finish a story when its last
-sub-task is done, stretch an epic's dates over its stories.
+sub-task is done, stretch an epic's dates over its stories. A rule acts only in its own project:
+a parent or children in another project (a programme's initiative above a team's epic, or the
+epics under an initiative) are skipped, and the run log says so
+([programmes.md](programmes.md#automation)).
 
 | Action | Options |
 |---|---|
@@ -56,7 +59,7 @@ sub-task is done, stretch an epic's dates over its stories.
 | `notify` | `recipients`: `assignee`, `reporter` or `watchers` (in-app, and emailed per their [settings](notifications.md)) |
 | `webhook` | `url`: POSTs `{event: "automation", issue, trigger, data, sentAt}`; optional `secret` (signs it, see [below](#automation-webhooks)), `authHeader` and `authValue` |
 | `chat` | `channelId` (one of the project's [Slack/Mattermost channels](chat.md)), `body`: message with the same templates as comments |
-| `rollup_dates` | sets the target's start and due dates to span its children's dates — typically with target `parent`, so epics on the timeline cover their stories |
+| `rollup_dates` | sets the target's start and due dates to span its children's dates (children in the rule's project only) — typically with target `parent`, so epics on the timeline cover their stories |
 
 Project settings → Automation offers these as **templates** to start from.
 
