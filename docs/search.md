@@ -1,8 +1,10 @@
 # Search
 
 Search uses a JQL-like query language. Queries compile to parameterised SQL and are always
-limited to projects you can browse. Errors report the character position they refer to, which
-the UI highlights.
+limited to projects you can browse. An issue key in a query, as in `parent = PLAT-1` or
+`linkedIssues("PLAT-1")`, only matches issues you can browse: a key in a project you can't see
+matches nothing, as if it didn't exist. Errors report the character position they refer to,
+which the UI highlights.
 
 ```
 project = PLAT AND status in ("To Do", "In Progress") AND assignee = currentUser()

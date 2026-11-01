@@ -36,6 +36,19 @@ func (s *Service) searchEnv(ctx context.Context, q *dbq.Queries, actor *authz.Ac
 	if s.SLACalendars != nil {
 		env.SLACalendars = func() ([]search.SLACalendar, error) { return s.SLACalendars(ctx, q) }
 	}
+	// Issue keys in a query resolve only within projects the caller can browse, so a query can't
+	// reveal what links to, or sits under, an issue it can't see.
+	switch {
+	case actor.Privileged() || actor.IsOrgAdmin():
+	case actor.Type == authz.ActorPortal:
+		var ids []uuid.UUID
+		if actor.PortalProject != nil {
+			ids = []uuid.UUID{*actor.PortalProject}
+		}
+		env.VisibleProjects = func() ([]uuid.UUID, error) { return ids, nil }
+	default:
+		env.VisibleProjects = func() ([]uuid.UUID, error) { return s.BrowsableProjectIDs(ctx, actor) }
+	}
 	for _, d := range defs {
 		env.CustomFields = append(env.CustomFields, search.CustomField{Key: d.Key, Name: d.Name, Type: d.Type})
 	}

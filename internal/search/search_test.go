@@ -1,7 +1,9 @@
 package search
 
 import (
+	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -268,5 +270,45 @@ func TestCustomFieldNamesAndKeys(t *testing.T) {
 		if !slices.Contains(c.Args, any(key)) {
 			t.Errorf("%q: args %v lack the key %q", src, c.Args, key)
 		}
+	}
+}
+
+func TestIssueKeysResolveOnlyInVisibleProjects(t *testing.T) {
+	visible := []uuid.UUID{uuid.New(), uuid.New()}
+	calls := 0
+	env := Env{VisibleProjects: func() ([]uuid.UUID, error) { calls++; return visible, nil }}
+	c := mustCompile(t, `issue in linkedIssues("SEC-1") OR parent = SEC-2 OR epic = SEC-3 OR key = SEC-4`, env)
+	if calls != 1 {
+		t.Errorf("VisibleProjects called %d times, want once", calls)
+	}
+	// One shared argument, used wherever the four keys are looked up (some functions look a key
+	// up twice).
+	uses := regexp.MustCompile(`AND x\.project_id = ANY\(\$(\d+)::uuid\[\]\)`).FindAllStringSubmatch(c.Where, -1)
+	if len(uses) != strings.Count(c.Where, "SELECT x.id FROM issues x") {
+		t.Fatalf("%d of %d key lookups are filtered:\n%s", len(uses), strings.Count(c.Where, "SELECT x.id FROM issues x"), c.Where)
+	}
+	for _, u := range uses {
+		if u[1] != uses[0][1] {
+			t.Errorf("filter uses $%s and $%s, want one argument", uses[0][1], u[1])
+		}
+	}
+	n, _ := strconv.Atoi(uses[0][1])
+	if got, ok := c.Args[n-2].([]uuid.UUID); !ok || !slices.Equal(got, visible) {
+		t.Errorf("argument $%d = %v, want the visible projects", n, c.Args[n-2])
+	}
+
+	// Queries without issue keys don't ask, and nil means no restriction.
+	calls = 0
+	if c := mustCompile(t, `assignee is EMPTY`, env); calls != 0 || strings.Contains(c.Where, "x.project_id = ANY") {
+		t.Errorf("a query without keys asked for visible projects: %s", c.Where)
+	}
+	if c := mustCompile(t, `parent = SEC-2`, Env{}); strings.Contains(c.Where, "x.project_id = ANY") {
+		t.Errorf("unrestricted env filtered keys: %s", c.Where)
+	}
+
+	// No visible projects at all still compiles, to an empty array.
+	empty := Env{VisibleProjects: func() ([]uuid.UUID, error) { return nil, nil }}
+	if c := mustCompile(t, `parent = SEC-2`, empty); len(c.Args) == 0 || c.Args[len(c.Args)-1] == nil {
+		t.Errorf("args = %v, want an empty uuid list", c.Args)
 	}
 }

@@ -47,3 +47,35 @@ func TestJQLLinksAndEpics(t *testing.T) {
 	c.must("GET", `/api/v1/search?jql=`+url.QueryEscape(`issue in linkedIssues()`), nil, 400, nil)
 	c.must("GET", `/api/v1/search?jql=`+url.QueryEscape(`issueLinkType = "frobs"`), nil, 400, nil)
 }
+
+// Issue keys in a query resolve only within projects the caller can browse: otherwise
+// linkedIssues("SEC-1") would show which visible issues link to an issue they can't see.
+func TestJQLKeysRespectBrowse(t *testing.T) {
+	e := newEnv(t)
+	ada := e.login("ada@example.com", "Ada")
+	bob := e.login("bob@example.com", "Bob")
+	ada.createProject("OPEN", "scrum")
+	ada.must("POST", "/api/v1/projects", obj{"key": "SEC", "name": "Secret", "template": "scrum", "access": "private"}, 201, nil)
+	key := func(i obj) string { return str(i, "key") }
+	secret := key(ada.createIssue("SEC", "task", "Acquire Initech", nil))
+	secretEpic := key(ada.createIssue("SEC", "epic", "Merger", nil))
+	visible := key(ada.createIssue("OPEN", "task", "Rename the billing service", nil))
+	ada.must("POST", "/api/v1/issues/"+visible+"/links", obj{"type": "blocks", "targetKey": secret}, 201, nil)
+
+	queries := []string{
+		`issue in linkedIssues("` + secret + `")`,
+		`issue in linkedIssues("` + secret + `", "blocks")`,
+		`parent = ` + secretEpic,
+		`epic = ` + secretEpic,
+		`key = ` + secret + ` OR issue in linkedIssues("` + secret + `")`,
+	}
+	for _, q := range queries {
+		sameStrings(t, bob.search(q), []string{}, "bob: "+q)
+	}
+	// Ada, an org admin, can browse both projects.
+	sameStrings(t, ada.search(queries[0]), []string{visible}, "ada sees the link")
+
+	// A member of the secret project sees it again.
+	ada.must("POST", "/api/v1/projects/SEC/members", obj{"userId": bob.id(), "roleKey": "viewer"}, 201, nil)
+	sameStrings(t, bob.search(queries[0]), []string{visible}, "bob as a member")
+}
