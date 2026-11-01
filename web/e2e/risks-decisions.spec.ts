@@ -64,7 +64,7 @@ test("risks: turn the section on, assess a risk, mitigate it and filter the matr
   await expect(drawer.getByRole("link", { name: "Hire temporary agents" })).toBeVisible();
 
   // Lowering the impact rescores it.
-  await drawer.getByRole("button", { name: "Impact", exact: true }).click();
+  await drawer.getByRole("button", { name: /^Impact: / }).click();
   await page.getByRole("menuitemradio", { name: "2 · Minor" }).click();
   await expect(drawer.getByRole("region", { name: "Risk", exact: true })).toContainText("8 Medium");
 });
@@ -98,7 +98,7 @@ test("decisions: record, accept, supersede and export, never on the board", asyn
   await page.getByRole("menuitem", { name: /^Accept/ }).click();
   const panel = page.getByRole("region", { name: "Decision", exact: true });
   await expect(panel).toContainText("0 of 1 done");
-  await expect(panel.getByRole("button", { name: "Decided on", exact: true })).not.toHaveText("None");
+  await expect(panel.getByRole("button", { name: /^Decided on: / })).not.toHaveText("Decided on: None");
 
   // Export as Markdown downloads the record.
   const download = page.waitForEvent("download");

@@ -220,12 +220,14 @@ function NotificationBell() {
     refetchInterval: 60_000,
   });
   const unread = data?.unread ?? 0;
+  const count = unread > 99 ? "99+" : String(unread);
   return (
-    <Link to="/notifications" aria-label={unread ? `Notifications (${unread} unread)` : "Notifications"} className="relative inline-flex size-8.5 items-center justify-center rounded-md text-muted hover:bg-surface-2 hover:text-ink">
+    // The name holds the count shown, outside parentheses, which Label in Name checks ignore (WCAG 2.5.3).
+    <Link to="/notifications" aria-label={unread ? `Notifications: ${count} unread` : "Notifications"} className="relative inline-flex size-8.5 items-center justify-center rounded-md text-muted hover:bg-surface-2 hover:text-ink">
       <Bell className="size-4.5" />
       {unread > 0 && (
         <span className="absolute top-1 right-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-bold text-danger-ink">
-          {unread > 99 ? "99+" : unread}
+          {count}
         </span>
       )}
     </Link>
@@ -250,7 +252,9 @@ function UserMenu() {
     <Popover
       align="end"
       trigger={({ toggle }) => (
-        <button onClick={toggle} aria-label="Account menu" className="rounded-full p-0.5 hover:bg-surface-2">
+        <button onClick={toggle} className="rounded-full p-0.5 hover:bg-surface-2">
+          {/* Named "Account menu: EA", with the initials shown (WCAG 2.5.3). */}
+          <span className="sr-only">Account menu: </span>
           <UserAvatar user={me} size={28} />
         </button>
       )}

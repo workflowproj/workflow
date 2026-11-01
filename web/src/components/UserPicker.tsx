@@ -9,7 +9,8 @@ import { cn } from "@/lib/cn";
 /**
  * UserPicker selects one user (or none). With `project`, only people who can be assigned in
  * that project are offered; with `customers={false}`, only people who can become project
- * members (no help desk customers).
+ * members (no help desk customers). `label` names it ahead of the person shown ("Owner: Priya
+ * Raman"); without one, what it shows is its name (an "Add a member…" placeholder, say).
  */
 export function UserPicker({
   value,
@@ -20,7 +21,7 @@ export function UserPicker({
   noneLabel = "Unassigned",
   disabled,
   compact,
-  label = "Select user",
+  label,
 }: {
   value?: User | null;
   onChange: (u: User | null) => void;
@@ -41,13 +42,13 @@ export function UserPicker({
           type="button"
           disabled={disabled}
           onClick={toggle}
-          aria-label={label}
           className={cn(
             "inline-flex max-w-full items-center gap-2 rounded-md text-left text-sm hover:bg-surface-2 disabled:cursor-default disabled:hover:bg-transparent",
             compact ? "p-0.5" : "h-8.5 w-full border border-line-strong bg-surface px-2",
           )}
         >
-          <UserAvatar user={value} size={compact ? 24 : 20} />
+          {label && <span className="sr-only">{label}: </span>}
+          <UserAvatar user={value} size={compact ? 24 : 20} decorative={!compact} />
           {!compact && <span className={cn("flex-1 truncate", !value && "text-muted")}>{value?.displayName ?? noneLabel}</span>}
           {!compact && <ChevronDown className="size-3.5 text-faint" />}
         </button>

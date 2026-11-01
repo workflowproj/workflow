@@ -121,7 +121,7 @@ export function GroupDrawer({ group, onClose }: { group: Group; onClose: () => v
             <h3 className="text-sm font-semibold">Members ({members.length})</h3>
             {local && (
               <div className="w-56">
-                <UserPicker value={null} onChange={(u) => u && addMember.mutate(u)} allowNone={false} noneLabel="Add a member…" label="Add a member" />
+                <UserPicker value={null} onChange={(u) => u && addMember.mutate(u)} allowNone={false} noneLabel="Add a member…" />
               </div>
             )}
           </div>

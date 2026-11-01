@@ -93,7 +93,9 @@ function AccountMenu() {
     <Popover
       align="end"
       trigger={({ toggle }) => (
-        <button onClick={toggle} aria-label="Account menu" className="rounded-full p-0.5 hover:bg-surface-2">
+        <button onClick={toggle} className="rounded-full p-0.5 hover:bg-surface-2">
+          {/* Named "Account menu: EA", with the initials shown (WCAG 2.5.3). */}
+          <span className="sr-only">Account menu: </span>
           <UserAvatar user={me} size={28} />
         </button>
       )}
