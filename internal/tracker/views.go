@@ -90,16 +90,21 @@ type lookups struct {
 	statuses map[uuid.UUID]dbq.Status
 	users    map[uuid.UUID]dbq.User
 	parents  map[uuid.UUID]dbq.Issue
+	// hidden holds issues whose parent sits in another project the viewer can't browse (an
+	// initiative above a team's epic): the parent is left out of their view.
+	hidden   map[uuid.UUID]bool
 	dev      map[uuid.UUID]dbq.DevSummariesRow
 	deployed map[uuid.UUID][]string
 	spent    map[uuid.UUID]int64
 }
 
-func (s *Service) loadLookups(ctx context.Context, issues []dbq.Issue) (*lookups, error) {
+// loadLookups loads what rendering issues needs for actor. A parent in another project is shown
+// only when actor can browse it; a nil actor (chat cards, webhook payloads) never sees one.
+func (s *Service) loadLookups(ctx context.Context, actor *authz.Actor, issues []dbq.Issue) (*lookups, error) {
 	l := &lookups{
 		projects: map[uuid.UUID]dbq.Project{}, types: map[uuid.UUID]dbq.IssueType{}, statuses: map[uuid.UUID]dbq.Status{},
-		users: map[uuid.UUID]dbq.User{}, parents: map[uuid.UUID]dbq.Issue{}, dev: map[uuid.UUID]dbq.DevSummariesRow{},
-		deployed: map[uuid.UUID][]string{},
+		users: map[uuid.UUID]dbq.User{}, parents: map[uuid.UUID]dbq.Issue{}, hidden: map[uuid.UUID]bool{},
+		dev: map[uuid.UUID]dbq.DevSummariesRow{}, deployed: map[uuid.UUID][]string{},
 	}
 	var projectIDs, typeIDs, statusIDs, userIDs, parentIDs, issueIDs []uuid.UUID
 	for _, i := range issues {
@@ -126,6 +131,30 @@ func (s *Service) loadLookups(ctx context.Context, issues []dbq.Issue) (*lookups
 	}
 	for _, p := range projects {
 		l.projects[p.ID] = p
+	}
+	browse := map[uuid.UUID]bool{}
+	for _, i := range issues {
+		if i.ParentID == nil {
+			continue
+		}
+		par, ok := l.parents[*i.ParentID]
+		if !ok || par.ProjectID == i.ProjectID {
+			continue
+		}
+		can, seen := browse[par.ProjectID]
+		if !seen {
+			if pp, ok := l.projects[par.ProjectID]; ok && actor != nil {
+				access, err := s.Authz.Access(ctx, actor, pp)
+				if err != nil {
+					return nil, err
+				}
+				can = access.CanBrowse()
+			}
+			browse[par.ProjectID] = can
+		}
+		if !can {
+			l.hidden[i.ID] = true
+		}
 	}
 	types, err := s.Q.GetIssueTypesByIDs(ctx, typeIDs)
 	if err != nil {
@@ -201,7 +230,7 @@ func (l *lookups) issue(i dbq.Issue) api.Issue {
 			v.Reporter = &uv
 		}
 	}
-	if i.ParentID != nil {
+	if i.ParentID != nil && !l.hidden[i.ID] {
 		if par, ok := l.parents[*i.ParentID]; ok {
 			r := l.ref(par)
 			v.Parent = &r
@@ -227,12 +256,13 @@ func (l *lookups) issue(i dbq.Issue) api.Issue {
 }
 
 // IssueViews renders a list of issues with their related data in a fixed number of queries.
-func (s *Service) IssueViews(ctx context.Context, issues []dbq.Issue) ([]api.Issue, error) {
+// The parent is left out when it sits in another project actor can't browse (see loadLookups).
+func (s *Service) IssueViews(ctx context.Context, actor *authz.Actor, issues []dbq.Issue) ([]api.Issue, error) {
 	out := make([]api.Issue, 0, len(issues))
 	if len(issues) == 0 {
 		return out, nil
 	}
-	l, err := s.loadLookups(ctx, issues)
+	l, err := s.loadLookups(ctx, actor, issues)
 	if err != nil {
 		return nil, err
 	}
@@ -242,8 +272,8 @@ func (s *Service) IssueViews(ctx context.Context, issues []dbq.Issue) ([]api.Iss
 	return out, nil
 }
 
-func (s *Service) IssueView(ctx context.Context, i dbq.Issue) (api.Issue, error) {
-	vs, err := s.IssueViews(ctx, []dbq.Issue{i})
+func (s *Service) IssueView(ctx context.Context, actor *authz.Actor, i dbq.Issue) (api.Issue, error) {
+	vs, err := s.IssueViews(ctx, actor, []dbq.Issue{i})
 	if err != nil {
 		return api.Issue{}, err
 	}
@@ -278,6 +308,10 @@ func (s *Service) IssueDetail(ctx context.Context, actor *authz.Actor, i dbq.Iss
 	if err != nil {
 		return api.IssueDetail{}, err
 	}
+	// An initiative's epics sit in team projects: list those the viewer can browse.
+	if children, err = s.browsableIssues(ctx, actor, p.ID, children); err != nil {
+		return api.IssueDetail{}, err
+	}
 	linkRows, err := s.Q.IssueLinks(ctx, i.ID)
 	if err != nil {
 		return api.IssueDetail{}, err
@@ -300,7 +334,7 @@ func (s *Service) IssueDetail(ctx context.Context, actor *authz.Actor, i dbq.Iss
 		return api.IssueDetail{}, err
 	}
 	all := append(append([]dbq.Issue{i}, children...), others...)
-	l, err := s.loadLookups(ctx, all)
+	l, err := s.loadLookups(ctx, actor, all)
 	if err != nil {
 		return api.IssueDetail{}, err
 	}
@@ -319,7 +353,16 @@ func (s *Service) IssueDetail(ctx context.Context, actor *authz.Actor, i dbq.Iss
 	for _, c := range children {
 		d.Children = append(d.Children, l.issue(c))
 	}
-	if t := l.types[i.TypeID]; t.Level > 0 {
+	if i.ParentID != nil && d.Parent == nil {
+		d.ParentHidden = ptr(true)
+	}
+	if t := l.types[i.TypeID]; t.Level > 1 {
+		prog, err := s.initiativeProgress(ctx, actor, i.ID)
+		if err != nil {
+			return d, err
+		}
+		d.Progress = &prog
+	} else if t.Level > 0 {
 		prog := api.IssueProgress{}
 		rows, err := s.Q.EpicProgress(ctx, []uuid.UUID{i.ID})
 		if err != nil {

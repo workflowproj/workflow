@@ -134,9 +134,12 @@ func (s *Service) sprintFor(ctx context.Context, q *dbq.Queries, p dbq.Project, 
 	return sp, nil
 }
 
-// resolveParent loads a parent issue in the same project and enforces parent level = child level + 1.
+// resolveParent loads a parent issue and enforces parent level = child level + 1. The parent is
+// in the same project, except an epic's: it may be an initiative of a programme the epic's project
+// belongs to, when actor can browse that programme (see programmes.go). Revalidating checks only
+// the levels, for a type change that keeps the parent. A parent actor can't use reads as not found.
 // Risks and decisions stay out of the hierarchy: they have no parent and no children.
-func (s *Service) resolveParent(ctx context.Context, q *dbq.Queries, p dbq.Project, child dbq.IssueType, parentKey string) (*dbq.Issue, error) {
+func (s *Service) resolveParent(ctx context.Context, q *dbq.Queries, actor *authz.Actor, p dbq.Project, child dbq.IssueType, parentKey string, revalidating bool) (*dbq.Issue, error) {
 	if child.Kind != KindWork {
 		if parentKey != "" {
 			return nil, apperr.Invalid("parentKey", "a %s has no parent issue; link work to it instead", child.Name)
@@ -149,12 +152,15 @@ func (s *Service) resolveParent(ctx context.Context, q *dbq.Queries, p dbq.Proje
 		}
 		return nil, nil
 	}
+	notFound := apperr.Invalid("parentKey", "parent issue %s not found", parentKey)
 	parent, err := s.ResolveIssue(ctx, q, parentKey)
 	if err != nil {
-		return nil, apperr.Invalid("parentKey", "parent issue %s not found", parentKey)
+		return nil, notFound
 	}
-	if parent.ProjectID != p.ID {
-		return nil, apperr.Invalid("parentKey", "the parent must be in the same project")
+	if parent.ProjectID != p.ID && !revalidating {
+		if err := s.crossProjectParent(ctx, q, actor, p, child, parent); err != nil {
+			return nil, err
+		}
 	}
 	pt, err := q.GetIssueType(ctx, parent.TypeID)
 	if err != nil {
@@ -208,7 +214,7 @@ func (s *Service) CreateIssue(ctx context.Context, actor *authz.Actor, in IssueI
 		if err != nil {
 			return apperr.Invalid("typeKey", "unknown issue type %q in %s", in.TypeKey, p.Key)
 		}
-		parent, err := s.resolveParent(ctx, q, p, it, in.ParentKey)
+		parent, err := s.resolveParent(ctx, q, actor, p, it, in.ParentKey, false)
 		if err != nil {
 			return err
 		}
@@ -429,10 +435,14 @@ func (s *Service) UpdateIssue(ctx context.Context, actor *authz.Actor, ref strin
 				if in.ParentKey.Value != nil {
 					parentKey = *in.ParentKey.Value
 				}
+				if err := s.canLeaveParent(ctx, q, actor, i, parentKey); err != nil {
+					return err
+				}
 			} else if i.ParentID != nil && newType.Kind == KindWork {
 				parentKey = i.ParentID.String() // becoming a risk or decision leaves the parent
 			}
-			parent, err := s.resolveParent(ctx, q, p, newType, parentKey)
+			keeps := !in.ParentKey.Set && i.ParentID != nil && parentKey == i.ParentID.String()
+			parent, err := s.resolveParent(ctx, q, actor, p, newType, parentKey, keeps)
 			if err != nil {
 				return err
 			}
@@ -448,7 +458,13 @@ func (s *Service) UpdateIssue(ctx context.Context, actor *authz.Actor, ref strin
 				label := func(id *uuid.UUID) *string {
 					for _, r := range refs {
 						if id != nil && r.ID == *id {
-							k := issueKey(p, r)
+							rp := p
+							if r.ProjectID != p.ID { // an initiative in a programme
+								if other, err := q.GetProject(ctx, r.ProjectID); err == nil {
+									rp = other
+								}
+							}
+							k := issueKey(rp, r)
 							return &k
 						}
 					}
@@ -456,6 +472,16 @@ func (s *Service) UpdateIssue(ctx context.Context, actor *authz.Actor, ref strin
 				}
 				record("parent", label(i.ParentID), label(newParent), idRef(i.ParentID), idRef(newParent))
 				upd.ParentID = newParent
+				// A programme's roadmap shows its initiatives' epics: refresh it when one comes or goes.
+				for _, r := range refs {
+					if r.ProjectID != p.ID {
+						if other, err := q.GetProject(ctx, r.ProjectID); err == nil {
+							if err := publishOnly(ctx, tx, actor, other, &r); err != nil {
+								return err
+							}
+						}
+					}
+				}
 			}
 			if newType.Level < 0 && parent != nil {
 				upd.SprintID = parent.SprintID
@@ -687,6 +713,14 @@ func (s *Service) DeleteIssue(ctx context.Context, actor *authz.Actor, ref strin
 		return err
 	}
 	return s.tx(ctx, func(tx pgx.Tx, q *dbq.Queries) error {
+		// An initiative's epics in team projects stay, without it.
+		elsewhere, err := q.CrossProjectChildren(ctx, []uuid.UUID{i.ID})
+		if err != nil {
+			return err
+		}
+		if err := s.unlinkChildrenElsewhere(ctx, tx, q, actor, p, elsewhere); err != nil {
+			return err
+		}
 		if err := q.DeleteSubtasks(ctx, &i.ID); err != nil {
 			return err
 		}

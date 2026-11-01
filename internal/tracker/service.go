@@ -114,7 +114,7 @@ func (t Template) WorkflowSources() ([]string, error) {
 
 var templates = func() []Template {
 	var out []Template
-	for _, id := range []string{"scrum", "kanban", "bug_tracking", "service"} {
+	for _, id := range []string{"scrum", "kanban", "bug_tracking", "service", "programme"} {
 		b, err := templateFS.ReadFile("templates/" + id + ".yaml")
 		if err != nil {
 			panic(err)
@@ -353,6 +353,13 @@ const ServiceTemplate = "service"
 
 // IsServiceProject reports a service project.
 func IsServiceProject(p dbq.Project) bool { return p.Template == ServiceTemplate }
+
+// ProgrammeTemplate is the template of programmes: initiatives that team projects' epics work
+// toward (see programmes.go).
+const ProgrammeTemplate = "programme"
+
+// IsProgramme reports a programme.
+func IsProgramme(p dbq.Project) bool { return p.Template == ProgrammeTemplate }
 
 // workflowDef loads and decodes a workflow version definition.
 func workflowDef(ctx context.Context, q *dbq.Queries, versionID uuid.UUID) (*workflow.Definition, dbq.WorkflowVersion, error) {

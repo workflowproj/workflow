@@ -306,6 +306,14 @@ func (s *Service) DeleteProject(ctx context.Context, actor *authz.Actor, ref str
 		return err
 	}
 	return s.tx(ctx, func(tx pgx.Tx, q *dbq.Queries) error {
+		// A programme's initiatives go with it; the team epics under them stay, without them.
+		elsewhere, err := q.ProgrammeCrossProjectChildren(ctx, p.ID)
+		if err != nil {
+			return err
+		}
+		if err := s.unlinkChildrenElsewhere(ctx, tx, q, actor, p, elsewhere); err != nil {
+			return err
+		}
 		if err := q.DeleteProject(ctx, p.ID); err != nil {
 			return err
 		}

@@ -494,6 +494,13 @@ type OauthToken struct {
 	RevokedAt  *time.Time
 }
 
+type ProgrammeProject struct {
+	ProgrammeID uuid.UUID
+	ProjectID   uuid.UUID
+	AddedBy     *uuid.UUID
+	CreatedAt   time.Time
+}
+
 type Project struct {
 	ID             uuid.UUID
 	Key            string

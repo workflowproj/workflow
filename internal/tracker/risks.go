@@ -387,7 +387,7 @@ func (s *Service) RiskRegister(ctx context.Context, actor *authz.Actor, ref stri
 		return out, err
 	}
 	out.Truncated = truncated
-	views, err := s.IssueViews(ctx, issues)
+	views, err := s.IssueViews(ctx, actor, issues)
 	if err != nil {
 		return out, err
 	}
@@ -479,7 +479,7 @@ func (s *Service) DecisionLog(ctx context.Context, actor *authz.Actor, ref strin
 	all := make([]dbq.Issue, 0, len(known))
 	all = append(all, issues...)
 	all = append(all, others...)
-	l, err := s.loadLookups(ctx, all)
+	l, err := s.loadLookups(ctx, actor, all)
 	if err != nil {
 		return out, err
 	}

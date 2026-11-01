@@ -106,7 +106,7 @@ func (s *Service) chatCommand(r *http.Request, text, command string) chat.Messag
 	if err != nil || !visible {
 		return chat.Message{Text: fmt.Sprintf("No issue %s that chat can show. %s", strings.Fields(text)[0], help.Text)}
 	}
-	view, err := s.Tracker.IssueView(ctx, issue)
+	view, err := s.Tracker.IssueView(ctx, nil, issue)
 	if err != nil {
 		return chat.Message{Text: "Something went wrong; try again later."}
 	}
@@ -141,7 +141,7 @@ func (s *Service) commandSearch(r *http.Request, projects map[uuid.UUID]dbq.Proj
 	if total == 0 {
 		return chat.Message{Text: "No issues match."}
 	}
-	views, err := s.Tracker.IssueViews(r.Context(), issues)
+	views, err := s.Tracker.IssueViews(r.Context(), nil, issues)
 	if err != nil {
 		return chat.Message{Text: "Something went wrong; try again later."}
 	}

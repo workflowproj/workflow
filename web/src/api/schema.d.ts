@@ -1412,6 +1412,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{projectKey}/programme": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A programme's roadmap - its initiatives, the team epics under them and how far along they are
+         * @description The programme's initiatives in rank order (up to 500), each with the epics under it in the
+         *     team projects you can browse, the work under those epics by status category, a forecast
+         *     (the latest due date among the epic and its issues) and flags: late, overdue, unscheduled,
+         *     and blocked by unfinished work in another project. Teams you can't browse are left out,
+         *     not counted. Also lists open epics in the teams that belong to no initiative.
+         */
+        get: operations["getProgrammeOverview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{projectKey}/programme/teams": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The team projects of a programme that you can browse */
+        get: operations["listProgrammeTeams"];
+        put?: never;
+        /**
+         * Add a team project to a programme (programme admins; you must be able to browse the team)
+         * @description Its epics can then have the programme's initiatives as their parent. Membership gives no
+         *     access to the team's issues: people see only the teams they can browse.
+         */
+        post: operations["addProgrammeTeam"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{projectKey}/programme/teams/{teamKey}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Take a team project out of a programme, unlinking its epics from the programme's initiatives */
+        delete: operations["removeProgrammeTeam"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{projectKey}/programmes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The programmes a project is a team of (those you can browse) */
+        get: operations["listProjectProgrammes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/projects/{projectKey}/decisions": {
         parameters: {
             query?: never;
@@ -4279,6 +4359,8 @@ export interface components {
             watching: boolean;
             watcherCount: number;
             suggestedBranch?: string;
+            /** @description The issue has a parent you can't browse (an initiative in a programme you can't see) */
+            parentHidden?: boolean;
             permissions: components["schemas"]["IssuePermissions"];
         };
         ProjectRef: {
@@ -4703,8 +4785,76 @@ export interface components {
             links: components["schemas"]["TimelineLink"][];
             sprints: components["schemas"]["TimelineSprint"][];
             releases: components["schemas"]["TimelineRelease"][];
+            /** @description Blocks links between a shown issue and one that isn't shown (another project, filtered out or past the limit) */
+            externalLinks?: components["schemas"]["ExternalDependency"][];
             /** @description More issues matched than the timeline shows (2000) */
             truncated: boolean;
+        };
+        /** @description A blocks link from a shown issue to one outside the view. The other issue is named only when you can browse it. */
+        ExternalDependency: {
+            /** @description The shown issue */
+            issueKey: string;
+            /**
+             * @description blockedBy: the other issue blocks the shown one
+             * @enum {string}
+             */
+            direction: "blockedBy" | "blocks";
+            /** @description The other issue is not done */
+            open: boolean;
+            /**
+             * Format: uuid
+             * @description Present when you can browse the other issue
+             */
+            linkId?: string;
+            other?: components["schemas"]["Issue"];
+        };
+        ProgrammeTeams: {
+            teams: components["schemas"]["ProjectRef"][];
+            /** @description Teams in the programme that you can't browse */
+            hiddenCount: number;
+        };
+        ProgrammeOverview: {
+            programme: components["schemas"]["ProjectRef"];
+            teams: components["schemas"]["ProjectRef"][];
+            /** @description Teams you can't browse; their epics and work are left out */
+            hiddenTeamCount: number;
+            initiatives: components["schemas"]["ProgrammeInitiative"][];
+            /** @description Open epics in the teams that belong to no initiative (up to 50) */
+            unlinkedEpics: components["schemas"]["Issue"][];
+            unlinkedTotal: number;
+            /** @description More initiatives or epics than the overview shows */
+            truncated: boolean;
+        };
+        ProgrammeInitiative: {
+            issue: components["schemas"]["Issue"];
+            /** @description The work under its epics (in teams you can browse) */
+            progress: components["schemas"]["IssueProgress"];
+            /**
+             * Format: date
+             * @description The latest forecast of its epics
+             */
+            forecastDate?: string;
+            epics: components["schemas"]["ProgrammeEpic"][];
+            flags: components["schemas"]["PlanningFlag"][];
+        };
+        ProgrammeEpic: {
+            issue: components["schemas"]["Issue"];
+            progress: components["schemas"]["IssueProgress"];
+            /**
+             * Format: date
+             * @description The latest due date of the epic and the issues under it
+             */
+            forecastDate?: string;
+            flags: components["schemas"]["PlanningFlag"][];
+        };
+        PlanningFlag: {
+            /** @enum {string} */
+            kind: "late" | "overdue" | "unscheduled" | "blocked";
+            message: string;
+            /** @description blocked: the unfinished issues in other projects doing the blocking, those you can browse */
+            issueKeys: string[];
+            /** @description blocked: blocking issues you can't browse */
+            hiddenCount: number;
         };
         TimelineLink: {
             /** Format: uuid */
@@ -8496,6 +8646,141 @@ export interface operations {
             default: components["responses"]["Problem"];
         };
     };
+    getProgrammeOverview: {
+        parameters: {
+            query?: {
+                /** @description Include initiatives resolved within this many days (default 90) */
+                doneDays?: number;
+            };
+            header?: never;
+            path: {
+                /** @description Project key (or id) */
+                projectKey: components["parameters"]["ProjectKey"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Programme overview */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProgrammeOverview"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listProgrammeTeams: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project key (or id) */
+                projectKey: components["parameters"]["ProjectKey"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Teams */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProgrammeTeams"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    addProgrammeTeam: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project key (or id) */
+                projectKey: components["parameters"]["ProjectKey"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description The team project's key */
+                    projectKey: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Teams */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProgrammeTeams"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    removeProgrammeTeam: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project key (or id) */
+                projectKey: components["parameters"]["ProjectKey"];
+                /** @description The team project's key */
+                teamKey: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Epics that lost their initiative */
+                        unlinkedEpics: number;
+                    };
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listProjectProgrammes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project key (or id) */
+                projectKey: components["parameters"]["ProjectKey"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Programmes */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectRef"][];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
     getDecisionLog: {
         parameters: {
             query?: never;
@@ -9434,6 +9719,8 @@ export interface operations {
             query?: {
                 /** @description Comma-separated project keys; omit for every project you can browse */
                 projects?: string;
+                /** @description A programme's key: its initiatives and the team projects you can browse (not with projects) */
+                programme?: string;
                 /** @description Optional extra query filter (e.g. assignee = currentUser()) */
                 jql?: string;
                 /** @description Include issues resolved within this many days (default 90) */

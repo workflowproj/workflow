@@ -459,7 +459,7 @@ func (s *Service) Timesheet(ctx context.Context, actor *authz.Actor, in Timeshee
 	for _, i := range loaded {
 		byID[i.ID] = i
 	}
-	if out.lookups, err = s.loadLookups(ctx, loaded); err != nil {
+	if out.lookups, err = s.loadLookups(ctx, actor, loaded); err != nil {
 		return out, err
 	}
 	users, err := s.Q.GetUsersByIDs(ctx, userIDs)
