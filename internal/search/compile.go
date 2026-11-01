@@ -30,6 +30,11 @@ type Env struct {
 	// SLACalendars lists the calendars of SLA clocks for remaining() (called only when a query
 	// uses it; nil means every clock runs around the clock).
 	SLACalendars func() ([]SLACalendar, error)
+	// VisibleProjects lists the projects whose issues an issue key in the query may resolve to,
+	// as in parent = PLAT-1 or linkedIssues("PLAT-1"), so a key in a project the caller can't
+	// browse matches nothing, like a key that doesn't exist. Called once, only when a query names
+	// an issue; nil means no restriction (system and automation searches).
+	VisibleProjects func() ([]uuid.UUID, error)
 }
 
 // Compiled is a WHERE expression and ORDER BY list over the issues table aliased as `i`.
@@ -40,9 +45,10 @@ type Compiled struct {
 }
 
 type builder struct {
-	env  Env
-	args []any
-	base int
+	env     Env
+	args    []any
+	base    int
+	visible string // placeholder of the VisibleProjects argument, once added
 }
 
 func (b *builder) arg(v any) string {
@@ -501,7 +507,32 @@ func (b *builder) issueByKey(v Value) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("SELECT x.id FROM issues x WHERE x.number = %s::int AND x.project_id IN %s", b.arg(n), projectByKey(b.arg(key))), nil
+	sub := fmt.Sprintf("SELECT x.id FROM issues x WHERE x.number = %s::int AND x.project_id IN %s", b.arg(n), projectByKey(b.arg(key)))
+	visible, err := b.visibleProjects()
+	if err != nil {
+		return "", err
+	}
+	if visible != "" {
+		sub += " AND x.project_id = ANY(" + visible + "::uuid[])"
+	}
+	return sub, nil
+}
+
+// visibleProjects is the placeholder of the projects issue keys may resolve to ("" when
+// unrestricted), added to the arguments the first time a query names an issue.
+func (b *builder) visibleProjects() (string, error) {
+	if b.env.VisibleProjects == nil || b.visible != "" {
+		return b.visible, nil
+	}
+	ids, err := b.env.VisibleProjects()
+	if err != nil {
+		return "", err
+	}
+	if ids == nil {
+		ids = []uuid.UUID{}
+	}
+	b.visible = b.arg(ids)
+	return b.visible, nil
 }
 
 func (b *builder) keyField(c Clause) (string, error) {
