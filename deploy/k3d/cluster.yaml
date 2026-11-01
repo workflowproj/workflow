@@ -14,7 +14,7 @@ metadata:
 servers: 1
 agents: 0
 # Keep in step with the Kubernetes versions you run in production (chart needs >= 1.30).
-image: rancher/k3s:v1.33.5-k3s1
+image: rancher/k3s:v1.33.13-k3s1
 ports:
   - port: 8081:80
     nodeFilters: [loadbalancer]
