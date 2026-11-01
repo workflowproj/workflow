@@ -227,9 +227,12 @@ jobs:
       - name: Install the chart (development sign-in and Keycloak, single-instance CNPG)
         # No --wait: the migration runs as a post-install hook once the release's objects exist,
         # and helm waits for that Job. The rollout checks below wait for the pods.
+        # values-dev.yaml turns the preStop drain off for quick Tilt restarts; CI keeps the
+        # chart's default, so the rolling upgrade below runs the way it does in production.
         run: |
           helm upgrade --install wfm deploy/helm/wfm --namespace wfm --create-namespace \
             -f deploy/k3d/values-dev.yaml -f deploy/k3d/values-cnpg.yaml \
+            --set web.preStopSleepSeconds=5 --set hooks.preStopSleepSeconds=5 \
             --set image.tag=ci --timeout 10m
           kubectl -n wfm logs job/wfm-migrate --tail=5
           for d in web hooks worker; do kubectl -n wfm rollout status "deployment/wfm-$d" --timeout=5m; done
@@ -237,17 +240,30 @@ jobs:
         run: |
           helm upgrade wfm deploy/helm/wfm --namespace wfm \
             -f deploy/k3d/values-dev.yaml -f deploy/k3d/values-cnpg.yaml \
+            --set web.preStopSleepSeconds=5 --set hooks.preStopSleepSeconds=5 \
             --set image.tag=ci --set config.WFM_LOG_LEVEL=info --wait --timeout 5m
       - name: Check the ingress split (Traefik)
         run: |
-          set -x
+          set -euo pipefail
+          # expect HOST PATH CODE: retries only gateway errors (no backend yet: 000, 502-504) for up
+          # to 30s; any other wrong code fails at once.
+          expect() {
+            local got
+            for _ in $(seq 1 15); do
+              got=$(curl -s -o /dev/null -w '%{http_code}' -H "Host: $1" "http://localhost:8081$2" || true)
+              [ "$got" = "$3" ] && { echo "ok   $1$2 -> $got"; return 0; }
+              case "$got" in 000|502|503|504) sleep 2 ;; *) break ;; esac
+            done
+            echo "::error::$1$2: expected $3, got $got"
+            return 1
+          }
           # web host serves the UI and API
-          test "$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: wfm.localhost' http://localhost:8081/readyz)" = 200
+          expect wfm.localhost /readyz 200
           # hooks host serves SCIM (bearer token required) ...
-          test "$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: hooks.localhost' http://localhost:8081/scim/v2/Users)" = 401
+          expect hooks.localhost /scim/v2/Users 401
           # ... but neither the UI nor the API
-          test "$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: hooks.localhost' http://localhost:8081/api/v1/projects)" = 404
-          test "$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: hooks.localhost' http://localhost:8081/)" = 404
+          expect hooks.localhost /api/v1/projects 404
+          expect hooks.localhost / 404
       - name: Check Keycloak sign-in and directory sync
         run: |
           set -euo pipefail
@@ -289,6 +305,9 @@ jobs:
         if: failure()
         run: |
           kubectl get pods,jobs,svc,ingress,networkpolicy -A -o wide || true
+          kubectl -n wfm describe ingress || true
+          kubectl -n wfm get endpointslices -o wide || true
+          kubectl -n kube-system logs deployment/traefik --tail=100 || true
           kubectl -n wfm get cluster.postgresql.cnpg.io -o yaml || true
           kubectl -n wfm describe pods || true
           for c in web hooks worker; do echo "== $c"; kubectl -n wfm logs "deployment/wfm-$c" --all-containers --tail=200 || true; done
