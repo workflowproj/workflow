@@ -5411,7 +5411,7 @@ components:
         externalLinks:
           type: array
           items: { $ref: '#/components/schemas/ExternalDependency' }
-          description: Blocks links between a shown issue and one that isn't shown (another project, filtered out or past the limit)
+          description: Blocks links between a shown issue and an unfinished one that isn't shown (another project, filtered out or past the limit)
         truncated: { type: boolean, description: More issues matched than the timeline shows (2000) }
     ExternalDependency:
       type: object
@@ -5420,7 +5420,7 @@ components:
       properties:
         issueKey: { type: string, description: The shown issue }
         direction: { type: string, enum: [blockedBy, blocks], description: 'blockedBy: the other issue blocks the shown one' }
-        open: { type: boolean, description: The other issue is not done }
+        open: { type: boolean, description: The other issue is not done (always true; done ones are left out) }
         linkId: { type: string, format: uuid, description: Present when you can browse the other issue }
         other: { $ref: '#/components/schemas/Issue' }
     ProgrammeTeams:

@@ -4785,7 +4785,7 @@ export interface components {
             links: components["schemas"]["TimelineLink"][];
             sprints: components["schemas"]["TimelineSprint"][];
             releases: components["schemas"]["TimelineRelease"][];
-            /** @description Blocks links between a shown issue and one that isn't shown (another project, filtered out or past the limit) */
+            /** @description Blocks links between a shown issue and an unfinished one that isn't shown (another project, filtered out or past the limit) */
             externalLinks?: components["schemas"]["ExternalDependency"][];
             /** @description More issues matched than the timeline shows (2000) */
             truncated: boolean;
@@ -4799,7 +4799,7 @@ export interface components {
              * @enum {string}
              */
             direction: "blockedBy" | "blocks";
-            /** @description The other issue is not done */
+            /** @description The other issue is not done (always true; done ones are left out) */
             open: boolean;
             /**
              * Format: uuid

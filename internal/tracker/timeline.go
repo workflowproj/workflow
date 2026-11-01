@@ -107,11 +107,21 @@ func (s *Service) Timeline(ctx context.Context, actor *authz.Actor, tq TimelineQ
 	for i, is := range issues {
 		ids[i] = is.ID
 	}
-	if out.Links, err = s.Q.BlockLinksAmong(ctx, ids); err != nil {
+	// Blocks links between loaded issues are drawn; those to issues outside are listed.
+	links, err := s.Q.BlockLinksTouching(ctx, ids)
+	if err != nil {
 		return out, err
 	}
-	if out.External, err = s.Q.BlockLinksTouching(ctx, ids); err != nil {
-		return out, err
+	loaded := make(map[uuid.UUID]bool, len(ids))
+	for _, id := range ids {
+		loaded[id] = true
+	}
+	for _, l := range links {
+		if loaded[l.SourceID] && loaded[l.TargetID] {
+			out.Links = append(out.Links, l)
+		} else {
+			out.External = append(out.External, l)
+		}
 	}
 	for _, p := range out.Projects {
 		sprints, err := s.Q.ListSprints(ctx, dbq.ListSprintsParams{ProjectID: p.ID})
@@ -167,9 +177,8 @@ func (s *Service) projectsByKeys(ctx context.Context, actor *authz.Actor, keys [
 	return out, nil
 }
 
-// ExternalDependencies renders a timeline's links to issues it doesn't show. The other issue is
-// named (with a link id to remove it by) only when actor can browse it; otherwise just whether
-// it is still open.
+// ExternalDependencies renders a timeline's links to unfinished issues it doesn't show. The other
+// issue is named (with a link id to remove it by) only when actor can browse it.
 func (s *Service) ExternalDependencies(ctx context.Context, actor *authz.Actor, tl Timeline, keyOf map[uuid.UUID]string) ([]api.ExternalDependency, error) {
 	out := []api.ExternalDependency{}
 	if len(tl.External) == 0 {
@@ -223,10 +232,10 @@ func (s *Service) ExternalDependencies(ctx context.Context, actor *authz.Actor, 
 			other = l.SourceID
 		}
 		st, ok := statuses[other]
-		if !ok {
-			continue // deleted meanwhile
+		if !ok || done[st] {
+			continue // deleted meanwhile, or done: nothing to wait for
 		}
-		dep.Open = !done[st]
+		dep.Open = true
 		if v, ok := viewByID[other]; ok {
 			id := l.ID
 			dep.LinkId, dep.Other = &id, &v

@@ -291,6 +291,11 @@ func TestProgrammeTimeline(t *testing.T) {
 		}
 	}
 
+	// Once the outside blocker is done there is nothing to wait for: it is left out.
+	ada.transition(outIssue, "done", 200)
+	bob.get("/api/v1/timeline?programme=PROG", &tl)
+	eq(t, len(anyObjs(tl["externalLinks"])), 1, "done blockers are left out")
+
 	bob.must("GET", "/api/v1/timeline?programme=PROG&projects=APP", nil, 400, nil)
 	bob.must("GET", "/api/v1/timeline?programme=APP", nil, 404, nil)
 }

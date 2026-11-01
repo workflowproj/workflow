@@ -29,14 +29,13 @@ func (q *Queries) AddProgrammeProject(ctx context.Context, arg AddProgrammeProje
 }
 
 const blockLinksTouching = `-- name: BlockLinksTouching :many
-SELECT id, source_id, target_id, link_type, created_by, created_at FROM issue_links
-WHERE link_type = 'blocks'
-  AND ((source_id = ANY($1::uuid[]) AND NOT target_id = ANY($1::uuid[]))
-    OR (target_id = ANY($1::uuid[]) AND NOT source_id = ANY($1::uuid[])))
+SELECT id, source_id, target_id, link_type, created_by, created_at FROM issue_links WHERE link_type = 'blocks' AND source_id = ANY($1::uuid[])
+UNION
+SELECT id, source_id, target_id, link_type, created_by, created_at FROM issue_links WHERE link_type = 'blocks' AND target_id = ANY($1::uuid[])
 ORDER BY created_at
 `
 
-// Blocks links with exactly one end among the given issues.
+// Blocks links with either end among the given issues.
 func (q *Queries) BlockLinksTouching(ctx context.Context, ids []uuid.UUID) ([]IssueLink, error) {
 	rows, err := q.db.Query(ctx, blockLinksTouching, ids)
 	if err != nil {

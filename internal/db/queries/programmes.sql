@@ -73,9 +73,8 @@ WHERE b.project_id <> t.project_id AND bs.category <> 'done'
 ORDER BY b.project_id, b.number;
 
 -- name: BlockLinksTouching :many
--- Blocks links with exactly one end among the given issues.
-SELECT * FROM issue_links
-WHERE link_type = 'blocks'
-  AND ((source_id = ANY(@ids::uuid[]) AND NOT target_id = ANY(@ids::uuid[]))
-    OR (target_id = ANY(@ids::uuid[]) AND NOT source_id = ANY(@ids::uuid[])))
+-- Blocks links with either end among the given issues.
+SELECT * FROM issue_links WHERE link_type = 'blocks' AND source_id = ANY(@ids::uuid[])
+UNION
+SELECT * FROM issue_links WHERE link_type = 'blocks' AND target_id = ANY(@ids::uuid[])
 ORDER BY created_at;
