@@ -218,8 +218,7 @@ function InitiativeRow() {
           align="end"
           trigger={({ toggle, open }) => (
             <button type="button" className={ghost} disabled={!editable || !scope} onClick={toggle} aria-haspopup="dialog" aria-expanded={open}>
-              {/* Named "Initiative: CHK-1 Self-serve checkout", with the text shown (WCAG 2.5.3). */}
-              <span className="sr-only">Initiative: </span>
+              <FieldName label="Initiative" />
               {parent ? (
                 <>
                   <IssueTypeIcon type={parent.type} />
