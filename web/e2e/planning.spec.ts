@@ -40,6 +40,8 @@ test("board: a move with a transition screen waits for it, and Cancel leaves the
   await page.goto(`/projects/${key}/board`);
   const waiting = page.getByRole("group", { name: "Waiting for support column" }).locator(`[data-issue-key="${req.key}"]`);
   const done = page.getByRole("group", { name: "Done column" }).locator(`[data-issue-key="${req.key}"]`);
+  // dnd-kit's live region: a failed check shows what the drag announced instead.
+  const announced = page.locator('[id^="DndLiveRegion"]');
   // Drag the card onto Done, dropping once the drag announces it is over that column.
   const drag = async () => {
     const from = (await waiting.boundingBox())!;
@@ -47,9 +49,9 @@ test("board: a move with a transition screen waits for it, and Cancel leaves the
     await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
     await page.mouse.down();
     await page.mouse.move(from.x + from.width / 2 + 12, from.y + from.height / 2, { steps: 3 });
-    await expect(page.getByText(`${req.key} is over Waiting for support.`)).toBeAttached();
+    await expect(announced).toHaveText(`${req.key} is over Waiting for support.`);
     await page.mouse.move(to.x + to.width / 2, to.y + 120, { steps: 12 });
-    await expect(page.getByText(`${req.key} is over Done.`)).toBeAttached();
+    await expect(announced).toHaveText(`${req.key} is over Done.`);
     await page.mouse.up();
   };
 

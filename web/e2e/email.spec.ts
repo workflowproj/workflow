@@ -59,13 +59,16 @@ test("email notifications: preferences, a combined email, one-click unsubscribe 
   // Nobody is emailed about their own changes.
   expect((await mailbox(page.request, "e2e-admin@example.com")).filter((m) => m.subject.includes(`${key}-1`))).toHaveLength(0);
 
-  // The email's unsubscribe link asks first, then switches those emails off.
-  const unsubscribe = new URL(mail.headers!["List-Unsubscribe"].replace(/^<|>$/g, ""));
-  await mel.goto(unsubscribe.pathname + unsubscribe.search);
+  // The email's unsubscribe link asks first, then switches those emails off. It points at the
+  // hooks URL (WFM_HOOKS_PUBLIC_URL), which only the hooks pods serve, so open it as written.
+  await mel.goto(mail.headers!["List-Unsubscribe"].replace(/^<|>$/g, ""));
   await expect(mel.getByRole("heading", { name: "Unsubscribe from emails about assignments and comments?" })).toBeVisible();
   await mel.getByRole("button", { name: "Unsubscribe", exact: true }).click();
   await expect(mel.getByRole("heading", { name: "You're unsubscribed" })).toBeVisible();
-  await mel.getByRole("link", { name: "Manage email notifications" }).click();
+  // Its link back goes to the profile on the public URL, which can be another host than the one
+  // Mel signed in on here (in CI, the Ingress host rather than the port-forward).
+  await expect(mel.getByRole("link", { name: "Manage email notifications" })).toHaveAttribute("href", /\/profile#email-notifications$/);
+  await mel.goto("/profile#email-notifications");
   await expect(section.getByRole("radio", { name: "Assigned to me: Off" })).toBeChecked();
   await expect(section.getByRole("radio", { name: "Comments: Off" })).toBeChecked();
   await expect(section.getByRole("radio", { name: "Status changes: Daily digest" })).toBeChecked();
