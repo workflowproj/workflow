@@ -77,8 +77,12 @@ export function RiskMatrix({ cells, selected, onSelect }: { cells: Schemas["Risk
                 const label = `Likelihood ${l} ${LIKELIHOOD[l - 1]}, impact ${i} ${IMPACT[i - 1]}: score ${c.score}, ${RATING_LABEL[c.rating].toLowerCase()}; ${c.count} open risk${c.count === 1 ? "" : "s"}`;
                 const body = (
                   <>
-                    <span className="absolute top-1 right-1.5 text-[10px] font-medium tabular-nums opacity-90">{c.score}</span>
-                    <span className="text-lg leading-none font-semibold tabular-nums">{c.count > 0 ? c.count : ""}</span>
+                    <span aria-hidden className="absolute top-1 right-1.5 text-[10px] font-medium tabular-nums opacity-90">
+                      {c.score}
+                    </span>
+                    <span aria-hidden className="text-lg leading-none font-semibold tabular-nums">
+                      {c.count > 0 ? c.count : ""}
+                    </span>
                   </>
                 );
                 const cls = cn("relative flex h-12 w-full items-center justify-center rounded-md", ratingClass[c.rating]);
@@ -87,12 +91,13 @@ export function RiskMatrix({ cells, selected, onSelect }: { cells: Schemas["Risk
                     {c.count > 0 || on ? (
                       <button
                         type="button"
-                        aria-label={label}
                         aria-pressed={on}
                         title={label}
                         onClick={() => onSelect(on ? undefined : { likelihood: l, impact: i })}
                         className={cn(cls, "hover:brightness-95 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent", on && "ring-2 ring-accent ring-offset-1 ring-offset-surface")}
                       >
+                        {/* The label is the button's text, not an aria-label, so its name holds the score and count shown (WCAG 2.5.3); those are hidden so they aren't read twice. */}
+                        <span className="sr-only">{label}</span>
                         {body}
                       </button>
                     ) : (

@@ -201,7 +201,8 @@ export function DevIndicators({ dev }: { dev?: Issue["dev"] }) {
 
 /**
  * SortableIssueCard: drag with the pointer, or focus it and press Space to pick it up (arrows
- * move, Space drops, Escape cancels). Click or Enter opens the issue.
+ * move, Space drops, Escape cancels). Click or Enter opens the issue. What the card shows (the
+ * summary, key and fields) is its accessible name.
  */
 export function SortableIssueCard({
   issue,
@@ -233,7 +234,6 @@ export function SortableIssueCard({
       {...listeners}
       onKeyDown={onKeyDown}
       onClick={() => onOpen(issue.key)}
-      aria-label={`${issue.key} ${issue.summary}`}
       data-issue-key={issue.key}
       className={cn(
         "cursor-pointer rounded-md outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-canvas",

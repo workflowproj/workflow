@@ -16,8 +16,9 @@ test("time tracking: estimates, logging work and the timesheet", async ({ page }
 
   await page.goto(`/browse/${issue.key}`);
   const panel = page.getByRole("region", { name: "Time tracking" });
-  await expect(panel.getByRole("button", { name: "Original estimate" })).toHaveText("1d");
-  await expect(panel.getByRole("button", { name: "Remaining estimate" })).toHaveText("1d");
+  // An estimate's button reads "Original estimate: 1d" (the field's name is for screen readers only).
+  await expect(panel.getByRole("button", { name: "Original estimate" })).toHaveText("Original estimate: 1d");
+  await expect(panel.getByRole("button", { name: "Remaining estimate" })).toHaveText("Remaining estimate: 1d");
 
   // Log 3h: the remaining estimate adjusts automatically.
   await panel.getByRole("button", { name: "Log work" }).click();
@@ -28,7 +29,7 @@ test("time tracking: estimates, logging work and the timesheet", async ({ page }
   await dialog.getByRole("button", { name: "Log work" }).click();
   await expect(dialog).toBeHidden();
   await expect(panel.getByText("3h logged")).toBeVisible();
-  await expect(panel.getByRole("button", { name: "Remaining estimate" })).toHaveText("5h");
+  await expect(panel.getByRole("button", { name: "Remaining estimate" })).toHaveText("Remaining estimate: 5h");
 
   // Log 6h and set the remaining estimate to 1h: the issue runs over its estimate.
   await panel.getByRole("button", { name: "Log work" }).click();
@@ -45,7 +46,7 @@ test("time tracking: estimates, logging work and the timesheet", async ({ page }
   await panel.getByRole("button", { name: "Original estimate" }).click();
   await panel.getByRole("textbox", { name: "Original estimate" }).fill("2d");
   await panel.getByRole("textbox", { name: "Original estimate" }).press("Enter");
-  await expect(panel.getByRole("button", { name: "Original estimate" })).toHaveText("2d");
+  await expect(panel.getByRole("button", { name: "Original estimate" })).toHaveText("Original estimate: 2d");
   await expect(panel.getByText(/over the/)).toBeHidden();
 
   // The work log: edit one entry (the remaining estimate absorbs the difference), delete another.
@@ -60,12 +61,12 @@ test("time tracking: estimates, logging work and the timesheet", async ({ page }
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(dialog).toBeHidden();
   await expect(first.getByText("2h", { exact: true })).toBeVisible();
-  await expect(panel.getByRole("button", { name: "Remaining estimate" })).toHaveText("2h");
+  await expect(panel.getByRole("button", { name: "Remaining estimate" })).toHaveText("Remaining estimate: 2h");
   await log.getByRole("listitem").filter({ hasText: "6h" }).getByRole("button", { name: "Delete" }).click();
   await page.getByRole("dialog", { name: "Delete work log?" }).getByRole("button", { name: "Delete" }).click();
   await expect(log.getByRole("listitem")).toHaveCount(1);
   await expect(panel.getByText("2h logged")).toBeVisible();
-  await expect(panel.getByRole("button", { name: "Remaining estimate" })).toHaveText("1d");
+  await expect(panel.getByRole("button", { name: "Remaining estimate" })).toHaveText("Remaining estimate: 1d");
 
   await page.getByRole("tab", { name: "History" }).click();
   await expect(page.getByText("logged work").first()).toBeVisible();

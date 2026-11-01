@@ -21,6 +21,15 @@ export function None({ children = "None" }: { children?: ReactNode }) {
 }
 
 /**
+ * FieldName starts a value trigger's content with the field's name, for assistive technology
+ * only. The trigger is then named "Assignee: Priya Raman": the context with the value shown,
+ * so its accessible name includes its visible text (WCAG 2.5.3, Label in Name).
+ */
+export function FieldName({ label }: { label: string }) {
+  return <span className="sr-only">{label}: </span>;
+}
+
+/**
  * MenuKeys wraps popover content: focuses the first item and moves focus with the arrow keys.
  * The Popover closes on Escape; focus then returns to the trigger instead of being lost.
  */
@@ -115,7 +124,8 @@ export function InlineSelect({
     <BlockPopover
       align={align}
       trigger={({ toggle, open }) => (
-        <button type="button" className={ghost} disabled={disabled} onClick={toggle} aria-label={label} aria-haspopup="menu" aria-expanded={open}>
+        <button type="button" className={ghost} disabled={disabled} onClick={toggle} aria-haspopup="menu" aria-expanded={open}>
+          <FieldName label={label} />
           {current ? (
             <>
               {current.icon && (
@@ -179,7 +189,8 @@ export function InlineMulti({
     <BlockPopover
       align="end"
       trigger={({ toggle, open }) => (
-        <button type="button" className={cn(ghost, "flex-wrap")} disabled={disabled} onClick={toggle} aria-label={label} aria-haspopup="menu" aria-expanded={open}>
+        <button type="button" className={cn(ghost, "flex-wrap")} disabled={disabled} onClick={toggle} aria-haspopup="menu" aria-expanded={open}>
+          <FieldName label={label} />
           {selected.length + unknown.length === 0 ? (
             <None />
           ) : (
@@ -302,8 +313,9 @@ export function InlineUser({
     <BlockPopover
       align="end"
       trigger={({ toggle, open }) => (
-        <button type="button" className={ghost} disabled={disabled} onClick={toggle} aria-label={label} aria-haspopup="menu" aria-expanded={open}>
-          <UserAvatar user={value} size={22} />
+        <button type="button" className={ghost} disabled={disabled} onClick={toggle} aria-haspopup="menu" aria-expanded={open}>
+          <FieldName label={label} />
+          <UserAvatar user={value} size={22} decorative />
           {value ? <span className="truncate">{value.displayName}</span> : <None>{noneLabel}</None>}
         </button>
       )}
@@ -360,7 +372,8 @@ export function InlineText({
     );
   }
   return (
-    <button type="button" className={ghost} disabled={disabled} onClick={() => setDraft(value)} aria-label={label}>
+    <button type="button" className={ghost} disabled={disabled} onClick={() => setDraft(value)}>
+      <FieldName label={label} />
       {value ? (children ?? <span className="truncate">{value}</span>) : <None />}
     </button>
   );
@@ -414,7 +427,8 @@ export function InlineDate({ value, onCommit, disabled, label }: { value?: strin
   }
   return (
     <div className="group flex items-center">
-      <button type="button" className={ghost} disabled={disabled} onClick={() => setEditing(true)} aria-label={label}>
+      <button type="button" className={ghost} disabled={disabled} onClick={() => setEditing(true)}>
+        <FieldName label={label} />
         {value ? formatDate(value) : <None />}
       </button>
       {value && !disabled && (
@@ -561,7 +575,8 @@ export function InlineLabels({ value, onCommit, projectKey, disabled }: { value:
     );
   }
   return (
-    <button type="button" className={cn(ghost, "flex-wrap")} disabled={disabled} onClick={() => setDraft(value)} aria-label="Edit labels">
+    <button type="button" className={cn(ghost, "flex-wrap")} disabled={disabled} onClick={() => setDraft(value)}>
+      <FieldName label="Edit labels" />
       {value.length === 0 ? (
         <None />
       ) : (

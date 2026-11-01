@@ -47,7 +47,8 @@ export function CopyButton({
       size={size}
       variant={variant}
       className={className}
-      aria-label={`${label}${copied ? " (copied)" : ""}`}
+      // "Copy key: copied" while it shows "Copied": the name holds the text shown (WCAG 2.5.3).
+      aria-label={copied ? `${label}: copied` : undefined}
       icon={copied ? <Check className="size-3.5 text-success" /> : <Copy className="size-3.5" />}
       onClick={async () => setCopied(await copyText(value))}
     >

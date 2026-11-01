@@ -436,7 +436,6 @@ function RequestTypeDialog({
                 )}
                 <div className="max-w-xs">
                   <UserPicker
-                    label="Add an approver"
                     noneLabel="Add an approver…"
                     allowNone={false}
                     value={null}
