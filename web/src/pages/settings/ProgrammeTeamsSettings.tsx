@@ -70,7 +70,7 @@ export function ProgrammeTeamsSettings() {
           {teams.length === 0 && data.hiddenCount === 0 ? (
             <EmptyState icon={<Network className="size-8" />} title="No teams yet" body="Add the projects whose epics deliver this programme's initiatives." />
           ) : (
-            <ul className="divide-y divide-line">
+            <ul className="divide-y divide-line" aria-label="Team projects">
               {teams.map((t) => (
                 <li key={t.key} className="flex items-center gap-3 px-4 py-2.5">
                   <ProjectAvatar projectKey={t.key} />

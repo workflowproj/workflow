@@ -22,14 +22,14 @@ test("programmes: teams, an epic under an initiative, the roadmap, timeline and 
   // The programme opens on its roadmap; with no teams yet it says how to add them.
   await page.goto(`/projects/${prog}`);
   await expect(page).toHaveURL(new RegExp(`/projects/${prog}/roadmap`));
-  await expect(page.getByRole("heading", { name: "No teams yet" })).toBeVisible();
+  await expect(page.getByText("No teams yet")).toBeVisible();
 
   // Add both teams in settings.
   await page.goto(`/projects/${prog}/settings/teams`);
   for (const key of [app, ops]) {
     await page.getByLabel("Add a team project").selectOption(key);
     await page.getByRole("button", { name: "Add team" }).click();
-    await expect(page.getByRole("link", { name: new RegExp(key) })).toBeVisible();
+    await expect(page.getByRole("list", { name: "Team projects" }).getByRole("link", { name: new RegExp(key) })).toBeVisible();
   }
 
   // The App epic joins the initiative from its Initiative field.
