@@ -165,7 +165,7 @@ function EpicRow({ epic, onOpen }: { epic: ProgrammeEpic; onOpen: (key: string) 
         </button>
         <StatusBadge status={issue.status} className="shrink-0" />
       </div>
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 md:grid md:shrink-0 md:grid-cols-[14rem_13rem_6.5rem] md:items-center">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 md:grid md:shrink-0 md:grid-cols-[16.5rem_13rem_6.5rem] md:items-center">
         <Dates due={issue.dueDate} forecast={epic.forecastDate} />
         <ProgressBar progress={epic.progress} className="w-52 md:w-auto" />
         <Flags flags={epic.flags} />
