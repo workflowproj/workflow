@@ -25,9 +25,11 @@ const jqlHelp = `Query examples (a JQL-like language):
   parent = PLAT-1   (children of an epic)    fixVersion = "2026.11"
   kind = risk AND "Risk score" >= 10 AND statusCategory != Done   (serious open risks)
   issue in linkedIssues("PLAT-40", "is mitigated by")   (work mitigating a risk)
+  initiative = PROG-3   (everything under a programme's initiative, across its team projects)
+  project in programmeProjects("PROG") AND issue in descendantsOf("PROG-3") AND statusCategory != Done
 Fields: project, key, type, kind (work, risk, decision), status, statusCategory ("To Do", "In Progress", Done), assignee, reporter
 (email or currentUser()), priority (Highest..Lowest, comparable), labels, sprint (name, openSprints(),
-closedSprints(), futureSprints()), fixVersion, parent, summary/description/comment (~ contains), text ~
+closedSprints(), futureSprints()), fixVersion, parent, epic, initiative, summary/description/comment (~ contains), text ~
 (full text), created/updated/resolved/due/start (dates: "2026-11-01", -7d, startOfWeek()), storyPoints,
 originalEstimate/remainingEstimate/timeSpent (durations: 2h, "1d 4h"), worklogAuthor, worklogDate.
 Operators: = != in "not in" ~ !~ < <= > >= "is EMPTY" "is not EMPTY"; combine with AND, OR, NOT, ().`
@@ -48,6 +50,7 @@ func (t *tools) register(s *mcp.Server) {
 	mcp.AddTool(s, &mcp.Tool{Name: "get_board", Description: "A project's board: each column with its issues (the active sprint on a Scrum board).", Annotations: read("Get board")}, t.getBoard)
 	mcp.AddTool(s, &mcp.Tool{Name: "get_sprint_report", Description: "Progress of a sprint (the active one by default): commitment, completed work, scope added or removed, and the day-by-day burndown.", Annotations: read("Sprint report")}, t.getSprintReport)
 	mcp.AddTool(s, &mcp.Tool{Name: "get_metrics", Description: "Delivery metrics over projects and/or a query: summary (open, created, resolved, overdue, cycle time), breakdown (counts and points by a field), cycle_time, created_resolved, cumulative_flow, or velocity (one project's recent sprints).", Annotations: read("Get metrics")}, t.getMetrics)
+	mcp.AddTool(s, &mcp.Tool{Name: "get_programme", Description: "A programme's roadmap: its initiatives with the team projects' epics under them, progress, forecast dates and flags (late, overdue, unscheduled, blocked by another project), and team epics that belong to no initiative.", Annotations: read("Get programme")}, t.getProgramme)
 	mcp.AddTool(s, &mcp.Tool{Name: "find_users", Description: "Find people by name or email (to assign issues or write queries).", Annotations: read("Find users")}, t.findUsers)
 
 	if t.readOnly {
@@ -496,6 +499,67 @@ func (t *tools) getSprintReport(ctx context.Context, _ *mcp.CallToolRequest, in 
 	return text(b.String()), nil, nil
 }
 
+type programmeIn struct {
+	ProgrammeKey string `json:"programmeKey" jsonschema:"the programme project's key"`
+}
+
+func (t *tools) getProgramme(ctx context.Context, _ *mcp.CallToolRequest, in programmeIn) (*mcp.CallToolResult, any, error) {
+	ctx, err := t.ctx(ctx, false)
+	if err != nil {
+		return nil, nil, err
+	}
+	o, err := as[api.GetProgrammeOverview200JSONResponse](t.api.GetProgrammeOverview(ctx, api.GetProgrammeOverviewRequestObject{ProjectKey: in.ProgrammeKey}))
+	if err != nil {
+		return nil, nil, err
+	}
+	var b strings.Builder
+	var teams []string
+	for _, p := range o.Teams {
+		teams = append(teams, p.Key)
+	}
+	fmt.Fprintf(&b, "%s (%s). Teams: %s", o.Programme.Name, o.Programme.Key, strings.Join(teams, ", "))
+	if o.HiddenTeamCount > 0 {
+		fmt.Fprintf(&b, " (and %d you can't see, left out below)", o.HiddenTeamCount)
+	}
+	b.WriteString("\n")
+	progress := func(p api.IssueProgress) string {
+		return fmt.Sprintf("%d/%d issues done, %s/%s points", p.Done, p.Total, num(p.DonePoints), num(p.Points))
+	}
+	flags := func(fs []api.PlanningFlag) string {
+		var out []string
+		for _, f := range fs {
+			out = append(out, f.Message)
+		}
+		if len(out) == 0 {
+			return ""
+		}
+		return " ⚑ " + strings.Join(out, "; ")
+	}
+	date := func(d *openapi_types.Date) string {
+		if d == nil {
+			return "none"
+		}
+		return d.String()
+	}
+	for _, in := range o.Initiatives {
+		due := "no due date"
+		if in.Issue.DueDate != nil {
+			due = "due " + in.Issue.DueDate.String()
+		}
+		fmt.Fprintf(&b, "\n%s %s [%s] %s, forecast %s; %s%s\n", in.Issue.Key, in.Issue.Summary, in.Issue.Status.Name, due, date(in.ForecastDate), progress(in.Progress), flags(in.Flags))
+		for _, e := range in.Epics {
+			fmt.Fprintf(&b, "  %s %s [%s] forecast %s; %s%s\n", e.Issue.Key, e.Issue.Summary, e.Issue.Status.Name, date(e.ForecastDate), progress(e.Progress), flags(e.Flags))
+		}
+	}
+	if o.UnlinkedTotal > 0 {
+		fmt.Fprintf(&b, "\nOpen team epics under no initiative (%d):\n", o.UnlinkedTotal)
+		for _, e := range o.UnlinkedEpics {
+			fmt.Fprintf(&b, "  %s %s [%s]\n", e.Key, e.Summary, e.Status.Name)
+		}
+	}
+	return text(b.String()), nil, nil
+}
+
 type metricsIn struct {
 	Kind       string   `json:"kind" jsonschema:"summary, breakdown, cycle_time, created_resolved, cumulative_flow or velocity"`
 	Projects   []string `json:"projects,omitempty" jsonschema:"project keys (default: every project you can browse)"`
@@ -656,7 +720,7 @@ type createIn struct {
 	Description string         `json:"description,omitempty" jsonschema:"Markdown"`
 	Priority    string         `json:"priority,omitempty" jsonschema:"highest, high, medium, low or lowest"`
 	Assignee    string         `json:"assignee,omitempty" jsonschema:"email, name, or me"`
-	ParentKey   string         `json:"parentKey,omitempty" jsonschema:"epic (for a story/task/bug) or parent issue (for a sub-task)"`
+	ParentKey   string         `json:"parentKey,omitempty" jsonschema:"epic (for a story/task/bug), parent issue (for a sub-task) or a programme's initiative (for an epic in one of its team projects)"`
 	Labels      []string       `json:"labels,omitempty"`
 	StoryPoints *float64       `json:"storyPoints,omitempty"`
 	Sprint      string         `json:"sprint,omitempty" jsonschema:"active, or a sprint name or id"`

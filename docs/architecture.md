@@ -54,6 +54,12 @@ or, for open projects without an explicit membership, the project's open role.
   refuse them, and they have no parent or children. Their fields have reserved keys
   (`risk_*`, `decision_*`); a risk's score and rating are derived when its likelihood or impact
   changes. See [risks-decisions.md](risks-decisions.md).
+- **Programmes**: a project from the programme template holds initiatives (level 2) and lists
+  team projects (`programme_projects`). An epic's parent may be an initiative of a programme its
+  project belongs to: the one parent link that crosses projects (`resolveParent`). Membership
+  grants no access, so views that show a programme filter teams, epics, parents and blockers by
+  what the viewer can browse, and automation never acts across projects. See
+  [programmes.md](programmes.md).
 - **Search**: `internal/search` parses the query language and compiles it to parameterised SQL. Text search uses
   a `tsvector` expression index plus `pg_trgm` for fuzzy matching. Results are always limited
   to projects the caller may browse.

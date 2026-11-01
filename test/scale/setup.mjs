@@ -20,6 +20,7 @@ for (const [key, template] of projects) {
   if (template === "scrum") for (let s = 0; s < 26; s++) await call(admin, "POST", `/projects/${key}/sprints`, { name: `${key} Sprint ${s + 1}` }).catch((e) => console.log(e.message));
   for (let v = 0; v < 10; v++) await call(admin, "POST", `/projects/${key}/releases`, { name: `${key} 1.${v}` });
   const types = await call(admin, "GET", `/projects/${key}/issue-types`);
-  for (const t of types) await call(admin, "POST", "/issues", { projectKey: key, typeKey: t.key, summary: `Seed ${t.key}`, ...(t.level === -1 ? { parentKey: `${key}-1` } : {}) }).catch((e) => console.log(e.message));
+  // One issue of each work type (seed.sql numbers its issues from 5); risks and decisions aren't planned work.
+  for (const t of types.filter((t) => t.kind === "work")) await call(admin, "POST", "/issues", { projectKey: key, typeKey: t.key, summary: `Seed ${t.key}`, ...(t.level === -1 ? { parentKey: `${key}-1` } : {}) }).catch((e) => console.log(e.message));
 }
 console.log(admin);

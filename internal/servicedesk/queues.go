@@ -140,7 +140,7 @@ func (s *Service) QueueIssues(ctx context.Context, actor *authz.Actor, id uuid.U
 	if err != nil {
 		return api.QueueIssues{}, err
 	}
-	views, err := s.Tracker.IssueViews(ctx, issues)
+	views, err := s.Tracker.IssueViews(ctx, actor, issues)
 	if err != nil {
 		return api.QueueIssues{}, err
 	}

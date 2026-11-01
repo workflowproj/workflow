@@ -26,13 +26,13 @@ fixVersion = "2026.11" AND statusCategory != Done
 
 | Field (aliases) | Operators | Values |
 |---|---|---|
-| `project` | `=` `!=` `in` `not in` | key (old keys after a rename work) |
+| `project` | `=` `!=` `in` `not in` | key (old keys after a rename work), or `programmeProjects("CHK")`: a programme and its team projects ([programmes.md](programmes.md)) |
 | `key` (`issuekey`, `issue`) | `=` `!=` `in` `not in` `<` `<=` `>` `>=` | `PLAT-12`; comparisons stay within the project |
 | `status` | `=` `!=` `in` `not in` | status name |
 | `statusCategory` (`category`) | `=` `!=` `in` `not in` | `"To Do"`, `"In Progress"`, `Done` |
 | `type` (`issuetype`) | `=` `!=` `in` `not in` | issue type key or name |
 | `kind` (`typeKind`) | `=` `!=` `in` `not in` | `work`, `risk` or `decision`: the issue type's kind ([risks-decisions.md](risks-decisions.md)) |
-| `level` (`hierarchyLevel`) | `=` `!=` `<` `>` … | `1` epics, `0` standard, `-1` sub-tasks |
+| `level` (`hierarchyLevel`) | `=` `!=` `<` `>` … | `2` initiatives, `1` epics, `0` standard, `-1` sub-tasks |
 | `assignee`, `reporter` | `=` `!=` `in` `not in` `is [not] EMPTY` | email, user id, `currentUser()`, `membersOf("group")` |
 | `watcher` | `=` `!=` `in` | as above |
 | `priority` | `=` `!=` `in` `<` `<=` `>` `>=` | `Highest`, `High`, `Medium`, `Low`, `Lowest` (ordered) |
@@ -42,7 +42,8 @@ fixVersion = "2026.11" AND statusCategory != Done
 | `fixVersion` (`release`, `version`) | `=` `!=` `in` `not in` `is [not] EMPTY` | release name, `releasedVersions()`, `unreleasedVersions()` |
 | `deployedTo` | `=` `!=` `in` `not in` `is [not] EMPTY` | environment name (any case): issues a successful deployment there contained (see [scm.md](scm.md#deployments)); `EMPTY` for issues never deployed |
 | `parent` | `=` `!=` `in` `is [not] EMPTY` | issue key: the direct parent |
-| `epic` (`epicLink`) | `=` `!=` `in` `is [not] EMPTY` | epic key: everything under the epic, sub-tasks included |
+| `epic` (`epicLink`) | `=` `!=` `in` `is [not] EMPTY` | epic key: everything under the epic, sub-tasks included. Epics only: an initiative is not an epic, and an epic has no epic of its own |
+| `initiative` | `=` `!=` `in` `is [not] EMPTY` | initiative key: everything under a programme's initiative, in every team project ([programmes.md](programmes.md)) |
 | `issueLinkType` | `=` `!=` `in` `not in` `is [not] EMPTY` | `blocks`, `"is blocked by"`, `relates`, `duplicates`, `"is duplicated by"`, `clones`, `"is cloned by"`, `mitigates`, `"is mitigated by"`, `implements`, `"is implemented by"`, `supersedes`, `"is superseded by"` — issues with such a link |
 | `summary` (`title`), `description` | `~` `!~` `=` `!=` `is [not] EMPTY` | `~` is a case-insensitive substring match |
 | `text` | `~` `!~` | full-text search over summary and description (web-search syntax: `"exact phrase"`, `-exclude`, `or`) |
@@ -74,10 +75,12 @@ Issue functions go with `issue in` (or `key in`):
   `linkedIssues("PLAT-1", "blocks")` what PLAT-1 blocks.
 - `issue in blockedIssues()` — issues blocked by at least one issue that is not done.
 - `issue in blockingIssues()` — issues blocking at least one issue that is not done.
+- `issue in descendantsOf("CHK-1")` — everything below an issue: its children, theirs and theirs.
 
 ```
 sprint in openSprints() AND issue in blockedIssues()          blocked sprint work
 epic = PLAT-1 AND statusCategory != Done                       what's left in an epic
+initiative = CHK-1 AND statusCategory != Done                  what's left for an initiative, across teams
 issue in linkedIssues("PLAT-42", "is blocked by") AND statusCategory != Done
 issue in linkedIssues("PLAT-40", "is mitigated by")           the work mitigating a risk
 kind = decision AND issueLinkType = "is superseded by"         decisions that were replaced

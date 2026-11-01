@@ -7,7 +7,7 @@ import type { Issue } from "@/api/types";
 import { EmptyState, PageSpinner } from "@/components/ui";
 import { ErrorBox } from "@/components/ErrorBox";
 import { cn } from "@/lib/cn";
-import { buildRows, dependencies, isOverdue, schedules, stats, todayDay } from "./model";
+import { buildProgrammeRows, buildRows, dependencies, externalWarnings, isOverdue, mergeWarnings, rollupProgress, schedules, stats, todayDay } from "./model";
 import { timelineQuery, useEpicProgress, useTimelineEdits } from "./queries";
 import type { Zoom } from "./scale";
 import { TimelineGrid } from "./TimelineGrid";
@@ -28,10 +28,12 @@ function readZoom(): Zoom {
 /**
  * Timeline is the roadmap view shared by a project's Timeline tab and the cross-project big
  * picture: a tree of epics and issues beside a time grid with bars, sprints, releases and
- * dependencies. `projects` is a comma list ("" = all browsable projects).
+ * dependencies. `projects` is a comma list ("" = all browsable projects); `programme` instead
+ * shows a programme's initiatives, with the team epics and issues under each.
  */
 export function Timeline({
   projects,
+  programme,
   multi,
   baseJql,
   onOpen,
@@ -39,6 +41,7 @@ export function Timeline({
   live,
 }: {
   projects: string;
+  programme?: string;
   multi: boolean;
   baseJql?: string;
   onOpen: (key: string) => void;
@@ -62,7 +65,7 @@ export function Timeline({
   const today = todayDay();
 
   const jql = [baseJql, filters.mine ? "assignee = currentUser()" : ""].filter(Boolean).map((j) => `(${j})`).join(" AND ");
-  const query = timelineQuery(projects, jql, showDone ? 90 : 0);
+  const query = timelineQuery(projects, jql, showDone ? 90 : 0, programme);
   const { data, isLoading, error, isPlaceholderData } = useQuery(query);
   // One event stream follows every project shown.
   useLiveEvents(live && data ? data.projects.map((p) => p.key) : undefined, { debounceMs: 500 });
@@ -73,20 +76,28 @@ export function Timeline({
 
   const sched = useMemo(() => (data ? schedules(data) : new Map()), [data]);
   const { deps, warnings } = useMemo(() => (data ? dependencies(data, sched) : { deps: [], warnings: new Map<string, string[]>() }), [data, sched]);
+  // Rows also explain dependencies on issues the timeline doesn't show (the conflict filter doesn't count them).
+  const shownWarnings = useMemo(() => (data ? mergeWarnings(warnings, externalWarnings(data)) : warnings), [data, warnings]);
   const counts = useMemo(() => (data ? stats(data, sched, deps, today) : { inProgress: 0, overdue: 0, conflicts: 0, unscheduled: 0 }), [data, sched, deps, today]);
   const include = useMemo(
     () => (filters.overdue || filters.conflicts ? (i: Issue) => (!filters.overdue || isOverdue(i, today)) && (!filters.conflicts || warnings.has(i.key)) : undefined),
     [filters.overdue, filters.conflicts, warnings, today],
   );
   const filtering = !!include || !!jql;
-  const rows = useMemo(() => (data ? buildRows(data, { multi, collapsed, include, hideEmpty: filtering }) : []), [data, multi, collapsed, include, filtering]);
+  const build = useCallback(
+    (d: Pick<NonNullable<typeof data>, "projects" | "issues">, c: Set<string>) =>
+      programme ? buildProgrammeRows(d, { collapsed: c, include, hideEmpty: filtering }) : buildRows(d, { multi, collapsed: c, include, hideEmpty: filtering }),
+    [programme, multi, include, filtering],
+  );
+  const rows = useMemo(() => (data ? build(data, collapsed) : []), [data, build, collapsed]);
   const epicKeys = useMemo(() => (data?.issues ?? []).filter((i) => i.type.level >= 1).map((i) => i.key), [data]);
-  const { data: progress } = useEpicProgress(epicKeys);
+  const { data: epicFill } = useEpicProgress(epicKeys);
+  const progress = useMemo(() => (epicFill && data ? rollupProgress(data.issues, epicFill) : epicFill), [epicFill, data]);
 
   const toggle = (id: string) => setCollapsed((s) => (s.has(id) ? new Set([...s].filter((x) => x !== id)) : new Set(s).add(id)));
   const toggleAll = (collapse: boolean) => {
     if (!collapse) return setCollapsed(new Set());
-    const all = buildRows(data ?? { projects: [], issues: [] }, { multi, collapsed: new Set(), include, hideEmpty: filtering });
+    const all = build(data ?? { projects: [], issues: [] }, new Set());
     setCollapsed(new Set(all.filter((r) => r.kind !== "issue" || r.childCount > 0).map((r) => r.id)));
   };
   const flip = (k: keyof QuickFilters) => setFilters((f) => ({ ...f, [k]: !f[k] }));
@@ -153,7 +164,7 @@ export function Timeline({
             rows={rows}
             sched={sched}
             deps={deps}
-            warnings={warnings}
+            warnings={shownWarnings}
             progress={progress}
             zoom={zoom}
             multi={multi}

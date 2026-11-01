@@ -495,7 +495,7 @@ func (s *Service) ReleaseReadiness(ctx context.Context, actor *authz.Actor, id u
 	for k, i := range issues {
 		ids[k] = i.ID
 	}
-	l, err := s.loadLookups(ctx, issues)
+	l, err := s.loadLookups(ctx, actor, issues)
 	if err != nil {
 		return out, err
 	}

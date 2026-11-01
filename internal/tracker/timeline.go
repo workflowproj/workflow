@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/workflowproj/workflow/internal/api"
 	"github.com/workflowproj/workflow/internal/apperr"
 	"github.com/workflowproj/workflow/internal/authz"
 	"github.com/workflowproj/workflow/internal/db/dbq"
@@ -19,12 +20,23 @@ const timelineLimit = 2000
 // Timeline is what the timeline view draws: epics and standard issues with their dates, the
 // dependencies between them, and each project's sprints and releases.
 type Timeline struct {
-	Projects  []dbq.Project
-	Issues    []dbq.Issue
-	Links     []dbq.IssueLink
+	Projects []dbq.Project
+	Issues   []dbq.Issue
+	Links    []dbq.IssueLink
+	// External holds blocks links from a loaded issue to one that isn't loaded.
+	External  []dbq.IssueLink
 	Sprints   []ProjectSprint
 	Releases  []ProjectRelease
 	Truncated bool
+}
+
+// TimelineQuery chooses what a timeline shows: the projects with Keys (every browsable project
+// when empty), or a programme's initiatives and the teams the actor can browse.
+type TimelineQuery struct {
+	Keys      []string
+	Programme string
+	JQL       string
+	DoneDays  int
 }
 
 type ProjectSprint struct {
@@ -39,11 +51,29 @@ type ProjectRelease struct {
 
 // Timeline loads the given projects (all browsable ones when keys is empty). Sub-tasks, risks and
 // decisions are left out, and so are issues resolved more than doneDays ago.
-func (s *Service) Timeline(ctx context.Context, actor *authz.Actor, keys []string, jql string, doneDays int) (Timeline, error) {
+func (s *Service) Timeline(ctx context.Context, actor *authz.Actor, tq TimelineQuery) (Timeline, error) {
 	var out Timeline
 	var err error
-	if out.Projects, err = s.projectsByKeys(ctx, actor, keys); err != nil {
-		return out, err
+	jql, doneDays := tq.JQL, tq.DoneDays
+	switch {
+	case tq.Programme != "" && len(tq.Keys) > 0:
+		return out, apperr.Invalid("programme", "choose a programme or projects, not both")
+	case tq.Programme != "":
+		// A programme's timeline covers the teams the actor can browse; the others are left out
+		// rather than failing the request.
+		prog, err := s.programmeFor(ctx, actor, tq.Programme, authz.ProjectBrowse)
+		if err != nil {
+			return out, err
+		}
+		teams, err := s.programmeTeams(ctx, s.Q, actor, prog)
+		if err != nil {
+			return out, err
+		}
+		out.Projects = append([]dbq.Project{prog}, teams.Teams...)
+	default:
+		if out.Projects, err = s.projectsByKeys(ctx, actor, tq.Keys); err != nil {
+			return out, err
+		}
 	}
 	if doneDays < 0 || doneDays > 3650 {
 		return out, apperr.Invalid("doneDays", "doneDays must be between 0 and 3650")
@@ -77,8 +107,21 @@ func (s *Service) Timeline(ctx context.Context, actor *authz.Actor, keys []strin
 	for i, is := range issues {
 		ids[i] = is.ID
 	}
-	if out.Links, err = s.Q.BlockLinksAmong(ctx, ids); err != nil {
+	// Blocks links between loaded issues are drawn; those to issues outside are listed.
+	links, err := s.Q.BlockLinksTouching(ctx, ids)
+	if err != nil {
 		return out, err
+	}
+	loaded := make(map[uuid.UUID]bool, len(ids))
+	for _, id := range ids {
+		loaded[id] = true
+	}
+	for _, l := range links {
+		if loaded[l.SourceID] && loaded[l.TargetID] {
+			out.Links = append(out.Links, l)
+		} else {
+			out.External = append(out.External, l)
+		}
 	}
 	for _, p := range out.Projects {
 		sprints, err := s.Q.ListSprints(ctx, dbq.ListSprintsParams{ProjectID: p.ID})
@@ -130,6 +173,74 @@ func (s *Service) projectsByKeys(ctx context.Context, actor *authz.Actor, keys [
 			seen[p.ID] = true
 			out = append(out, p)
 		}
+	}
+	return out, nil
+}
+
+// ExternalDependencies renders a timeline's links to unfinished issues it doesn't show. The other
+// issue is named (with a link id to remove it by) only when actor can browse it.
+func (s *Service) ExternalDependencies(ctx context.Context, actor *authz.Actor, tl Timeline, keyOf map[uuid.UUID]string) ([]api.ExternalDependency, error) {
+	out := []api.ExternalDependency{}
+	if len(tl.External) == 0 {
+		return out, nil
+	}
+	otherIDs := make([]uuid.UUID, 0, len(tl.External))
+	for _, l := range tl.External {
+		if _, ok := keyOf[l.SourceID]; ok {
+			otherIDs = append(otherIDs, l.TargetID)
+		} else {
+			otherIDs = append(otherIDs, l.SourceID)
+		}
+	}
+	others, err := s.Q.GetIssuesByIDs(ctx, otherIDs)
+	if err != nil {
+		return nil, err
+	}
+	visible, err := s.browsableIssues(ctx, actor, uuid.Nil, others)
+	if err != nil {
+		return nil, err
+	}
+	views, err := s.IssueViews(ctx, actor, visible)
+	if err != nil {
+		return nil, err
+	}
+	viewByID := map[uuid.UUID]api.Issue{}
+	for _, v := range views {
+		viewByID[v.Id] = v
+	}
+	statuses := map[uuid.UUID]uuid.UUID{}
+	for _, o := range others {
+		statuses[o.ID] = o.StatusID
+	}
+	var statusIDs []uuid.UUID
+	for _, id := range statuses {
+		statusIDs = append(statusIDs, id)
+	}
+	sts, err := s.Q.GetStatusesByIDs(ctx, statusIDs)
+	if err != nil {
+		return nil, err
+	}
+	done := map[uuid.UUID]bool{}
+	for _, st := range sts {
+		done[st.ID] = st.Category == "done"
+	}
+	for _, l := range tl.External {
+		dep := api.ExternalDependency{IssueKey: keyOf[l.SourceID], Direction: api.ExternalDependencyDirectionBlocks}
+		other := l.TargetID
+		if _, ok := keyOf[l.SourceID]; !ok {
+			dep = api.ExternalDependency{IssueKey: keyOf[l.TargetID], Direction: api.ExternalDependencyDirectionBlockedBy}
+			other = l.SourceID
+		}
+		st, ok := statuses[other]
+		if !ok || done[st] {
+			continue // deleted meanwhile, or done: nothing to wait for
+		}
+		dep.Open = true
+		if v, ok := viewByID[other]; ok {
+			id := l.ID
+			dep.LinkId, dep.Other = &id, &v
+		}
+		out = append(out, dep)
 	}
 	return out, nil
 }

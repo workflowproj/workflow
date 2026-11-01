@@ -104,8 +104,9 @@ export function schedules(data: Pick<TimelineData, "issues" | "sprints">): Map<s
     }
     if (s) out.set(i.key, s);
   }
-  for (const i of data.issues) {
-    if (i.type.level < 1) continue;
+  // Then epics, then initiatives, which span their epics' (possibly derived) dates.
+  const upper = data.issues.filter((i) => i.type.level >= 1).sort((a, b) => a.type.level - b.type.level);
+  for (const i of upper) {
     let s: Schedule | undefined = i.startDate && i.dueDate ? own(i) : undefined;
     if (!s) {
       const spans = (children.get(i.key) ?? []).map((c) => out.get(c.key)).filter((x): x is Schedule => !!x);
@@ -192,6 +193,46 @@ export function buildRows(
   return rows;
 }
 
+/**
+ * buildProgrammeRows nests a programme's timeline: each initiative, the team epics under it and
+ * their issues; then, project by project, the epics under no initiative and issues with no epic
+ * (as buildRows draws them). `include`, `collapsed` and `hideEmpty` work as in buildRows.
+ */
+export function buildProgrammeRows(
+  data: Pick<TimelineData, "projects" | "issues">,
+  opts: { collapsed: Set<string>; include?: (i: Issue) => boolean; hideEmpty?: boolean },
+): Row[] {
+  const include = opts.include ?? (() => true);
+  const childrenOf = new Map<string, Issue[]>();
+  for (const i of data.issues) {
+    if (i.parent) childrenOf.set(i.parent.key, [...(childrenOf.get(i.parent.key) ?? []), i]);
+  }
+  const rows: Row[] = [];
+  const placed = new Set<string>();
+  for (const init of data.issues.filter((i) => i.type.level >= 2)) {
+    placed.add(init.key);
+    const epics = childrenOf.get(init.key) ?? [];
+    const under: Row[] = [];
+    let shown = 0;
+    for (const epic of epics) {
+      placed.add(epic.key);
+      const all = childrenOf.get(epic.key) ?? [];
+      for (const k of all) placed.add(k.key);
+      const kids = all.filter(include);
+      if (!include(epic) && kids.length === 0) continue;
+      shown++;
+      under.push({ kind: "issue", id: epic.key, projectKey: epic.projectKey, issue: epic, depth: 1, childCount: kids.length });
+      if (!opts.collapsed.has(epic.key)) for (const k of kids) under.push({ kind: "issue", id: k.key, projectKey: k.projectKey, issue: k, depth: 2, childCount: 0 });
+    }
+    if (!include(init) && shown === 0) continue;
+    rows.push({ kind: "issue", id: init.key, projectKey: init.projectKey, issue: init, depth: 0, childCount: shown });
+    if (!opts.collapsed.has(init.key)) rows.push(...under);
+  }
+  const rest = data.issues.filter((i) => !placed.has(i.key));
+  rows.push(...buildRows({ projects: data.projects, issues: rest }, { multi: true, collapsed: opts.collapsed, include: opts.include, hideEmpty: true }));
+  return rows;
+}
+
 // ---------------------------------------------------------------------------
 // Dependencies
 
@@ -218,6 +259,28 @@ export function dependencies(data: Pick<TimelineData, "issues" | "links">, sched
     return { link, from, to, conflict };
   });
   return { deps, warnings };
+}
+
+/**
+ * externalWarnings explains each shown issue's unfinished dependencies on issues the timeline
+ * doesn't show (another project, filtered out, or one the viewer can't browse).
+ */
+export function externalWarnings(data: Pick<TimelineData, "externalLinks">): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  for (const x of data.externalLinks ?? []) {
+    if (!x.open) continue;
+    const other = x.other ? `${x.other.key} (${x.other.summary}), which isn't on this timeline` : "an unfinished issue in a project you can't browse";
+    const msg = x.direction === "blockedBy" ? `Blocked by ${other}.` : `Blocks ${other}.`;
+    out.set(x.issueKey, [...(out.get(x.issueKey) ?? []), msg]);
+  }
+  return out;
+}
+
+/** mergeWarnings joins warning maps, keeping each key's messages in order. */
+export function mergeWarnings(...maps: Map<string, string[]>[]): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  for (const m of maps) for (const [k, v] of m) out.set(k, [...(out.get(k) ?? []), ...v]);
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -249,6 +312,24 @@ export function epicProgress(children: Pick<Issue, "parent" | "status">[]) {
     if (isDone(c)) p.done++;
     out.set(c.parent.key, p);
   }
+  return out;
+}
+
+/**
+ * rollupProgress makes an initiative's progress the sum of its epics' (the issues under them)
+ * rather than how many of its epics are done, so it matches the programme's roadmap.
+ */
+export function rollupProgress(issues: Pick<Issue, "key" | "type" | "parent">[], progress: Map<string, { done: number; total: number }>) {
+  const out = new Map(progress);
+  const sums = new Map<string, { done: number; total: number }>();
+  for (const i of issues) {
+    if (i.type.level !== 1 || !i.parent) continue;
+    const p = progress.get(i.key);
+    if (!p) continue;
+    const s = sums.get(i.parent.key) ?? { done: 0, total: 0 };
+    sums.set(i.parent.key, { done: s.done + p.done, total: s.total + p.total });
+  }
+  for (const i of issues) if (i.type.level >= 2) out.set(i.key, sums.get(i.key) ?? { done: 0, total: 0 });
   return out;
 }
 

@@ -629,7 +629,7 @@ var breakdownKeys = map[string]struct{ join, key string }{
 	"release":        {"LEFT JOIN issue_releases bir ON bir.issue_id = i.id", "bir.release_id::text"},
 	"epic": {`LEFT JOIN issues bp ON bp.id = i.parent_id LEFT JOIN issue_types bpt ON bpt.id = bp.type_id
 		LEFT JOIN issues bgp ON bgp.id = bp.parent_id LEFT JOIN issue_types bgpt ON bgpt.id = bgp.type_id`,
-		"(CASE WHEN bpt.level >= 1 THEN bp.id WHEN bgpt.level >= 1 THEN bgp.id END)::text"},
+		"(CASE WHEN bpt.level = 1 THEN bp.id WHEN bgpt.level = 1 THEN bgp.id END)::text"},
 }
 
 // Breakdown groups the matching issues by a field. Groups are largest first, except priority and

@@ -4,11 +4,15 @@ import type { Issue } from "@/api/types";
 import { useToast } from "@/components/ui";
 import { epicProgress, withDates, type TimelineData, type TimelineLink } from "./model";
 
-/** projects is a comma list ("" = every project the viewer can browse). */
-export const timelineQuery = (projects: string, jql: string, doneDays: number) =>
+/**
+ * projects is a comma list ("" = every project the viewer can browse); a programme's key instead
+ * shows its initiatives and the team projects the viewer can browse.
+ */
+export const timelineQuery = (projects: string, jql: string, doneDays: number, programme?: string) =>
   queryOptions({
-    queryKey: ["timeline", projects, jql, doneDays],
-    queryFn: () => unwrap(api.GET("/timeline", { params: { query: { projects: projects || undefined, jql: jql || undefined, doneDays } } })),
+    queryKey: ["timeline", programme ? `programme:${programme}` : projects, jql, doneDays],
+    queryFn: () =>
+      unwrap(api.GET("/timeline", { params: { query: { projects: programme ? undefined : projects || undefined, programme, jql: jql || undefined, doneDays } } })),
     placeholderData: keepPreviousData,
   });
 

@@ -61,14 +61,14 @@ func TestRisksDecisionsSection(t *testing.T) {
 	e := newEnv(t)
 	admin := e.login("ada@example.com", "Ada")
 
-	// Scrum, Kanban and Bug tracking start with the section on; service desks without it.
+	// Scrum, Kanban, Bug tracking and programmes start with the section on; service desks without it.
 	var templates []obj
 	admin.get("/api/v1/project-templates", &templates)
 	on := map[string]any{}
 	for _, tpl := range templates {
 		on[str(tpl, "id")] = tpl["risksDecisions"]
 	}
-	eq(t, fmt.Sprint(on), "map[bug_tracking:true kanban:true scrum:true service:false]", "template defaults")
+	eq(t, fmt.Sprint(on), "map[bug_tracking:true kanban:true programme:true scrum:true service:false]", "template defaults")
 
 	for _, tpl := range []string{"scrum", "kanban", "bug_tracking"} {
 		key := strings.ToUpper(strings.ReplaceAll(tpl, "_", ""))[:5]

@@ -175,7 +175,7 @@ func (s *Server) MoveIssue(ctx context.Context, req api.MoveIssueRequestObject) 
 	if err != nil {
 		return nil, err
 	}
-	v, err := s.Tracker.IssueView(ctx, i)
+	v, err := s.Tracker.IssueView(ctx, a, i)
 	return api.MoveIssue200JSONResponse(v), err
 }
 
@@ -308,7 +308,7 @@ func (s *Server) CreateIssueLink(ctx context.Context, req api.CreateIssueLinkReq
 	if err != nil {
 		return nil, err
 	}
-	tv, err := s.Tracker.IssueView(ctx, target)
+	tv, err := s.Tracker.IssueView(ctx, a, target)
 	if err != nil {
 		return nil, err
 	}
@@ -479,7 +479,7 @@ func (s *Server) SearchIssues(ctx context.Context, req api.SearchIssuesRequestOb
 	if err != nil {
 		return nil, err
 	}
-	views, err := s.Tracker.IssueViews(ctx, issues)
+	views, err := s.Tracker.IssueViews(ctx, a, issues)
 	if err != nil {
 		return nil, err
 	}

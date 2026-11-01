@@ -148,7 +148,7 @@ func (s *Server) GetBoardData(ctx context.Context, req api.GetBoardDataRequestOb
 	for _, c := range d.Columns {
 		all = append(all, c.Issues...)
 	}
-	views, err := s.Tracker.IssueViews(ctx, all)
+	views, err := s.Tracker.IssueViews(ctx, a, all)
 	if err != nil {
 		return nil, err
 	}
@@ -176,13 +176,13 @@ func (s *Server) GetBacklog(ctx context.Context, req api.GetBacklogRequestObject
 	}
 	out := api.GetBacklog200JSONResponse{Sprints: []api.BacklogSprint{}, BacklogTotal: bl.BacklogTotal}
 	for _, sp := range bl.Sprints {
-		views, err := s.Tracker.IssueViews(ctx, sp.Issues)
+		views, err := s.Tracker.IssueViews(ctx, a, sp.Issues)
 		if err != nil {
 			return nil, err
 		}
 		out.Sprints = append(out.Sprints, api.BacklogSprint{Sprint: tracker.SprintView(sp.Sprint), Issues: views, Total: sp.Total})
 	}
-	if out.Backlog, err = s.Tracker.IssueViews(ctx, bl.Backlog); err != nil {
+	if out.Backlog, err = s.Tracker.IssueViews(ctx, a, bl.Backlog); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -391,11 +391,11 @@ func (s *Server) GetTimeline(ctx context.Context, req api.GetTimelineRequestObje
 	if req.Params.DoneDays != nil {
 		doneDays = *req.Params.DoneDays
 	}
-	tl, err := s.Tracker.Timeline(ctx, a, keys, deref(req.Params.Jql), doneDays)
+	tl, err := s.Tracker.Timeline(ctx, a, tracker.TimelineQuery{Keys: keys, Programme: deref(req.Params.Programme), JQL: deref(req.Params.Jql), DoneDays: doneDays})
 	if err != nil {
 		return nil, err
 	}
-	views, err := s.Tracker.IssueViews(ctx, tl.Issues)
+	views, err := s.Tracker.IssueViews(ctx, a, tl.Issues)
 	if err != nil {
 		return nil, err
 	}
@@ -413,6 +413,11 @@ func (s *Server) GetTimeline(ctx context.Context, req api.GetTimelineRequestObje
 	for _, l := range tl.Links {
 		out.Links = append(out.Links, api.TimelineLink{Id: l.ID, SourceKey: keyByID[l.SourceID], TargetKey: keyByID[l.TargetID], Type: api.TimelineLinkTypeBlocks})
 	}
+	ext, err := s.Tracker.ExternalDependencies(ctx, a, tl, keyByID)
+	if err != nil {
+		return nil, err
+	}
+	out.ExternalLinks = &ext
 	for _, sp := range tl.Sprints {
 		out.Sprints = append(out.Sprints, api.TimelineSprint{ProjectKey: sp.ProjectKey, Sprint: tracker.SprintView(sp.Sprint)})
 	}

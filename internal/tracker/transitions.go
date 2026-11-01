@@ -81,8 +81,14 @@ func (s *Service) celIssue(ctx context.Context, q *dbq.Queries, p dbq.Project, i
 			return nil, err
 		}
 		ct, _ := q.GetIssueType(ctx, c.TypeID)
+		cp := p
+		if c.ProjectID != p.ID { // an initiative's epics sit in team projects
+			if other, err := q.GetProject(ctx, c.ProjectID); err == nil {
+				cp = other
+			}
+		}
 		subtasks = append(subtasks, map[string]any{
-			"key": issueKey(p, c), "summary": c.Summary, "type": ct.Key, "status": cs.Name, "category": cs.Category,
+			"key": issueKey(cp, c), "summary": c.Summary, "type": ct.Key, "status": cs.Name, "category": cs.Category,
 		})
 	}
 	if subtasks == nil {
@@ -135,7 +141,13 @@ func (s *Service) celIssue(ctx context.Context, q *dbq.Queries, p dbq.Project, i
 					open++
 				}
 			}
-			parent = map[string]any{"key": issueKey(p, par), "type": pt.Key, "status": ps.Name, "category": ps.Category,
+			pp := p
+			if par.ProjectID != p.ID { // an epic's initiative sits in a programme
+				if other, err := q.GetProject(ctx, par.ProjectID); err == nil {
+					pp = other
+				}
+			}
+			parent = map[string]any{"key": issueKey(pp, par), "type": pt.Key, "status": ps.Name, "category": ps.Category,
 				"childCount": int64(len(siblings)), "openChildren": int64(open), "startDate": dateStr(par.StartDate), "dueDate": dateStr(par.DueDate)}
 		}
 	}

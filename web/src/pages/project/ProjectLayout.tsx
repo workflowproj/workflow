@@ -5,6 +5,7 @@ import { PageSpinner, TabLinks } from "@/components/ui";
 import { ErrorBox } from "@/components/ErrorBox";
 import { ProjectAvatar } from "@/layout/AppShell";
 import { useProjectEvents } from "@/lib/events";
+import { isProgramme } from "@/lib/project";
 
 const route = getRouteApi("/app/projects/$projectKey");
 
@@ -17,6 +18,7 @@ export function ProjectLayout() {
   if (error || !project) return <div className="p-6"><ErrorBox error={error ?? new Error("Project not found")} /></div>;
   const params = { projectKey: project.key };
   const service = project.template === "service";
+  const programme = isProgramme(project);
   // Risks and decisions sit beside the issues, outside planning, when the project keeps them.
   const section = project.risksDecisions
     ? [
@@ -24,7 +26,18 @@ export function ProjectLayout() {
         { label: "Decisions", to: "/projects/$projectKey/decisions" as const, params },
       ]
     : [];
-  const tabs = service
+  const tabs = programme
+    ? [
+        // Programmes: the roadmap across their teams, and initiatives instead of a backlog.
+        { label: "Roadmap", to: "/projects/$projectKey/roadmap" as const, params },
+        { label: "Timeline", to: "/projects/$projectKey/timeline" as const, params },
+        { label: "Dependencies", to: "/projects/$projectKey/dependencies" as const, params },
+        { label: "Board", to: "/projects/$projectKey/board" as const, params },
+        { label: "Issues", to: "/projects/$projectKey/issues" as const, params },
+        ...section,
+        { label: "Reports", to: "/projects/$projectKey/reports" as const, params },
+      ]
+    : service
     ? [
         // Service projects: queues first, and customers instead of the planning views.
         { label: "Queues", to: "/projects/$projectKey/queues" as const, params },
@@ -52,7 +65,7 @@ export function ProjectLayout() {
           <div className="min-w-0">
             <h1 className="truncate text-lg leading-tight font-semibold">{project.name}</h1>
             <p className="text-xs text-muted">
-              <span className="font-mono">{project.key}</span> · {project.access === "private" ? "Private" : "Open"} {service ? "service project" : "project"}
+              <span className="font-mono">{project.key}</span> · {project.access === "private" ? "Private" : "Open"} {service ? "service project" : programme ? "programme" : "project"}
             </p>
           </div>
           {service && (

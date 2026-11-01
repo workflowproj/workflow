@@ -236,7 +236,3 @@ DELETE FROM saved_filters WHERE id = $1;
 -- ---------------------------------------------------------------------------
 -- Reports
 
--- name: BlockLinksAmong :many
-SELECT * FROM issue_links
-WHERE link_type = 'blocks' AND source_id = ANY(@ids::uuid[]) AND target_id = ANY(@ids::uuid[])
-ORDER BY created_at;

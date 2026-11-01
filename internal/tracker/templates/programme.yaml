@@ -1,0 +1,46 @@
+id: programme
+name: Programme
+description: Initiatives that team projects' epics work toward, with a roadmap across the teams.
+boardType: kanban
+risksDecisions: true
+workflows:
+  - name: Initiative
+    description: Proposed → In Progress → Done; move freely.
+    statuses:
+      - { name: Proposed, category: todo }
+      - { name: In Progress, category: in_progress }
+      - { name: Done, category: done }
+    transitions:
+      - { name: Propose, to: Proposed }
+      - { name: Start, to: In Progress }
+      - { name: Done, to: Done }
+    layout:
+      Proposed: { x: 0, y: 120 }
+      In Progress: { x: 260, y: 120 }
+      Done: { x: 520, y: 120 }
+  - name: Action
+    description: To Do → In Progress → Done; move freely.
+    statuses:
+      - { name: To Do, category: todo }
+      - { name: In Progress, category: in_progress }
+      - { name: Done, category: done }
+    transitions:
+      - { name: To Do, to: To Do }
+      - name: Start work
+        to: In Progress
+        postFunctions: [{ assignTo: actor }]
+      - { name: Done, to: Done }
+    layout:
+      To Do: { x: 0, y: 120 }
+      In Progress: { x: 260, y: 120 }
+      Done: { x: 520, y: 120 }
+issueTypes:
+  - { key: initiative, name: Initiative, level: 2, icon: initiative, color: '#d97706', workflow: Initiative }
+  - { key: action, name: Action, level: 0, icon: task, color: '#1d7afc', workflow: Action }
+boards:
+  - name: Actions
+    type: kanban
+    columns:
+      - { name: To Do, statuses: [To Do] }
+      - { name: In Progress, statuses: [In Progress] }
+      - { name: Done, statuses: [Done] }

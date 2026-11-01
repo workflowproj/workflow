@@ -409,13 +409,18 @@ func (s *Service) runRule(ctx context.Context, rule dbq.AutomationRule, issueID 
 	trigger := triggerRef{Key: tracker.IssueKey(p, issue), Summary: issue.Summary}
 	var done []string
 	for _, a := range actions {
-		targets, err := s.targets(ctx, issue, a.Target)
+		targets, elsewhere, err := s.targets(ctx, issue, a.Target)
 		if err != nil {
 			s.record(ctx, rule.ID, &issueID, "failed", fmt.Sprintf("%s: %v", a.Type, err), ev.Depth)
 			return
 		}
+		if elsewhere > 0 {
+			done = append(done, fmt.Sprintf("%s: skipped %d %s in another project", a.Type, elsewhere, a.Target))
+		}
 		if len(targets) == 0 {
-			done = append(done, fmt.Sprintf("%s: no %s", a.Type, a.Target))
+			if elsewhere == 0 {
+				done = append(done, fmt.Sprintf("%s: no %s", a.Type, a.Target))
+			}
 			continue
 		}
 		for _, target := range targets {
@@ -447,26 +452,38 @@ func changedAny(data map[string]any, fields string) bool {
 	return false
 }
 
-// targets resolves an action's target relative to the triggering issue.
-func (s *Service) targets(ctx context.Context, issue dbq.Issue, target string) ([]uuid.UUID, error) {
+// targets resolves an action's target relative to the triggering issue. A rule acts only in its
+// own project: a parent or children in another project (an initiative above a team's epic, or
+// the epics under an initiative) are skipped and counted in elsewhere.
+func (s *Service) targets(ctx context.Context, issue dbq.Issue, target string) (ids []uuid.UUID, elsewhere int, err error) {
 	switch target {
 	case "parent":
 		if issue.ParentID == nil {
-			return nil, nil
+			return nil, 0, nil
 		}
-		return []uuid.UUID{*issue.ParentID}, nil
+		parent, err := s.Q.GetIssue(ctx, *issue.ParentID)
+		if err != nil {
+			return nil, 0, err
+		}
+		if parent.ProjectID != issue.ProjectID {
+			return nil, 1, nil
+		}
+		return []uuid.UUID{parent.ID}, 0, nil
 	case "children":
 		children, err := s.Q.ChildIssues(ctx, &issue.ID)
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
-		ids := make([]uuid.UUID, len(children))
-		for i, c := range children {
-			ids[i] = c.ID
+		for _, c := range children {
+			if c.ProjectID != issue.ProjectID {
+				elsewhere++
+				continue
+			}
+			ids = append(ids, c.ID)
 		}
-		return ids, nil
+		return ids, elsewhere, nil
 	}
-	return []uuid.UUID{issue.ID}, nil
+	return []uuid.UUID{issue.ID}, 0, nil
 }
 
 func (s *Service) keyOf(ctx context.Context, p dbq.Project, id uuid.UUID) string {
@@ -604,6 +621,9 @@ func (s *Service) rollupDates(ctx context.Context, actor *authz.Actor, issue dbq
 	}
 	var start, due *time.Time
 	for _, c := range children {
+		if c.ProjectID != issue.ProjectID {
+			continue // a rule acts in its own project: an initiative's epics in team projects don't count
+		}
 		for _, d := range []*time.Time{c.StartDate, c.DueDate} {
 			if d == nil {
 				continue
@@ -759,7 +779,7 @@ func (s *Service) HandlePostFunction(ctx context.Context, pf jobs.PostFunction) 
 		return s.notifyRecipients(ctx, issue, pf.Notify, pf.ActorID, "transitioned", key+": "+issue.Summary, fmt.Sprintf("%s: %s → %s", pf.Transition, pf.FromStatus, pf.ToStatus))
 	}
 	if pf.Webhook != "" {
-		view, err := s.Tracker.IssueView(ctx, issue)
+		view, err := s.Tracker.IssueView(ctx, nil, issue)
 		if err != nil {
 			return err
 		}
@@ -799,7 +819,7 @@ func (s *Service) dispatchWebhooks(ctx context.Context, ev jobs.DomainEvent, dat
 	}
 	if ev.IssueID != nil {
 		if issue, err := s.Q.GetIssue(ctx, *ev.IssueID); err == nil {
-			if view, err := s.Tracker.IssueView(ctx, issue); err == nil {
+			if view, err := s.Tracker.IssueView(ctx, nil, issue); err == nil {
 				payload["issue"] = view
 			}
 		}

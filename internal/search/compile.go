@@ -147,6 +147,9 @@ func (b *builder) clause(c Clause) (string, error) {
 	switch normalize(c.Field) {
 	case "project":
 		return b.setField(c, func(v Value) (string, error) {
+			if v.Kind == VFunc {
+				return b.projectFunction(v)
+			}
 			s, err := b.str(v)
 			if err != nil {
 				return "", err
@@ -294,8 +297,18 @@ func (b *builder) clause(c Clause) (string, error) {
 			if err != nil {
 				return "", err
 			}
-			return inEpics("SELECT e.id FROM issues e JOIN issue_types et ON et.id = e.type_id WHERE et.level >= 1 AND e.id IN (" + sub + ")"), nil
+			return inEpics("SELECT e.id FROM issues e JOIN issue_types et ON et.id = e.type_id WHERE et.level = 1 AND e.id IN (" + sub + ")"), nil
 		}, "NOT coalesce("+inEpics(allEpics)+", false)")
+	case "initiative":
+		// The initiative above an issue: its epic's parent (or the epic's, for sub-tasks). The
+		// initiative may be in a programme, with the issues under it in team projects.
+		return b.setField(c, func(v Value) (string, error) {
+			sub, err := b.issueByKey(v)
+			if err != nil {
+				return "", err
+			}
+			return "i.id IN (" + descendants("SELECT r.id FROM issues r JOIN issue_types rt ON rt.id = r.type_id WHERE rt.level = 2 AND r.id IN ("+sub+")") + ")", nil
+		}, "NOT "+underInitiative)
 	case "issuelinktype", "linktype":
 		return b.setField(c, func(v Value) (string, error) {
 			s, err := b.str(v)
@@ -563,7 +576,43 @@ func inEpics(epics string) string {
 	return "(i.parent_id IN (" + epics + ") OR i.parent_id IN (SELECT c.id FROM issues c JOIN issue_types ct ON ct.id = c.type_id WHERE ct.level < 1 AND c.parent_id IN (" + epics + ")))"
 }
 
-const allEpics = "SELECT e.id FROM issues e JOIN issue_types et ON et.id = e.type_id WHERE et.level >= 1"
+const allEpics = "SELECT e.id FROM issues e JOIN issue_types et ON et.id = e.type_id WHERE et.level = 1"
+
+// descendants selects the ids of every issue below the roots (children, their children and
+// theirs: the hierarchy is at most four levels deep), walking down the parent index.
+func descendants(roots string) string {
+	return "WITH RECURSIVE d(id, depth) AS (SELECT x.id, 1 FROM issues x WHERE x.parent_id IN (" + roots + ")" +
+		" UNION ALL SELECT c.id, d.depth + 1 FROM issues c JOIN d ON c.parent_id = d.id WHERE d.depth < 3) SELECT id FROM d"
+}
+
+// underInitiative is "an ancestor (up to three levels up) is an initiative", by primary key lookups.
+const underInitiative = "EXISTS (SELECT 1 FROM issues a1 LEFT JOIN issues a2 ON a2.id = a1.parent_id LEFT JOIN issues a3 ON a3.id = a2.parent_id" +
+	" JOIN issue_types ait ON ait.id IN (a1.type_id, a2.type_id, a3.type_id) WHERE a1.id = i.parent_id AND ait.level = 2)"
+
+// projectFunction compiles project functions (project in programmeProjects("PROG")).
+func (b *builder) projectFunction(v Value) (string, error) {
+	switch strings.ToLower(v.Text) {
+	case "programmeprojects":
+		if len(v.Args) != 1 {
+			return "", errAt(v.Pos, `programmeProjects() takes a programme's key, e.g. programmeProjects("PROG")`)
+		}
+		key, err := b.str(v.Args[0])
+		if err != nil {
+			return "", err
+		}
+		prog := fmt.Sprintf("SELECT id FROM projects WHERE key = upper(%[1]s::text) UNION SELECT project_id FROM project_key_aliases WHERE key = upper(%[1]s::text)", b.arg(key))
+		// A programme the caller can't browse has no teams, as far as the query can tell.
+		visible, err := b.visibleProjects()
+		if err != nil {
+			return "", err
+		}
+		if visible != "" {
+			prog = "SELECT pv.id FROM (" + prog + ") pv WHERE pv.id = ANY(" + visible + "::uuid[])"
+		}
+		return "(i.project_id IN (" + prog + ") OR i.project_id IN (SELECT pp.project_id FROM programme_projects pp WHERE pp.programme_id IN (" + prog + ")))", nil
+	}
+	return "", errAt(v.Pos, "unknown function %s() for project (use programmeProjects)", v.Text)
+}
 
 // linkDescription is one side of a link type, as people word it: "blocks" is the source's side
 // of a blocks link, "is blocked by" the target's.
@@ -629,6 +678,15 @@ func (b *builder) issueFunction(v Value) (string, error) {
 			return fmt.Sprintf("i.id IN (SELECT l.source_id FROM issue_links l WHERE l.link_type = %s::text AND l.target_id IN (%s))", t, sub), nil
 		}
 		return fmt.Sprintf("i.id IN (SELECT l.target_id FROM issue_links l WHERE l.link_type = %[1]s::text AND l.source_id IN (%[2]s) UNION SELECT l.source_id FROM issue_links l WHERE l.link_type = %[1]s::text AND l.target_id IN (%[2]s))", t, sub), nil
+	case "descendantsof":
+		if len(v.Args) != 1 {
+			return "", errAt(v.Pos, `descendantsOf() takes an issue key, e.g. descendantsOf("PROG-1")`)
+		}
+		sub, err := b.issueByKey(v.Args[0])
+		if err != nil {
+			return "", err
+		}
+		return "i.id IN (" + descendants(sub) + ")", nil
 	case "blockedissues":
 		// Blocked by at least one issue that is not done.
 		return "EXISTS (SELECT 1 FROM issue_links l WHERE l.target_id = i.id AND l.link_type = 'blocks' AND " + fmt.Sprintf(openIssue, "l.source_id") + ")", nil
@@ -636,7 +694,7 @@ func (b *builder) issueFunction(v Value) (string, error) {
 		// Blocking at least one issue that is not done.
 		return "EXISTS (SELECT 1 FROM issue_links l WHERE l.source_id = i.id AND l.link_type = 'blocks' AND " + fmt.Sprintf(openIssue, "l.target_id") + ")", nil
 	}
-	return "", errAt(v.Pos, "unknown function %s() for issue (use linkedIssues, blockedIssues or blockingIssues)", v.Text)
+	return "", errAt(v.Pos, "unknown function %s() for issue (use linkedIssues, descendantsOf, blockedIssues or blockingIssues)", v.Text)
 }
 
 var priorityOrder = []string{"lowest", "low", "medium", "high", "highest"}
@@ -1085,6 +1143,7 @@ var Fields = []struct {
 	{"deployedTo", "environment", []string{"=", "!=", "in", "not in", "is", "is not"}},
 	{"parent", "issue", []string{"=", "!=", "in", "not in", "is", "is not"}},
 	{"epic", "issue", []string{"=", "!=", "in", "not in", "is", "is not"}},
+	{"initiative", "issue", []string{"=", "!=", "in", "not in", "is", "is not"}},
 	{"issueLinkType", "linkType", []string{"=", "!=", "in", "not in", "is", "is not"}},
 	{"level", "number", []string{"=", "!=", ">", ">=", "<", "<="}},
 	{"summary", "text", []string{"~", "!~", "=", "!=", "is", "is not"}},
@@ -1113,7 +1172,7 @@ var Functions = []string{
 	"currentUser()", "membersOf(\"group\")", "openSprints()", "futureSprints()", "closedSprints()",
 	"releasedVersions()", "unreleasedVersions()", "now()", "startOfDay()", "endOfDay()",
 	"startOfWeek()", "endOfWeek()", "startOfMonth()", "endOfMonth()", "startOfYear()", "endOfYear()",
-	"linkedIssues(\"KEY\")", "blockedIssues()", "blockingIssues()",
+	"linkedIssues(\"KEY\")", "descendantsOf(\"KEY\")", "blockedIssues()", "blockingIssues()", "programmeProjects(\"KEY\")",
 	"breached()", "running()", "paused()", "completed()", "remaining(\"2h\")",
 	"pending()", "approved()", "declined()", "pendingBy(currentUser())",
 }

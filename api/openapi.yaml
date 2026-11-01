@@ -27,6 +27,8 @@ tags:
   - name: boards
   - name: sprints
   - name: releases
+  - name: programmes
+    description: Initiatives in a programme project that team projects' epics work toward.
   - name: issues
   - name: search
   - name: dashboards
@@ -1652,6 +1654,96 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/RiskRegister' }
         default: { $ref: '#/components/responses/Problem' }
+  /projects/{projectKey}/programme:
+    get:
+      operationId: getProgrammeOverview
+      tags: [programmes]
+      summary: A programme's roadmap - its initiatives, the team epics under them and how far along they are
+      description: |
+        The programme's initiatives in rank order (up to 500), each with the epics under it in the
+        team projects you can browse, the work under those epics by status category, a forecast
+        (the latest due date among the epic and its issues) and flags: late, overdue, unscheduled,
+        and blocked by unfinished work in another project. Teams you can't browse are left out,
+        not counted. Also lists open epics in the teams that belong to no initiative.
+      parameters:
+        - { $ref: '#/components/parameters/ProjectKey' }
+        - { name: doneDays, in: query, description: 'Include initiatives resolved within this many days (default 90)', schema: { type: integer, minimum: 0, maximum: 3650 } }
+      responses:
+        "200":
+          description: Programme overview
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProgrammeOverview' }
+        default: { $ref: '#/components/responses/Problem' }
+  /projects/{projectKey}/programme/teams:
+    get:
+      operationId: listProgrammeTeams
+      tags: [programmes]
+      summary: The team projects of a programme that you can browse
+      parameters: [{ $ref: '#/components/parameters/ProjectKey' }]
+      responses:
+        "200":
+          description: Teams
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProgrammeTeams' }
+        default: { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: addProgrammeTeam
+      tags: [programmes]
+      summary: Add a team project to a programme (programme admins; you must be able to browse the team)
+      description: |
+        Its epics can then have the programme's initiatives as their parent. Membership gives no
+        access to the team's issues: people see only the teams they can browse.
+      parameters: [{ $ref: '#/components/parameters/ProjectKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [projectKey]
+              properties:
+                projectKey: { type: string, description: The team project's key }
+      responses:
+        "201":
+          description: Teams
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProgrammeTeams' }
+        default: { $ref: '#/components/responses/Problem' }
+  /projects/{projectKey}/programme/teams/{teamKey}:
+    delete:
+      operationId: removeProgrammeTeam
+      tags: [programmes]
+      summary: Take a team project out of a programme, unlinking its epics from the programme's initiatives
+      parameters:
+        - { $ref: '#/components/parameters/ProjectKey' }
+        - { name: teamKey, in: path, required: true, description: The team project's key, schema: { type: string } }
+      responses:
+        "200":
+          description: Removed
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [unlinkedEpics]
+                properties:
+                  unlinkedEpics: { type: integer, description: Epics that lost their initiative }
+        default: { $ref: '#/components/responses/Problem' }
+  /projects/{projectKey}/programmes:
+    get:
+      operationId: listProjectProgrammes
+      tags: [programmes]
+      summary: The programmes a project is a team of (those you can browse)
+      parameters: [{ $ref: '#/components/parameters/ProjectKey' }]
+      responses:
+        "200":
+          description: Programmes
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/ProjectRef' } }
+        default: { $ref: '#/components/responses/Problem' }
   /projects/{projectKey}/decisions:
     get:
       operationId: getDecisionLog
@@ -2233,6 +2325,7 @@ paths:
       summary: Epics and issues with dates, dependencies, sprints and releases across one or more projects
       parameters:
         - { name: projects, in: query, description: 'Comma-separated project keys; omit for every project you can browse', schema: { type: string } }
+        - { name: programme, in: query, description: "A programme's key: its initiatives and the team projects you can browse (not with projects)", schema: { type: string } }
         - { name: jql, in: query, description: Optional extra query filter (e.g. assignee = currentUser()), schema: { type: string } }
         - { name: doneDays, in: query, description: 'Include issues resolved within this many days (default 90)', schema: { type: integer, minimum: 0, maximum: 3650 } }
       responses:
@@ -4958,6 +5051,7 @@ components:
             watching: { type: boolean }
             watcherCount: { type: integer }
             suggestedBranch: { type: string }
+            parentHidden: { type: boolean, description: The issue has a parent you can't browse (an initiative in a programme you can't see), so parent is left out }
             permissions: { $ref: '#/components/schemas/IssuePermissions' }
     ProjectRef:
       type: object
@@ -5314,7 +5408,63 @@ components:
         links: { type: array, items: { $ref: '#/components/schemas/TimelineLink' } }
         sprints: { type: array, items: { $ref: '#/components/schemas/TimelineSprint' } }
         releases: { type: array, items: { $ref: '#/components/schemas/TimelineRelease' } }
+        externalLinks:
+          type: array
+          items: { $ref: '#/components/schemas/ExternalDependency' }
+          description: Blocks links between a shown issue and an unfinished one that isn't shown (another project, filtered out or past the limit)
         truncated: { type: boolean, description: More issues matched than the timeline shows (2000) }
+    ExternalDependency:
+      type: object
+      required: [issueKey, direction, open]
+      description: A blocks link from a shown issue to one outside the view. The other issue is named only when you can browse it.
+      properties:
+        issueKey: { type: string, description: The shown issue }
+        direction: { type: string, enum: [blockedBy, blocks], description: 'blockedBy: the other issue blocks the shown one' }
+        open: { type: boolean, description: The other issue is not done (always true; done ones are left out) }
+        linkId: { type: string, format: uuid, description: Present when you can browse the other issue }
+        other: { $ref: '#/components/schemas/Issue' }
+    ProgrammeTeams:
+      type: object
+      required: [teams, hiddenCount]
+      properties:
+        teams: { type: array, items: { $ref: '#/components/schemas/ProjectRef' } }
+        hiddenCount: { type: integer, description: Teams in the programme that you can't browse }
+    ProgrammeOverview:
+      type: object
+      required: [programme, teams, hiddenTeamCount, initiatives, unlinkedEpics, unlinkedTotal, truncated]
+      properties:
+        programme: { $ref: '#/components/schemas/ProjectRef' }
+        teams: { type: array, items: { $ref: '#/components/schemas/ProjectRef' } }
+        hiddenTeamCount: { type: integer, description: Teams you can't browse; their epics and work are left out }
+        initiatives: { type: array, items: { $ref: '#/components/schemas/ProgrammeInitiative' } }
+        unlinkedEpics: { type: array, items: { $ref: '#/components/schemas/Issue' }, description: Open epics in the teams that belong to no initiative (up to 50) }
+        unlinkedTotal: { type: integer }
+        truncated: { type: boolean, description: More initiatives or epics than the overview shows }
+    ProgrammeInitiative:
+      type: object
+      required: [issue, progress, epics, flags]
+      properties:
+        issue: { $ref: '#/components/schemas/Issue' }
+        progress: { $ref: '#/components/schemas/IssueProgress', description: The work under its epics (in teams you can browse) }
+        forecastDate: { type: string, format: date, description: The latest forecast of its epics }
+        epics: { type: array, items: { $ref: '#/components/schemas/ProgrammeEpic' } }
+        flags: { type: array, items: { $ref: '#/components/schemas/PlanningFlag' } }
+    ProgrammeEpic:
+      type: object
+      required: [issue, progress, flags]
+      properties:
+        issue: { $ref: '#/components/schemas/Issue' }
+        progress: { $ref: '#/components/schemas/IssueProgress' }
+        forecastDate: { type: string, format: date, description: The latest due date of the epic and the issues under it }
+        flags: { type: array, items: { $ref: '#/components/schemas/PlanningFlag' } }
+    PlanningFlag:
+      type: object
+      required: [kind, message, issueKeys, hiddenCount]
+      properties:
+        kind: { type: string, enum: [late, overdue, unscheduled, blocked] }
+        message: { type: string }
+        issueKeys: { type: array, items: { type: string }, description: 'blocked: the unfinished issues in other projects doing the blocking, those you can browse' }
+        hiddenCount: { type: integer, description: 'blocked: blocking issues you can''t browse' }
     TimelineLink:
       type: object
       required: [id, sourceKey, targetKey, type]

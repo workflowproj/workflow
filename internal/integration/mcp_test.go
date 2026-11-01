@@ -91,7 +91,7 @@ func TestMCPServer(t *testing.T) {
 			t.Fatal("read tools are marked read-only")
 		}
 	}
-	for _, want := range []string{"search_issues", "get_issue", "create_issue", "update_issue", "transition_issue", "add_comment", "get_metrics", "get_sprint_report"} {
+	for _, want := range []string{"search_issues", "get_issue", "create_issue", "update_issue", "transition_issue", "add_comment", "get_metrics", "get_sprint_report", "get_programme"} {
 		if !slices.Contains(names, want) {
 			t.Fatalf("missing tool %s in %v", want, names)
 		}
@@ -200,4 +200,11 @@ func TestMCPServer(t *testing.T) {
 	eq(t, str(spec, "info", "title") != "", true, "openapi.json")
 	r = ada.do("GET", "/api/v1/openapi.yaml", nil)
 	eq(t, strings.HasPrefix(string(r.Body), "openapi:"), true, "openapi.yaml")
+
+	// A programme's roadmap, with an AI epic under its initiative.
+	ada.createProject("PROG", "programme")
+	ada.must("POST", "/api/v1/projects/PROG/programme/teams", obj{"projectKey": "AI"}, 201, nil)
+	ada.createIssue("PROG", "initiative", "Assistants everywhere", nil)
+	wantContains(t, mustCall(t, cs, "create_issue", obj{"projectKey": "AI", "type": "epic", "summary": "Assistant API", "parentKey": "PROG-1"}), "Created AI-")
+	wantContains(t, mustCall(t, cs, "get_programme", obj{"programmeKey": "PROG"}), "Teams: AI", "PROG-1 Assistants everywhere", "Assistant API", "0/0 issues done")
 }

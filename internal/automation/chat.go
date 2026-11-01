@@ -337,7 +337,7 @@ func (s *Service) chatAction(ctx context.Context, p dbq.Project, issue dbq.Issue
 	if !ch.Active {
 		return "chat channel " + ch.Name + " is paused", nil
 	}
-	view, err := s.Tracker.IssueView(ctx, issue)
+	view, err := s.Tracker.IssueView(ctx, nil, issue)
 	if err != nil {
 		return "", err
 	}
@@ -365,7 +365,7 @@ func (s *Service) chatEventDetails(ctx context.Context, ev jobs.DomainEvent, kin
 	}
 	if ev.IssueID != nil {
 		if issue, err := s.Q.GetIssue(ctx, *ev.IssueID); err == nil {
-			if view, err := s.Tracker.IssueView(ctx, issue); err == nil {
+			if view, err := s.Tracker.IssueView(ctx, nil, issue); err == nil {
 				e.IssueKey, e.IssueURL, e.Summary = view.Key, s.issueURL(view.Key), view.Summary
 				e.Type, e.Status, e.Category, e.Priority = view.Type.Name, view.Status.Name, string(view.Status.Category), string(view.Priority)
 				if view.Assignee != nil {

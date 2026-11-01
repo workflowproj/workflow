@@ -97,6 +97,7 @@ internal ingress, like the UI and API; assistants must be able to reach that add
 | `get_issue` | fields, description, parent, children, links, pull requests, recent comments, time tracking (estimated, logged, remaining), lead/cycle time and time in each status, and the transitions available now; for service requests, the request type, SLA clocks and approvals, with each comment labelled reply to customer or internal note |
 | `get_board` | a board's columns and issues (the active sprint on a Scrum board) |
 | `get_sprint_report` | a sprint's commitment, completion, scope change and day-by-day burndown |
+| `get_programme` | a programme's roadmap: its initiatives with the team epics under them, progress, forecasts and flags, and team epics under no initiative ([programmes.md](programmes.md)) |
 | `get_metrics` | `summary`, `breakdown`, `cycle_time`, `created_resolved`, `cumulative_flow` or `velocity` over projects and a query |
 | `find_users` | people by name or email |
 | `create_issue` | create an issue (type, summary, Markdown description, priority, assignee by email or `me`, parent, labels, points, sprint, dates, custom `fields` by key such as a risk's `risk_likelihood` and `risk_impact`) |

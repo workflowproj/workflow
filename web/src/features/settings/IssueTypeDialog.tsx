@@ -15,6 +15,7 @@ export const ICONS = [
   { id: "task", label: "Task" },
   { id: "bug", label: "Bug" },
   { id: "epic", label: "Epic" },
+  { id: "initiative", label: "Initiative" },
   { id: "subtask", label: "Sub-task" },
   { id: "risk", label: "Risk" },
   { id: "decision", label: "Decision" },
