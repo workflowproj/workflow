@@ -1,27 +1,79 @@
-# Weekly dependency updates, grouped so minor and patch bumps arrive as one pull request per
-# ecosystem. Security updates are separate and immediate (enable Dependabot security updates in
-# the repository settings).
+# Weekly dependency updates, on Mondays, grouped into one pull request per entry (two for npm: the
+# runtime and the development packages). The Go and npm groups take minor and patch updates;
+# anything else (a new major version of an npm package, say) arrives on its own. Security updates
+# don't wait for Monday when Dependabot security updates are on in the repository settings, and
+# arrive grouped per ecosystem (the security-updates groups).
+#
+# The commit message decides whether merging an update releases anything (release-please, see
+# CONTRIBUTING.md). Updates to what ships in the image (Go modules, the UI's runtime npm packages,
+# the Dockerfile's base images) are fix(deps) commits, which produce a patch release. UI development
+# tools and the k3d images get chore commits and GitHub Actions ci commits, which release nothing.
 version: 2
 updates:
   - package-ecosystem: gomod
     directory: /
     schedule: { interval: weekly, day: monday }
+    commit-message: { prefix: fix, include: scope }
     groups:
       go-minor-and-patch:
         update-types: [minor, patch]
+      go-security:
+        applies-to: security-updates
+        patterns: ["*"]
+  # web/ is built into the binary, so its runtime dependencies ship and its development dependencies
+  # (build, test and lint tools) don't. A group with any runtime dependency in it is fix(deps).
   - package-ecosystem: npm
     directory: /web
     schedule: { interval: weekly, day: monday }
+    commit-message: { prefix: fix, prefix-development: chore, include: scope }
     groups:
       npm-minor-and-patch:
+        dependency-type: production
         update-types: [minor, patch]
+      npm-dev-minor-and-patch:
+        dependency-type: development
+        update-types: [minor, patch]
+      npm-security:
+        applies-to: security-updates
+        patterns: ["*"]
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: weekly, day: monday }
+    commit-message: { prefix: ci, include: scope }
     groups:
       actions:
         patterns: ["*"]
-  # The Dockerfile's base images are pinned by digest; Dependabot bumps tag and digest together.
+      actions-security:
+        applies-to: security-updates
+        patterns: ["*"]
+  # The Dockerfile's base images, written out in its FROM lines (Dependabot can't see an image named
+  # through an ARG). Pinned by tag and digest, which Dependabot bumps together.
   - package-ecosystem: docker
     directory: /
     schedule: { interval: weekly, day: monday }
+    commit-message: { prefix: fix, include: scope }
+    groups:
+      base-images:
+        patterns: ["*"]
+    ignore:
+      # A new major version (Node 22 to 24, say) is a deliberate change, not a weekly update.
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+  # The local k3d cluster and its development services: k3s (cluster.yaml), PostgreSQL
+  # (postgres.yaml) and Keycloak (keycloak/keycloak.yaml). Never deployed, so nothing to release.
+  # postgres:17 is a moving tag (the latest 17.x), so there is nothing to bump below a major.
+  - package-ecosystem: docker
+    directories: [/deploy/k3d, /deploy/k3d/keycloak]
+    schedule: { interval: weekly, day: monday }
+    commit-message: { prefix: chore, include: scope }
+    groups:
+      k3d-images:
+        patterns: ["*"]
+    ignore:
+      # Major versions are deliberate changes: PostgreSQL 17 to 18 needs a data migration.
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+      # A k3s minor release is a new Kubernetes version: move it with the version CI validates the
+      # chart against (kubeconform in ci.yml, .github/trivy.yaml) and the one production runs.
+      - dependency-name: rancher/k3s
+        update-types: ["version-update:semver-minor"]

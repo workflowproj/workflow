@@ -21,5 +21,6 @@ Every change runs through the [Security workflow](.github/workflows/security.yml
 vulnerabilities (govulncheck), Go static analysis (gosec), CodeQL for Go, TypeScript and the
 workflows, secret scanning over the whole history (gitleaks), the UI's npm dependencies, and
 Trivy over the dependencies, the Dockerfile, the Helm chart and the built image. Release images
-are signed with Cosign and ship with an SBOM. [CONTRIBUTING.md](CONTRIBUTING.md#continuous-integration)
-describes each check.
+are signed with Cosign and ship with an SBOM. The latest release's image is rescanned every week,
+and Dependabot proposes dependency and base image updates weekly; updates to what ships go out as
+patch releases. [CONTRIBUTING.md](CONTRIBUTING.md#continuous-integration) describes each check.

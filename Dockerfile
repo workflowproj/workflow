@@ -11,16 +11,18 @@
 #
 # The Node and Go stages run on the build platform and cross-compile, so multi-arch builds
 # (linux/amd64 + linux/arm64) do not need QEMU for the expensive steps.
-# Base images are pinned by digest; Renovate/Dependabot can bump tag and digest together.
+#
+# Base images are pinned by tag and digest in the FROM lines, where Dependabot finds them and bumps
+# tag and digest together each week (it can't see an image named through an ARG). It skips major
+# versions (.github/dependabot.yml) and keeps the -alpine3.24 suffix, so a new Node major or Alpine
+# release is a manual change. The Security workflow's govulncheck job reads the Go version from the
+# golang FROM line.
 
-ARG NODE_IMAGE=node:22.23.4-alpine3.24@sha256:fe4f6d74e20370acb04ad889077d14d0f64a9c8ea6a42bc60cddf1e844699914
-ARG GO_IMAGE=golang:1.26.10-alpine3.24@sha256:27f2d3b83cfc5803c8078f8e730af0f7c431bf067afaec8f60a36fb763187cba
-ARG RUNTIME_IMAGE=gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab
 # Which stage provides the UI assets: "web" (default) or "ui-none".
 ARG UI_STAGE=web
 
 # ---------------------------------------------------------------------------
-FROM --platform=$BUILDPLATFORM ${NODE_IMAGE} AS web
+FROM --platform=$BUILDPLATFORM node:22.23.4-alpine3.24@sha256:fe4f6d74e20370acb04ad889077d14d0f64a9c8ea6a42bc60cddf1e844699914 AS web
 ENV CI=true \
     NPM_CONFIG_UPDATE_NOTIFIER=false \
     NPM_CONFIG_FUND=false \
@@ -40,7 +42,7 @@ COPY internal/webui/dist/.gitkeep /src/web/dist/.gitkeep
 FROM ${UI_STAGE} AS ui
 
 # ---------------------------------------------------------------------------
-FROM --platform=$BUILDPLATFORM ${GO_IMAGE} AS build
+FROM --platform=$BUILDPLATFORM golang:1.26.10-alpine3.24@sha256:27f2d3b83cfc5803c8078f8e730af0f7c431bf067afaec8f60a36fb763187cba AS build
 WORKDIR /src
 ENV CGO_ENABLED=0 GOTOOLCHAIN=local
 COPY go.mod go.sum ./
@@ -62,7 +64,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
       -o /out/wfm ./cmd/wfm
 
 # ---------------------------------------------------------------------------
-FROM ${RUNTIME_IMAGE} AS runtime
+FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab AS runtime
 ARG VERSION=dev
 LABEL org.opencontainers.image.title="workflow" \
       org.opencontainers.image.description="Workflow platform: web, hooks and worker modes in one binary" \
