@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.4.1](https://github.com/workflowproj/workflow/compare/v0.4.0...v0.4.1) (2026-11-01)
+
+
+### Bug Fixes
+
+* **deps:** bump golang from 1.26.10-alpine3.24 to 1.27.3-alpine3.24 in the base-images group ([#30](https://github.com/workflowproj/workflow/issues/30)) ([8fb6900](https://github.com/workflowproj/workflow/commit/8fb690005937bbeeb1b78331a81a36f753b8d99b))
+* **deps:** bump the go-minor-and-patch group with 6 updates ([#32](https://github.com/workflowproj/workflow/issues/32)) ([f918b4a](https://github.com/workflowproj/workflow/commit/f918b4a3a458495d6f9eea08886c3044d33871b5))
+* **deps:** bump the npm-minor-and-patch group in /web with 6 updates ([#33](https://github.com/workflowproj/workflow/issues/33)) ([4ac5370](https://github.com/workflowproj/workflow/commit/4ac5370a19e2dad51f88a4bbd4b83030ec37e4d0))
+
 ## [0.4.0](https://github.com/workflowproj/workflow/compare/v0.3.0...v0.4.0) (2026-11-01)
 
 
