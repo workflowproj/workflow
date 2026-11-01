@@ -36,6 +36,15 @@ updates:
       npm-security:
         applies-to: security-updates
         patterns: ["*"]
+    ignore:
+      # @types/node follows the Node version the UI is built with (22: ci.yml and the Dockerfile),
+      # so its major moves with a deliberate Node upgrade.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+      # openapi-typescript (which generates src/api/schema.d.ts) supports only TypeScript 5 as of
+      # 7.13; remove this once it supports TypeScript 6.
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: weekly, day: monday }
