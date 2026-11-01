@@ -198,9 +198,10 @@ base images. The UI's development packages and the k3d images are `chore` commit
 Actions `ci` commits, which release nothing.
 
 The Security workflow's Released image job rescans the latest release's image every Monday, since
-advisories keep arriving after a release ships. When it fails, merge the open Dependabot pull requests (or update the
-affected dependency by hand), then merge the release pull request release-please opens. If no
-fixed version exists yet, accept the finding in `.trivyignore` with a reason and a review date.
+advisories keep arriving after a release ships. When it fails, merge the open Dependabot pull
+requests (or update the affected dependency by hand), then merge the release pull request
+release-please opens. If no fixed version exists yet, accept the finding in `.trivyignore` with a
+reason and a review date.
 
 Turn on **Dependabot security updates** in the repository settings, so a fix for a published
 advisory arrives straight away, grouped per ecosystem, instead of waiting for Monday.
