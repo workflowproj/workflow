@@ -41,11 +41,14 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
-      # Check against the Go release the image is built with (the Dockerfile's GO_IMAGE), since
-      # standard library fixes arrive in patch releases.
+      # Check against the Go release the image is built with (the Dockerfile's golang FROM line,
+      # which Dependabot keeps current), since standard library fixes arrive in patch releases.
       - name: Go version of the release build
         id: go
-        run: echo "version=$(sed -n 's/^ARG GO_IMAGE=golang:\([0-9.]*\)-.*/\1/p' Dockerfile)" >> "$GITHUB_OUTPUT"
+        run: |
+          version=$(sed -n 's/^FROM .*[ /]golang:\([0-9][0-9.]*\).*/\1/p' Dockerfile)
+          test -n "${version}" || { echo "::error file=Dockerfile::no golang FROM line"; exit 1; }
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-go@v7
         with:
           go-version: ${{ steps.go.outputs.version }}
@@ -244,6 +247,70 @@ jobs:
         with:
           sarif_file: trivy-image.sarif
           category: trivy-image
+
+  # trivy-image scans an image built from this commit, but people run the latest release, and new
+  # advisories for its base image, Go or the binary's modules appear after it ships. So each week
+  # (and on demand) the published image is scanned too. When this fails, merge the open Dependabot
+  # pull requests: Go, runtime npm and Dockerfile updates are fix(deps) commits, so release-please
+  # then proposes a patch release, and merging that publishes a fixed image. If no update fixes it
+  # yet, wait for one or accept the finding in .trivyignore with a reason.
+  trivy-release:
+    name: Released image (Trivy)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: read
+      security-events: write
+    env:
+      IMAGE: ghcr.io/workflowproj/workflow
+    steps:
+      - uses: actions/checkout@v7
+      # Releases are tagged vX.Y.Z and release.yml pushes the image as X.Y.Z.
+      - name: Latest release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag=$(gh release view --repo "${GITHUB_REPOSITORY}" --json tagName --jq .tagName)
+          echo "Scanning ${IMAGE}:${tag#v} (release ${tag})"
+          echo "image=${IMAGE}:${tag#v}" >> "$GITHUB_OUTPUT"
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Scan
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: ${{ env.TRIVY_VERSION }}
+          scan-type: image
+          image-ref: ${{ steps.release.outputs.image }}
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          format: table
+          trivyignores: .trivyignore
+      - name: Record for code scanning
+        if: always() && steps.release.outcome == 'success' && env.CAN_UPLOAD == 'true'
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: ${{ env.TRIVY_VERSION }}
+          scan-type: image
+          image-ref: ${{ steps.release.outputs.image }}
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          format: sarif
+          output: trivy-release.sarif
+          limit-severities-for-sarif: true
+          trivyignores: .trivyignore
+          skip-setup-trivy: true
+      - if: always() && env.CAN_UPLOAD == 'true' && hashFiles('trivy-release.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy-release.sarif
+          category: trivy-release
 
   dependency-review:
     name: New dependencies (dependency review)

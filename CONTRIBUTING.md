@@ -178,11 +178,44 @@ WFM_TEST_KEYCLOAK_URL=http://127.0.0.1:8180 go test ./internal/integration -run 
 | Secrets | `gitleaks` over the whole history; `.gitleaks.toml` allows the test fixtures by path |
 | UI dependencies | `npm audit`, failing on anything that ships in the UI bundle |
 | Trivy | Vulnerabilities in `go.mod` and `package-lock.json`, misconfigurations in the Dockerfile and the Helm chart, and the built image; accepted findings go in `.trivyignore` with a reason |
+| Released image | Weekly and on demand only: Trivy over the image of the latest release, as published on ghcr.io |
 | Dependency review | On pull requests, any new dependency with a known high or critical vulnerability |
 
-Findings show under the repository's Security tab. Dependabot (`.github/dependabot.yml`) proposes
-grouped weekly updates for Go modules, npm packages, GitHub Actions and the Dockerfile's base
-images. Run the quick scans locally with `make security-tools security`.
+Findings show under the repository's Security tab. Run the quick scans locally with
+`make security-tools security`.
+
+### Keeping dependencies current
+
+Every Monday Dependabot (`.github/dependabot.yml`) opens grouped pull requests: one each for the
+Go modules, the UI's runtime npm packages, its development npm packages, the GitHub Actions, the
+Dockerfile's base images and the k3d cluster's images. The Go and npm groups take minor and patch
+updates; anything else (a new major version of an npm package, say) arrives on its own. They run
+through CI and the Security workflow like any other change.
+
+Updates to what ships in the image are `fix(deps)` commits, so merging them produces a patch
+release (see [Releases](#releases)): Go modules, the UI's runtime npm packages and the Dockerfile's
+base images. The UI's development packages and the k3d images are `chore` commits and GitHub
+Actions `ci` commits, which release nothing.
+
+The Security workflow's Released image job rescans the latest release's image every Monday, since
+advisories keep arriving after a release ships. When it fails, merge the open Dependabot pull
+requests (or update the affected dependency by hand), then merge the release pull request
+release-please opens. If no fixed version exists yet, accept the finding in `.trivyignore` with a
+reason and a review date.
+
+Turn on **Dependabot security updates** in the repository settings, so a fix for a published
+advisory arrives straight away, grouped per ecosystem, instead of waiting for Monday.
+
+These stay manual:
+
+- Major versions of the base and k3d images (Node 22 to 24, PostgreSQL 17 to 18), and the Alpine
+  release in the Node and Go image tags (`-alpine3.24`), which Dependabot keeps as it is.
+- The k3s version in `deploy/k3d/cluster.yaml` beyond patch releases: a k3s minor release is a new
+  Kubernetes version, so move it with the version CI validates the chart against.
+- The CloudNativePG PostgreSQL image in the chart (`database.cnpg.imageName` in
+  `deploy/helm/wfm/values.yaml`), which Dependabot doesn't detect.
+- Tool versions pinned in the workflows' `env:` blocks (Trivy, govulncheck, gosec, gitleaks, Helm,
+  kubeconform, k3d) and in the `Makefile`.
 
 ### Releases
 
