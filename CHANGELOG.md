@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.4.0](https://github.com/workflowproj/workflow/compare/v0.3.0...v0.4.0) (2026-11-01)
+
+
+### Features
+
+* **planning:** programmes — initiatives across team projects, with a roadmap, timeline and dependencies ([#27](https://github.com/workflowproj/workflow/issues/27)) ([c1e9d1b](https://github.com/workflowproj/workflow/commit/c1e9d1b7054dfe60cf8b86c5afd2fd8d803cb829))
+
+
+### Bug Fixes
+
+* **search:** resolve issue keys only in projects the caller can browse ([#25](https://github.com/workflowproj/workflow/issues/25)) ([51e7f1f](https://github.com/workflowproj/workflow/commit/51e7f1fecd314d96dedbb35b712215340968e1a1))
+* **ui:** include the visible text in accessible names (WCAG 2.5.3) ([#28](https://github.com/workflowproj/workflow/issues/28)) ([9c769dc](https://github.com/workflowproj/workflow/commit/9c769dc7307ce157c60a0d73bc07dda98920f60b))
+
 ## [0.3.0](https://github.com/workflowproj/workflow/compare/v0.2.0...v0.3.0) (2026-10-29)
 
 
