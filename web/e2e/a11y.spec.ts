@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
-import { api, projectKey, signIn } from "./helpers";
+import { api, projectKey, run, signIn } from "./helpers";
 
 // Accessibility: every main page (the admin pages need the first user, an organisation admin), in light and dark mode, has no serious or critical axe
 // violations against WCAG 2.1 A/AA. Less severe findings are printed for follow-up.
@@ -55,6 +55,8 @@ test("accessibility: main pages in light and dark mode", async ({ page, browser 
       { id: "l", type: "issue_list", width: 2, config: { projectKeys: [key] } },
     ],
   });
+  // A saved timeline of the project.
+  const timeline = await a.post("/timeline-views", { name: `Accessible ${key}`, projects: [key] });
   // A programme with the project as a team: an initiative with the project's epic under it, and a
   // cross-team dependency from the programme's action to the story.
   const prog = projectKey("AXPG");
@@ -115,7 +117,8 @@ test("accessibility: main pages in light and dark mode", async ({ page, browser 
     ["search", `/issues?jql=${encodeURIComponent(`project = ${key}`)}`],
     ["dashboards", "/dashboards"],
     ["dashboard", `/dashboards/${dashboard.id}`],
-    ["big picture", "/timeline"],
+    ["timeline of chosen projects", `/timeline?projects=${key}`],
+    ["saved timeline", `/timeline?view=${timeline.id}`],
     ["programme roadmap", `/projects/${prog}/roadmap?done=true`],
     ["programme timeline", `/projects/${prog}/timeline`],
     ["programme dependencies", `/projects/${prog}/dependencies`],
@@ -168,7 +171,23 @@ test("accessibility: main pages in light and dark mode", async ({ page, browser 
     await page.getByRole("button", { name: "Release", exact: true }).click();
     await expect(page.getByRole("dialog", { name: "Release 1.0" }).getByText(/not done/)).toBeVisible();
     await audit(page, `release dialog (${theme})`);
+    // The saved timeline's edit dialog.
+    await page.goto(`/timeline?view=${timeline.id}`);
+    await page.getByRole("button", { name: "Edit", exact: true }).click();
+    await expect(page.getByRole("dialog", { name: "Edit timeline" })).toBeVisible();
+    await audit(page, `edit timeline dialog (${theme})`);
   }
+  // The Timeline page for someone without saved timelines: what timelines are, and the project picker.
+  const fresh = await browser.newContext();
+  const newcomer = await fresh.newPage();
+  await signIn(newcomer, `e2e-a11y-${run.toLowerCase()}@example.com`, "Nia Newcomer");
+  for (const theme of ["light", "dark"] as const) {
+    await newcomer.evaluate((t) => localStorage.setItem("wfm.theme", t), theme);
+    await newcomer.goto("/timeline");
+    await expect(newcomer.getByText("Timelines show a group of projects together")).toBeVisible();
+    await audit(newcomer, `timeline without saved timelines (${theme})`);
+  }
+  await fresh.close();
   // The help centre's sign-up page, signed out.
   const anonDesk = await browser.newContext();
   const visitor = await anonDesk.newPage();

@@ -30,8 +30,9 @@ type Timeline struct {
 	Truncated bool
 }
 
-// TimelineQuery chooses what a timeline shows: the projects with Keys (every browsable project
-// when empty), or a programme's initiatives and the teams the actor can browse.
+// TimelineQuery chooses what a timeline shows: the projects with Keys, or a programme's
+// initiatives and the teams the actor can browse. One of the two is required: a timeline is
+// always of chosen projects, never of every project at once.
 type TimelineQuery struct {
 	Keys      []string
 	Programme string
@@ -49,13 +50,22 @@ type ProjectRelease struct {
 	Release    dbq.ListReleasesRow
 }
 
-// Timeline loads the given projects (all browsable ones when keys is empty). Sub-tasks, risks and
-// decisions are left out, and so are issues resolved more than doneDays ago.
+// Timeline loads the given projects or programme. Sub-tasks, risks and decisions are left out, and
+// so are issues resolved more than doneDays ago.
 func (s *Service) Timeline(ctx context.Context, actor *authz.Actor, tq TimelineQuery) (Timeline, error) {
 	var out Timeline
 	var err error
 	jql, doneDays := tq.JQL, tq.DoneDays
+	hasKeys := false
+	for _, k := range tq.Keys {
+		if strings.TrimSpace(k) != "" {
+			hasKeys = true
+			break
+		}
+	}
 	switch {
+	case tq.Programme == "" && !hasKeys:
+		return out, apperr.Invalid("projects", "choose projects or a programme")
 	case tq.Programme != "" && len(tq.Keys) > 0:
 		return out, apperr.Invalid("programme", "choose a programme or projects, not both")
 	case tq.Programme != "":

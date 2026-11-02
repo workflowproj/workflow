@@ -126,7 +126,7 @@ export function Timeline({
         </div>
         {data && <Stats counts={counts} />}
         {data?.truncated && (
-          <Notice tone="warning">The timeline shows the first 2,000 issues only. Narrow it with the project picker or a filter.</Notice>
+          <Notice tone="warning">The timeline shows the first 2,000 issues only. Choose fewer projects, or narrow it with a filter.</Notice>
         )}
         {data && data.issues.length > 0 && sched.size === 0 && (
           <Notice tone="info">

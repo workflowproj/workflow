@@ -78,12 +78,25 @@ curl -G $WFM/api/v1/search -H "Authorization: Bearer $T" \
 
 `GET /api/v1/timeline?projects=PLAT,OPS&jql=…&doneDays=90` returns what the timeline draws:
 epics and standard issues (not sub-tasks) with their dates and parents, the `blocks` dependencies
-between them (`sourceKey` blocks `targetKey`), and each project's sprints and releases. Omit
-`projects` for every project you can browse, or pass `programme=CHK` instead for a programme's
-initiatives and the team projects you can browse. `externalLinks` lists `blocks` links to
-unfinished issues the timeline doesn't show, naming the other issue only when you can browse it. Change dates with
-`PATCH /issues/{key}` (`startDate`, `dueDate`) and add dependencies with
-`POST /issues/{key}/links` (`type: blocks`).
+between them (`sourceKey` blocks `targetKey`), and each project's sprints and releases. Pass
+`programme=CHK` instead of `projects` for a programme's initiatives and the team projects you can
+browse. One or the other is required: a request without either gets 400. `externalLinks` lists
+`blocks` links to unfinished issues the timeline doesn't show, naming the other issue only when
+you can browse it. Change dates with `PATCH /issues/{key}` (`startDate`, `dueDate`) and add
+dependencies with `POST /issues/{key}/links` (`type: blocks`).
+
+Saved timelines ([timeline.md](timeline.md)) are named groups of projects:
+
+| Endpoint | Does |
+|---|---|
+| `GET /timeline-views` | Your timelines and the ones shared with everyone |
+| `POST /timeline-views` | Saves one: `{"name": "Payments teams", "description": "", "shared": false, "projects": ["PLAT", "WEB"]}` (1–50 project keys, no programmes) |
+| `GET /timeline-views/{id}` | One timeline |
+| `PUT /timeline-views/{id}` | Changes it (the owner, or an organisation admin for a shared one). Projects you can't browse stay in it |
+| `DELETE /timeline-views/{id}` | Deletes it (same rule) |
+
+Each lists only the `projects` you can browse; `hiddenProjects` counts the rest. To draw one, pass
+its project keys to `GET /timeline?projects=…`.
 
 ## Programmes
 

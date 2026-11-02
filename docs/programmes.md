@@ -109,7 +109,11 @@ then lists, team by team, the epics under no initiative and issues with no epic.
 
 Dependency arrows work across teams. An issue that blocks, or is blocked by, an issue the
 timeline doesn't show gets a warning naming it, or saying it is in a project the viewer can't
-browse. Everything else works as on a project's timeline; the API is in [api.md](api.md#timeline).
+browse. Everything else works as on a project's timeline ([timeline.md](timeline.md)); the API
+is in [api.md](api.md#timeline).
+
+To plan a few teams together without initiatives, use a [saved timeline](timeline.md#saved-timelines)
+instead.
 
 ## Dependencies
 

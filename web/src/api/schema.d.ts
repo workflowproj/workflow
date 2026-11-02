@@ -1911,11 +1911,52 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Epics and issues with dates, dependencies, sprints and releases across one or more projects */
+        /**
+         * Epics and issues with dates, dependencies, sprints and releases across one or more projects
+         * @description A timeline is always of chosen projects or a programme: give `projects` (for example a saved timeline's projects) or `programme`. Without either, the request is refused.
+         */
         get: operations["getTimeline"];
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/timeline-views": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Your saved timelines and those shared with everyone */
+        get: operations["listTimelineViews"];
+        put?: never;
+        /** Save a timeline for a group of projects */
+        post: operations["createTimelineView"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/timeline-views/{viewId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getTimelineView"];
+        /**
+         * Change a saved timeline (its owner, or an org admin for a shared one)
+         * @description Replaces the name, description, sharing and projects. The timeline's projects that you can't browse stay in it, after the ones you give.
+         */
+        put: operations["updateTimelineView"];
+        post?: never;
+        delete: operations["deleteTimelineView"];
         options?: never;
         head?: never;
         patch?: never;
@@ -4906,6 +4947,28 @@ export interface components {
             jql: string;
             shared?: boolean;
         };
+        /** @description A saved timeline, as the caller sees it. */
+        TimelineView: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            description: string;
+            /** @description Shared with everyone; each person still sees only the projects they can browse */
+            shared: boolean;
+            mine: boolean;
+            owner: components["schemas"]["User"];
+            /** @description The timeline's projects that the caller can browse, in its order */
+            projects: components["schemas"]["ProjectRef"][];
+            /** @description How many of the timeline's projects the caller can't browse */
+            hiddenProjects: number;
+        };
+        TimelineViewInput: {
+            name: string;
+            description?: string;
+            shared?: boolean;
+            /** @description Project keys, in order (1 to 50; not programmes, which have their own timeline) */
+            projects: string[];
+        };
         FieldDefinition: {
             /** Format: uuid */
             id: string;
@@ -6051,6 +6114,7 @@ export interface components {
         LinkId: string;
         AttachmentId: string;
         FilterId: string;
+        TimelineViewId: string;
         ConnectionId: string;
         RepositoryId: string;
         RuleId: string;
@@ -9717,9 +9781,9 @@ export interface operations {
     getTimeline: {
         parameters: {
             query?: {
-                /** @description Comma-separated project keys; omit for every project you can browse */
+                /** @description Comma-separated project keys (required unless programme is given) */
                 projects?: string;
-                /** @description A programme's key: its initiatives and the team projects you can browse (not with projects) */
+                /** @description A programme's key: its initiatives and the team projects you can browse (instead of projects) */
                 programme?: string;
                 /** @description Optional extra query filter (e.g. assignee = currentUser()) */
                 jql?: string;
@@ -9740,6 +9804,123 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Timeline"];
                 };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listTimelineViews: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Saved timelines by name. Each lists only the projects you can browse. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TimelineView"][];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    createTimelineView: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TimelineViewInput"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TimelineView"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getTimelineView: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                viewId: components["parameters"]["TimelineViewId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The saved timeline */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TimelineView"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    updateTimelineView: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                viewId: components["parameters"]["TimelineViewId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TimelineViewInput"];
+            };
+        };
+        responses: {
+            /** @description Updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TimelineView"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    deleteTimelineView: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                viewId: components["parameters"]["TimelineViewId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             default: components["responses"]["Problem"];
         };

@@ -484,8 +484,14 @@ func TestTimeline(t *testing.T) {
 		Truncated bool  `json:"truncated"`
 	}
 	var tl timeline
-	bob.get("/api/v1/timeline", &tl)
-	eq(t, len(tl.Projects), 2, "only browsable projects")
+	// A timeline is always of chosen projects (or a programme), never of every project at once.
+	r := bob.do("GET", "/api/v1/timeline", nil)
+	eq(t, r.Status, 400, "no scope")
+	if !strings.Contains(string(r.Body), "choose projects or a programme") {
+		t.Errorf("a timeline without a scope should say why: %s", r.Body)
+	}
+	bob.get("/api/v1/timeline?projects=APP,API", &tl)
+	eq(t, len(tl.Projects), 2, "the chosen projects")
 	// Grouped by project in project order, rank order within a project.
 	want := map[string][]string{"APP": {str(epic, "key"), str(ui, "key")}, "API": {str(endpoint, "key"), str(done, "key")}}
 	var expected []string
@@ -512,8 +518,8 @@ func TestTimeline(t *testing.T) {
 	// Filters.
 	ada.get("/api/v1/timeline?projects=API&doneDays=0", &tl)
 	sameStrings(t, keys(tl.Issues), []string{str(endpoint, "key")}, "recently resolved issues can be hidden")
-	bob.get("/api/v1/timeline?jql="+url.QueryEscape("assignee = currentUser()"), &tl)
+	bob.get("/api/v1/timeline?projects=APP,API&jql="+url.QueryEscape("assignee = currentUser()"), &tl)
 	sameStrings(t, keys(tl.Issues), []string{str(ui, "key")}, "JQL filter")
 	bob.must("GET", "/api/v1/timeline?projects=SEC", nil, 404, nil)
-	ada.must("GET", "/api/v1/timeline?jql="+url.QueryEscape("assignee =="), nil, 400, nil)
+	ada.must("GET", "/api/v1/timeline?projects=APP&jql="+url.QueryEscape("assignee =="), nil, 400, nil)
 }

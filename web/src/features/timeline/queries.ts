@@ -5,8 +5,8 @@ import { useToast } from "@/components/ui";
 import { epicProgress, withDates, type TimelineData, type TimelineLink } from "./model";
 
 /**
- * projects is a comma list ("" = every project the viewer can browse); a programme's key instead
- * shows its initiatives and the team projects the viewer can browse.
+ * projects is a comma list of project keys; a programme's key instead shows its initiatives and
+ * the team projects the viewer can browse. The API needs one or the other.
  */
 export const timelineQuery = (projects: string, jql: string, doneDays: number, programme?: string) =>
   queryOptions({

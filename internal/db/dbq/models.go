@@ -775,6 +775,22 @@ type Status struct {
 	CreatedAt time.Time
 }
 
+type TimelineView struct {
+	ID          uuid.UUID
+	OwnerID     uuid.UUID
+	Name        string
+	Description string
+	Shared      bool
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
+type TimelineViewProject struct {
+	ViewID    uuid.UUID
+	ProjectID uuid.UUID
+	Position  int32
+}
+
 type User struct {
 	ID               uuid.UUID
 	Kind             string
