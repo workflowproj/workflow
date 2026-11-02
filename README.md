@@ -49,7 +49,8 @@ feature gates and no licence keys.
 - **Workflows as code**: versioned YAML with CEL conditions and validators, transition screens and
   post-functions, edited visually or applied from CI.
 - **Boards and planning**: Scrum and Kanban boards with WIP limits and swimlanes, a ranked backlog,
-  sprints, releases and a timeline across projects, updated live.
+  sprints, releases, and timelines for a project, a programme or a saved group of projects,
+  updated live.
 - **Releases**: a page per release with progress, a burnup and readiness checks before you ship,
   release notes generated from done issues and published to the help centre, Git tags and the
   environments a release reached.
@@ -126,6 +127,7 @@ The reference pages live in [`docs/`](docs/) and are published at
 | [Workflows as code](docs/workflows.md) | The YAML format, CEL reference, versioning and migration |
 | [Releases](docs/releases.md) | Release pages, readiness, release notes and What's new, tags and deployments |
 | [Programmes](docs/programmes.md) | Initiatives across team projects: the roadmap, forecasts, cross-team dependencies |
+| [Timelines](docs/timeline.md) | Project, programme and saved timelines: dates, dependencies and sharing |
 | [Search](docs/search.md) | The query language |
 | [Risks and decisions](docs/risks-decisions.md) | The risk register, the decision log, scoring and their links |
 | [Metrics and dashboards](docs/metrics.md) | Issue timing, sprint reports, flow metrics, dashboards |

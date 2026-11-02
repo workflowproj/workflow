@@ -44,7 +44,7 @@ const cases = [
   ["issue metrics", `/issues/SCRA-10050/metrics`],
   ["epic issue (children)", `/issues/SCRA-67`],
   ["timeline project", `/timeline?projects=SCRA`],
-  ["timeline all projects", `/timeline`],
+  ["timeline 5 projects", `/timeline?projects=${P}`],
   ["metrics summary 5 projects", `/metrics/summary?projects=${P}&days=30`],
   ["metrics flow 90d", `/metrics/flow?projects=${P}&days=90`],
   ["metrics flow by status 365d", `/metrics/flow?projects=SCRA&days=365&by=status`],

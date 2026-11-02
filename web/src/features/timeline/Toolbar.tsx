@@ -5,6 +5,7 @@ import { projectsQuery } from "@/api/queries";
 import { Button, MenuLabel, Popover } from "@/components/ui";
 import { ProjectAvatar } from "@/layout/AppShell";
 import { cn } from "@/lib/cn";
+import { isProgramme } from "@/lib/project";
 import { ZOOMS, type Zoom } from "./scale";
 
 export type QuickFilters = { overdue: boolean; conflicts: boolean; mine: boolean };
@@ -71,10 +72,26 @@ export function ZoomSwitch({ zoom, onChange, onToday }: { zoom: Zoom; onChange: 
   );
 }
 
-/** ProjectPicker chooses which projects the big-picture timeline shows (none = all). */
-export function ProjectPicker({ value, onChange }: { value: string[]; onChange: (keys: string[]) => void }) {
-  const { data: projects = [] } = useQuery(projectsQuery);
-  const label = value.length === 0 ? "All projects" : value.length === 1 ? (projects.find((p) => p.key === value[0])?.name ?? value[0]) : `${value.length} projects`;
+/**
+ * ProjectPicker chooses projects: for a dashboard gadget (none = all), or for the Timeline page,
+ * which always shows chosen projects (`allowAll={false}`) and leaves programmes to their own
+ * timelines (`excludeProgrammes`).
+ */
+export function ProjectPicker({
+  value,
+  onChange,
+  allowAll = true,
+  excludeProgrammes = false,
+}: {
+  value: string[];
+  onChange: (keys: string[]) => void;
+  allowAll?: boolean;
+  excludeProgrammes?: boolean;
+}) {
+  const { data: all = [] } = useQuery(projectsQuery);
+  const projects = excludeProgrammes ? all.filter((p) => !isProgramme(p)) : all;
+  const none = allowAll ? "All projects" : "Choose projects";
+  const label = value.length === 0 ? none : value.length === 1 ? (projects.find((p) => p.key === value[0])?.name ?? value[0]) : `${value.length} projects`;
   const toggle = (key: string) => onChange(value.includes(key) ? value.filter((k) => k !== key) : [...value, key]);
   return (
     <Popover
@@ -93,9 +110,11 @@ export function ProjectPicker({ value, onChange }: { value: string[]; onChange: 
       )}
       content={() => (
         <div role="menu" className="max-h-80 w-64 overflow-y-auto">
-          <MenuItemCheck checked={value.length === 0} onClick={() => onChange([])}>
-            All projects
-          </MenuItemCheck>
+          {allowAll && (
+            <MenuItemCheck checked={value.length === 0} onClick={() => onChange([])}>
+              All projects
+            </MenuItemCheck>
+          )}
           <MenuLabel>Projects</MenuLabel>
           {projects.map((p) => (
             <MenuItemCheck key={p.id} checked={value.includes(p.key)} onClick={() => toggle(p.key)}>

@@ -162,8 +162,8 @@ const projectIssuesRoute = createRoute({
   validateSearch: (s: Record<string, unknown>): { jql?: string; issue?: string } => ({ jql: str(s.jql), issue: str(s.issue) }),
   component: ProjectIssuesPage,
 });
-export type TimelineSearch = { projects?: string; jql?: string; issue?: string };
-const timelineSearch = (s: Record<string, unknown>): TimelineSearch => ({ projects: str(s.projects), jql: str(s.jql), issue: str(s.issue) });
+export type TimelineSearch = { view?: string; projects?: string; jql?: string; issue?: string };
+const timelineSearch = (s: Record<string, unknown>): TimelineSearch => ({ view: str(s.view), projects: str(s.projects), jql: str(s.jql), issue: str(s.issue) });
 const projectTimelineRoute = createRoute({
   getParentRoute: () => projectRoute,
   path: "/timeline",

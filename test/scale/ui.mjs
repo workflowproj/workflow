@@ -14,7 +14,7 @@ const pages = [
   ["backlog kanban", "/projects/KANA/backlog", "[data-issue-key]"],
   ["issues", "/projects/SCRA/issues", "table tbody tr"],
   ["timeline", "/projects/SCRA/timeline", "[data-row-key]"],
-  ["big picture", "/timeline", "[data-row-key]"],
+  ["timeline 5 projects", "/timeline?projects=SCRA,SCRB,SCRC,KANA,KANB", "[data-row-key]"],
   ["issue", "/browse/SCRA-10050", "h1"],
   ["reports", "/projects/SCRA/reports", "svg"],
 ];
